@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* LocationSidebar (apps/web/app/page.tsx) animates via Tailwind
+ * translate/opacity transitions driven by its own `shown` state — no
+ * keyframes needed. The drawer slides in from the left on open and back
+ * out on close; the backdrop fades in/out with it. */
+
+/* Same setup as apps/owner/app/globals.css's Icon component. */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}
+

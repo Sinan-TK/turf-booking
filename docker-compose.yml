@@ -1,0 +1,34 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: turf
+      POSTGRES_PASSWORD: turf
+      POSTGRES_DB: turf_booking
+    ports:
+      - "5432:5432"
+    volumes:
+      - turf_postgres_data:/var/lib/postgresql/data
+      - ./packages/database/docker/init-extensions.sql:/docker-entrypoint-initdb.d/init-extensions.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U turf -d turf_booking"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  turf_postgres_data:

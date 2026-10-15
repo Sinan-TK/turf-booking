@@ -1,0 +1,15 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "RAILPACK",
+    "buildCommand": "pnpm db:generate && pnpm --filter @venue/shared build && pnpm --filter @venue/config build && pnpm --filter @venue/database build && pnpm --filter @venue/api build"
+  },
+  "deploy": {
+    "preDeployCommand": "pnpm --filter @venue/database migrate:deploy",
+    "startCommand": "node apps/api/dist/main.js",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 60,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 5
+  }
+}

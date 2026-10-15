@@ -1,0 +1,33 @@
+{
+  "name": "@venue/database",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "generate": "prisma generate",
+    "migrate": "prisma migrate deploy",
+    "migrate:dev": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "studio": "prisma studio",
+    "seed": "tsx prisma/seed.ts",
+    "seed:identity": "tsx prisma/seed-identity.ts",
+    "provision:admin": "tsx prisma/provision-admin.ts",
+    "backfill:availability": "tsx prisma/backfill-availability.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.20.0",
+    "@venue/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.10",
+    "prisma": "^5.20.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3"
+  }
+}

@@ -1,0 +1,45 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build outputs
+dist/
+build/
+.next/
+out/
+.turbo/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# editors / os
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+
+# testing
+coverage/
+
+# prisma
+packages/database/prisma/generated/
+
+# local Redis dumps (created if a dev-machine redis-server saves its
+# working directory snapshot inside a package folder)
+dump.rdb
+
+# misc
+*.tsbuildinfo
+
+.claude
+.impeccable
+
+# local agent workspace
+.superpowers/
