@@ -190,6 +190,7 @@ enum CustomerSessionSourceLinkType {
   BOOKING
   MY_BOOKINGS
   PROFILE
+  LOGIN
 }
 
 /// Auth mechanism for the customer web app — a server-side session, not a
@@ -208,6 +209,21 @@ model CustomerSession {
 
   @@index([customerId])
   @@map("customer_sessions")
+}
+
+/// One-time phone login codes for the customer website. The code itself is
+/// never stored — only an HMAC of (phone, code). Single use via consumedAt.
+model LoginCode {
+  id         String    @id @default(uuid()) @db.Uuid
+  phone      String
+  codeHash   String
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([phone, createdAt])
+  @@map("login_codes")
 }
 
 // =====================================================================
