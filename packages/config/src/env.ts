@@ -47,7 +47,19 @@ const envSchema = z.object({
 
   // Customer server-side sessions
   CUSTOMER_SESSION_SECRET: z.string().min(32),
-  CUSTOMER_SESSION_TTL_HOURS: z.coerce.number().int().positive().default(6),
+  CUSTOMER_SESSION_TTL_HOURS: z.coerce.number().int().positive().default(168),
+
+  // Customer login codes (phone number + one-time code). "log" prints the
+  // code in the server log instead of sending it — development only.
+  AUTH_OTP_DELIVERY: z.enum(['whatsapp', 'log']).default('whatsapp'),
+  OTP_TTL_MINUTES: z.coerce.number().int().positive().default(5),
+  OTP_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
+  OTP_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().nonnegative().default(30),
+  OTP_MAX_CODES_PER_HOUR: z.coerce.number().int().positive().default(5),
+  DEFAULT_COUNTRY_CODE: z.string().regex(/^\d{1,3}$/).default('91'),
+  // Approved WhatsApp authentication template carrying the code; when unset
+  // the code is sent as a plain text message.
+  WHATSAPP_OTP_TEMPLATE: optionalString(z.string().min(1)),
 
   // BookingSession / SlotHold durations (minutes) — configurable, not hardcoded
   BOOKING_SESSION_TTL_MINUTES: z.coerce.number().int().positive().default(20),
@@ -103,6 +115,14 @@ const productionChecks = envSchema.superRefine((env, ctx) => {
         message: 'must be an exact https origin with no path or trailing slash in production',
       });
     }
+  }
+
+  if (env.AUTH_OTP_DELIVERY === 'log') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['AUTH_OTP_DELIVERY'],
+      message: 'log is development only; use whatsapp in production',
+    });
   }
 
   const secrets = ['CUSTOMER_SESSION_SECRET', 'AUTH_JWT_SECRET'] as const;
