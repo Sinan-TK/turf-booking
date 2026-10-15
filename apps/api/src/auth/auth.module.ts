@@ -7,6 +7,9 @@ import { CustomerSessionService } from './customer-session.service';
 import { AuthGuard } from './guards/auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { IdentityModule } from '../identity/identity.module';
+import { CustomersModule } from '../customers/customers.module';
+import { CustomerMessagingModule } from '../customer-messaging/customer-messaging.module';
+import { CustomerOtpService } from './customer-otp.service';
 
 /**
  * @Global so AuthGuard/CustomerSessionService/IdentityService are
@@ -15,9 +18,9 @@ import { IdentityModule } from '../identity/identity.module';
  */
 @Global()
 @Module({
-  imports: [IdentityModule],
+  imports: [IdentityModule, CustomersModule, CustomerMessagingModule],
   controllers: [AdminAuthController, OwnerAuthController, StaffAuthController],
-  providers: [CustomerSessionService, StaffAuthService, AuthGuard, RolesGuard],
-  exports: [CustomerSessionService, AuthGuard, RolesGuard, IdentityModule],
+  providers: [CustomerSessionService, CustomerOtpService, StaffAuthService, AuthGuard, RolesGuard],
+  exports: [CustomerSessionService, CustomerOtpService, AuthGuard, RolesGuard, IdentityModule],
 })
 export class AuthModule {}
