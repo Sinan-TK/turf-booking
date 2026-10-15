@@ -3,10 +3,10 @@ import { CoinsService } from './coins.service';
 import { CoinsController } from './coins.controller';
 import { COINS_REPOSITORY } from './coins.repository';
 import { PrismaCoinsRepository } from './prisma-coins.repository';
-import { WhatsAppClientModule } from '../whatsapp/whatsapp-client.module';
+import { CustomerMessagingModule } from '../customer-messaging/customer-messaging.module';
 
 @Module({
-  imports: [WhatsAppClientModule],
+  imports: [CustomerMessagingModule],
   controllers: [CoinsController],
   providers: [
     CoinsService,

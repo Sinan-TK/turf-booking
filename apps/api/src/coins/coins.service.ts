@@ -7,7 +7,7 @@ import {
   SLOT_HOLD_TRANSITIONS,
 } from '@venue/shared';
 import { AuditService } from '../audit/audit.service';
-import { WhatsAppClientService } from '../whatsapp/whatsapp-client.service';
+import { CUSTOMER_MESSENGER, type CustomerMessenger } from '../customer-messaging/customer-messenger.port';
 import type { AuthContext } from '../auth/auth.types';
 import { COINS_REPOSITORY, type CoinsRepository } from './coins.repository';
 
@@ -16,7 +16,7 @@ export class CoinsService {
   constructor(
     @Inject(COINS_REPOSITORY) private readonly coins: CoinsRepository,
     private readonly audit: AuditService,
-    private readonly whatsapp: WhatsAppClientService,
+    @Inject(CUSTOMER_MESSENGER) private readonly messenger: CustomerMessenger,
   ) {}
 
   async getWallet(customerId: string) {
@@ -78,11 +78,8 @@ export class CoinsService {
     // bug that pattern fixes.
     const customer = await this.coins.findCustomerById(actor.id);
     if (customer) {
-      await this.whatsapp
-        .sendText(
-          customer.whatsappNumber,
-          `✅ Payment received! Booking ${booking.orderId} is confirmed. See you on the venue!`,
-        )
+      await this.messenger
+        .bookingConfirmed(customer.whatsappNumber, booking.orderId)
         .catch(() => undefined);
     }
 

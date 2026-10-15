@@ -6,10 +6,10 @@ import { PAYMENT_PROVIDER } from './payment-provider.interface';
 import { PAYMENTS_REPOSITORY } from './payments.repository';
 import { PrismaPaymentsRepository } from './prisma-payments.repository';
 import { CoinsModule } from '../coins/coins.module';
-import { WhatsAppClientModule } from '../whatsapp/whatsapp-client.module';
+import { CustomerMessagingModule } from '../customer-messaging/customer-messaging.module';
 
 @Module({
-  imports: [CoinsModule, WhatsAppClientModule],
+  imports: [CoinsModule, CustomerMessagingModule],
   controllers: [PaymentsController, AdminPaymentsController, OwnerPaymentsController],
   providers: [
     PaymentsService,

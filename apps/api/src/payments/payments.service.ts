@@ -19,7 +19,7 @@ import { AuditService } from '../audit/audit.service';
 import { PAYMENT_PROVIDER, type PaymentProvider } from './payment-provider.interface';
 import { PAYMENTS_REPOSITORY, type PaymentsRepository } from './payments.repository';
 import { CoinsService } from '../coins/coins.service';
-import { WhatsAppClientService } from '../whatsapp/whatsapp-client.service';
+import { CUSTOMER_MESSENGER, type CustomerMessenger } from '../customer-messaging/customer-messenger.port';
 import { NotificationsService } from '../notifications/notifications.service';
 import type { AuthContext } from '../auth/auth.types';
 
@@ -32,7 +32,7 @@ export class PaymentsService {
     @Inject(PAYMENT_PROVIDER) private readonly provider: PaymentProvider,
     private readonly coins: CoinsService,
     private readonly audit: AuditService,
-    private readonly whatsapp: WhatsAppClientService,
+    @Inject(CUSTOMER_MESSENGER) private readonly messenger: CustomerMessenger,
     private readonly notifications: NotificationsService,
   ) {}
 
@@ -271,10 +271,7 @@ export class PaymentsService {
   private async notifyBookingConfirmed(customerId: string, orderId: string): Promise<void> {
     const customer = await this.payments.findCustomerById(customerId);
     if (!customer) return;
-    await this.whatsapp.sendText(
-      customer.whatsappNumber,
-      `✅ Payment received! Booking ${orderId} is confirmed. See you on the venue!`,
-    );
+    await this.messenger.bookingConfirmed(customer.whatsappNumber, orderId);
   }
 
   /** Platform-wide listing for the Super Admin Portal (§12). */

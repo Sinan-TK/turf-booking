@@ -18,7 +18,7 @@ import { BOOKINGS_REPOSITORY, type BookingsRepository } from './bookings.reposit
 import { PoliciesService } from '../policies/policies.service';
 import { AuditService } from '../audit/audit.service';
 import { CoinsService } from '../coins/coins.service';
-import { WhatsAppClientService } from '../whatsapp/whatsapp-client.service';
+import { CUSTOMER_MESSENGER, type CustomerMessenger } from '../customer-messaging/customer-messenger.port';
 import { CustomersService } from '../customers/customers.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -61,7 +61,7 @@ export class BookingsService {
     private readonly policies: PoliciesService,
     private readonly audit: AuditService,
     private readonly coins: CoinsService,
-    private readonly whatsapp: WhatsAppClientService,
+    @Inject(CUSTOMER_MESSENGER) private readonly messenger: CustomerMessenger,
     private readonly customers: CustomersService,
     private readonly notifications: NotificationsService,
     private readonly policyResolver: PolicyResolverService,
@@ -833,12 +833,10 @@ export class BookingsService {
   ): Promise<void> {
     const customer = await this.bookings.findCustomerById(customerId);
     if (!customer) return;
-    const refundLine = result.refund
-      ? `\n🪙 ${result.refund.coinAmountCredited} Coins credited.`
-      : '';
-    await this.whatsapp.sendText(
+    await this.messenger.bookingCancelled(
       customer.whatsappNumber,
-      `✅ Booking ${result.booking.orderId} cancelled.${refundLine}`,
+      result.booking.orderId,
+      result.refund ? result.refund.coinAmountCredited.toString() : undefined,
     );
   }
 }

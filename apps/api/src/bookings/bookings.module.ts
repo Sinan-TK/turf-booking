@@ -6,7 +6,7 @@ import { PrismaBookingsRepository } from './prisma-bookings.repository';
 import { ResourcesModule } from '../resources/resources.module';
 import { PoliciesModule } from '../policies/policies.module';
 import { CoinsModule } from '../coins/coins.module';
-import { WhatsAppClientModule } from '../whatsapp/whatsapp-client.module';
+import { CustomerMessagingModule } from '../customer-messaging/customer-messaging.module';
 import { CustomersModule } from '../customers/customers.module';
 import { SchedulingModule } from '../scheduling/scheduling.module';
 
@@ -15,7 +15,7 @@ import { SchedulingModule } from '../scheduling/scheduling.module';
     ResourcesModule,
     PoliciesModule,
     CoinsModule,
-    WhatsAppClientModule,
+    CustomerMessagingModule,
     CustomersModule,
     SchedulingModule,
   ],
