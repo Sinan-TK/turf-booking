@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { AdminAuthController } from './admin-auth.controller';
 import { OwnerAuthController } from './owner-auth.controller';
 import { StaffAuthController } from './staff-auth.controller';
+import { CustomerAuthController } from './customer-auth.controller';
 import { StaffAuthService } from './staff-auth.service';
 import { CustomerSessionService } from './customer-session.service';
 import { AuthGuard } from './guards/auth.guard';
@@ -19,7 +20,7 @@ import { CustomerOtpService } from './customer-otp.service';
 @Global()
 @Module({
   imports: [IdentityModule, CustomersModule, CustomerMessagingModule],
-  controllers: [AdminAuthController, OwnerAuthController, StaffAuthController],
+  controllers: [AdminAuthController, OwnerAuthController, StaffAuthController, CustomerAuthController],
   providers: [CustomerSessionService, CustomerOtpService, StaffAuthService, AuthGuard, RolesGuard],
   exports: [CustomerSessionService, CustomerOtpService, AuthGuard, RolesGuard, IdentityModule],
 })
