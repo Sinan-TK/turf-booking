@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useFetch } from '@/lib/use-fetch';
 import { api, ApiError } from '@/lib/api';
 import { Button, Card, ErrorBanner, Input, Label, PageHeader, Select, SkeletonText } from '@/components/ui';
+import { Pagination, usePageSlice } from '@/components/pagination';
 
 interface State {
   id: string;
@@ -23,6 +24,8 @@ export default function LocationsPage() {
   const { data: districts, refetch: refetchDistricts } = useFetch<District[]>(
     stateId ? `/districts?stateId=${stateId}` : null,
   );
+
+  const districtPage = usePageSlice(districts ?? [], 10, stateId);
 
   const [districtForm, setDistrictForm] = useState({ name: '', code: '', timezone: 'Asia/Kolkata' });
   const [districtError, setDistrictError] = useState<string | null>(null);
@@ -88,7 +91,7 @@ export default function LocationsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {districts.map((d) => (
+                  {districtPage.rows.map((d) => (
                     <tr key={d.id} className="border-b border-gray-100 last:border-0">
                       <td className="py-2 font-medium">{d.name}</td>
                       <td className="py-2 font-mono text-xs">{d.code}</td>
@@ -97,6 +100,7 @@ export default function LocationsPage() {
                   ))}
                 </tbody>
               </table>
+              <Pagination page={districtPage.page} pageSize={10} total={districtPage.total} onPage={districtPage.setPage} />
             </div>
           )}
 

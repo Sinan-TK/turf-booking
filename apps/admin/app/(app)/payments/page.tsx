@@ -2,8 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useFetch } from '@/lib/use-fetch';
-import { Badge, Card, EmptyState, ErrorBanner, PageHeader, Select, SkeletonTable } from '@/components/ui';
+import { usePagedFetch, PAGE_SIZE } from '@/lib/use-paged-fetch';
+import { Dropdown } from '@/components/dropdown';
+import { ListSection } from '@/components/list-section';
+import { Pagination } from '@/components/pagination';
+import { Badge, Card, EmptyState, ErrorBanner, SkeletonTable } from '@/components/ui';
 
 interface Payment {
   id: string;
@@ -16,33 +19,48 @@ interface Payment {
   booking: { id: string; orderId: string };
 }
 
-const STATUSES = ['', 'PENDING', 'SUCCESS', 'FAILED', 'REFUNDED'];
+const STATUS_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'PENDING', label: 'Pending' },
+  { value: 'SUCCESS', label: 'Success' },
+  { value: 'FAILED', label: 'Failed' },
+  { value: 'REFUNDED', label: 'Refunded' },
+];
 
 export default function PaymentsPage() {
   const [status, setStatus] = useState('');
-  const { data, error, loading } = useFetch<Payment[]>(
-    `/admin/payments?limit=100${status ? `&status=${status}` : ''}`,
+  const [page, setPage] = useState(1);
+  const { rows, total, error, loading } = usePagedFetch<Payment>(
+    '/admin/payments',
+    status ? `status=${status}` : '',
+    page,
   );
 
   return (
     <div>
-      <PageHeader
+      <ListSection
         title="Payments"
-        action={
-          <Select value={status} onChange={(e) => setStatus(e.target.value)} className="w-48">
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s || 'All statuses'}
-              </option>
-            ))}
-          </Select>
-        }
-      />
-      {loading && <SkeletonTable columns={7} />}
+        subtitle={loading && total === 0 ? 'Every payment on the platform.' : `${total} payment${total === 1 ? '' : 's'}${status ? ' match this filter' : ' on the platform'}.`}
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <Dropdown
+            label="Status"
+            value={status}
+            neutral=""
+            options={STATUS_OPTIONS}
+            onChange={(v) => {
+              setStatus(v);
+              setPage(1);
+            }}
+          />
+        </div>
+      </ListSection>
+
+      {loading && rows.length === 0 && <SkeletonTable columns={7} />}
       {error && <ErrorBanner message={error} />}
-      {data && data.length === 0 && <EmptyState message="No payments found." />}
-      {data && data.length > 0 && (
-        <Card className="overflow-x-auto p-0">
+      {!loading && !error && total === 0 && <EmptyState message="No payments found." />}
+      {rows.length > 0 && (
+        <Card className={`overflow-x-auto p-0 transition-opacity ${loading ? 'opacity-60' : ''}`}>
           <table className="w-full text-left text-sm">
             <thead className="border-b border-gray-200 bg-gray-50/70 text-xs font-medium uppercase tracking-wide text-gray-500">
               <tr>
@@ -56,7 +74,7 @@ export default function PaymentsPage() {
               </tr>
             </thead>
             <tbody>
-              {data.map((p) => (
+              {rows.map((p) => (
                 <tr key={p.id} className="border-b border-gray-100 last:border-0 transition-colors hover:bg-brand-50/40">
                   <td className="px-4 py-3 font-mono text-xs">{p.booking.orderId}</td>
                   <td className="px-4 py-3">{p.provider}</td>
@@ -69,10 +87,7 @@ export default function PaymentsPage() {
                   </td>
                   <td className="px-4 py-3 text-gray-600">{new Date(p.createdAt).toLocaleString()}</td>
                   <td className="px-4 py-3 text-right">
-                    <Link
-                      href={`/bookings/${p.booking.id}`}
-                      className="text-sm font-medium text-gray-900 hover:underline"
-                    >
+                    <Link href={`/bookings/${p.booking.id}`} className="text-sm font-medium text-gray-900 hover:underline">
                       View Booking →
                     </Link>
                   </td>
@@ -80,6 +95,7 @@ export default function PaymentsPage() {
               ))}
             </tbody>
           </table>
+          <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPage={setPage} />
         </Card>
       )}
     </div>

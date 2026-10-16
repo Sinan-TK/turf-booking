@@ -7,6 +7,7 @@ import { api, ApiError } from '@/lib/api';
 import { durationLabel, type AdminVenueCategory } from '@/lib/categories';
 import { Icon } from '@/components/icons';
 import { Dropdown } from '@/components/dropdown';
+import { Pagination, usePageSlice } from '@/components/pagination';
 import { Badge, Button, Card, EmptyState, ErrorBanner, Input, SkeletonTable } from '@/components/ui';
 
 type StatusFilter = 'all' | 'active' | 'inactive';
@@ -94,6 +95,7 @@ export default function VenueTypesPage() {
     return rows;
   }, [data, query, status, style, sort]);
 
+  const paged = usePageSlice(visible, 25, `${query}|${status}|${style}|${sort.key}|${sort.dir}`);
   const filtersActive = query.trim() !== '' || status !== 'all' || style !== 'all';
   const clearFilters = () => {
     setQuery('');
@@ -239,7 +241,7 @@ export default function VenueTypesPage() {
               </tr>
             </thead>
             <tbody>
-              {visible.map((c) => {
+              {paged.rows.map((c) => {
                 const busy = busyId === c.id;
                 return (
                   <tr
@@ -331,6 +333,7 @@ export default function VenueTypesPage() {
               })}
             </tbody>
           </table>
+          <Pagination page={paged.page} pageSize={25} total={paged.total} onPage={paged.setPage} />
         </Card>
       )}
     </div>

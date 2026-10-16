@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useFetch } from '@/lib/use-fetch';
 import type { VenueCategorySummary } from '@/lib/categories';
 import { Icon } from '@/components/icons';
 import { Dropdown } from '@/components/dropdown';
 import { SortHeader, type SortDir } from '@/components/sort-header';
+import { Pagination, usePageSlice } from '@/components/pagination';
 import { Badge, Button, Card, EmptyState, ErrorBanner, Input, SkeletonTable } from '@/components/ui';
 
 interface Venue {
@@ -44,7 +45,6 @@ export default function VenuesPage() {
   const [status, setStatus] = useState('all');
   const [type, setType] = useState('all');
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'name', dir: 'asc' });
-  const [page, setPage] = useState(1);
 
   const typeOptions = useMemo(() => {
     const names = new Map<string, string>();
@@ -81,12 +81,7 @@ export default function VenuesPage() {
     return rows;
   }, [data, query, status, type, sort]);
 
-  // Any change to what is shown starts again from the first page.
-  useEffect(() => setPage(1), [query, status, type, sort]);
-
-  const pageCount = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
-  const current = Math.min(page, pageCount);
-  const rows = visible.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+  const paged = usePageSlice(visible, PAGE_SIZE, `${query}|${status}|${type}|${sort.key}|${sort.dir}`);
   const filtersActive = query.trim() !== '' || status !== 'all' || type !== 'all';
   const activeCount = data?.filter((v) => v.status === 'ACTIVE').length ?? 0;
   const onSort = (key: SortKey) =>
@@ -186,7 +181,7 @@ export default function VenuesPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((venue) => (
+              {paged.rows.map((venue) => (
                 <tr key={venue.id} className="border-b border-gray-100 last:border-0 transition-colors hover:bg-brand-50/40">
                   <td className="px-4 py-3 font-mono text-xs">{venue.facilityCode}</td>
                   <td className="px-4 py-3 font-medium text-gray-900">{venue.name}</td>
@@ -205,32 +200,7 @@ export default function VenuesPage() {
             </tbody>
           </table>
 
-          {pageCount > 1 && (
-            <nav
-              aria-label="Pagination"
-              className="flex items-center justify-between gap-3 border-t border-gray-100 bg-gray-50/50 px-4 py-3 text-sm"
-            >
-              <span className="text-gray-500">
-                {(current - 1) * PAGE_SIZE + 1}–{Math.min(current * PAGE_SIZE, visible.length)} of {visible.length}
-              </span>
-              <div className="flex items-center gap-2">
-                <Button variant="secondary" className="px-3 py-1.5" disabled={current <= 1} onClick={() => setPage(current - 1)}>
-                  Previous
-                </Button>
-                <span className="text-gray-500">
-                  Page {current} of {pageCount}
-                </span>
-                <Button
-                  variant="secondary"
-                  className="px-3 py-1.5"
-                  disabled={current >= pageCount}
-                  onClick={() => setPage(current + 1)}
-                >
-                  Next
-                </Button>
-              </div>
-            </nav>
-          )}
+          <Pagination page={paged.page} pageSize={PAGE_SIZE} total={paged.total} onPage={paged.setPage} />
         </Card>
       )}
     </div>

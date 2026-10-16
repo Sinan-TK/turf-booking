@@ -1,9 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useFetch } from '@/lib/use-fetch';
-import { Card, EmptyState, ErrorBanner, Input, PageHeader, SkeletonTable } from '@/components/ui';
+import { usePagedFetch, PAGE_SIZE } from '@/lib/use-paged-fetch';
+import { Icon } from '@/components/icons';
+import { ListSection, FilterSummary } from '@/components/list-section';
+import { Pagination } from '@/components/pagination';
+import { Card, EmptyState, ErrorBanner, Input, SkeletonTable } from '@/components/ui';
 
 interface Customer {
   id: string;
@@ -16,28 +19,60 @@ interface Customer {
 
 export default function CustomersPage() {
   const [search, setSearch] = useState('');
-  const { data, error, loading } = useFetch<Customer[]>(
-    `/admin/customers${search ? `?search=${encodeURIComponent(search)}` : ''}`,
+  const [debounced, setDebounced] = useState('');
+  const [page, setPage] = useState(1);
+
+  // The directory is searched on the server; wait for a pause in typing.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setDebounced(search.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(id);
+  }, [search]);
+
+  const { rows, total, error, loading } = usePagedFetch<Customer>(
+    '/admin/customers',
+    debounced ? `search=${encodeURIComponent(debounced)}` : '',
+    page,
   );
 
   return (
     <div>
-      <PageHeader
+      <ListSection
         title="Customers"
-        action={
+        subtitle={loading && total === 0 ? 'Everyone who has booked or signed in.' : `${total} customer${total === 1 ? '' : 's'}${debounced ? ' match your search' : ''}.`}
+      >
+        <div className="relative max-w-xl">
+          <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input
-            placeholder="Search phone, name, or email…"
+            type="search"
+            placeholder="Search by phone, name or email…"
+            aria-label="Search customers"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-64"
+            className="h-10 pl-9"
           />
-        }
-      />
-      {loading && <SkeletonTable columns={5} />}
+        </div>
+        {debounced && (
+          <FilterSummary
+            shown={total}
+            total={total}
+            noun="customers"
+            onClear={() => {
+              setSearch('');
+              setDebounced('');
+              setPage(1);
+            }}
+          />
+        )}
+      </ListSection>
+
+      {loading && rows.length === 0 && <SkeletonTable columns={5} />}
       {error && <ErrorBanner message={error} />}
-      {data && data.length === 0 && <EmptyState message="No customers found." />}
-      {data && data.length > 0 && (
-        <Card className="overflow-x-auto p-0">
+      {!loading && !error && total === 0 && <EmptyState message="No customers found." />}
+      {rows.length > 0 && (
+        <Card className={`overflow-x-auto p-0 transition-opacity ${loading ? 'opacity-60' : ''}`}>
           <table className="w-full text-left text-sm">
             <thead className="border-b border-gray-200 bg-gray-50/70 text-xs font-medium uppercase tracking-wide text-gray-500">
               <tr>
@@ -49,7 +84,7 @@ export default function CustomersPage() {
               </tr>
             </thead>
             <tbody>
-              {data.map((c) => (
+              {rows.map((c) => (
                 <tr key={c.id} className="border-b border-gray-100 last:border-0 transition-colors hover:bg-brand-50/40">
                   <td className="px-4 py-3 font-mono text-xs">{c.whatsappNumber}</td>
                   <td className="px-4 py-3">{c.name || '—'}</td>
@@ -64,6 +99,7 @@ export default function CustomersPage() {
               ))}
             </tbody>
           </table>
+          <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPage={setPage} />
         </Card>
       )}
     </div>
