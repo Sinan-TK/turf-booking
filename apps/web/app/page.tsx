@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
-import { ErrorBanner, Icon, LoadingState, Select, WhatsAppIcon } from '@/components/ui';
+import { DISMISSED, useCustomer } from '@/lib/customer';
+import { ErrorBanner, Icon, LoadingState, Select } from '@/components/ui';
 import { durationLabel, shortDuration, type VenueCategory } from '@/lib/categories';
 
 interface StateOption {
@@ -144,24 +146,38 @@ function next7Days(): Array<{ iso: string; weekday: string; day: string; month: 
   });
 }
 
-/** The WhatsApp Business number customers message to book — set once as a
- * deploy-time env var (see apps/web/.env.local / the Vercel project
- * settings for this app), never hardcoded here. Digits only, with country
- * code, no leading '+' (wa.me's own format). */
-const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
-
-function whatsappLink(text: string): string | null {
-  if (!WHATSAPP_NUMBER) return null;
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
-}
-
 /**
- * The exact text format apps/api/src/whatsapp/whatsapp-menu.service.ts's
- * parseBookIntentText expects — machine-generated, matched by a strict
- * regex on the bot side. Keep the two in sync if this ever changes.
+ * Holds a slot for the logged-in customer and sends them to checkout. Logged
+ * out, it opens the login dialog first and carries on once they are in. The
+ * server decides whether the slot is still free; its message (e.g. "just
+ * taken") is shown as `error`. `busy` stays set after success until the
+ * navigation finishes, so a second tap cannot create a second hold.
  */
-function bookSlotIntentText(r: SearchResult, startTime: string, durationMinutes: number): string {
-  return `Book: ${r.venue.facilityCode} | Resource: ${r.resource.id} | ${startTime} | ${durationMinutes}min`;
+function useBookSlot(resourceId: string, durationMinutes: number) {
+  const router = useRouter();
+  const { requireLogin } = useCustomer();
+  const [busyStart, setBusyStart] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const inFlight = useRef(false);
+
+  async function bookSlot(startTime: string) {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusyStart(startTime);
+    setError(null);
+    try {
+      await requireLogin(); // may open the login dialog; rejects if dismissed
+      const hold = await api.post<{ id: string }>('/bookings/hold', { resourceId, startTime, durationMinutes });
+      router.push(`/checkout/${hold.id}`);
+    } catch (err) {
+      inFlight.current = false;
+      setBusyStart(null);
+      if (err instanceof Error && err.message === DISMISSED) return;
+      setError(err instanceof ApiError ? err.message : 'Could not hold that slot. Please try another.');
+    }
+  }
+
+  return { bookSlot, busyStart, error, clearError: () => setError(null) };
 }
 
 export default function HomePage() {
@@ -422,7 +438,6 @@ export default function HomePage() {
     }));
   }
 
-  const generalWhatsappLink = whatsappLink('Hi! I want to make a booking.');
   const days = useMemo(() => next7Days(), []);
 
   // Header location lines: line one is a single value — the most
@@ -447,7 +462,7 @@ export default function HomePage() {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-emerald-900/10 pt-3 pb-0">
         <div className="mx-auto w-full max-w-screen-xl px-4 sm:px-6 lg:px-8">
-        {/* Top row: location · (search, inline from md up) · WhatsApp. Below md the search box wraps to its own full-width row. */}
+        {/* Top row: location · (search, inline from md up) · account. Below md the search box wraps to its own full-width row. */}
         <div className="flex flex-wrap items-center justify-between gap-x-3 md:flex-nowrap md:gap-x-6">
           <button onClick={() => setLocationModalOpen(true)} className="flex items-center gap-2 text-slate-700 hover:text-slate-900 transition py-1 text-left group md:order-1" type="button">
             <svg className="w-6 h-6 text-brand-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"></path></svg>
@@ -458,11 +473,6 @@ export default function HomePage() {
               </span>
             </div>
           </button>
-          {generalWhatsappLink && (
-            <a href={generalWhatsappLink} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp Chat" className="md:order-3 w-9 h-9 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-700 hover:text-slate-900 active:bg-slate-50 transition active:scale-95">
-              <WhatsAppIcon className="w-5 h-5 text-slate-600" />
-            </a>
-          )}
         <div className="relative order-last mt-2.5 w-full md:order-2 md:mt-0 md:w-auto md:max-w-xl md:flex-1">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
@@ -768,9 +778,8 @@ function formatDateLabel(dateIso: string): string {
 /**
  * Detailed booking modal opened from "Book Now": venue summary, date /
  * resource / price, and the full available-slot grid for the searched
- * day. Picking a slot enables "Continue on WhatsApp", which deep-links
- * the bot-parseable intent (bookSlotIntentText — same shape the
- * WhatsApp menu's Book flow matches on), not a free-text message.
+ * day. Picking a slot enables "Book", which holds it and moves on to
+ * checkout (logging the customer in first when needed).
  */
 function SlotBookingModal({
   result: r,
@@ -844,7 +853,13 @@ function SlotBookingModal({
     };
   }, []);
 
-  const confirmLink = selected ? whatsappLink(bookSlotIntentText(r, selected, durationMinutes)) : null;
+  const { bookSlot, busyStart, error: bookError, clearError } = useBookSlot(r.resource.id, durationMinutes);
+  const booking = busyStart !== null;
+
+  // A different slot or length makes an old "just taken" message stale.
+  useEffect(() => {
+    clearError();
+  }, [selected, durationMinutes]);
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={`Book ${r.venue.name}`}>
@@ -972,24 +987,26 @@ function SlotBookingModal({
               {formatDateLabel(dateIso)} · {formatTimeRange(selected, durationMinutes, r.timezone)} · {displayPrice ? formatPrice(displayPrice) : ''}
             </p>
           )}
-          {confirmLink ? (
-            <a
-              href={confirmLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-extrabold text-white shadow-md transition active:scale-95 ${
-                selected ? 'bg-[#25D366] hover:bg-[#20ba59]' : 'pointer-events-none bg-slate-300'
-              }`}
-              aria-disabled={!selected}
-            >
-              <WhatsAppIcon className="h-4 w-4" />
-              {selected ? 'Continue on WhatsApp' : 'Select a slot above'}
-            </a>
-          ) : (
-            <p className="rounded-xl bg-slate-100 p-3 text-center text-xs font-semibold text-slate-500">
-              WhatsApp booking is not configured right now — please try again later.
-            </p>
+          {bookError && (
+            <div role="alert" className="mb-2">
+              <ErrorBanner message={bookError} />
+            </div>
           )}
+          <button
+            type="button"
+            disabled={!selected || booking || reloading}
+            onClick={() => selected && bookSlot(selected)}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-extrabold text-white shadow-md transition hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:active:scale-100"
+          >
+            {booking && (
+              <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+            )}
+            {booking
+              ? 'Holding your slot…'
+              : selected
+                ? `Book ${formatStart(selected, r.timezone)}`
+                : 'Select a slot above'}
+          </button>
         </div>
       </div>
     </div>
@@ -1012,7 +1029,6 @@ function MobileVenueCard({
   onDurationChange: (minutes: number) => void;
 }) {
   const hasSlots = r.availableStartTimes.length > 0;
-  const generalLink = whatsappLink(`Hi, I want to inquire about ${r.venue.name}`);
   const [slotModalOpen, setSlotModalOpen] = useState(false);
 
   const timeline = useMemo(() => buildTimeline(r), [r]);
@@ -1114,17 +1130,6 @@ function MobileVenueCard({
               <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round"></path></svg>
               <span>{hasSlots ? `Book Now · ${r.availableStartTimes.length} slots` : 'No Slots Today'}</span>
             </button>
-            {generalLink && (
-              <a 
-                href={generalLink} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="py-2 px-3.5 rounded-xl bg-[#25D366]/10 text-emerald-800 hover:bg-[#25D366]/20 font-bold text-xs flex items-center gap-1.5 border border-emerald-500/20 transition shadow-sm shrink-0"
-              >
-                <svg className="w-3.5 h-3.5 fill-current text-emerald-600" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"></path></svg>
-                <span>Chat</span>
-              </a>
-            )}
           </div>
         </div>
       </div>
@@ -1160,6 +1165,7 @@ function DesktopVenueCard({
 }) {
   const hasSlots = r.availableStartTimes.length > 0;
   const [slotModalOpen, setSlotModalOpen] = useState(false);
+  const { bookSlot, busyStart, error: bookError } = useBookSlot(r.resource.id, durationMinutes);
 
   return (
     <>
@@ -1249,14 +1255,13 @@ function DesktopVenueCard({
             ) : (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
                 {r.availableStartTimes.map((t) => {
-                  const link = whatsappLink(bookSlotIntentText(r, t, durationMinutes));
-                  return link ? (
-                    <a
+                  return (
+                    <button
                       key={t}
-                      href={link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/60 p-2.5 shadow-sm transition-all hover:border-emerald-600 hover:bg-emerald-600 hover:text-white"
+                      type="button"
+                      disabled={busyStart !== null}
+                      onClick={() => bookSlot(t)}
+                      className="group flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/60 p-2.5 shadow-sm transition-all hover:border-emerald-600 hover:bg-emerald-600 hover:text-white disabled:cursor-wait disabled:opacity-60"
                     >
                       <span className="flex flex-col text-left">
                         <span className="text-xs font-extrabold text-slate-900 group-hover:text-white">{formatStart(t, r.timezone)}</span>
@@ -1267,16 +1272,16 @@ function DesktopVenueCard({
                         )}
                       </span>
                       <span className="flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 text-[10px] font-extrabold uppercase text-white group-hover:bg-white group-hover:text-emerald-900">
-                        <WhatsAppIcon className="h-2.5 w-2.5" />
-                        Book
+                        {busyStart === t ? 'Holding…' : 'Book'}
                       </span>
-                    </a>
-                  ) : (
-                    <div key={t} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-2.5 opacity-60">
-                      <span className="text-xs font-semibold text-slate-700">{formatTimeRange(t, durationMinutes, r.timezone)}</span>
-                    </div>
+                    </button>
                   );
                 })}
+              </div>
+            )}
+            {bookError && (
+              <div role="alert" className="mt-2">
+                <ErrorBanner message={bookError} />
               </div>
             )}
           </div>

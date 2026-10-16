@@ -31,18 +31,6 @@ export function Icon({ name, className = '' }: { name: string; className?: strin
   const LucideIconComponent = ICON_MAP[name] || Activity;
   return <LucideIconComponent size="1em" className={`shrink-0 ${className}`} />;
 }
-/** Material Symbols has no WhatsApp glyph (it's a brand mark, not a
- * generic icon) — a small inline SVG instead, so the WhatsApp CTAs stay
- * recognizable rather than falling back to a generic chat bubble. */
-export function WhatsAppIcon({ className = '' }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.472-.148-.67.15-.198.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
-      <path d="M12.004 2.003c-5.514 0-9.997 4.483-9.997 9.997 0 1.762.462 3.485 1.34 5.003L2 22l5.13-1.345a9.96 9.96 0 0 0 4.874 1.242h.004c5.514 0 9.997-4.483 9.997-9.997s-4.483-9.997-9.997-9.997zm0 18.19a8.174 8.174 0 0 1-4.166-1.14l-.299-.177-3.113.817.83-3.033-.194-.312a8.19 8.19 0 0 1-1.256-4.351c0-4.522 3.68-8.203 8.202-8.203 4.522 0 8.202 3.68 8.202 8.203 0 4.523-3.68 8.196-8.2 8.196z" />
-    </svg>
-  );
-}
-
 export function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={`rounded-lg border border-gray-200 bg-white p-5 shadow-sm ${className}`}>
