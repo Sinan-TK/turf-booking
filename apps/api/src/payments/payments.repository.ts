@@ -88,8 +88,10 @@ export interface PaymentsRepository {
   recordLatePaymentAtomic(params: LatePaymentAtomicParams): Promise<Refund>;
   confirmPaymentAtomic(params: ConfirmPaymentAtomicParams): Promise<void>;
   findCustomerById(id: string): Promise<CustomerProfile | null>;
-  listPaymentsForAdmin(filters: { status?: string; limit?: number }): Promise<PaymentListItem[]>;
-  listRefundsForAdmin(filters: { status?: string; limit?: number }): Promise<RefundListItem[]>;
+  listPaymentsForAdmin(filters: { status?: string; limit?: number; offset?: number }): Promise<PaymentListItem[]>;
+  countPaymentsForAdmin(filters: { status?: string }): Promise<number>;
+  listRefundsForAdmin(filters: { status?: string; limit?: number; offset?: number }): Promise<RefundListItem[]>;
+  countRefundsForAdmin(filters: { status?: string }): Promise<number>;
   listPaymentsForOwner(
     organizationId: string,
     filters: { status?: string; limit?: number },

@@ -1,4 +1,6 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
+import { parsePage, setTotalCount } from '../common/pagination';
 import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -75,18 +77,22 @@ export class AdminBookingsController {
   constructor(private readonly bookings: BookingsService) {}
 
   @Get()
-  list(
+  async list(
     @Query('status') status?: string,
     @Query('venueId') venueId?: string,
     @Query('organizationId') organizationId?: string,
     @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Res({ passthrough: true }) res?: Response,
   ) {
-    return this.bookings.listForAdmin({
-      status,
-      venueId,
-      organizationId,
-      limit: limit ? Number(limit) : undefined,
-    });
+    const page = parsePage(limit, offset);
+    const filters = { status, venueId, organizationId };
+    const [rows, total] = await Promise.all([
+      this.bookings.listForAdmin({ ...filters, ...page }),
+      this.bookings.countForAdmin(filters),
+    ]);
+    if (res) setTotalCount(res, total);
+    return rows;
   }
 
   @Get(':id')

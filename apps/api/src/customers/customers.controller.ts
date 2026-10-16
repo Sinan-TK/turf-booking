@@ -1,4 +1,6 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
+import { parsePage, setTotalCount } from '../common/pagination';
 import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -15,8 +17,19 @@ export class CustomersController {
   constructor(private readonly customers: CustomersService) {}
 
   @Get()
-  search(@Query('search') search?: string, @Query('limit') limit?: string) {
-    return this.customers.searchForAdmin(search, limit ? Number(limit) : undefined);
+  async search(
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Res({ passthrough: true }) res?: Response,
+  ) {
+    const page = parsePage(limit, offset);
+    const [rows, total] = await Promise.all([
+      this.customers.searchForAdmin(search, page),
+      this.customers.countForAdmin(search),
+    ]);
+    if (res) setTotalCount(res, total);
+    return rows;
   }
 
   @Get(':id')

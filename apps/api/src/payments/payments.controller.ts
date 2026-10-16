@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Headers, HttpCode, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
+import { parsePage, setTotalCount } from '../common/pagination';
 import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -60,19 +61,35 @@ export class AdminPaymentsController {
   constructor(private readonly payments: PaymentsService) {}
 
   @Get('payments')
-  listPayments(@Query('status') status?: string, @Query('limit') limit?: string) {
-    return this.payments.listPaymentsForAdmin({
-      status,
-      limit: limit ? Number(limit) : undefined,
-    });
+  async listPayments(
+    @Query('status') status?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Res({ passthrough: true }) res?: Response,
+  ) {
+    const page = parsePage(limit, offset);
+    const [rows, total] = await Promise.all([
+      this.payments.listPaymentsForAdmin({ status, ...page }),
+      this.payments.countPaymentsForAdmin({ status }),
+    ]);
+    if (res) setTotalCount(res, total);
+    return rows;
   }
 
   @Get('refunds')
-  listRefunds(@Query('status') status?: string, @Query('limit') limit?: string) {
-    return this.payments.listRefundsForAdmin({
-      status,
-      limit: limit ? Number(limit) : undefined,
-    });
+  async listRefunds(
+    @Query('status') status?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Res({ passthrough: true }) res?: Response,
+  ) {
+    const page = parsePage(limit, offset);
+    const [rows, total] = await Promise.all([
+      this.payments.listRefundsForAdmin({ status, ...page }),
+      this.payments.countRefundsForAdmin({ status }),
+    ]);
+    if (res) setTotalCount(res, total);
+    return rows;
   }
 }
 

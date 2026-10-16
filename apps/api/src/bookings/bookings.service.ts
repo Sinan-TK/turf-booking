@@ -681,8 +681,13 @@ export class BookingsService {
     venueId?: string;
     organizationId?: string;
     limit?: number;
+    offset?: number;
   }) {
     return this.bookings.listForAdmin(filters);
+  }
+
+  async countForAdmin(filters: { status?: string; venueId?: string; organizationId?: string }) {
+    return this.bookings.countForAdmin(filters);
   }
 
   /** Org-scoped listing for the Venue Owner Portal (§12: an owner sees

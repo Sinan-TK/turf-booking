@@ -47,13 +47,20 @@ export class SupportService {
   }
 
   /** Platform-wide support queue for the Super Admin Portal (§12). */
-  async listForAdmin(filters: { status?: string; limit?: number }) {
+  async listForAdmin(filters: { status?: string; limit?: number; offset?: number }) {
     const limit = Math.min(filters.limit ?? 50, 200);
     return this.prisma.client.supportTicket.findMany({
       where: { status: filters.status ? (filters.status as SupportTicketStatus) : undefined },
       include: { customer: { select: { id: true, whatsappNumber: true, name: true } } },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
       take: limit,
+      skip: filters.offset ?? 0,
+    });
+  }
+
+  async countForAdmin(filters: { status?: string }) {
+    return this.prisma.client.supportTicket.count({
+      where: { status: filters.status ? (filters.status as SupportTicketStatus) : undefined },
     });
   }
 

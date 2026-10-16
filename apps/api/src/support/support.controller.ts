@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
+import { parsePage, setTotalCount } from '../common/pagination';
 import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -37,8 +39,19 @@ export class AdminSupportController {
   constructor(private readonly support: SupportService) {}
 
   @Get()
-  list(@Query('status') status?: string, @Query('limit') limit?: string) {
-    return this.support.listForAdmin({ status, limit: limit ? Number(limit) : undefined });
+  async list(
+    @Query('status') status?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Res({ passthrough: true }) res?: Response,
+  ) {
+    const page = parsePage(limit, offset);
+    const [rows, total] = await Promise.all([
+      this.support.listForAdmin({ status, ...page }),
+      this.support.countForAdmin({ status }),
+    ]);
+    if (res) setTotalCount(res, total);
+    return rows;
   }
 
   @Get(':id')

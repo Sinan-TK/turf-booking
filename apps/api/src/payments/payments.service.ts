@@ -275,12 +275,20 @@ export class PaymentsService {
   }
 
   /** Platform-wide listing for the Super Admin Portal (§12). */
-  async listPaymentsForAdmin(filters: { status?: string; limit?: number }) {
+  async listPaymentsForAdmin(filters: { status?: string; limit?: number; offset?: number }) {
     return this.payments.listPaymentsForAdmin(filters);
   }
 
-  async listRefundsForAdmin(filters: { status?: string; limit?: number }) {
+  async countPaymentsForAdmin(filters: { status?: string }) {
+    return this.payments.countPaymentsForAdmin(filters);
+  }
+
+  async listRefundsForAdmin(filters: { status?: string; limit?: number; offset?: number }) {
     return this.payments.listRefundsForAdmin(filters);
+  }
+
+  async countRefundsForAdmin(filters: { status?: string }) {
+    return this.payments.countRefundsForAdmin(filters);
   }
 
   /** Org-scoped listings for the Venue Owner Portal — view-only, per the

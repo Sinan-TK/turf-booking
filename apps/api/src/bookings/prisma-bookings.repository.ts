@@ -114,20 +114,35 @@ export class PrismaBookingsRepository implements BookingsRepository {
     });
   }
 
-  listForAdmin(filters: { status?: string; venueId?: string; organizationId?: string; limit?: number }) {
+  private adminBookingWhere(filters: { status?: string; venueId?: string; organizationId?: string }) {
+    return {
+      status: filters.status ? (filters.status as BookingStatus) : undefined,
+      venueId: filters.venueId,
+      venue: filters.organizationId ? { organizationId: filters.organizationId } : undefined,
+    };
+  }
+
+  countForAdmin(filters: { status?: string; venueId?: string; organizationId?: string }) {
+    return this.prisma.client.booking.count({ where: this.adminBookingWhere(filters) });
+  }
+
+  listForAdmin(filters: {
+    status?: string;
+    venueId?: string;
+    organizationId?: string;
+    limit?: number;
+    offset?: number;
+  }) {
     const limit = Math.min(filters.limit ?? 50, 200);
     return this.prisma.client.booking.findMany({
-      where: {
-        status: filters.status ? (filters.status as BookingStatus) : undefined,
-        venueId: filters.venueId,
-        venue: filters.organizationId ? { organizationId: filters.organizationId } : undefined,
-      },
+      where: this.adminBookingWhere(filters),
       include: {
         venue: { select: { id: true, name: true, facilityCode: true, organizationId: true } },
         customer: { select: { id: true, whatsappNumber: true, name: true } },
       },
-      orderBy: { startTime: 'desc' },
+      orderBy: [{ startTime: 'desc' }, { id: 'asc' }],
       take: limit,
+      skip: filters.offset ?? 0,
     });
   }
 

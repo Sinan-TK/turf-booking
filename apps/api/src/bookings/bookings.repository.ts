@@ -138,7 +138,9 @@ export interface BookingsRepository {
     venueId?: string;
     organizationId?: string;
     limit?: number;
+    offset?: number;
   }): Promise<BookingListItem[]>;
+  countForAdmin(filters: { status?: string; venueId?: string; organizationId?: string }): Promise<number>;
   listForOwner(
     organizationId: string,
     filters: { status?: string; venueId?: string; limit?: number },

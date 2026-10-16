@@ -36,20 +36,29 @@ export class CustomersService {
   }
 
   /** Platform-wide customer directory for the Super Admin Portal (§12). */
-  async searchForAdmin(search: string | undefined, limit = 50) {
+  private adminCustomerWhere(search: string | undefined) {
+    return search
+      ? {
+          OR: [
+            { whatsappNumber: { contains: search, mode: 'insensitive' as const } },
+            { name: { contains: search, mode: 'insensitive' as const } },
+            { email: { contains: search, mode: 'insensitive' as const } },
+          ],
+        }
+      : undefined;
+  }
+
+  async searchForAdmin(search: string | undefined, page: { limit: number; offset: number } = { limit: 50, offset: 0 }) {
     return this.prisma.client.customerProfile.findMany({
-      where: search
-        ? {
-            OR: [
-              { whatsappNumber: { contains: search, mode: 'insensitive' } },
-              { name: { contains: search, mode: 'insensitive' } },
-              { email: { contains: search, mode: 'insensitive' } },
-            ],
-          }
-        : undefined,
-      orderBy: { createdAt: 'desc' },
-      take: Math.min(limit, 200),
+      where: this.adminCustomerWhere(search),
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      take: Math.min(page.limit, 200),
+      skip: page.offset,
     });
+  }
+
+  async countForAdmin(search: string | undefined) {
+    return this.prisma.client.customerProfile.count({ where: this.adminCustomerWhere(search) });
   }
 
   async getForAdmin(customerId: string) {
