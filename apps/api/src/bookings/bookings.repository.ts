@@ -23,6 +23,15 @@ export type BookingDetail = Prisma.BookingGetPayload<{
   };
 }>;
 
+/** Booking with what the customer's checkout/receipt page shows. */
+export type BookingCheckoutView = Prisma.BookingGetPayload<{
+  include: {
+    venue: { select: { id: true; name: true; facilityCode: true; address: true } };
+    resource: { select: { name: true } };
+    slotHold: { select: { holdExpiresAt: true } };
+  };
+}>;
+
 /** Booking with the list-view includes (venue/customer). */
 export type BookingListItem = Prisma.BookingGetPayload<{
   include: {
@@ -132,6 +141,7 @@ export interface BookingsRepository {
   findInventoryReservations(slotHoldId: string): Promise<InventoryReservation[]>;
   findBookingById(id: string): Promise<Booking | null>;
   findBookingDetailById(id: string): Promise<BookingDetail | null>;
+  findBookingCheckoutViewById(id: string): Promise<BookingCheckoutView | null>;
   listForCustomer(customerId: string): Promise<Booking[]>;
   listForAdmin(filters: {
     status?: string;

@@ -107,6 +107,17 @@ export class PrismaBookingsRepository implements BookingsRepository {
     });
   }
 
+  findBookingCheckoutViewById(id: string) {
+    return this.prisma.client.booking.findUnique({
+      where: { id },
+      include: {
+        venue: { select: { id: true, name: true, facilityCode: true, address: true } },
+        resource: { select: { name: true } },
+        slotHold: { select: { holdExpiresAt: true } },
+      },
+    });
+  }
+
   listForCustomer(customerId: string) {
     return this.prisma.client.booking.findMany({
       where: { customerId },

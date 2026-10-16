@@ -667,6 +667,25 @@ export class BookingsService {
     return booking;
   }
 
+  /**
+   * What the website checkout/receipt page renders: the booking row plus the
+   * venue, the unit's name and until when the slot is held. Same ownership
+   * rule as getForCustomer; the extra fields are additive.
+   */
+  async getCheckoutViewForCustomer(bookingId: string, actor: AuthContext) {
+    const view = await this.bookings.findBookingCheckoutViewById(bookingId);
+    if (!view) throw new NotFoundException('Booking not found');
+    if (view.customerId !== actor.id) {
+      throw new ForbiddenException("Cannot access another customer's booking");
+    }
+    const { resource, slotHold, ...booking } = view;
+    return {
+      ...booking,
+      resourceName: resource?.name ?? null,
+      holdExpiresAt: slotHold.holdExpiresAt,
+    };
+  }
+
   async listForCustomer(actor: AuthContext) {
     return this.bookings.listForCustomer(actor.id);
   }

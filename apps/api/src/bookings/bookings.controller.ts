@@ -53,7 +53,7 @@ export class BookingsController {
 
   @Get('me/bookings/:id')
   getMine(@Param('id') id: string, @CurrentUser() actor: AuthContext) {
-    return this.bookings.getForCustomer(id, actor);
+    return this.bookings.getCheckoutViewForCustomer(id, actor);
   }
 
   @Post('me/bookings/:id/cancel')
