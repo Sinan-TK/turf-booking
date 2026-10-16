@@ -3,7 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
-import { Badge, Button, Card, ErrorBanner, LoadingState, Screen, SuccessBanner } from '@/components/ui';
+import { useCustomer } from '@/lib/customer';
+import { LoginGate } from '@/components/login-gate';
+import { Badge, Button, Card, ErrorBanner, LoadingState, SuccessBanner } from '@/components/ui';
+import { Screen } from '@/components/screen';
 
 interface Booking {
   id: string;
@@ -17,8 +20,9 @@ interface Booking {
   paymentMethod: string | null;
 }
 
-export default function BookingDetailPage() {
+function BookingDetail() {
   const { id } = useParams<{ id: string }>();
+  const { refresh } = useCustomer();
   const [booking, setBooking] = useState<Booking | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
@@ -29,7 +33,11 @@ export default function BookingDetailPage() {
     api
       .get<Booking>(`/me/bookings/${id}`)
       .then(setBooking)
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'Something went wrong.'));
+      .catch((err) => {
+        // An expired session sends the visitor back to the login prompt.
+        if (err instanceof ApiError && err.status === 401) return void refresh();
+        setError(err instanceof ApiError ? err.message : 'Something went wrong.');
+      });
   }
 
   useEffect(load, [id]);
@@ -59,8 +67,7 @@ export default function BookingDetailPage() {
   const cancellable = booking && ['CONFIRMED', 'PENDING_PAYMENT'].includes(booking.status);
 
   return (
-    <Screen>
-      <h1 className="mb-6 text-center text-xl font-semibold text-gray-900">Booking Details</h1>
+    <>
       {error && <ErrorBanner message={error} />}
       {!error && !booking && <LoadingState />}
       {booking && (
@@ -135,6 +142,17 @@ export default function BookingDetailPage() {
           )}
         </Card>
       )}
+    </>
+  );
+}
+
+export default function BookingDetailPage() {
+  return (
+    <Screen>
+      <h1 className="mb-6 text-center text-xl font-semibold text-gray-900">Booking Details</h1>
+      <LoginGate message="Log in to see this booking.">
+        <BookingDetail />
+      </LoginGate>
     </Screen>
   );
 }

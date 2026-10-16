@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { DISMISSED, useCustomer } from '@/lib/customer';
 import { ErrorBanner, Icon, LoadingState, Select } from '@/components/ui';
+import { AccountMenu } from '@/components/account-menu';
 import { durationLabel, shortDuration, type VenueCategory } from '@/lib/categories';
 
 interface StateOption {
@@ -473,6 +474,9 @@ export default function HomePage() {
               </span>
             </div>
           </button>
+          <div className="md:order-3">
+            <AccountMenu />
+          </div>
         <div className="relative order-last mt-2.5 w-full md:order-2 md:mt-0 md:w-auto md:max-w-xl md:flex-1">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>

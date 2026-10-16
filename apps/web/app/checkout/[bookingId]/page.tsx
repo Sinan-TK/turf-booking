@@ -8,7 +8,8 @@ import { api, ApiError } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
 import { formatCountdown, formatDay, formatTimeRange, useCountdown } from '@/lib/checkout';
 import type { RazorpayCheckoutOptions } from '@/lib/razorpay';
-import { Badge, Button, Card, ErrorBanner, Icon, LoadingState, Screen, SuccessBanner } from '@/components/ui';
+import { Badge, Button, Card, ErrorBanner, Icon, LoadingState, SuccessBanner } from '@/components/ui';
+import { Screen } from '@/components/screen';
 
 interface CheckoutBooking {
   id: string;

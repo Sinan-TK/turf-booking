@@ -3,7 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
-import { Badge, Card, ErrorBanner, Icon, LoadingState, Screen } from '@/components/ui';
+import { useCustomer } from '@/lib/customer';
+import { LoginGate } from '@/components/login-gate';
+import { Badge, Card, ErrorBanner, Icon, LoadingState } from '@/components/ui';
+import { Screen } from '@/components/screen';
 
 interface Booking {
   id: string;
@@ -15,7 +18,8 @@ interface Booking {
   groundType: string;
 }
 
-export default function MyBookingsPage() {
+function BookingList() {
+  const { refresh } = useCustomer();
   const [bookings, setBookings] = useState<Booking[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,33 +28,28 @@ export default function MyBookingsPage() {
       .get<Booking[]>('/me/bookings')
       .then(setBookings)
       .catch((err) => {
-        setError(
-          err instanceof ApiError && err.status === 401
-            ? "Your session has expired — open your booking link from WhatsApp again, or send 'Hi' for a new one."
-            : err instanceof ApiError
-              ? err.message
-              : 'Something went wrong.',
-        );
+        // An expired session sends the visitor back to the login prompt.
+        if (err instanceof ApiError && err.status === 401) return void refresh();
+        setError(err instanceof ApiError ? err.message : 'Something went wrong.');
       });
-  }, []);
+  }, [refresh]);
 
   return (
-    <Screen>
-      <h1 className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold text-gray-900">
-        <Icon name="event_note" />
-        My Bookings
-      </h1>
+    <>
       {error && <ErrorBanner message={error} />}
       {!error && !bookings && <LoadingState />}
       {!error && bookings && bookings.length === 0 && (
         <Card>
-          <p className="text-center text-sm text-gray-500">No bookings yet.</p>
+          <p className="mb-4 text-center text-sm text-gray-500">No bookings yet.</p>
+          <Link href="/" className="block text-center text-sm font-medium text-emerald-700 hover:underline">
+            Find a venue
+          </Link>
         </Card>
       )}
       {!error && bookings && bookings.length > 0 && (
         <div className="space-y-3">
           {bookings.map((b) => (
-            <Link key={b.id} href={`/bookings/${b.id}`}>
+            <Link key={b.id} href={b.status === 'PENDING_PAYMENT' ? `/checkout/${b.id}` : `/bookings/${b.id}`}>
               <Card className="transition-shadow hover:shadow-md">
                 <div className="flex items-center justify-between">
                   <div>
@@ -71,6 +70,20 @@ export default function MyBookingsPage() {
           ))}
         </div>
       )}
+    </>
+  );
+}
+
+export default function MyBookingsPage() {
+  return (
+    <Screen>
+      <h1 className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold text-gray-900">
+        <Icon name="schedule" />
+        My Bookings
+      </h1>
+      <LoginGate message="Log in to see your bookings.">
+        <BookingList />
+      </LoginGate>
     </Screen>
   );
 }

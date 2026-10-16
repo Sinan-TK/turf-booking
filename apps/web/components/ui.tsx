@@ -128,11 +128,3 @@ export function SuccessBanner({ message }: { message: React.ReactNode }) {
 export function LoadingState({ message = 'Loading…' }: { message?: string }) {
   return <div className="p-6 text-center text-sm text-gray-500">{message}</div>;
 }
-
-export function Screen({ children }: { children: React.ReactNode }) {
-  return (
-    <main className="flex min-h-screen justify-center bg-gray-50 px-4 py-8 sm:px-6 sm:py-12">
-      <div className="w-full max-w-lg md:max-w-2xl">{children}</div>
-    </main>
-  );
-}
