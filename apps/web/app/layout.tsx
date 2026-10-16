@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Akshar } from 'next/font/google';
 import './globals.css';
+import { CustomerProvider } from '@/lib/customer';
 
 const akshar = Akshar({
   subsets: ['latin'],
@@ -10,7 +11,7 @@ const akshar = Akshar({
 
 export const metadata: Metadata = {
   title: 'TurfX by ZK Fitness',
-  description: 'Instant 1-tap booking for sports, games and activity venues — live slots, book straight on WhatsApp.',
+  description: 'Instant 1-tap booking for sports, games and activity venues — live slots, pay online and get your confirmation on WhatsApp.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -21,7 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
       </head>
       <body className="font-sans antialiased text-slate-800 selection:bg-brand-500 selection:text-white">
-        {children}
+        <CustomerProvider>{children}</CustomerProvider>
       </body>
     </html>
   );

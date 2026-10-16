@@ -14,7 +14,7 @@ export class ApiError extends Error {
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
-    credentials: 'include', // sends the httpOnly customer_session cookie set by GET /booking-sessions/:token
+    credentials: 'include', // sends the httpOnly customer_session cookie set by POST /customer-auth/verify
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
@@ -40,5 +40,7 @@ export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, data?: unknown) =>
     request<T>(path, { method: 'POST', body: data !== undefined ? JSON.stringify(data) : undefined }),
+  patch: <T>(path: string, data?: unknown) =>
+    request<T>(path, { method: 'PATCH', body: data !== undefined ? JSON.stringify(data) : undefined }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 };
