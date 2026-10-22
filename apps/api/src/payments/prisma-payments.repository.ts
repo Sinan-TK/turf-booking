@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@venue/database';
-import type { BookingStatus, PaymentStatus, RefundStatus, SlotHoldStatus, WebhookGateway } from '@venue/database';
+import type { BookingStatus, PaymentProviderType, PaymentStatus, RefundStatus, SlotHoldStatus, WebhookGateway } from '@venue/database';
 import { PrismaService } from '../prisma/prisma.service';
+import { contains, dateWhere } from '../common/list-filters';
 import type {
+  AdminPaymentFilters,
+  AdminRefundFilters,
   ConfirmPaymentAtomicParams,
   LatePaymentAtomicParams,
   PaymentsRepository,
@@ -158,7 +161,7 @@ export class PrismaPaymentsRepository implements PaymentsRepository {
       });
       await tx.booking.update({
         where: { id: params.bookingId, status: params.bookingStatus as BookingStatus },
-        data: { status: 'CONFIRMED', paymentMethod: 'MONEY' },
+        data: { status: 'CONFIRMED', paymentMethod: 'MONEY', paidAmount: params.paidAmount },
       });
       await tx.slotHold.update({
         where: { id: params.slotHoldId, status: params.slotHoldStatus as SlotHoldStatus },
@@ -182,22 +185,54 @@ export class PrismaPaymentsRepository implements PaymentsRepository {
     return this.prisma.client.customerProfile.findUnique({ where: { id } });
   }
 
-  countPaymentsForAdmin(filters: { status?: string }) {
-    return this.prisma.client.payment.count({
-      where: { status: filters.status ? (filters.status as PaymentStatus) : undefined },
-    });
+  private adminPaymentWhere(filters: AdminPaymentFilters) {
+    const q = filters.search;
+    return {
+      booking: filters.organizationId ? { venue: { organizationId: filters.organizationId } } : undefined,
+      status: filters.status ? (filters.status as PaymentStatus) : undefined,
+      provider: filters.provider ? (filters.provider as PaymentProviderType) : undefined,
+      createdAt: dateWhere(filters.range),
+      OR: q
+        ? [
+            { gatewayOrderId: contains(q) },
+            { gatewayPaymentId: contains(q) },
+            { booking: { orderId: contains(q) } },
+            { booking: { customer: { whatsappNumber: contains(q) } } },
+            { booking: { customer: { name: contains(q) } } },
+          ]
+        : undefined,
+    };
   }
 
-  countRefundsForAdmin(filters: { status?: string }) {
-    return this.prisma.client.refund.count({
-      where: { status: filters.status ? (filters.status as RefundStatus) : undefined },
-    });
+  private adminRefundWhere(filters: AdminRefundFilters) {
+    const q = filters.search;
+    return {
+      booking: filters.organizationId ? { venue: { organizationId: filters.organizationId } } : undefined,
+      status: filters.status ? (filters.status as RefundStatus) : undefined,
+      createdAt: dateWhere(filters.range),
+      OR: q
+        ? [
+            { reason: contains(q) },
+            { booking: { orderId: contains(q) } },
+            { booking: { customer: { whatsappNumber: contains(q) } } },
+            { booking: { customer: { name: contains(q) } } },
+          ]
+        : undefined,
+    };
   }
 
-  listPaymentsForAdmin(filters: { status?: string; limit?: number; offset?: number }) {
+  countPaymentsForAdmin(filters: AdminPaymentFilters) {
+    return this.prisma.client.payment.count({ where: this.adminPaymentWhere(filters) });
+  }
+
+  countRefundsForAdmin(filters: AdminRefundFilters) {
+    return this.prisma.client.refund.count({ where: this.adminRefundWhere(filters) });
+  }
+
+  listPaymentsForAdmin(filters: AdminPaymentFilters & { limit?: number; offset?: number }) {
     const limit = Math.min(filters.limit ?? 50, 200);
     return this.prisma.client.payment.findMany({
-      where: { status: filters.status ? (filters.status as PaymentStatus) : undefined },
+      where: this.adminPaymentWhere(filters),
       include: {
         booking: {
           select: { id: true, orderId: true, venueId: true, customerId: true, amount: true },
@@ -209,48 +244,16 @@ export class PrismaPaymentsRepository implements PaymentsRepository {
     });
   }
 
-  listRefundsForAdmin(filters: { status?: string; limit?: number; offset?: number }) {
+  listRefundsForAdmin(filters: AdminRefundFilters & { limit?: number; offset?: number }) {
     const limit = Math.min(filters.limit ?? 50, 200);
     return this.prisma.client.refund.findMany({
-      where: { status: filters.status ? (filters.status as RefundStatus) : undefined },
+      where: this.adminRefundWhere(filters),
       include: {
         booking: { select: { id: true, orderId: true, venueId: true, customerId: true } },
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
       take: limit,
       skip: filters.offset ?? 0,
-    });
-  }
-
-  listPaymentsForOwner(organizationId: string, filters: { status?: string; limit?: number }) {
-    const limit = Math.min(filters.limit ?? 50, 200);
-    return this.prisma.client.payment.findMany({
-      where: {
-        status: filters.status ? (filters.status as PaymentStatus) : undefined,
-        booking: { venue: { organizationId } },
-      },
-      include: {
-        booking: {
-          select: { id: true, orderId: true, venueId: true, customerId: true, amount: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-    });
-  }
-
-  listRefundsForOwner(organizationId: string, filters: { status?: string; limit?: number }) {
-    const limit = Math.min(filters.limit ?? 50, 200);
-    return this.prisma.client.refund.findMany({
-      where: {
-        status: filters.status ? (filters.status as RefundStatus) : undefined,
-        booking: { venue: { organizationId } },
-      },
-      include: {
-        booking: { select: { id: true, orderId: true, venueId: true, customerId: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
     });
   }
 

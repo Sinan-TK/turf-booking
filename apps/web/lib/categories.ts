@@ -1,4 +1,4 @@
-/** Venue types as returned by the public GET /categories. */
+/** Facilities as returned by the public GET /categories (?available=true = only bookable ones). */
 
 export interface CategoryPolicy {
   slotIntervalMin: number;

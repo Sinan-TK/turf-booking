@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Inject,
@@ -122,6 +123,9 @@ export class CustomerOtpService {
     if (claimed.count !== 1) throw new UnauthorizedException(INVALID);
 
     const customer = await this.customers.findOrCreateByWhatsAppNumber(phone);
+    if (customer.status === 'BLOCKED') {
+      throw new ForbiddenException('This account has been blocked. Please contact support.');
+    }
     const { rawToken } = await this.sessions.createSession(customer.id, 'LOGIN');
     return {
       rawToken,

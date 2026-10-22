@@ -45,5 +45,13 @@ export const createOfflineBookingSchema = z.object({
   // fat-fingered extra zero from creating an absurd audit/commission
   // figure.
   amount: z.number().positive().max(1_000_000).optional(),
+  // What was collected when the booking was made; the rest is due at the venue. Defaults to the full amount.
+  amountPaid: z.number().nonnegative().max(1_000_000).optional(),
 });
 export class CreateOfflineBookingDto extends createZodDto(createOfflineBookingSchema) {}
+
+// Records money collected at the venue for the balance of a booking. Omit amount to collect all that is left.
+export const collectBalanceSchema = z.object({
+  amount: z.number().positive().max(1_000_000).optional(),
+});
+export class CollectBalanceDto extends createZodDto(collectBalanceSchema) {}

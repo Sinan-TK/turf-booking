@@ -1,0 +1,111 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
+import { IdentityService } from '../identity/identity.service';
+import { OwnerScopeService } from '../owner-scope/owner-scope.service';
+import type { AuthContext } from '../auth/auth.types';
+import type { InviteStaffDto } from './dto/owner-staff.dto';
+
+const staffSelect = {
+  id: true,
+  name: true,
+  email: true,
+  phone: true,
+  status: true,
+  createdAt: true,
+  venueAssignments: { select: { venue: { select: { id: true, name: true } } } },
+} as const;
+
+/** An owner admin's own staff: invited by email, each limited to the venues they are assigned. */
+@Injectable()
+export class OwnerStaffService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly identity: IdentityService,
+    private readonly scope: OwnerScopeService,
+    private readonly audit: AuditService,
+  ) {}
+
+  private shape(u: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string | null;
+    status: string;
+    createdAt: Date;
+    venueAssignments: Array<{ venue: { id: string; name: string } }>;
+  }) {
+    const { venueAssignments, ...rest } = u;
+    return { ...rest, venues: venueAssignments.map((a) => a.venue) };
+  }
+
+  async list(actor: AuthContext) {
+    const users = await this.prisma.client.venueOwnerUser.findMany({
+      where: { organizationId: actor.organizationId, role: 'OWNER_STAFF' },
+      orderBy: { createdAt: 'desc' },
+      select: staffSelect,
+    });
+    return users.map((u) => this.shape(u));
+  }
+
+  async invite(dto: InviteStaffDto, actor: AuthContext) {
+    const organizationId = actor.organizationId!;
+    // Checked before the account exists, so a bad venue never leaves a half-made staff login.
+    await this.scope.assertVenuesInOrganization(organizationId, dto.venueIds);
+    const created = await this.identity.inviteOwner({
+      organizationId,
+      email: dto.email,
+      name: dto.name,
+      phone: dto.phone,
+      role: 'OWNER_STAFF',
+    });
+    await this.scope.replaceAssignments(created.id, organizationId, dto.venueIds);
+    await this.audit.record({
+      actor,
+      action: 'OWNER_STAFF_INVITED',
+      entityType: 'VenueOwnerUser',
+      entityId: created.id,
+      metadata: { organizationId, email: created.email, venueIds: dto.venueIds },
+    });
+    return this.get(created.id, organizationId);
+  }
+
+  private async get(id: string, organizationId: string) {
+    const user = await this.prisma.client.venueOwnerUser.findFirst({
+      where: { id, organizationId, role: 'OWNER_STAFF' },
+      select: staffSelect,
+    });
+    if (!user) throw new NotFoundException('Staff member not found');
+    return this.shape(user);
+  }
+
+  async setVenues(id: string, venueIds: string[], actor: AuthContext) {
+    const organizationId = actor.organizationId!;
+    await this.get(id, organizationId);
+    await this.scope.replaceAssignments(id, organizationId, venueIds);
+    await this.audit.record({
+      actor,
+      action: 'OWNER_STAFF_VENUES_CHANGED',
+      entityType: 'VenueOwnerUser',
+      entityId: id,
+      metadata: { organizationId, venueIds },
+    });
+    return this.get(id, organizationId);
+  }
+
+  async setStatus(id: string, status: 'ACTIVE' | 'DISABLED', actor: AuthContext) {
+    const organizationId = actor.organizationId!;
+    await this.get(id, organizationId);
+    await this.prisma.client.venueOwnerUser.update({ where: { id }, data: { status } });
+    // Disabling signs them out everywhere at once.
+    if (status === 'DISABLED') await this.identity.revokeAllSessions('OWNER', id);
+    await this.audit.record({
+      actor,
+      action: status === 'DISABLED' ? 'OWNER_USER_DISABLED' : 'OWNER_USER_ENABLED',
+      entityType: 'VenueOwnerUser',
+      entityId: id,
+      metadata: { organizationId },
+    });
+    return this.get(id, organizationId);
+  }
+}

@@ -3,6 +3,7 @@ import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { OwnerRoles } from '../auth/decorators/owner-roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { VenuesService } from './venues.service';
 import { CreateVenueDto, UpdateVenueDto } from './dto/venue.dto';
@@ -15,6 +16,7 @@ export class VenuesController {
   @Post()
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.SUPER_ADMIN, Role.VENUE_OWNER)
+  @OwnerRoles('OWNER_ADMIN')
   create(@Body() dto: CreateVenueDto, @CurrentUser() actor: AuthContext) {
     return this.venues.create(dto, actor);
   }
@@ -36,6 +38,7 @@ export class VenuesController {
   @Patch(':id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.SUPER_ADMIN, Role.VENUE_OWNER)
+  @OwnerRoles('OWNER_ADMIN')
   update(@Param('id') id: string, @Body() dto: UpdateVenueDto, @CurrentUser() actor: AuthContext) {
     return this.venues.update(id, dto, actor);
   }

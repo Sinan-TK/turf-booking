@@ -11,11 +11,49 @@ import {
   LocateFixed,
   Handshake,
   Activity,
+  CircleDot,
+  Waves,
+  Dumbbell,
+  Gamepad2,
+  Puzzle,
+  Dices,
+  Camera,
+  Music,
+  Mic,
+  Sailboat,
+  Trophy,
+  Swords,
+  DoorOpen,
+  BedDouble,
+  PartyPopper,
+  LayoutGrid,
+  Flower2,
+  Volleyball,
   type LucideIcon
 } from 'lucide-react';
 
 const ICON_MAP: Record<string, LucideIcon> = {
-  sports_soccer: Activity, // Fallback for a generic activity/sport icon
+  // Facility icons (the keys the Super Admin picks in the facility catalogue).
+  sports_soccer: CircleDot,
+  sports_cricket: Trophy,
+  sports_tennis: Activity,
+  sports_basketball: Activity,
+  sports_volleyball: Volleyball,
+  sports_esports: Gamepad2,
+  extension: Puzzle,
+  casino: Dices,
+  pool: Waves,
+  kayaking: Sailboat,
+  sports_martial_arts: Swords,
+  fitness_center: Dumbbell,
+  self_improvement: Flower2,
+  music_note: Music,
+  mic: Mic,
+  photo_camera: Camera,
+  meeting_room: DoorOpen,
+  bedroom_parent: BedDouble,
+  celebration: PartyPopper,
+  category: LayoutGrid,
   location_on: MapPin,
   expand_more: ChevronDown,
   search: Search,
@@ -82,9 +120,26 @@ export function Select({ className = '', style, ...props }: SelectHTMLAttributes
   );
 }
 
-export function Label({ children }: { children: React.ReactNode }) {
-  return <label className="mb-1 block text-xs font-medium text-gray-600">{children}</label>;
+export function Label({ children, htmlFor }: { children: React.ReactNode; htmlFor?: string }) {
+  return (
+    <label htmlFor={htmlFor} className="mb-1 block text-xs font-medium text-gray-600">
+      {children}
+    </label>
+  );
 }
+
+/** The red message under a form field; pair it with `aria-invalid` and `aria-describedby` on the input. */
+export function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null;
+  return (
+    <p id={id} role="alert" className="mt-1 text-xs font-medium text-red-600">
+      {message}
+    </p>
+  );
+}
+
+/** Class to add to an Input/textarea that has an error. */
+export const invalidClass = '!border-red-500 focus:!border-red-500';
 
 const BADGE_COLORS: Record<string, string> = {
   ACTIVE: 'bg-green-100 text-green-800',

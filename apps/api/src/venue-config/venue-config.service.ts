@@ -1,18 +1,26 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PolicyResolverService } from '../scheduling/policy-resolver.service';
 import { isDurationAllowed } from '../scheduling/policy-validation';
 import { allowedDurations } from '../common/booking-policy.defaults';
+import {
+  describeRule,
+  effectivePrice,
+  legacyDayTypeToWeekdays,
+  resolvePrices,
+  rulesOverlap,
+  withPrice,
+} from '../pricing/pricing-rules';
 import type { AuthContext } from '../auth/auth.types';
 import type {
   CreateBlockedDateDto,
   CreatePricingRuleDto,
-  UpsertOperatingHoursDto,
+  UpdatePricingRuleDto,
 } from './dto/venue-config.dto';
 
 /**
- * Owner-facing "how bookable is my venue" configuration: pricing rules,
- * weekly operating hours, and one-off blocked dates. Previously there
+ * Owner-facing "how bookable is my venue" configuration: pricing rules (which also
+ * decide when a unit can be booked) and one-off blocked dates. Previously there
  * was no API for any of this — the pricing rules the Phase 5-8 booking
  * tests relied on were inserted directly via psql, which is obviously
  * not something a real Venue Owner can do. Mirrors ResourcesService's
@@ -38,7 +46,7 @@ export class VenueConfigService {
 
   /** A price rule only makes sense for a duration the venue's policy offers. */
   private async assertDurationAllowed(
-    venue: { id: string; categoryId: string },
+    venue: { id: string },
     target: { resourceId?: string; resourceGroupId?: string },
     durationMinutes: number,
   ) {
@@ -59,6 +67,23 @@ export class VenueConfigService {
     if (!!dto.resourceId === !!dto.resourceGroupId) {
       throw new BadRequestException('Exactly one of resourceId, resourceGroupId is required');
     }
+    const weekdays = dto.days
+      ? [...new Set(dto.days)].sort((a, b) => a - b)
+      : legacyDayTypeToWeekdays(dto.dayType!);
+    if (weekdays.length === 0) throw new BadRequestException('Choose the days this price applies to');
+    const prices = resolvePrices({
+      normalPrice: (dto.normalPrice ?? dto.price)!,
+      offerPrice: dto.offerPrice,
+      bookingPrice: dto.bookingPrice,
+    });
+    const candidate = {
+      resourceId: dto.resourceId ?? null,
+      resourceGroupId: dto.resourceGroupId ?? null,
+      durationMinutes: dto.durationMinutes,
+      weekdays,
+      startWindow: dto.startWindow ?? null,
+      endWindow: dto.endWindow ?? null,
+    };
     if (dto.resourceGroupId) {
       const group = await this.prisma.client.resourceGroup.findUnique({
         where: { id: dto.resourceGroupId },
@@ -66,20 +91,22 @@ export class VenueConfigService {
       if (!group) throw new NotFoundException('Resource group not found');
       const groupVenue = await this.assertVenueOwnership(group.venueId, actor);
       await this.assertDurationAllowed(groupVenue, { resourceGroupId: group.id }, dto.durationMinutes);
-      return this.prisma.client.pricingRule.create({
+      await this.assertNoOverlap(candidate);
+      const createdGroupRule = await this.prisma.client.pricingRule.create({
         data: {
           resourceId: null,
           resourceGroupId: dto.resourceGroupId,
           durationMinutes: dto.durationMinutes,
-          dayType: dto.dayType,
+          weekdays,
           startWindow: dto.startWindow,
           endWindow: dto.endWindow,
           pricingMode: dto.pricingMode,
-          price: dto.price,
+          ...prices,
           currency: dto.currency,
           effectiveFrom: dto.effectiveFrom ? new Date(dto.effectiveFrom) : undefined,
         },
       });
+      return withPrice(createdGroupRule);
     }
     const resource = await this.prisma.client.resource.findUnique({
       where: { id: dto.resourceId! },
@@ -87,19 +114,21 @@ export class VenueConfigService {
     if (!resource) throw new NotFoundException('Resource not found');
     const resourceVenue = await this.assertVenueOwnership(resource.venueId, actor);
     await this.assertDurationAllowed(resourceVenue, { resourceId: resource.id }, dto.durationMinutes);
+    await this.assertNoOverlap(candidate);
 
-    return this.prisma.client.pricingRule.create({
+    const created = await this.prisma.client.pricingRule.create({
       data: {
         resourceId: dto.resourceId,
         durationMinutes: dto.durationMinutes,
-        dayType: dto.dayType,
+        weekdays,
         startWindow: dto.startWindow,
         endWindow: dto.endWindow,
-        price: dto.price,
+        ...prices,
         currency: dto.currency,
         effectiveFrom: dto.effectiveFrom ? new Date(dto.effectiveFrom) : undefined,
       },
     });
+    return withPrice(created);
   }
 
   async listPricingRules(actor: AuthContext, resourceId?: string, resourceGroupId?: string) {
@@ -124,50 +153,139 @@ export class VenueConfigService {
             ],
           }
         : {};
-    return this.prisma.client.pricingRule.findMany({
+    const rules = await this.prisma.client.pricingRule.findMany({
       where: {
         resourceId: resourceId ?? undefined,
         resourceGroupId: resourceGroupId ?? undefined,
         ...ownerScope,
       },
-      orderBy: [{ dayType: 'asc' }, { durationMinutes: 'asc' }, { effectiveFrom: 'desc' }],
+      orderBy: [{ durationMinutes: 'asc' }, { createdAt: 'desc' }],
     });
+    return rules.map(withPrice);
   }
 
-  // --- Operating hours ---------------------------------------------------
-
-  async upsertOperatingHours(dto: UpsertOperatingHoursDto, actor: AuthContext) {
-    await this.assertVenueOwnership(dto.venueId, actor);
-    // Dual-write: the legacy OperatingHours row (rollback source) and its
-    // AvailabilityRule twin (keyed by sourceOperatingHoursId, so a repeat
-    // call updates rather than duplicates) commit together.
-    return this.prisma.client.$transaction(async (tx) => {
-      const hours = await tx.operatingHours.upsert({
-        where: { venueId_weekday: { venueId: dto.venueId, weekday: dto.weekday } },
-        create: dto,
-        update: { openTime: dto.openTime, closeTime: dto.closeTime },
-      });
-      await tx.availabilityRule.upsert({
-        where: { sourceOperatingHoursId: hours.id },
-        create: {
-          venueId: hours.venueId,
-          weekday: hours.weekday,
-          openTime: hours.openTime,
-          closeTime: hours.closeTime,
-          sourceOperatingHoursId: hours.id,
-        },
-        update: { weekday: hours.weekday, openTime: hours.openTime, closeTime: hours.closeTime },
-      });
-      return hours;
+  /**
+   * A price must not compete with another active price for the same unit and
+   * duration: if some slot (day + start time) would be priced by both, it is
+   * ambiguous which one applies, so the new/re-enabled price is refused and the
+   * clashing one is named.
+   */
+  private async assertNoOverlap(
+    candidate: {
+      resourceId: string | null;
+      resourceGroupId: string | null;
+      durationMinutes: number;
+      weekdays: number[];
+      startWindow: string | null;
+      endWindow: string | null;
+    },
+    excludeId?: string,
+  ) {
+    const existing = await this.prisma.client.pricingRule.findMany({
+      where: {
+        resourceId: candidate.resourceId,
+        resourceGroupId: candidate.resourceGroupId,
+        durationMinutes: candidate.durationMinutes,
+        isActive: true,
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
     });
+    const probe = { ...candidate, effectiveFrom: new Date(), createdAt: new Date() };
+    const clash = existing.find((rule) => rulesOverlap(probe, rule));
+    if (clash) {
+      throw new ConflictException(
+        `This overlaps an existing price (${describeRule(clash)}). Block or remove that price first, or choose different days or hours.`,
+      );
+    }
   }
 
-  async listOperatingHours(venueId: string, actor: AuthContext) {
+  /**
+   * Edits one price: its days, hours, duration, amount, or whether it is blocked.
+   * A price that is (or becomes) active is re-checked for overlaps, so editing or
+   * unblocking can never leave two active prices competing for the same slot.
+   */
+  async updatePricingRule(id: string, dto: UpdatePricingRuleDto, actor: AuthContext) {
+    const rule = await this.prisma.client.pricingRule.findUnique({
+      where: { id },
+      include: { resource: { select: { venueId: true } }, resourceGroup: { select: { venueId: true } } },
+    });
+    const venueId = rule?.resource?.venueId ?? rule?.resourceGroup?.venueId;
+    if (!rule || !venueId) throw new NotFoundException('Price rule not found');
+    const venue = await this.assertVenueOwnership(venueId, actor);
+
+    const currentDays = rule.weekdays.length
+      ? rule.weekdays
+      : rule.dayType
+        ? legacyDayTypeToWeekdays(rule.dayType)
+        : [];
+    const next = {
+      resourceId: rule.resourceId,
+      resourceGroupId: rule.resourceGroupId,
+      durationMinutes: dto.durationMinutes ?? rule.durationMinutes,
+      weekdays: dto.days ? [...new Set(dto.days)].sort((a, b) => a - b) : currentDays,
+      startWindow: dto.startWindow === undefined ? rule.startWindow : dto.startWindow,
+      endWindow: dto.endWindow === undefined ? rule.endWindow : dto.endWindow,
+    };
+    const isActive = dto.isActive ?? rule.isActive;
+    // Re-validated only when a price field is sent. The booking price follows the full price while it was
+    // equal to it (the old single-price behaviour); otherwise it stays unless sent.
+    const touchesPrice =
+      dto.normalPrice !== undefined ||
+      dto.price !== undefined ||
+      dto.offerPrice !== undefined ||
+      dto.bookingPrice !== undefined;
+    const oldFull = effectivePrice(rule);
+    const prices = touchesPrice
+      ? resolvePrices({
+          normalPrice: dto.normalPrice ?? dto.price ?? Number(rule.normalPrice),
+          offerPrice:
+            dto.offerPrice === undefined ? (rule.offerPrice == null ? null : Number(rule.offerPrice)) : dto.offerPrice,
+          bookingPrice: dto.bookingPrice ?? (Number(rule.bookingPrice) === oldFull ? undefined : Number(rule.bookingPrice)),
+        })
+      : undefined;
+    if (next.weekdays.length === 0) throw new BadRequestException('Choose the days this price applies to');
+    if (dto.durationMinutes !== undefined && dto.durationMinutes !== rule.durationMinutes) {
+      await this.assertDurationAllowed(
+        venue,
+        rule.resourceId ? { resourceId: rule.resourceId } : { resourceGroupId: rule.resourceGroupId! },
+        dto.durationMinutes,
+      );
+    }
+    const changesCoverage =
+      (isActive && !rule.isActive) ||
+      next.durationMinutes !== rule.durationMinutes ||
+      next.weekdays.join() !== currentDays.join() ||
+      next.startWindow !== rule.startWindow ||
+      next.endWindow !== rule.endWindow;
+    if (isActive && changesCoverage) await this.assertNoOverlap(next, id);
+
+    const { resource: _r, resourceGroup: _g, ...updated } = await this.prisma.client.pricingRule.update({
+      where: { id },
+      data: {
+        isActive,
+        durationMinutes: next.durationMinutes,
+        weekdays: next.weekdays,
+        startWindow: next.startWindow,
+        endWindow: next.endWindow,
+        ...(prices ?? {}),
+      },
+      include: { resource: { select: { venueId: true } }, resourceGroup: { select: { venueId: true } } },
+    });
+    return withPrice(updated);
+  }
+
+  /** Removes one price rule; the venue's owner (or a Super Admin) only. */
+  async deletePricingRule(id: string, actor: AuthContext) {
+    const rule = await this.prisma.client.pricingRule.findUnique({
+      where: { id },
+      include: { resource: { select: { venueId: true } }, resourceGroup: { select: { venueId: true } } },
+    });
+    if (!rule) throw new NotFoundException('Price rule not found');
+    const venueId = rule.resource?.venueId ?? rule.resourceGroup?.venueId;
+    if (!venueId) throw new NotFoundException('Price rule not found');
     await this.assertVenueOwnership(venueId, actor);
-    return this.prisma.client.operatingHours.findMany({
-      where: { venueId },
-      orderBy: { weekday: 'asc' },
-    });
+    await this.prisma.client.pricingRule.delete({ where: { id } });
+    return { status: 'ok' };
   }
 
   // --- Blocked dates ---------------------------------------------------

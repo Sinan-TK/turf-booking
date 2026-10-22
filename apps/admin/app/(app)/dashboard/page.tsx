@@ -38,7 +38,7 @@ const CARDS: Array<{
 ];
 
 const SHORTCUTS: Array<{ href: string; label: string; hint: string; icon: IconName }> = [
-  { href: '/venue-types/new', label: 'New venue type', hint: 'Add Chess, Badminton…', icon: 'tag' },
+  { href: '/venue-types/new', label: 'New facility', hint: 'Add Chess, Pool, Badminton…', icon: 'tag' },
   { href: '/venues/new', label: 'New venue', hint: 'Onboard a venue', icon: 'venue' },
   { href: '/bookings', label: 'Bookings', hint: 'See what is booked', icon: 'calendar' },
   { href: '/support', label: 'Support', hint: 'Answer open tickets', icon: 'support' },

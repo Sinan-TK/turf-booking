@@ -17,7 +17,12 @@ import {
 import { loadEnv } from '@venue/config';
 import { AuditService } from '../audit/audit.service';
 import { PAYMENT_PROVIDER, type PaymentProvider } from './payment-provider.interface';
-import { PAYMENTS_REPOSITORY, type PaymentsRepository } from './payments.repository';
+import {
+  PAYMENTS_REPOSITORY,
+  type AdminPaymentFilters,
+  type AdminRefundFilters,
+  type PaymentsRepository,
+} from './payments.repository';
 import { CoinsService } from '../coins/coins.service';
 import { CUSTOMER_MESSENGER, type CustomerMessenger } from '../customer-messaging/customer-messenger.port';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -62,7 +67,9 @@ export class PaymentsService {
       await this.payments.extendSlotHoldExpiry(slotHold.id, slotHold.status, graceExpiry);
     }
 
-    const amountMinorUnits = Math.round(Number(booking.amount) * 100);
+    // Only the booking price (the advance) is charged online; the rest of the full price is paid at the venue.
+    const charge = booking.advanceAmount.gt(0) ? booking.advanceAmount : booking.amount;
+    const amountMinorUnits = Math.round(Number(charge) * 100);
     const order = await this.provider.createOrder({
       amountMinorUnits,
       currency: booking.currency,
@@ -72,7 +79,7 @@ export class PaymentsService {
     const payment = await this.payments.createPendingPayment({
       bookingId,
       gatewayOrderId: order.gatewayOrderId,
-      amount: booking.amount,
+      amount: charge,
       currency: booking.currency,
       rawResponse: order.raw,
     });
@@ -80,7 +87,7 @@ export class PaymentsService {
     return {
       paymentId: payment.id,
       gatewayOrderId: order.gatewayOrderId,
-      amount: booking.amount,
+      amount: charge,
       currency: booking.currency,
     };
   }
@@ -194,7 +201,7 @@ export class PaymentsService {
         rawPayload: payload,
         bookingId: booking.id,
         bookingStatus: booking.status,
-        bookingAmount: booking.amount,
+        bookingAmount: payment.amount,
         bookingCurrency: booking.currency,
         cancelBooking: booking.status === 'PENDING_PAYMENT',
       });
@@ -237,6 +244,7 @@ export class PaymentsService {
       bookingStatus: booking.status,
       slotHoldId: slotHold.id,
       slotHoldStatus: slotHold.status,
+      paidAmount: payment.amount,
     });
 
     await this.audit.record({
@@ -275,32 +283,25 @@ export class PaymentsService {
   }
 
   /** Platform-wide listing for the Super Admin Portal (§12). */
-  async listPaymentsForAdmin(filters: { status?: string; limit?: number; offset?: number }) {
+  async listPaymentsForAdmin(filters: AdminPaymentFilters & { limit?: number; offset?: number }) {
     return this.payments.listPaymentsForAdmin(filters);
   }
 
-  async countPaymentsForAdmin(filters: { status?: string }) {
+  async countPaymentsForAdmin(filters: AdminPaymentFilters) {
     return this.payments.countPaymentsForAdmin(filters);
   }
 
-  async listRefundsForAdmin(filters: { status?: string; limit?: number; offset?: number }) {
+  async listRefundsForAdmin(filters: AdminRefundFilters & { limit?: number; offset?: number }) {
     return this.payments.listRefundsForAdmin(filters);
   }
 
-  async countRefundsForAdmin(filters: { status?: string }) {
+  async countRefundsForAdmin(filters: AdminRefundFilters) {
     return this.payments.countRefundsForAdmin(filters);
   }
 
   /** Org-scoped listings for the Venue Owner Portal — view-only, per the
    * brief (§12/§14): owners can see their own payments/refunds but never
    * mutate them directly. */
-  async listPaymentsForOwner(organizationId: string, filters: { status?: string; limit?: number }) {
-    return this.payments.listPaymentsForOwner(organizationId, filters);
-  }
-
-  async listRefundsForOwner(organizationId: string, filters: { status?: string; limit?: number }) {
-    return this.payments.listRefundsForOwner(organizationId, filters);
-  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async handlePaymentFailed(payload: any) {

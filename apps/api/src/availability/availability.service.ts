@@ -2,6 +2,7 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { TIME_WINDOW_HOURS, normalizeFacilityCode } from '@venue/shared';
 import type { TimeWindow } from '@venue/shared';
 import { DateTime } from 'luxon';
+import { effectivePrice, pickPricingRule } from '../pricing/pricing-rules';
 import { ResourcesService } from '../resources/resources.service';
 import { PolicyResolverService, type ResolvedPolicy } from '../scheduling/policy-resolver.service';
 import { ScheduleService, type OpenWindow } from '../scheduling/schedule.service';
@@ -67,15 +68,13 @@ export class AvailabilityService {
       if (!categoryId) return [];
     }
 
-    const candidateVenues = (await this.resolveCandidateVenues(params)).filter(
-      (venue) => !categoryId || venue.categoryId === categoryId,
-    );
+    const candidateVenues = await this.resolveCandidateVenues(params);
     if (candidateVenues.length === 0) return [];
 
     const now = new Date();
     const results = [];
     for (const venue of candidateVenues) {
-      const resources = await this.availability.findBookableResources(venue.id, params.groundType);
+      const resources = await this.availability.findBookableResources(venue.id, params.groundType, categoryId);
       if (resources.length === 0) continue;
       const policySet = await this.policies.forVenue(venue, now);
 
@@ -87,7 +86,6 @@ export class AvailabilityService {
         start: windowStart,
         end: windowEnd,
         localDay,
-        localWeekday,
       } = this.resolveWindow(params.date, params.timeWindow, venue.timezone);
 
       for (const resource of resources) {
@@ -97,9 +95,9 @@ export class AvailabilityService {
         if (!isDurationAllowed(policy, params.durationMinutes)) continue;
 
         const openWindows = await this.schedule.openWindows(
-          venue.id,
           { resourceId: resource.id },
           localDay,
+          params.durationMinutes,
         );
         const startTimes = await this.candidateStartTimes({
           venueId: venue.id,
@@ -114,12 +112,21 @@ export class AvailabilityService {
         });
         if (startTimes.length === 0) continue;
 
-        const pricingRule = await this.availability.findPricingRule(
+        // The price depends on the day AND the time a slot starts, so each
+        // start time is priced on its own; `price` is the lowest of them.
+        const latestStart = startTimes.reduce((a, b) => (a > b ? a : b));
+        const pricingRules = await this.availability.findPricingRules(
           resource.id,
           params.durationMinutes,
-          localWeekday === 0 || localWeekday === 6 ? 'WEEKEND' : 'WEEKDAY',
-          new Date(),
+          latestStart,
         );
+        const startPrices = startTimes.map((t) => pickPricingRule(pricingRules, t, venue.timezone));
+        const priced = startPrices.filter((r): r is NonNullable<typeof r> => r !== null);
+        const pricingRule = priced.reduce<(typeof priced)[number] | null>(
+          (low, r) => (low === null || effectivePrice(r) < effectivePrice(low) ? r : low),
+          null,
+        );
+        const priceVaries = new Set(startPrices.map((r) => (r ? effectivePrice(r) : null))).size > 1;
 
         results.push({
           venue: {
@@ -131,7 +138,7 @@ export class AvailabilityService {
             lat: Number(venue.lat),
             lng: Number(venue.lng),
           },
-          category: venue.category,
+          category: resource.category,
           resource: { id: resource.id, name: resource.name, groundType: resource.groundType },
           distanceKm:
             params.lat !== undefined && params.lng !== undefined
@@ -153,9 +160,22 @@ export class AvailabilityService {
           },
           openWindows: openWindows ?? null,
           timezone: venue.timezone,
+          // `amount` is the full price (the offer when there is one). `normalAmount` is the struck-through
+          // normal price (only when an offer applies) and `bookingAmount` is the advance paid online.
           price: pricingRule
-            ? { amount: pricingRule.price.toString(), currency: pricingRule.currency }
+            ? {
+                amount: String(effectivePrice(pricingRule)),
+                currency: pricingRule.currency,
+                normalAmount: pricingRule.offerPrice != null ? pricingRule.normalPrice.toString() : null,
+                bookingAmount: pricingRule.bookingPrice.toString(),
+              }
             : null,
+          // True when different start times cost different amounts, so the UI can say "from".
+          priceVaries,
+          // Aligned with availableStartTimes; null where no price rule covers that time.
+          startPrices: startPrices.map((r) => (r ? String(effectivePrice(r)) : null)),
+          startNormalPrices: startPrices.map((r) => (r && r.offerPrice != null ? r.normalPrice.toString() : null)),
+          startBookingPrices: startPrices.map((r) => (r ? r.bookingPrice.toString() : null)),
         });
       }
     }

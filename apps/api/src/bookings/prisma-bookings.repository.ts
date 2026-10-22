@@ -1,8 +1,10 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { formatOrderId, SLOT_HOLD_TRANSITIONS, assertTransition } from '@venue/shared';
-import type { BookingStatus, DayType } from '@venue/database';
+import type { BookingStatus, PaymentMethod, Prisma } from '@venue/database';
 import { PrismaService } from '../prisma/prisma.service';
+import { contains, dateWhere } from '../common/list-filters';
 import type {
+  AdminBookingFilters,
   BookingsRepository,
   CancelAtomicParams,
   HoldAtomicParams,
@@ -43,10 +45,9 @@ export class PrismaBookingsRepository implements BookingsRepository {
     });
   }
 
-  findPricingRule(resourceId: string, durationMinutes: number, dayType: string, at: Date) {
-    return this.prisma.client.pricingRule.findFirst({
-      where: { resourceId, durationMinutes, dayType: dayType as DayType, effectiveFrom: { lte: at } },
-      orderBy: { effectiveFrom: 'desc' },
+  findPricingRules(resourceId: string, durationMinutes: number, at: Date) {
+    return this.prisma.client.pricingRule.findMany({
+      where: { resourceId, durationMinutes, isActive: true, effectiveFrom: { lte: at } },
     });
   }
 
@@ -54,15 +55,9 @@ export class PrismaBookingsRepository implements BookingsRepository {
     return this.prisma.client.resourceGroup.findUnique({ where: { id } });
   }
 
-  findGroupPricingRule(resourceGroupId: string, durationMinutes: number, dayType: string, at: Date) {
-    return this.prisma.client.pricingRule.findFirst({
-      where: {
-        resourceGroupId,
-        durationMinutes,
-        dayType: dayType as DayType,
-        effectiveFrom: { lte: at },
-      },
-      orderBy: { effectiveFrom: 'desc' },
+  findGroupPricingRules(resourceGroupId: string, durationMinutes: number, at: Date) {
+    return this.prisma.client.pricingRule.findMany({
+      where: { resourceGroupId, durationMinutes, isActive: true, effectiveFrom: { lte: at } },
     });
   }
 
@@ -90,6 +85,10 @@ export class PrismaBookingsRepository implements BookingsRepository {
 
   findBookingById(id: string) {
     return this.prisma.client.booking.findUnique({ where: { id } });
+  }
+
+  addPaidAmount(id: string, delta: Prisma.Decimal | number | string) {
+    return this.prisma.client.booking.update({ where: { id }, data: { paidAmount: { increment: delta } } });
   }
 
   findBookingDetailById(id: string) {
@@ -125,25 +124,31 @@ export class PrismaBookingsRepository implements BookingsRepository {
     });
   }
 
-  private adminBookingWhere(filters: { status?: string; venueId?: string; organizationId?: string }) {
+  private adminBookingWhere(filters: AdminBookingFilters) {
+    const q = filters.search;
     return {
       status: filters.status ? (filters.status as BookingStatus) : undefined,
-      venueId: filters.venueId,
+      venueId: filters.venueId ?? (filters.venueIds ? { in: filters.venueIds } : undefined),
       venue: filters.organizationId ? { organizationId: filters.organizationId } : undefined,
+      paymentMethod: filters.paymentMethod ? (filters.paymentMethod as PaymentMethod) : undefined,
+      startTime: dateWhere(filters.startRange),
+      OR: q
+        ? [
+            { orderId: contains(q) },
+            { customer: { whatsappNumber: contains(q) } },
+            { customer: { name: contains(q) } },
+            { venue: { name: contains(q) } },
+            { venue: { facilityCode: contains(q) } },
+          ]
+        : undefined,
     };
   }
 
-  countForAdmin(filters: { status?: string; venueId?: string; organizationId?: string }) {
+  countForAdmin(filters: AdminBookingFilters) {
     return this.prisma.client.booking.count({ where: this.adminBookingWhere(filters) });
   }
 
-  listForAdmin(filters: {
-    status?: string;
-    venueId?: string;
-    organizationId?: string;
-    limit?: number;
-    offset?: number;
-  }) {
+  listForAdmin(filters: AdminBookingFilters & { limit?: number; offset?: number }) {
     const limit = Math.min(filters.limit ?? 50, 200);
     return this.prisma.client.booking.findMany({
       where: this.adminBookingWhere(filters),
@@ -154,26 +159,6 @@ export class PrismaBookingsRepository implements BookingsRepository {
       orderBy: [{ startTime: 'desc' }, { id: 'asc' }],
       take: limit,
       skip: filters.offset ?? 0,
-    });
-  }
-
-  listForOwner(
-    organizationId: string,
-    filters: { status?: string; venueId?: string; limit?: number },
-  ) {
-    const limit = Math.min(filters.limit ?? 50, 200);
-    return this.prisma.client.booking.findMany({
-      where: {
-        status: filters.status ? (filters.status as BookingStatus) : undefined,
-        venueId: filters.venueId,
-        venue: { organizationId },
-      },
-      include: {
-        venue: { select: { id: true, name: true, facilityCode: true, organizationId: true } },
-        customer: { select: { id: true, whatsappNumber: true, name: true } },
-      },
-      orderBy: { startTime: 'desc' },
-      take: limit,
     });
   }
 
@@ -225,6 +210,7 @@ export class PrismaBookingsRepository implements BookingsRepository {
           durationMinutes: params.durationMinutes,
           groundType: params.groundType,
           amount: params.amount,
+          advanceAmount: params.advanceAmount,
           currency: params.currency,
         },
       });
@@ -317,6 +303,7 @@ export class PrismaBookingsRepository implements BookingsRepository {
           durationMinutes: params.durationMinutes,
           groundType: params.unitLabel,
           amount: params.amount,
+          advanceAmount: params.advanceAmount,
           currency: params.currency,
         },
       });
@@ -375,6 +362,9 @@ export class PrismaBookingsRepository implements BookingsRepository {
           durationMinutes: params.durationMinutes,
           groundType: params.groundType,
           amount: params.amount,
+          // A walk-in is paid at the venue: nothing was charged online, and what was collected is recorded.
+          advanceAmount: 0,
+          paidAmount: params.paidAmount,
           currency: params.currency,
           status: 'CONFIRMED',
           paymentMethod: params.paymentMethod,

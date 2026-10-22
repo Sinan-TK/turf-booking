@@ -1,14 +1,17 @@
 import { BadRequestException, Body, Controller, Get, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { parsePage, setTotalCount } from '../common/pagination';
+import { parseDateRange, parseEnumFilter, parseSearch } from '../common/list-filters';
+import { BookingStatus, PaymentMethod } from '@venue/database';
 import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { BookingsService } from './bookings.service';
-import { CancelBookingDto, CreateHoldDto, CreateOfflineBookingDto } from './dto/booking.dto';
+import { CancelBookingDto, CollectBalanceDto, CreateHoldDto, CreateOfflineBookingDto } from './dto/booking.dto';
 import type { AuthContext } from '../auth/auth.types';
+import { OwnerScopeService } from '../owner-scope/owner-scope.service';
 
 @Controller()
 @UseGuards(AuthGuard, RolesGuard)
@@ -21,8 +24,7 @@ export class BookingsController {
     return this.bookings.createHold(dto, actor);
   }
 
-  // P2 pooled-inventory read mirroring the WhatsApp previewSlot flow:
-  // remaining units + price for an explicit start time, no rows written.
+  // P2 pooled-inventory read: remaining units + price for an explicit start time, no rows written.
   @Get('bookings/group-availability')
   previewGroupAvailability(
     @Query('resourceGroupId') resourceGroupId: string,
@@ -81,12 +83,23 @@ export class AdminBookingsController {
     @Query('status') status?: string,
     @Query('venueId') venueId?: string,
     @Query('organizationId') organizationId?: string,
+    @Query('search') search?: string,
+    @Query('paymentMethod') paymentMethod?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
     @Res({ passthrough: true }) res?: Response,
   ) {
     const page = parsePage(limit, offset);
-    const filters = { status, venueId, organizationId };
+    const filters = {
+      status: parseEnumFilter(status, Object.values(BookingStatus), 'status'),
+      venueId,
+      organizationId,
+      search: parseSearch(search),
+      paymentMethod: parseEnumFilter(paymentMethod, Object.values(PaymentMethod), 'paymentMethod'),
+      startRange: parseDateRange(from, to),
+    };
     const [rows, total] = await Promise.all([
       this.bookings.listForAdmin({ ...filters, ...page }),
       this.bookings.countForAdmin(filters),
@@ -105,20 +118,62 @@ export class AdminBookingsController {
 @UseGuards(AuthGuard, RolesGuard)
 @Roles(Role.VENUE_OWNER)
 export class OwnerBookingsController {
-  constructor(private readonly bookings: BookingsService) {}
+  constructor(
+    private readonly bookings: BookingsService,
+    private readonly scope: OwnerScopeService,
+  ) {}
 
   @Get()
-  list(
+  async list(
     @CurrentUser() actor: AuthContext,
     @Query('status') status?: string,
     @Query('venueId') venueId?: string,
+    @Query('search') search?: string,
+    @Query('paymentMethod') paymentMethod?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
     @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Res({ passthrough: true }) res?: Response,
   ) {
-    return this.bookings.listForOwner(actor.organizationId!, {
-      status,
+    const page = parsePage(limit, offset);
+    const filters = {
+      // Always the caller's own organization, never a client-supplied one.
+      organizationId: actor.organizationId!,
+      // A staff member only ever sees the venues they are assigned to.
+      ...(await this.scope.venueFilter(actor, venueId)),
+      status: parseEnumFilter(status, Object.values(BookingStatus), 'status'),
+      search: parseSearch(search),
+      paymentMethod: parseEnumFilter(paymentMethod, Object.values(PaymentMethod), 'paymentMethod'),
+      startRange: parseDateRange(from, to),
+    };
+    const [rows, total] = await Promise.all([
+      this.bookings.listForAdmin({ ...filters, ...page }),
+      this.bookings.countForAdmin(filters),
+    ]);
+    if (res) setTotalCount(res, total);
+    return rows;
+  }
+
+  // One venue's bookings (every status) for a day window [from, to), in start order: the staff day view.
+  @Get('day')
+  async day(
+    @CurrentUser() actor: AuthContext,
+    @Query('venueId') venueId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    if (!venueId) throw new BadRequestException('venueId is required');
+    if (!from || !to) throw new BadRequestException('from and to are required');
+    await this.scope.assertVenue(actor, venueId);
+    const rows = await this.bookings.listForAdmin({
+      organizationId: actor.organizationId!,
       venueId,
-      limit: limit ? Number(limit) : undefined,
+      startRange: parseDateRange(from, to),
+      limit: 200,
+      offset: 0,
     });
+    return [...rows].sort((x, y) => x.startTime.getTime() - y.startTime.getTime());
   }
 
   // Records a walk-in/offline booking directly as CONFIRMED — see
@@ -128,8 +183,16 @@ export class OwnerBookingsController {
     return this.bookings.createOfflineBooking(dto, actor);
   }
 
+  // The customer paid the rest at the venue: record it, so the booking shows nothing remaining.
+  @Post(':id/collect')
+  collect(@Param('id') id: string, @Body() dto: CollectBalanceDto, @CurrentUser() actor: AuthContext) {
+    return this.bookings.collectBalance(id, dto.amount, actor);
+  }
+
   @Get(':id')
-  getById(@Param('id') id: string, @CurrentUser() actor: AuthContext) {
-    return this.bookings.getForOwner(id, actor.organizationId!);
+  async getById(@Param('id') id: string, @CurrentUser() actor: AuthContext) {
+    const booking = await this.bookings.getForOwner(id, actor.organizationId!);
+    await this.scope.assertVenue(actor, booking.venue.id);
+    return booking;
   }
 }

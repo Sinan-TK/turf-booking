@@ -77,8 +77,8 @@ describe('Auth & RBAC boundaries', () => {
 
     // Owner B cannot write configuration onto Owner A's venue.
     const configRes = await ownerBAgent
-      .put('/venue-config/operating-hours')
-      .send({ venueId: venueA.venueId, weekday: 1, openTime: '01:00', closeTime: '02:00' });
+      .post('/resources/pricing-rules')
+      .send({ resourceId: venueA.fullGroundId, durationMinutes: 60, days: [1], price: 1 });
     expect(configRes.status).toBe(403);
 
     // Owner B cannot even read Owner A's venue as "mine".

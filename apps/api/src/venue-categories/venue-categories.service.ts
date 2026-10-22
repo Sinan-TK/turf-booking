@@ -36,10 +36,22 @@ export class VenueCategoriesService {
   ) {}
 
   /** Public: active categories only, in display order, each with the policy
-   * a venue of that type runs on (so the UI can show real durations). */
-  async listPublic() {
+   * a unit of that facility runs on (so the UI can show real durations).
+   * `availableOnly` keeps just the facilities with something bookable today. */
+  async listPublic(opts: { availableOnly?: boolean } = {}) {
+    const bookableVenue = { status: 'ACTIVE' as const, deletedAt: null };
     const categories = await this.prisma.client.venueCategory.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        ...(opts.availableOnly
+          ? {
+              OR: [
+                { resources: { some: { isBookable: true, status: 'ACTIVE' as const, venue: bookableVenue } } },
+                { resourceGroups: { some: { venue: bookableVenue } } },
+              ],
+            }
+          : {}),
+      },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     });
     return this.withPolicies(categories);
@@ -48,25 +60,27 @@ export class VenueCategoriesService {
   async listAdmin() {
     const categories = await this.prisma.client.venueCategory.findMany({
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-      include: { _count: { select: { venues: true } } },
     });
-    const withPolicy = await this.withPolicies(categories);
-    return withPolicy.map((c, i) => ({ ...c, venueCount: categories[i]._count.venues }));
+    const [withPolicy, venueCounts] = await Promise.all([
+      this.withPolicies(categories),
+      this.venueCounts(categories.map((c) => c.id)),
+    ]);
+    return withPolicy.map((c) => ({ ...c, venueCount: venueCounts.get(c.id) ?? 0 }));
   }
 
   async getAdmin(id: string) {
-    const category = await this.prisma.client.venueCategory.findUnique({
-      where: { id },
-      include: { _count: { select: { venues: true } } },
-    });
-    if (!category) throw new NotFoundException('Venue type not found');
-    const [withPolicy] = await this.withPolicies([category]);
-    return { ...withPolicy, venueCount: category._count.venues };
+    const category = await this.prisma.client.venueCategory.findUnique({ where: { id } });
+    if (!category) throw new NotFoundException('Facility not found');
+    const [[withPolicy], venueCounts] = await Promise.all([
+      this.withPolicies([category]),
+      this.venueCounts([id]),
+    ]);
+    return { ...withPolicy, venueCount: venueCounts.get(id) ?? 0 };
   }
 
   async create(dto: CreateCategoryDto, actor: AuthContext) {
     const existing = await this.prisma.client.venueCategory.findUnique({ where: { slug: dto.slug } });
-    if (existing) throw new ConflictException(`A venue type with slug ${dto.slug} already exists`);
+    if (existing) throw new ConflictException(`A facility with slug ${dto.slug} already exists`);
 
     const category = await this.prisma.client.$transaction(async (tx) => {
       const created = await tx.venueCategory.create({
@@ -101,17 +115,17 @@ export class VenueCategoriesService {
   async update(id: string, dto: UpdateCategoryDto, actor: AuthContext) {
     const current = await this.prisma.client.venueCategory.findUnique({
       where: { id },
-      include: { _count: { select: { venues: true } } },
+      include: { _count: { select: { resources: true, resourceGroups: true } } },
     });
-    if (!current) throw new NotFoundException('Venue type not found');
+    if (!current) throw new NotFoundException('Facility not found');
 
     if (
       dto.defaultAllocationMode &&
       dto.defaultAllocationMode !== current.defaultAllocationMode &&
-      current._count.venues > 0
+      current._count.resources + current._count.resourceGroups > 0
     ) {
       throw new ConflictException(
-        'The booking style cannot be changed while venues use this type. Create a new type instead.',
+        'The booking style cannot be changed while units use this facility. Create a new facility instead.',
       );
     }
     if (dto.isActive === false && current.isActive) {
@@ -150,17 +164,18 @@ export class VenueCategoriesService {
     return this.update(id, { isActive }, actor);
   }
 
-  /** Hard delete only when no venue (including soft-deleted ones) was ever
-   * created under the category; otherwise deactivate instead. */
+  /** Hard delete only when no unit was ever created under the facility;
+   * otherwise deactivate instead. */
   async remove(id: string, actor: AuthContext) {
     const category = await this.prisma.client.venueCategory.findUnique({
       where: { id },
-      include: { _count: { select: { venues: true } } },
+      include: { _count: { select: { resources: true, resourceGroups: true } } },
     });
-    if (!category) throw new NotFoundException('Venue type not found');
-    if (category._count.venues > 0) {
+    if (!category) throw new NotFoundException('Facility not found');
+    const units = category._count.resources + category._count.resourceGroups;
+    if (units > 0) {
       throw new ConflictException(
-        `${category._count.venues} venue(s) use this type, so it cannot be deleted. Deactivate it instead.`,
+        `${units} unit(s) use this facility, so it cannot be deleted. Deactivate it instead.`,
       );
     }
     // BookingPolicy rows scoped to this category cascade with it.
@@ -175,21 +190,43 @@ export class VenueCategoriesService {
     return { deleted: true };
   }
 
-  /** Deactivation hides the type from new-venue forms and the public list.
+  /** Deactivation hides the facility from "add unit" forms and the public list.
    * It is refused while live bookings exist under it. */
   private async assertSafeToDeactivate(id: string) {
     const live = await this.prisma.client.booking.count({
       where: {
-        venue: { categoryId: id },
+        OR: [{ resource: { categoryId: id } }, { resourceGroup: { categoryId: id } }],
         status: { in: [...LIVE_BOOKING_STATUSES] },
         endTime: { gt: new Date() },
       },
     });
     if (live > 0) {
       throw new ConflictException(
-        `${live} upcoming or pending booking(s) exist for venues of this type. Deactivate it once they are completed or cancelled.`,
+        `${live} upcoming or pending booking(s) exist for units of this facility. Deactivate it once they are completed or cancelled.`,
       );
     }
+  }
+
+  /** Distinct venues that have at least one unit under each facility. */
+  private async venueCounts(categoryIds: string[]): Promise<Map<string, number>> {
+    const [resources, groups] = await Promise.all([
+      this.prisma.client.resource.findMany({
+        where: { categoryId: { in: categoryIds } },
+        select: { categoryId: true, venueId: true },
+        distinct: ['categoryId', 'venueId'],
+      }),
+      this.prisma.client.resourceGroup.findMany({
+        where: { categoryId: { in: categoryIds } },
+        select: { categoryId: true, venueId: true },
+        distinct: ['categoryId', 'venueId'],
+      }),
+    ]);
+    const venuesBy = new Map<string, Set<string>>();
+    for (const u of [...resources, ...groups]) {
+      if (!venuesBy.has(u.categoryId)) venuesBy.set(u.categoryId, new Set());
+      venuesBy.get(u.categoryId)!.add(u.venueId);
+    }
+    return new Map([...venuesBy].map(([id, venues]) => [id, venues.size]));
   }
 
   private policyData(categoryId: string, policy: CategoryPolicyInput) {

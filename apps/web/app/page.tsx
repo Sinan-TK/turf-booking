@@ -34,10 +34,28 @@ interface SearchResult {
   openWindows?: Array<{ openTime: string; closeTime: string }> | null;
   /** IANA zone the venue's times are expressed in. */
   timezone: string;
-  price: { amount: string; currency: string } | null;
+  /** The lowest price across the available start times. */
+  price: SlotPrice | null;
+  /** Full price of each start time, aligned with availableStartTimes (prices can differ by day and time of day). */
+  startPrices?: Array<string | null>;
+  /** Normal price of each start time that has an offer (null where there is none). */
+  startNormalPrices?: Array<string | null>;
+  /** The advance paid online for each start time. */
+  startBookingPrices?: Array<string | null>;
 }
 
-// Shown when a venue has no opening hours configured.
+/**
+ * What a slot costs: `amount` is the full price (the offer price when there is one), `normalAmount` the
+ * struck-through normal price (only with an offer), `bookingAmount` the advance paid online to hold it.
+ */
+export interface SlotPrice {
+  amount: string;
+  currency: string;
+  normalAmount?: string | null;
+  bookingAmount?: string | null;
+}
+
+// Shown when the search result carries no bookable windows to size the timeline from.
 const DEFAULT_TIMELINE = { first: 6, last: 23 };
 
 function todayIso(): string {
@@ -114,6 +132,31 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   GBP: '£',
   AED: 'د.إ',
 };
+
+/** What a slot starting at `start` costs; falls back to the lowest price for an older API response. */
+function priceAt(
+  r: Pick<SearchResult, 'price' | 'startPrices' | 'startNormalPrices' | 'startBookingPrices' | 'availableStartTimes'>,
+  start: string | null,
+): SlotPrice | null {
+  if (!r.price) return null;
+  const i = start ? r.availableStartTimes.indexOf(start) : -1;
+  const amount = i >= 0 ? r.startPrices?.[i] : undefined;
+  if (!amount) return r.price;
+  return {
+    amount,
+    currency: r.price.currency,
+    normalAmount: r.startNormalPrices?.[i] ?? null,
+    bookingAmount: r.startBookingPrices?.[i] ?? r.price.bookingAmount ?? null,
+  };
+}
+
+/** "Pay ₹300 now" when only part of the price is charged online; empty when it is all of it. */
+function payNowLabel(price: SlotPrice): string {
+  if (!price.bookingAmount) return '';
+  return Number(price.bookingAmount) < Number(price.amount)
+    ? `Pay ${formatPrice({ amount: price.bookingAmount, currency: price.currency })} now`
+    : '';
+}
 
 function formatPrice(price: { amount: string; currency: string }): string {
   const n = Number(price.amount);
@@ -231,7 +274,7 @@ export default function HomePage() {
 
   useEffect(() => {
     api
-      .get<VenueCategory[]>('/categories')
+      .get<VenueCategory[]>('/categories?available=true')
       .then(setCategories)
       .catch(() => undefined);
   }, []);
@@ -924,7 +967,7 @@ function SlotBookingModal({
             {formatDateLabel(dateIso)}
           </span>
           <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 font-bold text-slate-700 ring-1 ring-slate-200">
-            {r.resource.name} · {r.resource.groundType}
+            {r.resource.groundType ? `${r.resource.name} · ${r.resource.groundType}` : r.resource.name}
           </span>
           <span className="inline-flex items-center gap-1 rounded-full bg-white py-0.5 pl-1 pr-2 font-bold text-slate-700 ring-1 ring-slate-200">
             <button
@@ -959,6 +1002,7 @@ function SlotBookingModal({
           <div className="grid max-h-[152px] grid-cols-2 gap-2 overflow-y-auto pr-0.5">
             {r.availableStartTimes.map((t) => {
               const active = selected === t;
+              const slotPrice = reloading ? null : priceAt(r, t);
               return (
                 <button
                   key={t}
@@ -974,9 +1018,9 @@ function SlotBookingModal({
                   <span className={`text-sm font-extrabold ${active ? 'text-white' : 'text-slate-900'}`}>
                     {formatStart(t, r.timezone)}
                   </span>
-                  {displayPrice && (
+                  {slotPrice && (
                     <span className={`shrink-0 text-[11px] font-black ${active ? 'text-emerald-100' : 'text-emerald-700'}`}>
-                      {formatPrice(displayPrice)}
+                      {formatPrice(slotPrice)}
                     </span>
                   )}
                 </button>
@@ -988,7 +1032,13 @@ function SlotBookingModal({
         <div className="border-t border-slate-100 bg-white p-4">
           {selected && (
             <p className="mb-2 text-center text-xs font-semibold text-slate-600">
-              {formatDateLabel(dateIso)} · {formatTimeRange(selected, durationMinutes, r.timezone)} · {displayPrice ? formatPrice(displayPrice) : ''}
+              {formatDateLabel(dateIso)} · {formatTimeRange(selected, durationMinutes, r.timezone)} · {displayPrice && priceAt(r, selected) ? formatPrice(priceAt(r, selected)!) : ''}
+              {displayPrice && priceAt(r, selected)?.normalAmount && (
+                <s className="ml-1 font-medium text-slate-400">{formatPrice({ amount: priceAt(r, selected)!.normalAmount!, currency: r.price!.currency })}</s>
+              )}
+              {displayPrice && priceAt(r, selected) && payNowLabel(priceAt(r, selected)!) && (
+                <span className="block text-emerald-700">{payNowLabel(priceAt(r, selected)!)}, the rest at the venue</span>
+              )}
             </p>
           )}
           {bookError && (
@@ -1090,6 +1140,9 @@ function MobileVenueCard({
           <div className="bg-emerald-50 border border-emerald-500/20 px-2.5 py-1 rounded-xl text-right shrink-0">
             <span className="text-[9px] uppercase font-bold text-emerald-700 block leading-none">From</span>
             <div className="flex items-baseline justify-end text-venue-primary leading-tight mt-0.5">
+              {r.price.normalAmount && (
+                <s className="mr-1 text-[11px] font-medium text-slate-400">{formatPrice({ amount: r.price.normalAmount, currency: r.price.currency })}</s>
+              )}
               <span className="text-base font-black tracking-tight">{formatPrice(r.price)}</span>
               <span className="text-[10px] font-medium text-slate-500 ml-0.5">/{shortDuration(durationMinutes)}</span>
             </div>
@@ -1185,7 +1238,7 @@ function DesktopVenueCard({
                 </div>
                 <div>
                   <span className="mb-1 inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
-                    {r.resource.name} · {r.resource.groundType}
+                    {r.resource.groundType ? `${r.resource.name} · ${r.resource.groundType}` : r.resource.name}
                   </span>
                   <h3 className="text-xl font-bold leading-snug text-slate-900">{r.venue.name}</h3>
                   <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
@@ -1215,9 +1268,17 @@ function DesktopVenueCard({
                   <span className="text-[11px] font-semibold text-slate-400">
                     {durationLabel(durationMinutes)} rate
                   </span>
+                  {r.price.normalAmount && (
+                    <s className="text-xs font-medium text-slate-400">
+                      {formatPrice({ amount: r.price.normalAmount, currency: r.price.currency })}
+                    </s>
+                  )}
                   <span className="text-2xl font-black text-emerald-700">
                     {formatPrice(r.price)}
                   </span>
+                  {payNowLabel(r.price) && (
+                    <span className="text-[11px] font-semibold text-emerald-700">{payNowLabel(r.price)}</span>
+                  )}
                 </div>
               )}
             </div>
@@ -1269,9 +1330,9 @@ function DesktopVenueCard({
                     >
                       <span className="flex flex-col text-left">
                         <span className="text-xs font-extrabold text-slate-900 group-hover:text-white">{formatStart(t, r.timezone)}</span>
-                        {r.price && (
+                        {priceAt(r, t) && (
                           <span className="text-[10px] font-bold text-emerald-700 group-hover:text-emerald-100">
-                            {formatPrice(r.price)}
+                            {formatPrice(priceAt(r, t)!)}
                           </span>
                         )}
                       </span>

@@ -3,6 +3,8 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { PrismaModule } from './prisma/prisma.module';
+import { OwnerStaffModule } from './owner-staff/owner-staff.module';
+import { OwnerScopeModule } from './owner-scope/owner-scope.module';
 import { AuthModule } from './auth/auth.module';
 import { AuditModule } from './audit/audit.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -21,7 +23,6 @@ import { BookingsModule } from './bookings/bookings.module';
 import { PaymentsModule } from './payments/payments.module';
 import { CoinsModule } from './coins/coins.module';
 import { SupportModule } from './support/support.module';
-import { WhatsAppModule } from './whatsapp/whatsapp.module';
 import { JobsModule } from './jobs/jobs.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { HealthModule } from './health/health.module';
@@ -29,6 +30,7 @@ import { HealthModule } from './health/health.module';
 @Module({
   imports: [
     PrismaModule,
+    OwnerScopeModule,
     AuditModule,
     NotificationsModule,
     AuthModule,
@@ -36,6 +38,7 @@ import { HealthModule } from './health/health.module';
     VenuesModule,
     VenueCategoriesModule,
     OwnerOrganizationsModule,
+    OwnerStaffModule,
     ResourcesModule,
     VenueConfigModule,
     PoliciesModule,
@@ -47,7 +50,6 @@ import { HealthModule } from './health/health.module';
     PaymentsModule,
     CoinsModule,
     SupportModule,
-    WhatsAppModule,
     JobsModule,
     DashboardModule,
     HealthModule,

@@ -6,10 +6,26 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthContext } from '../auth/auth.types';
+import { OwnerScopeService } from '../owner-scope/owner-scope.service';
+
+/** The facility fields a unit carries to clients: labels, allowed sub-types, icon. */
+const CATEGORY_SUMMARY = {
+  id: true,
+  slug: true,
+  name: true,
+  iconKey: true,
+  unitLabel: true,
+  venueLabel: true,
+  unitTypes: true,
+  defaultAllocationMode: true,
+} as const;
 
 @Injectable()
 export class ResourcesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly scope: OwnerScopeService,
+  ) {}
 
   /**
    * Every method (reads included) takes `actor` and re-derives the owning venue's
@@ -22,17 +38,25 @@ export class ResourcesService {
     if (actor.role === 'VENUE_OWNER' && venue.organizationId !== actor.organizationId) {
       throw new ForbiddenException("Cannot manage another organization's venue");
     }
+    await this.scope.assertVenue(actor, venueId);
     return venue;
   }
 
-  /**
-   * Resource unit types follow the venue type: when the category lists
-   * unitTypes the resource's groundType must be one of them (case-insensitive,
-   * stored as the canonical spelling); an empty list means free text.
-   */
-  private async assertValidUnitType(categoryId: string, groundType: string) {
+  /** The facility a unit is being added under: it must exist and be active. */
+  private async requireActiveCategory(categoryId: string) {
     const category = await this.prisma.client.venueCategory.findUnique({ where: { id: categoryId } });
-    if (!category || category.unitTypes.length === 0) return;
+    if (!category) throw new BadRequestException('Unknown facility');
+    if (!category.isActive) throw new BadRequestException('This facility is not active');
+    return category;
+  }
+
+  /**
+   * Unit types follow the unit's facility: when the category lists
+   * unitTypes the resource's groundType must be one of them; an empty list
+   * means free text.
+   */
+  private assertValidUnitType(category: { name: string; unitTypes: string[] }, groundType: string) {
+    if (category.unitTypes.length === 0) return;
     if (!category.unitTypes.some((t) => t === groundType)) {
       throw new BadRequestException(
         `Unit type must be one of: ${category.unitTypes.join(', ')} (${category.name})`,
@@ -40,13 +64,15 @@ export class ResourcesService {
     }
   }
 
-  /** Exclusive venue types (e.g. chess tables, courts) cannot host pooled inventory. */
-  private async assertGroupModeAllowed(categoryId: string, mode: 'EXCLUSIVE' | 'POOLED') {
+  /** Exclusive facilities (e.g. chess tables, courts) cannot host pooled inventory. */
+  private assertGroupModeAllowed(
+    category: { name: string; unitLabel: string; defaultAllocationMode: string },
+    mode: 'EXCLUSIVE' | 'POOLED',
+  ) {
     if (mode !== 'POOLED') return;
-    const category = await this.prisma.client.venueCategory.findUnique({ where: { id: categoryId } });
-    if (category && category.defaultAllocationMode === 'EXCLUSIVE') {
+    if (category.defaultAllocationMode === 'EXCLUSIVE') {
       throw new BadRequestException(
-        `${category.name} venues are booked per ${category.unitLabel.toLowerCase()}; pooled inventory is not available for this venue type.`,
+        `${category.name} is booked per ${category.unitLabel.toLowerCase()}; pooled inventory is not available for this facility.`,
       );
     }
   }
@@ -54,6 +80,7 @@ export class ResourcesService {
   async create(
     dto: {
       venueId: string;
+      categoryId: string;
       name: string;
       groundType: string;
       isBookable: boolean;
@@ -61,14 +88,19 @@ export class ResourcesService {
     },
     actor: AuthContext,
   ) {
-    const venue = await this.assertVenueOwnership(dto.venueId, actor);
-    await this.assertValidUnitType(venue.categoryId, dto.groundType);
+    await this.assertVenueOwnership(dto.venueId, actor);
+    const category = await this.requireActiveCategory(dto.categoryId);
+    this.assertValidUnitType(category, dto.groundType);
+    // Types are a preset list per facility so units stay filterable. A facility with
+    // no presets has no type at all: anything sent is ignored rather than stored as free text.
+    const groundType = category.unitTypes.length === 0 ? '' : dto.groundType;
     return this.prisma.client.$transaction(async (tx) => {
       const resource = await tx.resource.create({
         data: {
           venueId: dto.venueId,
+          categoryId: category.id,
           name: dto.name,
-          groundType: dto.groundType,
+          groundType,
           isBookable: dto.isBookable,
           sortOrder: dto.sortOrder,
         },
@@ -83,6 +115,31 @@ export class ResourcesService {
     });
   }
 
+  /** Stops (or resumes) new bookings on one unit. Bookings already made stay as they are. */
+  async setBookable(id: string, isBookable: boolean, actor: AuthContext) {
+    const resource = await this.prisma.client.resource.findUnique({ where: { id } });
+    if (!resource) throw new NotFoundException('Unit not found');
+    await this.assertVenueOwnership(resource.venueId, actor);
+    return this.prisma.client.resource.update({
+      where: { id },
+      data: { isBookable },
+      include: { category: { select: CATEGORY_SUMMARY } },
+    });
+  }
+
+  /** Same, for every unit of one facility in a venue, so a pool can close without touching the turf. */
+  async setFacilityBookable(
+    dto: { venueId: string; categoryId: string; isBookable: boolean },
+    actor: AuthContext,
+  ) {
+    await this.assertVenueOwnership(dto.venueId, actor);
+    const { count } = await this.prisma.client.resource.updateMany({
+      where: { venueId: dto.venueId, categoryId: dto.categoryId },
+      data: { isBookable: dto.isBookable },
+    });
+    return { updated: count };
+  }
+
   async listForVenue(venueId: string, actor: AuthContext) {
     // Reads are ownership-checked too: an owner must not enumerate another
     // organization's resources by guessing a venueId.
@@ -90,6 +147,7 @@ export class ResourcesService {
     return this.prisma.client.resource.findMany({
       where: { venueId },
       orderBy: { sortOrder: 'asc' },
+      include: { category: { select: CATEGORY_SUMMARY } },
     });
   }
 
@@ -116,6 +174,9 @@ export class ResourcesService {
     if (!parent || !child) throw new NotFoundException('Resource not found');
     if (parent.venueId !== child.venueId) {
       throw new BadRequestException('Composed resources must belong to the same venue');
+    }
+    if (parent.categoryId !== child.categoryId) {
+      throw new BadRequestException('Composed resources must belong to the same facility');
     }
     await this.assertVenueOwnership(parent.venueId, actor);
 
@@ -211,6 +272,7 @@ export class ResourcesService {
   async createGroup(
     dto: {
       venueId: string;
+      categoryId: string;
       name: string;
       allocationMode: 'EXCLUSIVE' | 'POOLED';
       totalUnits?: number;
@@ -218,8 +280,9 @@ export class ResourcesService {
     },
     actor: AuthContext,
   ) {
-    const venue = await this.assertVenueOwnership(dto.venueId, actor);
-    await this.assertGroupModeAllowed(venue.categoryId, dto.allocationMode);
+    await this.assertVenueOwnership(dto.venueId, actor);
+    const category = await this.requireActiveCategory(dto.categoryId);
+    this.assertGroupModeAllowed(category, dto.allocationMode);
     if (dto.allocationMode === 'POOLED') {
       if (dto.totalUnits === undefined || !Number.isInteger(dto.totalUnits) || dto.totalUnits < 1) {
         throw new BadRequestException('POOLED groups require a positive integer totalUnits');
@@ -228,6 +291,7 @@ export class ResourcesService {
     return this.prisma.client.resourceGroup.create({
       data: {
         venueId: dto.venueId,
+        categoryId: category.id,
         name: dto.name,
         allocationMode: dto.allocationMode,
         totalUnits: dto.totalUnits,
@@ -241,6 +305,7 @@ export class ResourcesService {
     return this.prisma.client.resourceGroup.findMany({
       where: { venueId },
       orderBy: { sortOrder: 'asc' },
+      include: { category: { select: CATEGORY_SUMMARY } },
     });
   }
 }

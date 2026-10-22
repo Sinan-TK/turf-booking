@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes } from 'react';
 import { Icon, type IconName } from '@/components/icons';
 
@@ -72,8 +73,8 @@ export function Select({ className = '', ...props }: SelectHTMLAttributes<HTMLSe
   return <select className={`${FIELD} ${className}`} {...props} />;
 }
 
-export function Label({ children }: { children: React.ReactNode }) {
-  return <label className="mb-1.5 block text-xs font-medium text-gray-700">{children}</label>;
+export function Label({ children, htmlFor }: { children: React.ReactNode; htmlFor?: string }) {
+  return <label htmlFor={htmlFor} className="mb-1.5 block text-xs font-medium text-gray-700">{children}</label>;
 }
 
 const BADGE_COLORS: Record<string, string> = {
@@ -92,6 +93,7 @@ const BADGE_COLORS: Record<string, string> = {
   CANCELLED: 'bg-red-50 text-red-700 ring-red-600/20',
   FAILED: 'bg-red-50 text-red-700 ring-red-600/20',
   SUSPENDED: 'bg-red-50 text-red-700 ring-red-600/20',
+  BLOCKED: 'bg-red-50 text-red-700 ring-red-600/20',
   CLOSED: 'bg-gray-100 text-gray-600 ring-gray-500/20',
 };
 
@@ -154,14 +156,26 @@ export function PageHeader({
   title,
   subtitle,
   action,
+  back,
 }: {
   title: string;
   subtitle?: string;
   action?: React.ReactNode;
+  /** Link back to the parent list, shown above the title. */
+  back?: { href: string; label: string };
 }) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
+        {back && (
+          <Link
+            href={back.href}
+            className="mb-2 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 transition hover:text-gray-900"
+          >
+            <Icon name="back" className="h-4 w-4" />
+            {back.label}
+          </Link>
+        )}
         <h1 className="text-2xl font-semibold tracking-tight text-gray-900">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-gray-500">{subtitle}</p>}
       </div>
@@ -278,3 +292,16 @@ export function SkeletonDetailCard({ fields = 4 }: { fields?: number }) {
 export function SkeletonText({ className = 'h-4 w-full' }: { className?: string }) {
   return <Skeleton className={className} />;
 }
+
+/** The red message under a form field; pair it with `aria-invalid` and `aria-describedby` on the input. */
+export function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null;
+  return (
+    <p id={id} role="alert" className="mt-1 text-xs font-medium text-red-600">
+      {message}
+    </p>
+  );
+}
+
+/** Class to add to an Input/Select/PasswordInput that has an error. */
+export const invalidClass = '!border-red-500 focus:!border-red-500 focus:!ring-red-500/15';

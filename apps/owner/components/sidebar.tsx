@@ -4,16 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '../lib/auth-context';
 import { Icon } from './ui';
-
-const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
-  { href: '/venues', label: 'My Venues', icon: 'storefront' },
-  { href: '/bookings', label: 'Bookings', icon: 'event' },
-  { href: '/notifications', label: 'Notifications', icon: 'notifications' },
-  { href: '/payments', label: 'Payments', icon: 'payments' },
-  { href: '/refunds', label: 'Refunds', icon: 'currency_exchange' },
-  { href: '/settings', label: 'Settings', icon: 'settings' },
-];
+import { NAV_ITEMS } from '../lib/access';
 
 interface SidebarProps {
   /** Whether the off-canvas drawer is open on small screens — ignored at
@@ -25,7 +16,13 @@ interface SidebarProps {
 export function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  // Each role sees only the pages it may open (staff: bookings, day view, walk-in, notifications).
+  const items = NAV_ITEMS.filter((i) => !user || i.roles.includes(user.ownerRole));
+  // The longest matching href wins, so /bookings/day does not also light up /bookings.
+  const activeHref = items
+    .filter((i) => pathname === i.href || pathname?.startsWith(`${i.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
   return (
     <>
@@ -59,8 +56,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           </button>
         </div>
         <nav className="flex-1 space-y-1 overflow-y-auto px-4 pb-4">
-          {NAV_ITEMS.map((item) => {
-            const active = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+          {items.map((item) => {
+            const active = item.href === activeHref;
             return (
               <Link
                 key={item.href}

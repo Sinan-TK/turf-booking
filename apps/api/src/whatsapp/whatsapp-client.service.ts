@@ -2,26 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { loadEnv } from '@venue/config';
 import { maskPhone } from './whatsapp-logging.util';
 
-export interface InteractiveButton {
-  id: string;
-  title: string;
-}
-
-export interface InteractiveListRow {
-  id: string;
-  title: string;
-  description?: string;
-}
-
 /**
- * Thin wrapper over the Meta WhatsApp Cloud API (ARCHITECTURE.md §15).
- * Falls back to logging instead of calling the real API when credentials
- * aren't configured — this is what let the full menu flow be exercised
- * end-to-end (webhook in, response computed, "send" logged) in this
- * environment, which has no real WhatsApp Business account. In
- * production, with real WHATSAPP_ACCESS_TOKEN/WHATSAPP_PHONE_NUMBER_ID
- * set, every call here goes to the real Graph API — this is a dev/test
- * fallback, not a feature flag anyone should rely on in production.
+ * Thin wrapper over the Meta WhatsApp Cloud API. WhatsApp is outbound only: the login one-time code,
+ * and the booking confirmed / cancelled messages with the booking id. There is no inbound chat bot.
+ * Falls back to logging instead of calling the real API when credentials aren't configured, so
+ * development works without a WhatsApp Business account. In production, with real
+ * WHATSAPP_ACCESS_TOKEN / WHATSAPP_PHONE_NUMBER_ID set, every call here goes to the real Graph API.
  */
 @Injectable()
 export class WhatsAppClientService {
@@ -34,42 +20,6 @@ export class WhatsAppClientService {
 
   async sendText(to: string, body: string): Promise<void> {
     return this.send(to, { type: 'text', text: { body } });
-  }
-
-  async sendInteractiveButtons(
-    to: string,
-    bodyText: string,
-    buttons: InteractiveButton[],
-  ): Promise<void> {
-    return this.send(to, {
-      type: 'interactive',
-      interactive: {
-        type: 'button',
-        body: { text: bodyText },
-        action: {
-          buttons: buttons.map((b) => ({ type: 'reply', reply: { id: b.id, title: b.title } })),
-        },
-      },
-    });
-  }
-
-  async sendInteractiveList(
-    to: string,
-    bodyText: string,
-    buttonLabel: string,
-    rows: InteractiveListRow[],
-  ): Promise<void> {
-    return this.send(to, {
-      type: 'interactive',
-      interactive: {
-        type: 'list',
-        body: { text: bodyText },
-        action: {
-          button: buttonLabel,
-          sections: [{ title: 'Options', rows }],
-        },
-      },
-    });
   }
 
   /**
@@ -97,30 +47,6 @@ export class WhatsAppClientService {
           : [],
       },
     });
-  }
-
-  /**
-   * Marks the customer's inbound message as read and shows WhatsApp's
-   * native "typing…" indicator — UX only, so the customer sees the bot
-   * is working while handleInboundMessage runs, not a substitute for
-   * fixing that latency. Named sendTypingIndicator (not
-   * markAsReadAndShowTyping) to match this codebase's existing
-   * send*-method naming convention, even though the single Graph API
-   * call it makes also marks the message read — that's Meta's own
-   * contract (v19.0's typing-indicator feature is only exposed via the
-   * same "mark as read" request, not a separate endpoint), not two
-   * responsibilities bolted together here.
-   */
-  async sendTypingIndicator(messageId: string): Promise<void> {
-    return this.postToMessagesEndpoint(
-      {
-        messaging_product: 'whatsapp',
-        status: 'read',
-        message_id: messageId,
-        typing_indicator: { type: 'text' },
-      },
-      { id: messageId, label: 'typing indicator' },
-    );
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

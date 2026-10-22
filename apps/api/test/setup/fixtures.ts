@@ -124,6 +124,22 @@ export async function createOwnerFixture(app: INestApplication, adminAgent: Test
   return { organizationId, ownerAgent, ownerEmail: email };
 }
 
+/** An OWNER_STAFF login in an organization, assigned to the given venues (inserted directly, like the owner above). */
+export async function createStaffFixture(app: INestApplication, organizationId: string, venueIds: string[]) {
+  const suffix = uniqueSuffix();
+  const user = await prisma.venueOwnerUser.create({
+    data: { organizationId, email: `e2e-staff-${suffix}@example.com`, name: `E2E Staff ${suffix}`, role: 'OWNER_STAFF' },
+  });
+  await prisma.venueStaffAssignment.createMany({ data: venueIds.map((venueId) => ({ ownerUserId: user.id, venueId })) });
+  const agent = await agentForStaffContext(app, {
+    role: Role.VENUE_OWNER,
+    id: user.id,
+    organizationId,
+    ownerRole: 'OWNER_STAFF',
+  });
+  return { staffId: user.id, agent };
+}
+
 interface VenueFixture {
   venueId: string;
   fullGroundId: string;
@@ -135,7 +151,7 @@ interface VenueFixture {
  * A fully bookable venue: 7s Full Ground composed of 5s Half A + 5s Half
  * B (the exact composition the brief's conflict rule is about),
  * WEEKDAY/WEEKEND pricing for a 60-minute slot on all three resources,
- * and wide-open (00:00-23:59) operating hours every day — set up
+ * and all-day prices (so bookable around the clock; the prices ARE the hours) — set up
  * entirely through the real owner-facing API (resource creation,
  * composition linking, VenueConfigModule from Phase 10), then activated
  * by the Super Admin (owners can't self-activate — VenuesService
@@ -161,9 +177,6 @@ export async function createVenueFixture(
     address: '1 Test Lane',
     lat: 10,
     lng: 76,
-    timezone: 'Asia/Kolkata',
-    defaultSlotGranularityMinutes: 30,
-    ...(options.categoryId ? { categoryId: options.categoryId } : {}),
   });
   if (venueRes.status !== 201) {
     throw new Error(`Venue creation failed: ${venueRes.status} ${JSON.stringify(venueRes.body)}`);
@@ -175,10 +188,14 @@ export async function createVenueFixture(
     throw new Error(`Venue activation failed: ${activateRes.status} ${JSON.stringify(activateRes.body)}`);
   }
 
+  // The facility (category) the units belong to: football unless a test asks otherwise.
+  const categoryId =
+    options.categoryId ?? (await prisma.venueCategory.findUniqueOrThrow({ where: { slug: 'FOOTBALL_TURF' } })).id;
+
   async function createResource(name: string, groundType: string, sortOrder: number) {
     const res = await ownerAgent
       .post('/resources')
-      .send({ venueId, name, groundType, isBookable: true, sortOrder });
+      .send({ venueId, categoryId, name, groundType, isBookable: true, sortOrder });
     if (res.status !== 201) {
       throw new Error(`Resource creation failed: ${res.status} ${JSON.stringify(res.body)}`);
     }
@@ -206,15 +223,6 @@ export async function createVenueFixture(
       if (res.status !== 201) {
         throw new Error(`Pricing rule creation failed: ${res.status} ${JSON.stringify(res.body)}`);
       }
-    }
-  }
-
-  for (let weekday = 0; weekday <= 6; weekday++) {
-    const res = await ownerAgent
-      .put('/venue-config/operating-hours')
-      .send({ venueId, weekday, openTime: '00:00', closeTime: '23:59' });
-    if (res.status !== 200) {
-      throw new Error(`Operating hours upsert failed: ${res.status} ${JSON.stringify(res.body)}`);
     }
   }
 

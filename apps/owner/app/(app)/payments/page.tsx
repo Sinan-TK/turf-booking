@@ -1,8 +1,18 @@
 'use client';
 
-import { useState } from 'react';
-import { useFetch } from '@/lib/use-fetch';
-import { Badge, Card, EmptyState, ErrorBanner, LoadingState, PageHeader, SearchInput, Select } from '@/components/ui';
+import Link from 'next/link';
+import { useListFilters } from '@/lib/use-list-filters';
+import { PAGE_SIZE, usePagedFetch } from '@/lib/use-paged-fetch';
+import { Badge, ErrorBanner, PageHeader } from '@/components/ui';
+import {
+  DataTable,
+  DateRangeFilter,
+  FilterSelect,
+  ListToolbar,
+  Pagination,
+  ROW,
+  SearchBox,
+} from '@/components/list-kit';
 
 interface Payment {
   id: string;
@@ -12,85 +22,89 @@ interface Payment {
   currency: string;
   gatewayPaymentId: string | null;
   createdAt: string;
-  booking: { orderId: string };
+  booking: { id: string; orderId: string };
 }
 
-const STATUSES = ['', 'PENDING', 'SUCCESS', 'FAILED', 'REFUNDED'];
+const STATUS_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'PENDING', label: 'Pending' },
+  { value: 'SUCCESS', label: 'Success' },
+  { value: 'FAILED', label: 'Failed' },
+  { value: 'REFUNDED', label: 'Refunded' },
+];
+
+const PROVIDER_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'RAZORPAY', label: 'Razorpay' },
+  { value: 'COINS', label: 'Coins' },
+];
 
 export default function PaymentsPage() {
-  const [status, setStatus] = useState('');
-  const [search, setSearch] = useState('');
-  const { data, error, loading } = useFetch<Payment[]>(
-    `/owner/payments?limit=100${status ? `&status=${status}` : ''}`,
-  );
-
-  const filtered = data?.filter((p) => {
-    const q = search.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      p.booking.orderId.toLowerCase().includes(q) ||
-      p.provider.toLowerCase().includes(q) ||
-      (p.gatewayPaymentId ?? '').toLowerCase().includes(q)
-    );
-  });
+  const f = useListFilters({ search: '', status: '', provider: '', from: '', to: '' });
+  const { rows, total, error, loading } = usePagedFetch<Payment>('/owner/payments', f.query, f.page);
 
   return (
     <div>
-      <PageHeader
-        title="Payments"
-        action={
-          <Select value={status} onChange={(e) => setStatus(e.target.value)} className="w-48">
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s || 'All statuses'}
-              </option>
-            ))}
-          </Select>
+      <PageHeader title="Payments" subtitle="Money and coins received for bookings at your venues." />
+      <ListToolbar
+        active={f.active}
+        total={total}
+        noun="payment"
+        onClear={f.clear}
+        search={
+          <SearchBox
+            label="Search payments"
+            placeholder="Search order, payment ID, customer…"
+            value={f.values.search}
+            onChange={(v) => f.set('search', v)}
+          />
         }
-      />
-      {data && data.length > 0 && (
-        <SearchInput
-          placeholder="Search by order, provider, or payment ID…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="mb-4 max-w-md"
+      >
+        <FilterSelect label="Status" value={f.values.status} options={STATUS_OPTIONS} onChange={(v) => f.set('status', v)} />
+        <FilterSelect
+          label="Provider"
+          value={f.values.provider}
+          options={PROVIDER_OPTIONS}
+          onChange={(v) => f.set('provider', v)}
         />
-      )}
-      {loading && <LoadingState />}
+        <DateRangeFilter
+          label="Date"
+          from={f.values.from}
+          to={f.values.to}
+          onFrom={(v) => f.set('from', v)}
+          onTo={(v) => f.set('to', v)}
+        />
+      </ListToolbar>
+
       {error && <ErrorBanner message={error} />}
-      {data && data.length === 0 && <EmptyState message="No payments found." />}
-      {filtered && filtered.length === 0 && data && data.length > 0 && (
-        <EmptyState message="No payments match your search." />
-      )}
-      {filtered && filtered.length > 0 && (
-        <Card className="overflow-x-auto p-0">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-outline-variant/30 bg-surface-container-low text-xs uppercase text-on-surface-variant">
-              <tr>
-                <th className="px-4 py-3">Order</th>
-                <th className="px-4 py-3">Provider</th>
-                <th className="px-4 py-3">Amount</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((p) => (
-                <tr key={p.id} className="border-b border-outline-variant/20 last:border-0">
-                  <td className="px-4 py-3 font-mono text-xs">{p.booking.orderId}</td>
-                  <td className="px-4 py-3">{p.provider}</td>
-                  <td className="px-4 py-3">
-                    {p.currency} {p.amount}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge value={p.status} />
-                  </td>
-                  <td className="px-4 py-3 text-on-surface-variant">{new Date(p.createdAt).toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+      {!error && (
+        <DataTable
+          columns={['Order', 'Provider', 'Amount', 'Status', 'Date']}
+          loading={loading}
+          rowCount={rows.length}
+          empty={f.active ? 'No payments match your search or filters.' : 'No payments yet.'}
+          footer={<Pagination page={f.page} pageSize={PAGE_SIZE} total={total} onPage={f.setPage} />}
+        >
+          {rows.map((p) => (
+            <tr key={p.id} className={ROW}>
+              <td className="px-4 py-3 font-mono text-xs">
+                <Link href={`/bookings/${p.booking.id}`} className="text-primary hover:underline">
+                  {p.booking.orderId}
+                </Link>
+              </td>
+              <td className="px-4 py-3">{p.provider}</td>
+              <td className="whitespace-nowrap px-4 py-3">
+                {p.currency} {p.amount}
+              </td>
+              <td className="px-4 py-3">
+                <Badge value={p.status} />
+              </td>
+              <td className="whitespace-nowrap px-4 py-3 text-on-surface-variant">
+                {new Date(p.createdAt).toLocaleString()}
+              </td>
+            </tr>
+          ))}
+        </DataTable>
       )}
     </div>
   );

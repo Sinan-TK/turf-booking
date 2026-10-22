@@ -110,7 +110,7 @@ export class PrismaCoinsRepository implements CoinsRepository {
       // sequence ever changes).
       const updatedBooking = await tx.booking.update({
         where: { id: params.bookingId, status: params.expectedBookingStatus as BookingStatus },
-        data: { status: 'CONFIRMED', paymentMethod: 'COINS' },
+        data: { status: 'CONFIRMED', paymentMethod: 'COINS', paidAmount: params.amount },
       });
       await tx.slotHold.update({
         where: { id: params.slotHoldId, status: params.expectedSlotHoldStatus as SlotHoldStatus },

@@ -1,18 +1,34 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api } from './api';
 
-interface OwnerUser {
+export interface OwnerVenue {
+  id: string;
+  name: string;
+  facilityCode: string;
+  status: string;
+}
+
+export interface OwnerUser {
   role: 'VENUE_OWNER';
   id: string;
   organizationId: string;
   ownerRole: 'OWNER_ADMIN' | 'OWNER_STAFF';
+  name: string | null;
+  email: string | null;
+  /** The venues this login may work in: every venue of the organization for an owner admin, only the assigned ones for staff. */
+  venues: OwnerVenue[];
 }
 
 interface AuthContextValue {
   user: OwnerUser | null;
   loading: boolean;
+  isStaff: boolean;
+  /** Staff work in one venue at a time; null until they have chosen (an owner admin never needs to). */
+  selectedVenueId: string | null;
+  selectedVenue: OwnerVenue | null;
+  selectVenue: (venueId: string) => void;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -23,9 +39,20 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+const storageKey = (userId: string) => `owner.venue.${userId}`;
+
+function readStoredVenue(userId: string): string | null {
+  try {
+    return window.localStorage.getItem(storageKey(userId));
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<OwnerUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [chosenVenueId, setChosenVenueId] = useState<string | null>(null);
 
   // The session is an httpOnly cookie JS can't read, so "who am I?" is
   // always answered by the backend. This is also how a SUPER_ADMIN who
@@ -34,7 +61,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // expired access cookie before giving up.
   const syncUser = useCallback(async () => {
     try {
-      setUser(await api.get<OwnerUser>('/auth/owner/me'));
+      const me = await api.get<OwnerUser>('/auth/owner/me');
+      setUser(me);
+      setChosenVenueId(readStoredVenue(me.id));
     } catch {
       setUser(null);
     }
@@ -43,6 +72,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     syncUser().finally(() => setLoading(false));
   }, [syncUser]);
+
+  const isStaff = user?.ownerRole === 'OWNER_STAFF';
+
+  // A staff member with one venue is simply in it; with several, their last choice counts only while
+  // it is still one of their venues (an owner admin can take a venue away at any time).
+  const selectedVenue = useMemo(() => {
+    if (!user || !isStaff) return null;
+    if (user.venues.length === 1) return user.venues[0]!;
+    return user.venues.find((v) => v.id === chosenVenueId) ?? null;
+  }, [user, isStaff, chosenVenueId]);
+
+  const selectVenue = useCallback(
+    (venueId: string) => {
+      setChosenVenueId(venueId);
+      if (!user) return;
+      try {
+        window.localStorage.setItem(storageKey(user.id), venueId);
+      } catch {
+        // private window: the choice just lasts until the page is closed
+      }
+    },
+    [user],
+  );
 
   const login = useCallback(
     async (email: string, password: string) => {
@@ -57,6 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await api.post('/auth/owner/logout');
     } finally {
       setUser(null);
+      setChosenVenueId(null);
     }
   }, []);
 
@@ -66,7 +119,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, login, logout, refreshUser: syncUser, requestPasswordReset }}
+      value={{
+        user,
+        loading,
+        isStaff,
+        selectedVenueId: selectedVenue?.id ?? null,
+        selectedVenue,
+        selectVenue,
+        login,
+        logout,
+        refreshUser: syncUser,
+        requestPasswordReset,
+      }}
     >
       {children}
     </AuthContext.Provider>

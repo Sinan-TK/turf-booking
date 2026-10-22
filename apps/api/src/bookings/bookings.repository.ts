@@ -11,6 +11,7 @@ import type {
   Refund,
   Venue,
 } from '@venue/database';
+import type { DateRange } from '../common/list-filters';
 
 /** Booking with the admin-detail includes (venue/customer/payments/refunds). */
 export type BookingDetail = Prisma.BookingGetPayload<{
@@ -40,6 +41,19 @@ export type BookingListItem = Prisma.BookingGetPayload<{
   };
 }>;
 
+export interface AdminBookingFilters {
+  status?: string;
+  venueId?: string;
+  /** Limits to these venues (a staff member's assignments); combined with venueId it is intersected by the caller. */
+  venueIds?: string[];
+  organizationId?: string;
+  /** Matches order id, customer name/number, venue name/facility code. */
+  search?: string;
+  paymentMethod?: string;
+  /** Window on the booking's start time. */
+  startRange?: DateRange;
+}
+
 export interface HoldAtomicParams {
   resourceId: string;
   customerId: string;
@@ -51,16 +65,28 @@ export interface HoldAtomicParams {
   /** Range the resource locks cover = booking time + policy buffers. */
   lockStartTime: Date;
   lockEndTime: Date;
-  priceSnapshot: { amount: string; currency: string; durationMinutes: number };
+  priceSnapshot: {
+    amount: string;
+    currency: string;
+    durationMinutes: number;
+    normalPrice?: string;
+    offerPrice?: string | null;
+    bookingPrice?: string;
+  };
   footprintIds: string[];
   durationMinutes: number;
   groundType: string;
+  /** The full price. */
   amount: Prisma.Decimal | number | string;
+  /** The part charged online to hold the slot (0 for an offline walk-in). */
+  advanceAmount: Prisma.Decimal | number | string;
   currency: string;
 }
 
 export interface OfflineAtomicParams extends HoldAtomicParams {
   paymentMethod: PaymentMethod;
+  /** What was collected at booking time (the rest is due at the venue). */
+  paidAmount: Prisma.Decimal | number | string;
 }
 
 /**
@@ -85,10 +111,12 @@ export interface PooledHoldAtomicParams {
     durationMinutes: number;
     quantity: number;
     unitPrice: string;
+    bookingPrice?: string;
   };
   durationMinutes: number;
   unitLabel: string;
   amount: Prisma.Decimal | number | string;
+  advanceAmount: Prisma.Decimal | number | string;
   currency: string;
 }
 
@@ -124,37 +152,20 @@ export interface BookingsRepository {
     startTime: Date,
     endTime: Date,
   ): Promise<ResourceLock | null>;
-  findPricingRule(
-    resourceId: string,
-    durationMinutes: number,
-    dayType: string,
-    at: Date,
-  ): Promise<PricingRule | null>;
+  /** Every rule for the unit and duration already in effect at `at`; the caller picks the one for the slot. */
+  findPricingRules(resourceId: string, durationMinutes: number, at: Date): Promise<PricingRule[]>;
   findResourceGroupById(id: string): Promise<ResourceGroup | null>;
-  findGroupPricingRule(
-    resourceGroupId: string,
-    durationMinutes: number,
-    dayType: string,
-    at: Date,
-  ): Promise<PricingRule | null>;
+  findGroupPricingRules(resourceGroupId: string, durationMinutes: number, at: Date): Promise<PricingRule[]>;
   sumHeldGroupQuantity(resourceGroupId: string, startTime: Date, endTime: Date): Promise<number>;
   findInventoryReservations(slotHoldId: string): Promise<InventoryReservation[]>;
   findBookingById(id: string): Promise<Booking | null>;
+  /** Adds money collected (at the venue) to what the booking has been paid so far. */
+  addPaidAmount(id: string, delta: Prisma.Decimal | number | string): Promise<Booking>;
   findBookingDetailById(id: string): Promise<BookingDetail | null>;
   findBookingCheckoutViewById(id: string): Promise<BookingCheckoutView | null>;
   listForCustomer(customerId: string): Promise<Booking[]>;
-  listForAdmin(filters: {
-    status?: string;
-    venueId?: string;
-    organizationId?: string;
-    limit?: number;
-    offset?: number;
-  }): Promise<BookingListItem[]>;
-  countForAdmin(filters: { status?: string; venueId?: string; organizationId?: string }): Promise<number>;
-  listForOwner(
-    organizationId: string,
-    filters: { status?: string; venueId?: string; limit?: number },
-  ): Promise<BookingListItem[]>;
+  listForAdmin(filters: AdminBookingFilters & { limit?: number; offset?: number }): Promise<BookingListItem[]>;
+  countForAdmin(filters: AdminBookingFilters): Promise<number>;
   findCustomerById(id: string): Promise<CustomerProfile | null>;
   createHoldAtomic(params: HoldAtomicParams): Promise<Booking>;
   createPooledHoldAtomic(params: PooledHoldAtomicParams): Promise<Booking>;

@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { Button, ErrorBanner, Input, Label } from '@/components/ui';
+import { AuthShell } from '@/components/auth-shell';
+import { Button, ErrorBanner, FieldError, Label, PasswordInput, invalidClass } from '@/components/ui';
+import { newPasswordError } from '@/lib/validation';
 
 // Landed on from the emailed link: both password-reset links and a
 // first-time, admin-invited owner's invite link point here as
@@ -15,6 +17,7 @@ export default function ResetPasswordPage() {
   const [token, setToken] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [passwordMsg, setPasswordMsg] = useState<string | undefined>();
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -26,6 +29,12 @@ export default function ResetPasswordPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const problem = newPasswordError(password);
+    setPasswordMsg(problem);
+    if (problem) {
+      document.getElementById('reset-password')?.focus();
+      return;
+    }
     setSubmitting(true);
     try {
       await api.post('/auth/owner/reset-password', { token, password });
@@ -38,14 +47,8 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-surface-container-low p-4">
-      <form
-        onSubmit={onSubmit}
-        className="w-full max-w-sm rounded-lg border border-outline-variant/30 bg-surface-container-lowest p-8 shadow-sm"
-      >
-        <h1 className="mb-1 text-lg font-semibold text-on-surface">Set a new password</h1>
-        <p className="mb-6 text-sm text-on-surface-variant">Choose a new password for your account.</p>
-
+    <AuthShell title="Set a new password" subtitle="Choose a new password for your account.">
+      <form onSubmit={onSubmit} noValidate>
         {error && (
           <div className="mb-4">
             <ErrorBanner message={error} />
@@ -53,26 +56,32 @@ export default function ResetPasswordPage() {
         )}
 
         <div className="mb-6">
-          <Label>New password</Label>
-          <Input
-            type="password"
-            required
-            minLength={8}
+          <Label htmlFor="reset-password">New password</Label>
+          <PasswordInput
+            id="reset-password"
+            aria-invalid={!!passwordMsg}
+            aria-describedby={passwordMsg ? 'reset-password-error' : undefined}
+            className={passwordMsg ? invalidClass : ''}
             autoComplete="new-password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setPasswordMsg(undefined);
+            }}
           />
+          <FieldError id="reset-password-error" message={passwordMsg} />
+          <p className="mt-1.5 text-xs text-on-surface-variant">At least 8 characters.</p>
         </div>
-        <Button type="submit" disabled={submitting || !token} className="w-full">
+        <Button type="submit" disabled={submitting || !token} className="w-full py-2.5">
           {submitting ? 'Saving…' : 'Set password'}
         </Button>
         <a
           href="/forgot-password"
-          className="mt-4 block text-center text-sm text-on-surface-variant hover:text-on-surface"
+          className="mt-5 block text-center text-sm text-on-surface-variant transition-colors hover:text-primary"
         >
           Request a new link
         </a>
       </form>
-    </main>
+    </AuthShell>
   );
 }

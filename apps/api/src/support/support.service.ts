@@ -1,8 +1,17 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import type { SupportTicketStatus } from '@venue/database';
+import type { SupportTicketCategory, SupportTicketPriority, SupportTicketStatus } from '@venue/database';
+import { contains } from '../common/list-filters';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthContext } from '../auth/auth.types';
 import type { CreateTicketDto, UpdateTicketDto } from './dto/support.dto';
+
+export interface AdminTicketFilters {
+  status?: string;
+  priority?: string;
+  category?: string;
+  /** Matches subject, customer name/number, linked order id. */
+  search?: string;
+}
 
 @Injectable()
 export class SupportService {
@@ -47,10 +56,27 @@ export class SupportService {
   }
 
   /** Platform-wide support queue for the Super Admin Portal (§12). */
-  async listForAdmin(filters: { status?: string; limit?: number; offset?: number }) {
+  private adminTicketWhere(filters: AdminTicketFilters) {
+    const q = filters.search;
+    return {
+      status: filters.status ? (filters.status as SupportTicketStatus) : undefined,
+      priority: filters.priority ? (filters.priority as SupportTicketPriority) : undefined,
+      category: filters.category ? (filters.category as SupportTicketCategory) : undefined,
+      OR: q
+        ? [
+            { subject: contains(q) },
+            { customer: { whatsappNumber: contains(q) } },
+            { customer: { name: contains(q) } },
+            { booking: { orderId: contains(q) } },
+          ]
+        : undefined,
+    };
+  }
+
+  async listForAdmin(filters: AdminTicketFilters & { limit?: number; offset?: number }) {
     const limit = Math.min(filters.limit ?? 50, 200);
     return this.prisma.client.supportTicket.findMany({
-      where: { status: filters.status ? (filters.status as SupportTicketStatus) : undefined },
+      where: this.adminTicketWhere(filters),
       include: { customer: { select: { id: true, whatsappNumber: true, name: true } } },
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
       take: limit,
@@ -58,10 +84,8 @@ export class SupportService {
     });
   }
 
-  async countForAdmin(filters: { status?: string }) {
-    return this.prisma.client.supportTicket.count({
-      where: { status: filters.status ? (filters.status as SupportTicketStatus) : undefined },
-    });
+  async countForAdmin(filters: AdminTicketFilters) {
+    return this.prisma.client.supportTicket.count({ where: this.adminTicketWhere(filters) });
   }
 
   async getForAdmin(ticketId: string) {

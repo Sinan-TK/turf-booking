@@ -23,6 +23,10 @@ interface BookingDetail {
   orderId: string;
   status: string;
   amount: string;
+  /** Charged online to hold the slot. */
+  advanceAmount: string;
+  /** Collected so far (the advance, plus anything recorded at the venue). */
+  paidAmount: string;
   currency: string;
   startTime: string;
   endTime: string;
@@ -88,6 +92,19 @@ export default function BookingDetailPage() {
             <dt className="text-gray-500">Amount</dt>
             <dd>
               {booking.currency} {booking.amount}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-gray-500">Paid online (advance)</dt>
+            <dd>
+              {booking.currency} {booking.advanceAmount}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-gray-500">Paid so far / remaining</dt>
+            <dd>
+              {booking.currency} {booking.paidAmount} / {booking.currency}{' '}
+              {Math.max(0, Number(booking.amount) - Number(booking.paidAmount)).toFixed(2)}
             </dd>
           </div>
           <div>

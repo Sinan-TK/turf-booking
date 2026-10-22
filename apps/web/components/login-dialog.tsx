@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import type { Customer } from '@/lib/customer';
-import { Button, ErrorBanner, Icon, Input, Label } from '@/components/ui';
+import { Button, ErrorBanner, FieldError, Icon, Input, Label, invalidClass } from '@/components/ui';
+import { codeError, nameError, phoneError } from '@/lib/validation';
 
 type Step = 'phone' | 'code' | 'name';
 
@@ -21,6 +22,8 @@ export function LoginDialog({
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // The message under the field of the step being shown (each step has exactly one field).
+  const [fieldMsg, setFieldMsg] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const [resendIn, setResendIn] = useState(0);
   // The customer exists server-side from the moment the code is verified,
@@ -76,12 +79,21 @@ export function LoginDialog({
   async function sendCode(e?: React.FormEvent) {
     e?.preventDefault();
     if (busy) return;
+    if (step === 'phone') {
+      const problem = phoneError(phone);
+      setFieldMsg(problem);
+      if (problem) {
+        document.getElementById('login-phone')?.focus();
+        return;
+      }
+    }
     setBusy(true);
     setError(null);
     try {
       const res = await api.post<{ resendAfterSeconds: number }>('/customer-auth/request-code', { phone });
       setResendIn(res.resendAfterSeconds);
       setCode('');
+      setFieldMsg(undefined);
       setStep('code');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not send the code. Please try again.');
@@ -93,6 +105,12 @@ export function LoginDialog({
   async function verify(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
+    const problem = codeError(code);
+    setFieldMsg(problem);
+    if (problem) {
+      document.getElementById('login-code')?.focus();
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -102,6 +120,7 @@ export function LoginDialog({
       });
       if (res.needsName) {
         setVerified(res.customer);
+        setFieldMsg(undefined);
         setStep('name');
       } else {
         onLoggedIn(res.customer);
@@ -116,6 +135,12 @@ export function LoginDialog({
   async function saveName(e: React.FormEvent) {
     e.preventDefault();
     if (busy || !verified) return;
+    const problem = nameError(name);
+    setFieldMsg(problem);
+    if (problem) {
+      document.getElementById('login-name')?.focus();
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -171,44 +196,56 @@ export function LoginDialog({
         )}
 
         {step === 'phone' && (
-          <form onSubmit={sendCode} className="space-y-3">
+          <form onSubmit={sendCode} noValidate className="space-y-3">
             <div>
-              <Label>WhatsApp number</Label>
+              <Label htmlFor="login-phone">WhatsApp number</Label>
               <Input
+                id="login-phone"
                 autoFocus
-                required
+                aria-invalid={!!fieldMsg}
+                aria-describedby={fieldMsg ? 'login-phone-error' : undefined}
+                className={fieldMsg ? invalidClass : ''}
                 type="tel"
                 inputMode="tel"
                 autoComplete="tel"
                 placeholder="98765 43210"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  setFieldMsg(undefined);
+                }}
               />
+              <FieldError id="login-phone-error" message={fieldMsg} />
             </div>
-            <Button type="submit" className="w-full" disabled={busy || phone.trim() === ''}>
+            <Button type="submit" className="w-full" disabled={busy}>
               {busy ? 'Sending…' : 'Send code'}
             </Button>
           </form>
         )}
 
         {step === 'code' && (
-          <form onSubmit={verify} className="space-y-3">
+          <form onSubmit={verify} noValidate className="space-y-3">
             <div>
-              <Label>6-digit code</Label>
+              <Label htmlFor="login-code">6-digit code</Label>
               <Input
+                id="login-code"
                 autoFocus
-                required
+                aria-invalid={!!fieldMsg}
+                aria-describedby={fieldMsg ? 'login-code-error' : undefined}
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 maxLength={6}
-                pattern="\d{6}"
                 placeholder="000000"
-                className="text-center text-lg tracking-[0.4em]"
+                className={`text-center text-lg tracking-[0.4em] ${fieldMsg ? invalidClass : ''}`}
                 value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onChange={(e) => {
+                  setCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                  setFieldMsg(undefined);
+                }}
               />
+              <FieldError id="login-code-error" message={fieldMsg} />
             </div>
-            <Button type="submit" className="w-full" disabled={busy || code.length !== 6}>
+            <Button type="submit" className="w-full" disabled={busy}>
               {busy ? 'Checking…' : 'Verify and continue'}
             </Button>
             <div className="flex items-center justify-between text-sm">
@@ -216,6 +253,7 @@ export function LoginDialog({
                 type="button"
                 onClick={() => {
                   setError(null);
+                  setFieldMsg(undefined);
                   setStep('phone');
                 }}
                 className="font-medium text-slate-600 hover:underline"
@@ -235,19 +273,26 @@ export function LoginDialog({
         )}
 
         {step === 'name' && (
-          <form onSubmit={saveName} className="space-y-3">
+          <form onSubmit={saveName} noValidate className="space-y-3">
             <div>
-              <Label>Your name</Label>
+              <Label htmlFor="login-name">Your name</Label>
               <Input
+                id="login-name"
                 autoFocus
-                required
+                aria-invalid={!!fieldMsg}
+                aria-describedby={fieldMsg ? 'login-name-error' : undefined}
+                className={fieldMsg ? invalidClass : ''}
                 autoComplete="name"
                 maxLength={80}
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setFieldMsg(undefined);
+                }}
               />
+              <FieldError id="login-name-error" message={fieldMsg} />
             </div>
-            <Button type="submit" className="w-full" disabled={busy || name.trim() === ''}>
+            <Button type="submit" className="w-full" disabled={busy}>
               {busy ? 'Saving…' : 'Continue'}
             </Button>
           </form>

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -8,14 +8,15 @@ import type { AuthContext } from '../auth/auth.types';
 import { VenueCategoriesService } from './venue-categories.service';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/venue-category.dto';
 
-/** Public: customers and owners see active venue types only. */
+/** Public: customers and owners see active facilities only. */
 @Controller('categories')
 export class PublicCategoriesController {
   constructor(private readonly categories: VenueCategoriesService) {}
 
+  // ?available=true: only facilities a customer can book right now (a bookable unit in an ACTIVE venue).
   @Get()
-  list() {
-    return this.categories.listPublic();
+  list(@Query('available') available?: string) {
+    return this.categories.listPublic({ availableOnly: available === 'true' });
   }
 }
 

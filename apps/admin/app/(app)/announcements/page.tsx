@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useFetch } from '@/lib/use-fetch';
 import { api, ApiError } from '@/lib/api';
-import { Button, Card, ErrorBanner, Input, Label, PageHeader, Select, SuccessBanner } from '@/components/ui';
+import { Button, Card, ErrorBanner, FieldError, Input, Label, PageHeader, Select, SuccessBanner, invalidClass } from '@/components/ui';
+import { hasErrors, textError, type FieldErrors } from '@/lib/validation';
 
 interface Recipient {
   id: string;
@@ -21,12 +22,15 @@ export default function AnnouncementsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors] = useState<FieldErrors<'title' | 'message' | 'owners'>>({});
+  const clear = (k: 'title' | 'message' | 'owners') => setErrors((p) => (p[k] ? { ...p, [k]: undefined } : p));
 
   const { data: recipients } = useFetch<Recipient[]>(
     recipientType === 'SELECTED' ? '/admin/notifications/recipients' : null,
   );
 
   function toggleOwner(id: string) {
+    clear('owners');
     setSelectedOwnerIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
@@ -34,6 +38,17 @@ export default function AnnouncementsPage() {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+    const found: FieldErrors<'title' | 'message' | 'owners'> = {
+      title: textError(title, 'Title', 1, 150),
+      message: textError(message, 'Message', 1, 2000),
+      owners: recipientType === 'SELECTED' && selectedOwnerIds.length === 0 ? 'Choose at least one owner, or send to all owners.' : undefined,
+    };
+    setErrors(found);
+    if (hasErrors(found)) {
+      const first = (['title', 'message', 'owners'] as const).find((k) => found[k]);
+      document.getElementById('announce-' + first)?.focus();
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await api.post<{ recipientCount: number }>('/admin/notifications', {
@@ -62,25 +77,41 @@ export default function AnnouncementsPage() {
           Sends a persistent notification into the Owner Portal's notification center — not an email or
           WhatsApp message.
         </p>
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} noValidate className="space-y-4">
           {error && <ErrorBanner message={error} />}
           {success && <SuccessBanner message={success} />}
 
           <div>
-            <Label>Title</Label>
-            <Input required value={title} onChange={(e) => setTitle(e.target.value)} maxLength={150} />
+            <Label htmlFor="announce-title">Title</Label>
+            <Input
+              id="announce-title"
+              value={title}
+              aria-invalid={!!errors.title}
+              aria-describedby={errors.title ? 'announce-title-error' : undefined}
+              className={errors.title ? invalidClass : ''}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                clear('title');
+              }}
+            />
+            <FieldError id="announce-title-error" message={errors.title} />
           </div>
 
           <div>
-            <Label>Message</Label>
+            <Label htmlFor="announce-message">Message</Label>
             <textarea
-              required
+              id="announce-message"
               rows={4}
-              maxLength={2000}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+              aria-invalid={!!errors.message}
+              aria-describedby={errors.message ? 'announce-message-error' : undefined}
+              className={`w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none ${errors.message ? invalidClass : ''}`}
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={(e) => {
+                setMessage(e.target.value);
+                clear('message');
+              }}
             />
+            <FieldError id="announce-message-error" message={errors.message} />
           </div>
 
           <div>
@@ -98,7 +129,10 @@ export default function AnnouncementsPage() {
                 <input
                   type="radio"
                   checked={recipientType === 'ALL'}
-                  onChange={() => setRecipientType('ALL')}
+                  onChange={() => {
+                    setRecipientType('ALL');
+                    clear('owners');
+                  }}
                 />
                 All Owners
               </label>
@@ -114,7 +148,13 @@ export default function AnnouncementsPage() {
           </div>
 
           {recipientType === 'SELECTED' && (
-            <div className="max-h-64 overflow-y-auto rounded-md border border-gray-200 p-3">
+            <div>
+            <div
+              id="announce-owners"
+              tabIndex={-1}
+              aria-invalid={!!errors.owners}
+              className={`max-h-64 overflow-y-auto rounded-md border p-3 ${errors.owners ? 'border-red-500' : 'border-gray-200'}`}
+            >
               {!recipients && <p className="text-sm text-gray-500">Loading owners…</p>}
               {recipients?.length === 0 && <p className="text-sm text-gray-500">No owners found.</p>}
               {recipients?.map((r) => (
@@ -131,13 +171,11 @@ export default function AnnouncementsPage() {
                 </label>
               ))}
             </div>
+            <FieldError id="announce-owners-error" message={errors.owners} />
+            </div>
           )}
 
-          <Button
-            type="submit"
-            loading={submitting}
-            disabled={recipientType === 'SELECTED' && selectedOwnerIds.length === 0}
-          >
+          <Button type="submit" loading={submitting}>
             {submitting ? 'Sending…' : 'Send Announcement'}
           </Button>
         </form>

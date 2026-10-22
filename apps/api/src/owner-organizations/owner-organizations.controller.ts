@@ -1,11 +1,11 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { OwnerOrganizationsService } from './owner-organizations.service';
-import { CreateOrganizationDto, CreateOwnerUserDto } from './dto/owner-organization.dto';
+import { CreateOrganizationDto, CreateOwnerUserDto, SetOrganizationStatusDto, SetOwnerUserStatusDto } from './dto/owner-organization.dto';
 import type { AuthContext } from '../auth/auth.types';
 
 // Super Admin only — this is platform-level provisioning of Venue Owner
@@ -28,7 +28,22 @@ export class OwnerOrganizationsController {
 
   @Get(':id')
   getById(@Param('id') id: string) {
-    return this.orgs.getOrganization(id);
+    return this.orgs.getOrganizationDetail(id);
+  }
+
+  @Patch(':id/status')
+  setStatus(@Param('id') id: string, @Body() dto: SetOrganizationStatusDto, @CurrentUser() actor: AuthContext) {
+    return this.orgs.setStatus(id, dto.status, dto.reason, actor);
+  }
+
+  @Patch(':id/owner-users/:userId/status')
+  setOwnerUserStatus(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @Body() dto: SetOwnerUserStatusDto,
+    @CurrentUser() actor: AuthContext,
+  ) {
+    return this.orgs.setOwnerUserStatus(id, userId, dto.status, dto.reason, actor);
   }
 
   @Post(':id/owner-users')

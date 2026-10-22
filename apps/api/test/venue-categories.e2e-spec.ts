@@ -51,19 +51,37 @@ describe('Venue categories', () => {
     return { res, slug };
   }
 
-  async function createVenue(categoryId?: string) {
+  async function districtOf() {
     const states = await request(app.getHttpServer()).get('/states');
     const districts = await request(app.getHttpServer()).get(`/districts?stateId=${states.body[0].id}`);
+    return districts.body[0] as { id: string; timezone?: string };
+  }
+
+  /** A venue carries no facility of its own: they come from the units added to it. */
+  async function createVenue() {
+    // Resolve the district before building the request: supertest starts its
+    // server when the request is created, and the lookups above would close it.
+    const districtId = (await districtOf()).id;
     return ownerAgent.post('/venues').send({
       name: `E2E Venue ${uniqueSuffix()}`,
-      districtId: districts.body[0].id,
+      districtId,
       address: '1 Test Lane',
       lat: 10,
       lng: 76,
-      timezone: 'Asia/Kolkata',
-      ...(categoryId ? { categoryId } : {}),
     });
   }
+
+  const addResource = (venueId: string, categoryId: string, groundType: string, name = 'Unit 1') =>
+    ownerAgent.post('/resources').send({ venueId, categoryId, name, groundType });
+
+  const addGroup = (venueId: string, categoryId: string, name: string, totalUnits = 5) =>
+    ownerAgent.post('/resources/groups').send({
+      venueId,
+      categoryId,
+      name,
+      allocationMode: 'POOLED',
+      totalUnits,
+    });
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -143,72 +161,79 @@ describe('Venue categories', () => {
     expect(dupTypes.res.status).toBe(400);
   });
 
-  test('a venue with no category defaults to FOOTBALL_TURF; football behaviour is unchanged', async () => {
+  test('a venue is created without a facility or timezone; its timezone comes from its district', async () => {
+    const district = await prisma.district.findUniqueOrThrow({ where: { id: (await districtOf()).id } });
     const res = await createVenue();
     expect(res.status).toBe(201);
-    expect(res.body.category.slug).toBe('FOOTBALL_TURF');
+    expect(res.body.facilities).toEqual([]);
+    expect(res.body.timezone).toBe(district.timezone);
   });
 
-  test('resource unit types follow the category (validated list vs free text)', async () => {
-    const { res: listed } = await createCategory({ unitTypes: ['Standard', 'Blitz'] });
-    const venue = await createVenue(listed.body.id);
-    expect(venue.status).toBe(201);
-    expect(venue.body.category.unitTypes).toEqual(['Standard', 'Blitz']);
+  test('a venue lists the facilities of its units, and one venue can hold two', async () => {
+    const { res: turf } = await createCategory({ unitTypes: ['Standard'] });
+    const { res: pool } = await createCategory({ unitLabel: 'Lane' });
+    const venue = await createVenue();
+    expect((await addResource(venue.body.id, turf.body.id, 'Standard')).status).toBe(201);
+    expect((await addResource(venue.body.id, pool.body.id, 'Lap', 'Lane 1')).status).toBe(201);
+    expect((await addResource(venue.body.id, pool.body.id, 'Lap', 'Lane 2')).status).toBe(201);
 
-    const resource = (groundType: string) =>
-      ownerAgent.post('/resources').send({ venueId: venue.body.id, name: 'Board 1', groundType });
-    expect((await resource('Rapid')).status).toBe(400);
-    expect((await resource('Standard')).status).toBe(201);
+    const got = await ownerAgent.get(`/venues/${venue.body.id}`);
+    expect(got.status).toBe(200);
+    expect(got.body.facilities.map((f: { id: string }) => f.id).sort()).toEqual([turf.body.id, pool.body.id].sort());
+    expect(got.body.facilities.find((f: { id: string }) => f.id === pool.body.id).unitLabel).toBe('Lane');
+
+    const units = await ownerAgent.get(`/resources?venueId=${venue.body.id}`);
+    expect(units.body.find((r: { name: string }) => r.name === 'Lane 1').category.id).toBe(pool.body.id);
+  });
+
+  test('unit types follow the unit\'s facility (validated list vs free text)', async () => {
+    const { res: listed } = await createCategory({ unitTypes: ['Standard', 'Blitz'] });
+    const venue = await createVenue();
+    expect((await addResource(venue.body.id, listed.body.id, 'Rapid', 'Board 1')).status).toBe(400);
+    expect((await addResource(venue.body.id, listed.body.id, 'Standard', 'Board 1')).status).toBe(201);
 
     // Empty unitTypes => free text.
     const { res: free } = await createCategory({ unitTypes: [] });
-    const freeVenue = await createVenue(free.body.id);
-    const ok = await ownerAgent
-      .post('/resources')
-      .send({ venueId: freeVenue.body.id, name: 'Room A', groundType: 'Anything goes' });
-    expect(ok.status).toBe(201);
+    expect((await addResource(venue.body.id, free.body.id, 'Anything goes', 'Room A')).status).toBe(201);
   });
 
-  test('exclusive venue types cannot host pooled inventory; pooled types can', async () => {
+  test('exclusive facilities cannot host pooled inventory; pooled ones can', async () => {
     const { res: exclusive } = await createCategory();
-    const exclusiveVenue = await createVenue(exclusive.body.id);
-    const rejected = await ownerAgent.post('/resources/groups').send({
-      venueId: exclusiveVenue.body.id,
-      name: 'Pool',
-      allocationMode: 'POOLED',
-      totalUnits: 5,
-    });
-    expect(rejected.status).toBe(400);
-
     const { res: pooled } = await createCategory({ defaultAllocationMode: 'POOLED', unitLabel: 'Kayak' });
-    const pooledVenue = await createVenue(pooled.body.id);
-    const accepted = await ownerAgent.post('/resources/groups').send({
-      venueId: pooledVenue.body.id,
-      name: 'Kayaks',
-      allocationMode: 'POOLED',
-      totalUnits: 5,
-    });
-    expect(accepted.status).toBe(201);
+    const venue = await createVenue();
+    expect((await addGroup(venue.body.id, exclusive.body.id, 'Pool')).status).toBe(400);
+    expect((await addGroup(venue.body.id, pooled.body.id, 'Kayaks')).status).toBe(201);
   });
 
-  test('the venue type cannot change once resources exist, or to an inactive type', async () => {
+  test('a unit cannot be added under an unknown or inactive facility', async () => {
+    const { res: facility } = await createCategory();
+    const venue = await createVenue();
+    await adminAgent.post(`/admin/categories/${facility.body.id}/deactivate`);
+    expect((await addResource(venue.body.id, facility.body.id, 'x')).status).toBe(400);
+    expect(
+      (await addResource(venue.body.id, '00000000-0000-4000-8000-000000000000', 'x')).status,
+    ).toBe(400);
+    // categoryId is required now.
+    expect((await ownerAgent.post('/resources').send({ venueId: venue.body.id, name: 'x', groundType: 'x' })).status).toBe(400);
+  });
+
+  test('composed resources must share a facility', async () => {
     const { res: a } = await createCategory();
     const { res: b } = await createCategory();
-    const venue = await createVenue(a.body.id);
-    expect((await ownerAgent.patch(`/venues/${venue.body.id}`).send({ categoryId: b.body.id })).status).toBe(200);
-
-    await ownerAgent.post('/resources').send({ venueId: venue.body.id, name: 'T1', groundType: 'x' });
-    const blocked = await ownerAgent.patch(`/venues/${venue.body.id}`).send({ categoryId: a.body.id });
-    expect(blocked.status).toBe(409);
-
-    await adminAgent.post(`/admin/categories/${a.body.id}/deactivate`);
-    const fresh = await createVenue(a.body.id);
-    expect(fresh.status).toBe(400);
+    const venue = await createVenue();
+    const parent = await addResource(venue.body.id, a.body.id, 'x', 'Parent');
+    const sameChild = await addResource(venue.body.id, a.body.id, 'x', 'Child A');
+    const otherChild = await addResource(venue.body.id, b.body.id, 'x', 'Child B');
+    const link = (child: string) =>
+      ownerAgent.post('/resources/compositions').send({ parentResourceId: parent.body.id, childResourceId: child });
+    expect((await link(otherChild.body.id)).status).toBe(400);
+    expect((await link(sameChild.body.id)).status).toBe(201);
   });
 
-  test('delete is refused once venues exist; an unused type can be deleted', async () => {
+  test('delete is refused once units exist; an unused facility can be deleted', async () => {
     const { res: used } = await createCategory();
-    await createVenue(used.body.id);
+    const venue = await createVenue();
+    await addResource(venue.body.id, used.body.id, 'x');
     const refused = await adminAgent.delete(`/admin/categories/${used.body.id}`);
     expect(refused.status).toBe(409);
 
@@ -216,6 +241,24 @@ describe('Venue categories', () => {
     const deleted = await adminAgent.delete(`/admin/categories/${unused.body.id}`);
     expect(deleted.status).toBe(200);
     expect((await adminAgent.get(`/admin/categories/${unused.body.id}`)).status).toBe(404);
+  });
+
+  test('?available=true lists only facilities with a bookable unit in an active venue', async () => {
+    const { res: withUnit } = await createCategory();
+    const { res: empty } = await createCategory();
+    const venue = await createVenue();
+    await addResource(venue.body.id, withUnit.body.id, 'x');
+
+    const slugs = async (qs = '') =>
+      (await request(app.getHttpServer()).get(`/categories${qs}`)).body.map((c: { slug: string }) => c.slug);
+    // Still a DRAFT venue: nothing is bookable yet.
+    expect(await slugs('?available=true')).not.toContain(withUnit.body.slug);
+    expect(await slugs()).toContain(empty.body.slug);
+
+    expect((await adminAgent.patch(`/venues/${venue.body.id}`).send({ status: 'ACTIVE' })).status).toBe(200);
+    const available = await slugs('?available=true');
+    expect(available).toContain(withUnit.body.slug);
+    expect(available).not.toContain(empty.body.slug);
   });
 
   test('deactivation is blocked while live bookings exist, and hides the type once safe', async () => {

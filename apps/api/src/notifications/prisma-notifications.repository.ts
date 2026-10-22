@@ -45,13 +45,17 @@ export class PrismaNotificationsRepository implements NotificationsRepository {
 
   async findActiveOwnerIdsByOrganization(
     organizationId: string,
-    opts?: { excludeOwnerId?: string },
+    opts?: { excludeOwnerId?: string; venueId?: string },
   ): Promise<string[]> {
     const owners = await this.prisma.client.venueOwnerUser.findMany({
       where: {
         organizationId,
         status: 'ACTIVE',
         id: opts?.excludeOwnerId ? { not: opts.excludeOwnerId } : undefined,
+        // About one venue: the owner admins, plus only the staff assigned to that venue.
+        ...(opts?.venueId
+          ? { OR: [{ role: 'OWNER_ADMIN' as const }, { venueAssignments: { some: { venueId: opts.venueId } } }] }
+          : {}),
       },
       select: { id: true },
     });

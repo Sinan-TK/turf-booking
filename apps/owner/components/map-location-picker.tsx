@@ -58,7 +58,8 @@ export default function MapLocationPicker({
 }) {
   const parsedLat = Number(lat);
   const parsedLng = Number(lng);
-  const hasPosition = lat !== '' && lng !== '' && !Number.isNaN(parsedLat) && !Number.isNaN(parsedLng);
+  const hasPosition =
+    lat !== '' && lng !== '' && !Number.isNaN(parsedLat) && !Number.isNaN(parsedLng);
 
   // react-leaflet's <MapContainer center> only sets the *initial* view —
   // it's not reactive to prop changes after mount (deliberately, per its
@@ -100,8 +101,12 @@ export default function MapLocationPicker({
 
   return (
     <div>
-      <div className="overflow-hidden rounded-md border border-gray-300" style={{ height: 280 }}>
-        <MapContainer center={center} zoom={hasPosition ? PICKED_ZOOM : DEFAULT_ZOOM} style={{ height: '100%', width: '100%' }}>
+      <div className="isolate h-[320px] overflow-hidden rounded-xl border border-outline-variant/40 sm:h-[420px] xl:h-[460px]">
+        <MapContainer
+          center={center}
+          zoom={hasPosition ? PICKED_ZOOM : DEFAULT_ZOOM}
+          style={{ height: '100%', width: '100%' }}
+        >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -123,16 +128,18 @@ export default function MapLocationPicker({
           )}
         </MapContainer>
       </div>
-      <div className="mt-2 flex items-center gap-3">
+      <div className="mt-3 flex flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={handleUseCurrentLocation}
           disabled={locating}
-          className="text-xs font-medium text-gray-700 hover:underline disabled:opacity-50"
+          className="rounded-full bg-primary-fixed-dim/20 px-3 py-1.5 text-xs font-medium text-on-primary-container transition-colors hover:bg-primary-fixed-dim/40 disabled:opacity-50"
         >
           {locating ? 'Locating…' : '📍 Use my current location'}
         </button>
-        {!hasPosition && <span className="text-xs text-gray-400">Click the map to drop a pin</span>}
+        {!hasPosition && (
+          <span className="text-xs text-on-surface-variant">or click the map to drop a pin</span>
+        )}
       </div>
       {locateError && <p className="mt-1 text-xs text-red-600">{locateError}</p>}
     </div>

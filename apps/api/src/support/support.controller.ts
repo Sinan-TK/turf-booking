@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { parsePage, setTotalCount } from '../common/pagination';
+import { parseEnumFilter, parseSearch } from '../common/list-filters';
+import { SupportTicketCategory, SupportTicketPriority, SupportTicketStatus } from '@venue/database';
 import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -41,14 +43,23 @@ export class AdminSupportController {
   @Get()
   async list(
     @Query('status') status?: string,
+    @Query('priority') priority?: string,
+    @Query('category') category?: string,
+    @Query('search') search?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
     @Res({ passthrough: true }) res?: Response,
   ) {
     const page = parsePage(limit, offset);
+    const filters = {
+      status: parseEnumFilter(status, Object.values(SupportTicketStatus), 'status'),
+      priority: parseEnumFilter(priority, Object.values(SupportTicketPriority), 'priority'),
+      category: parseEnumFilter(category, Object.values(SupportTicketCategory), 'category'),
+      search: parseSearch(search),
+    };
     const [rows, total] = await Promise.all([
-      this.support.listForAdmin({ status, ...page }),
-      this.support.countForAdmin({ status }),
+      this.support.listForAdmin({ ...filters, ...page }),
+      this.support.countForAdmin(filters),
     ]);
     if (res) setTotalCount(res, total);
     return rows;

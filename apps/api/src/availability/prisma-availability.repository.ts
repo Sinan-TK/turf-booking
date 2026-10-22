@@ -1,22 +1,20 @@
 import { Injectable } from '@nestjs/common';
-import type { DayType } from '@venue/database';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AvailabilityRepository } from './availability.repository';
 
 const VENUE_SEARCH_INCLUDE = {
   photos: { orderBy: { sortOrder: 'asc' as const }, take: 1, select: { url: true } },
-  category: {
-    select: {
-      id: true,
-      slug: true,
-      name: true,
-      iconKey: true,
-      unitLabel: true,
-      venueLabel: true,
-      unitTypes: true,
-    },
-  },
 };
+
+const UNIT_CATEGORY_SELECT = {
+  id: true,
+  slug: true,
+  name: true,
+  iconKey: true,
+  unitLabel: true,
+  venueLabel: true,
+  unitTypes: true,
+} as const;
 
 /**
  * Prisma-backed AvailabilityRepository. The ONLY file in the availability
@@ -60,26 +58,22 @@ export class PrismaAvailabilityRepository implements AvailabilityRepository {
     return category?.id ?? null;
   }
 
-  findBookableResources(venueId: string, groundType?: string) {
+  findBookableResources(venueId: string, groundType?: string, categoryId?: string) {
     return this.prisma.client.resource.findMany({
+      include: { category: { select: UNIT_CATEGORY_SELECT } },
       where: {
         venueId,
         ...(groundType ? { groundType } : {}),
+        ...(categoryId ? { categoryId } : {}),
         isBookable: true,
         status: 'ACTIVE',
       },
     });
   }
 
-  findPricingRule(resourceId: string, durationMinutes: number, dayType: string, now: Date) {
-    return this.prisma.client.pricingRule.findFirst({
-      where: {
-        resourceId,
-        durationMinutes,
-        dayType: dayType as DayType,
-        effectiveFrom: { lte: now },
-      },
-      orderBy: { effectiveFrom: 'desc' },
+  findPricingRules(resourceId: string, durationMinutes: number, at: Date) {
+    return this.prisma.client.pricingRule.findMany({
+      where: { resourceId, durationMinutes, isActive: true, effectiveFrom: { lte: at } },
     });
   }
 

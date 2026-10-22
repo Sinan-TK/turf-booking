@@ -15,7 +15,7 @@ const NAV_GROUPS: Array<{ title: string; items: Array<{ href: string; label: str
     title: 'Catalogue',
     items: [
       { href: '/venues', label: 'Venues', icon: 'venue' },
-      { href: '/venue-types', label: 'Venue types', icon: 'tag' },
+      { href: '/venue-types', label: 'Facilities', icon: 'tag' },
       { href: '/owners', label: 'Owners', icon: 'building' },
       { href: '/locations', label: 'Locations', icon: 'pin' },
     ],

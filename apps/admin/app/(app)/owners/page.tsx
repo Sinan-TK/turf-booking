@@ -9,7 +9,8 @@ import { Dropdown } from '@/components/dropdown';
 import { ListSection, FilterSummary } from '@/components/list-section';
 import { Pagination, usePageSlice } from '@/components/pagination';
 import { SortHeader, type SortDir } from '@/components/sort-header';
-import { Badge, Button, Card, EmptyState, ErrorBanner, Input, Label, SkeletonTable } from '@/components/ui';
+import { Badge, Button, Card, EmptyState, ErrorBanner, FieldError, Input, Label, SkeletonTable, invalidClass } from '@/components/ui';
+import { emailError, hasErrors, phoneError, textError, type FieldErrors } from '@/lib/validation';
 
 interface Organization {
   id: string;
@@ -44,6 +45,11 @@ export default function OwnersPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors] = useState<FieldErrors<keyof typeof EMPTY_FORM>>({});
+  const edit = (k: keyof typeof EMPTY_FORM, v: string) => {
+    setForm((f) => ({ ...f, [k]: v }));
+    setErrors((p) => (p[k] ? { ...p, [k]: undefined } : p));
+  };
 
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
@@ -52,10 +58,22 @@ export default function OwnersPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
+    const found: FieldErrors<keyof typeof EMPTY_FORM> = {
+      name: textError(form.name, 'Organization name', 1, 150),
+      contactEmail: emailError(form.contactEmail, 'the contact email'),
+      contactPhone: phoneError(form.contactPhone, 'the contact phone'),
+    };
+    setErrors(found);
+    if (hasErrors(found)) {
+      const first = (['name', 'contactEmail', 'contactPhone'] as const).find((k) => found[k]);
+      document.getElementById('org-' + first)?.focus();
+      return;
+    }
     setSubmitting(true);
     try {
-      await api.post('/admin/organizations', form);
+      await api.post('/admin/organizations', { ...form, name: form.name.trim(), contactEmail: form.contactEmail.trim(), contactPhone: form.contactPhone.trim() });
       setForm(EMPTY_FORM);
+      setErrors({});
       setShowForm(false);
       refetch();
     } catch (err) {
@@ -156,28 +174,42 @@ export default function OwnersPage() {
       {showForm && (
         <Card className="mb-4 max-w-xl">
           <h2 className="mb-4 text-sm font-semibold text-gray-900">New organization</h2>
-          <form onSubmit={onSubmit} className="space-y-3">
+          <form onSubmit={onSubmit} noValidate className="space-y-3">
             {formError && <ErrorBanner message={formError} />}
             <div>
-              <Label>Organization name</Label>
-              <Input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+              <Label htmlFor="org-name">Organization name</Label>
+              <Input
+                id="org-name"
+                value={form.name}
+                aria-invalid={!!errors.name}
+                className={errors.name ? invalidClass : ''}
+                onChange={(e) => edit('name', e.target.value)}
+              />
+              <FieldError id="org-name-error" message={errors.name} />
             </div>
             <div>
-              <Label>Contact email</Label>
+              <Label htmlFor="org-contactEmail">Contact email</Label>
               <Input
-                required
+                id="org-contactEmail"
                 type="email"
                 value={form.contactEmail}
-                onChange={(e) => setForm((f) => ({ ...f, contactEmail: e.target.value }))}
+                aria-invalid={!!errors.contactEmail}
+                className={errors.contactEmail ? invalidClass : ''}
+                onChange={(e) => edit('contactEmail', e.target.value)}
               />
+              <FieldError id="org-contactEmail-error" message={errors.contactEmail} />
             </div>
             <div>
-              <Label>Contact phone</Label>
+              <Label htmlFor="org-contactPhone">Contact phone</Label>
               <Input
-                required
+                id="org-contactPhone"
+                type="tel"
                 value={form.contactPhone}
-                onChange={(e) => setForm((f) => ({ ...f, contactPhone: e.target.value }))}
+                aria-invalid={!!errors.contactPhone}
+                className={errors.contactPhone ? invalidClass : ''}
+                onChange={(e) => edit('contactPhone', e.target.value)}
               />
+              <FieldError id="org-contactPhone-error" message={errors.contactPhone} />
             </div>
             <Button type="submit" loading={submitting}>
               {submitting ? 'Creating…' : 'Create organization'}

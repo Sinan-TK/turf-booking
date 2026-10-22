@@ -67,7 +67,10 @@ export class NotificationsService {
     input: NotificationInput,
     opts?: { excludeOwnerId?: string },
   ) {
-    const ownerIds = await this.repo.findActiveOwnerIdsByOrganization(organizationId, opts);
+    // Staff are told only about their own venues: the venue an event is about rides in its data.
+    const data = input.data as Record<string, unknown> | null | undefined;
+    const venueId = typeof data?.venueId === 'string' ? data.venueId : undefined;
+    const ownerIds = await this.repo.findActiveOwnerIdsByOrganization(organizationId, { ...opts, venueId });
     return this.createForOwners(ownerIds, input);
   }
 

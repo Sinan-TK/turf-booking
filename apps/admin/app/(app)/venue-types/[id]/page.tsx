@@ -21,15 +21,15 @@ export default function EditVenueTypePage() {
   return (
     <div>
       <Link href="/venue-types" className="mb-3 inline-block text-sm text-gray-500 hover:text-gray-800">
-        ← Venue types
+        ← Facilities
       </Link>
       <PageHeader
         title={data.name}
-        subtitle={`${data.venueCount} venue${data.venueCount === 1 ? '' : 's'} use this type. Rule changes apply to new bookings straight away; existing bookings are not touched.`}
+        subtitle={`${data.venueCount} venue${data.venueCount === 1 ? '' : 's'} offer this facility. Rule changes apply to new bookings straight away; existing bookings are not touched.`}
       />
       {saved && (
         <div className="mb-4">
-          <SuccessBanner message="Venue type saved." />
+          <SuccessBanner message="Facility saved." />
         </div>
       )}
       <CategoryForm

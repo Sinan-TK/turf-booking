@@ -13,6 +13,10 @@ interface Booking {
   orderId: string;
   status: string;
   amount: string;
+  /** Charged online to hold the slot. */
+  advanceAmount?: string;
+  /** Paid so far (the advance, plus anything paid at the venue). */
+  paidAmount?: string;
   currency: string;
   startTime: string;
   endTime: string;
@@ -90,7 +94,7 @@ function BookingDetail() {
               </dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-gray-500">Ground Type</dt>
+              <dt className="text-gray-500">Booked</dt>
               <dd>{booking.groundType}</dd>
             </div>
             <div className="flex justify-between">
@@ -99,6 +103,22 @@ function BookingDetail() {
                 {booking.currency} {booking.amount}
               </dd>
             </div>
+            {Number(booking.paidAmount) > 0 && Number(booking.paidAmount) < Number(booking.amount) && booking.status === 'CONFIRMED' && (
+              <>
+                <div className="flex justify-between">
+                  <dt className="text-gray-500">Paid</dt>
+                  <dd>
+                    {booking.currency} {booking.paidAmount}
+                  </dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-gray-500">Pay at the venue</dt>
+                  <dd className="font-semibold text-gray-900">
+                    {booking.currency} {(Number(booking.amount) - Number(booking.paidAmount)).toFixed(2)}
+                  </dd>
+                </div>
+              </>
+            )}
             <div className="flex justify-between">
               <dt className="text-gray-500">Payment Method</dt>
               <dd>{booking.paymentMethod ?? '—'}</dd>

@@ -1,19 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useFetch } from '@/lib/use-fetch';
 import type { VenueCategorySummary } from '@/lib/categories';
+import { Badge, Button, ErrorBanner, PageHeader } from '@/components/ui';
 import {
-  Badge,
-  Button,
-  Card,
-  EmptyState,
-  ErrorBanner,
-  LoadingState,
-  PageHeader,
-  SearchInput,
-} from '@/components/ui';
+  DataTable,
+  FilterSelect,
+  ListToolbar,
+  Pagination,
+  ROW,
+  SearchBox,
+  usePageSlice,
+} from '@/components/list-kit';
 
 interface Venue {
   id: string;
@@ -21,82 +21,158 @@ interface Venue {
   name: string;
   status: string;
   address: string;
-  category?: VenueCategorySummary;
+  facilities?: VenueCategorySummary[];
 }
+
+const PAGE = 10;
+
+const STATUS_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'ACTIVE', label: 'Active' },
+  { value: 'DRAFT', label: 'Draft' },
+  { value: 'SUSPENDED', label: 'Suspended' },
+];
 
 export default function VenuesPage() {
   const { data, error, loading } = useFetch<Venue[]>('/venues/mine');
   const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const [facility, setFacility] = useState('');
 
-  const filtered = data?.filter((venue) => {
+  const facilityOptions = useMemo(() => {
+    const names = new Map<string, string>();
+    for (const v of data ?? []) for (const f of v.facilities ?? []) names.set(f.slug, f.name);
+    return [
+      { value: '', label: 'All' },
+      ...[...names]
+        .sort((a, b) => a[1].localeCompare(b[1]))
+        .map(([value, label]) => ({ value, label })),
+    ];
+  }, [data]);
+
+  const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      venue.name.toLowerCase().includes(q) ||
-      venue.facilityCode.toLowerCase().includes(q) ||
-      venue.address.toLowerCase().includes(q)
-    );
-  });
+    return (data ?? []).filter((v) => {
+      if (status && v.status !== status) return false;
+      if (facility && !v.facilities?.some((f) => f.slug === facility)) return false;
+      if (!q) return true;
+      return [v.name, v.facilityCode, v.address, ...(v.facilities ?? []).map((f) => f.name)].some(
+        (t) => t.toLowerCase().includes(q),
+      );
+    });
+  }, [data, search, status, facility]);
+
+  const active = search !== '' || status !== '' || facility !== '';
+  const paged = usePageSlice(filtered, PAGE, `${search}|${status}|${facility}`);
 
   return (
     <div>
       <PageHeader
         title="My Venues"
+        subtitle="The places you run. Open one to manage its facilities, units, pricing and hours."
         action={
           <Link href="/venues/new">
-            <Button>New Venue</Button>
+            <Button>+ New venue</Button>
           </Link>
         }
       />
-      {data && data.length > 0 && (
-        <SearchInput
-          placeholder="Search venues by name, code, or address…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="mb-4 max-w-md"
-        />
-      )}
-      {loading && <LoadingState />}
       {error && <ErrorBanner message={error} />}
-      {data && data.length === 0 && (
-        <EmptyState message="You haven't added a venue yet. Create one to get started." />
+      {data && data.length > 0 && (
+        <ListToolbar
+          active={active}
+          total={filtered.length}
+          noun="venue"
+          onClear={() => {
+            setSearch('');
+            setStatus('');
+            setFacility('');
+          }}
+          search={
+            <SearchBox
+              label="Search venues"
+              placeholder="Search name, code, address or facility…"
+              value={search}
+              onChange={setSearch}
+            />
+          }
+        >
+          <FilterSelect
+            label="Status"
+            value={status}
+            options={STATUS_OPTIONS}
+            onChange={setStatus}
+          />
+          {facilityOptions.length > 2 && (
+            <FilterSelect
+              label="Facility"
+              value={facility}
+              options={facilityOptions}
+              onChange={setFacility}
+            />
+          )}
+        </ListToolbar>
       )}
-      {filtered && filtered.length === 0 && data && data.length > 0 && (
-        <EmptyState message="No venues match your search." />
-      )}
-      {filtered && filtered.length > 0 && (
-        <Card className="overflow-x-auto p-0">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-outline-variant/30 bg-surface-container-low text-xs uppercase text-on-surface-variant">
-              <tr>
-                <th className="px-4 py-3">Facility Code</th>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Address</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((venue) => (
-                <tr key={venue.id} className="border-b border-outline-variant/20 last:border-0">
-                  <td className="px-4 py-3 font-mono text-xs">{venue.facilityCode}</td>
-                  <td className="px-4 py-3 font-medium text-on-surface">{venue.name}</td>
-                  <td className="px-4 py-3 text-on-surface-variant">{venue.category?.name ?? '—'}</td>
-                  <td className="px-4 py-3 text-on-surface-variant">{venue.address}</td>
-                  <td className="px-4 py-3">
-                    <Badge value={venue.status} />
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Link href={`/venues/${venue.id}`} className="text-sm font-medium text-primary hover:underline">
-                      Manage →
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+      {!error && (
+        <DataTable
+          columns={[
+            'Code',
+            'Name',
+            'Facilities',
+            'Address',
+            'Status',
+            { label: '', className: 'w-24' },
+          ]}
+          loading={loading}
+          rowCount={paged.rows.length}
+          empty={
+            data && data.length > 0
+              ? 'No venues match your search or filters.'
+              : "You haven't added a venue yet. Create one to get started."
+          }
+          footer={
+            <Pagination
+              page={paged.page}
+              pageSize={PAGE}
+              total={paged.total}
+              onPage={paged.setPage}
+            />
+          }
+        >
+          {paged.rows.map((venue) => (
+            <tr key={venue.id} className={ROW}>
+              <td className="px-4 py-3 font-mono text-xs">{venue.facilityCode}</td>
+              <td className="px-4 py-3 font-medium text-on-surface">{venue.name}</td>
+              <td className="px-4 py-3">
+                {venue.facilities?.length ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {venue.facilities.map((f) => (
+                      <span
+                        key={f.id}
+                        className="rounded-full bg-primary-fixed-dim/20 px-2.5 py-0.5 text-xs font-medium text-on-primary-container"
+                      >
+                        {f.name}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-on-surface-variant">—</span>
+                )}
+              </td>
+              <td className="px-4 py-3 text-on-surface-variant">{venue.address}</td>
+              <td className="px-4 py-3">
+                <Badge value={venue.status} />
+              </td>
+              <td className="px-4 py-3 text-right">
+                <Link
+                  href={`/venues/${venue.id}`}
+                  className="text-sm font-medium text-primary hover:underline"
+                >
+                  Manage →
+                </Link>
+              </td>
+            </tr>
+          ))}
+        </DataTable>
       )}
     </div>
   );

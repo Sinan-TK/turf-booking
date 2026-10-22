@@ -41,6 +41,11 @@ export class CustomerSessionService {
     if (!session || session.revokedAt || session.expiresAt < new Date()) {
       return null;
     }
+    const customer = await this.prisma.client.customerProfile.findUnique({
+      where: { id: session.customerId },
+      select: { status: true },
+    });
+    if (customer?.status === 'BLOCKED') return null;
     await this.prisma.client.customerSession.update({
       where: { id: session.id },
       data: { lastSeenAt: new Date() },

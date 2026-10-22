@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { loadEnv } from '@venue/config';
 import { DateTime } from 'luxon';
 import { PrismaService } from '../prisma/prisma.service';
+import { coverageWindows } from '../pricing/pricing-rules';
 
 export interface OpenWindow {
   /** "HH:mm" in the venue's local time. */
@@ -17,17 +18,13 @@ export interface BlockTarget {
 }
 
 /**
- * Opening hours and blackouts — the single read path for both search and
+ * When a unit can be booked, and blackouts — the single read path for both search and
  * hold creation, so the two always agree.
  *
- * AVAILABILITY_SOURCE=rules (default): AvailabilityRule + BlockedPeriod.
- * Hours fall back to the legacy OperatingHours table for a venue that has no
- * AvailabilityRule rows at all (not yet synced), so a half-migrated venue
- * never silently becomes "open all day".
- * AVAILABILITY_SOURCE=legacy: OperatingHours + BlockedDate only (rollback).
- *
- * Writes always go to both table families (VenueConfigService), so flipping
- * the flag in either direction needs no data migration.
+ * There are no separate "opening hours": a unit can be booked exactly where one of its
+ * active prices (for the requested duration) covers the day and time. Blackouts come
+ * from AvailabilityRule-era BlockedPeriod (AVAILABILITY_SOURCE=rules, default) or the
+ * legacy BlockedDate table (AVAILABILITY_SOURCE=legacy, rollback).
  */
 @Injectable()
 export class ScheduleService {
@@ -38,47 +35,27 @@ export class ScheduleService {
   }
 
   /**
-   * Windows during which the target is open on the venue-local calendar day
-   * `localDay` (whose weekday is 0=Sunday..6). `null` = no hours configured
-   * for that weekday, which keeps the long-standing behaviour of
-   * "unconstrained" (see AvailabilityService) rather than "closed".
+   * Windows during which the target can be booked for `durationMinutes` on the venue-local
+   * calendar day `localDay`: the merged time windows of its active prices that cover that
+   * weekday (see coverageWindows). Empty = no price covers that day, so it is not bookable.
    */
   async openWindows(
-    venueId: string,
     target: { resourceId?: string; resourceGroupId?: string },
     localDay: DateTime,
-  ): Promise<OpenWindow[] | null> {
-    const weekday = localDay.weekday % 7; // luxon 1=Mon..7=Sun -> 0=Sun..6=Sat
-
-    if (this.useRules()) {
-      const rules = await this.prisma.client.availabilityRule.findMany({ where: { venueId } });
-      if (rules.length > 0) {
-        const dayStart = localDay.startOf('day').toJSDate();
-        const dayEnd = localDay.endOf('day').toJSDate();
-        const todays = rules.filter(
-          (r) =>
-            r.weekday === weekday &&
-            (!r.validFrom || r.validFrom <= dayEnd) &&
-            (!r.validTo || r.validTo >= dayStart),
-        );
-        const specific = todays.filter(
-          (r) =>
-            (target.resourceId !== undefined && r.resourceId === target.resourceId) ||
-            (target.resourceGroupId !== undefined && r.resourceGroupId === target.resourceGroupId),
-        );
-        const chosen = specific.length
-          ? specific
-          : todays.filter((r) => r.resourceId === null && r.resourceGroupId === null);
-        if (chosen.length === 0) return null;
-        return chosen
-          .map((r) => ({ openTime: r.openTime, closeTime: r.closeTime }))
-          .sort((a, b) => a.openTime.localeCompare(b.openTime));
-      }
-      // No AvailabilityRule rows for this venue at all -> fall through to legacy.
-    }
-
-    const legacy = await this.prisma.client.operatingHours.findFirst({ where: { venueId, weekday } });
-    return legacy ? [{ openTime: legacy.openTime, closeTime: legacy.closeTime }] : null;
+    durationMinutes: number,
+  ): Promise<OpenWindow[]> {
+    if (target.resourceId === undefined && target.resourceGroupId === undefined) return [];
+    const rules = await this.prisma.client.pricingRule.findMany({
+      where: {
+        durationMinutes,
+        isActive: true,
+        effectiveFrom: { lte: localDay.endOf('day').toJSDate() },
+        ...(target.resourceId !== undefined
+          ? { resourceId: target.resourceId }
+          : { resourceGroupId: target.resourceGroupId }),
+      },
+    });
+    return coverageWindows(rules, localDay.weekday);
   }
 
   /** Blocked ranges overlapping [start, end) that apply to the target. */
@@ -122,28 +99,24 @@ export class ScheduleService {
   }
 
   /**
-   * True when [start, end) lies inside a single opening window on the
-   * venue-local day of `start`. No configured hours = unconstrained.
+   * True when [start, end) lies inside a single bookable window (see openWindows) on the
+   * venue-local day of `start`. The duration is the length of [start, end).
    */
   async isWithinOpeningHours(
-    venueId: string,
     target: { resourceId?: string; resourceGroupId?: string },
     start: Date,
     end: Date,
     timezone: string,
   ): Promise<boolean> {
     const localStart = DateTime.fromJSDate(start, { zone: timezone });
-    const windows = await this.openWindows(venueId, target, localStart);
-    if (windows === null) return true;
-    return windows.some((w) => {
-      const open = this.at(localStart, w.openTime);
-      const close = this.at(localStart, w.closeTime);
-      return start >= open && end <= close;
-    });
+    const durationMinutes = Math.round((end.getTime() - start.getTime()) / 60_000);
+    const windows = await this.openWindows(target, localStart, durationMinutes);
+    return windows.some((w) => start >= this.at(localStart, w.openTime) && end <= this.at(localStart, w.closeTime));
   }
 
   /** Wall-clock "HH:mm" on the same local day as `day`, as an instant. */
   at(day: DateTime, hhmm: string): Date {
+    if (hhmm === '24:00') return day.startOf('day').plus({ days: 1 }).toJSDate(); // end of the day
     const [h, m] = hhmm.split(':').map(Number);
     return day.set({ hour: h ?? 0, minute: m ?? 0, second: 0, millisecond: 0 }).toJSDate();
   }

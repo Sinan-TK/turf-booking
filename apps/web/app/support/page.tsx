@@ -4,7 +4,21 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
 import { LoginGate } from '@/components/login-gate';
-import { Badge, Button, Card, ErrorBanner, Icon, Input, Label, LoadingState, Select, SuccessBanner } from '@/components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  ErrorBanner,
+  FieldError,
+  Icon,
+  Input,
+  Label,
+  LoadingState,
+  Select,
+  SuccessBanner,
+  invalidClass,
+} from '@/components/ui';
+import { hasErrors, type FieldErrors } from '@/lib/validation';
 import { Screen } from '@/components/screen';
 
 interface Ticket {
@@ -35,6 +49,7 @@ function Tickets() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<FieldErrors<'subject' | 'description'>>({});
 
   const load = useCallback(() => {
     api
@@ -51,6 +66,15 @@ function Tickets() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (sending) return;
+    const found: FieldErrors<'subject' | 'description'> = {
+      subject: form.subject.trim() ? undefined : 'Enter a subject.',
+      description: form.description.trim() ? undefined : 'Tell us what happened.',
+    };
+    setErrors(found);
+    if (hasErrors(found)) {
+      document.getElementById(found.subject ? 'support-subject' : 'support-description')?.focus();
+      return;
+    }
     setSending(true);
     setFormError(null);
     setSent(false);
@@ -61,6 +85,7 @@ function Tickets() {
         description: form.description.trim(),
       });
       setForm({ category: 'BOOKING_ISSUE', subject: '', description: '' });
+      setErrors({});
       setSent(true);
       load();
     } catch (err) {
@@ -74,7 +99,7 @@ function Tickets() {
     <>
       <Card className="mb-4">
         <h2 className="mb-3 text-sm font-semibold text-gray-900">Contact support</h2>
-        <form onSubmit={onSubmit} className="space-y-3">
+        <form onSubmit={onSubmit} noValidate className="space-y-3">
           {formError && (
             <div role="alert">
               <ErrorBanner message={formError} />
@@ -96,26 +121,39 @@ function Tickets() {
             </Select>
           </div>
           <div>
-            <Label>Subject</Label>
+            <Label htmlFor="support-subject">Subject</Label>
             <Input
-              required
+              id="support-subject"
               maxLength={150}
               value={form.subject}
-              onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
+              aria-invalid={!!errors.subject}
+              aria-describedby={errors.subject ? 'support-subject-error' : undefined}
+              className={errors.subject ? invalidClass : ''}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, subject: e.target.value }));
+                setErrors((p) => ({ ...p, subject: undefined }));
+              }}
             />
+            <FieldError id="support-subject-error" message={errors.subject} />
           </div>
           <div>
-            <Label>Details</Label>
+            <Label htmlFor="support-description">Details</Label>
             <textarea
-              required
+              id="support-description"
               maxLength={2000}
               rows={4}
               value={form.description}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              className="w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-600 focus:outline-none"
+              aria-invalid={!!errors.description}
+              aria-describedby={errors.description ? 'support-description-error' : undefined}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, description: e.target.value }));
+                setErrors((p) => ({ ...p, description: undefined }));
+              }}
+              className={`w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-600 focus:outline-none ${errors.description ? invalidClass : ''}`}
             />
+            <FieldError id="support-description-error" message={errors.description} />
           </div>
-          <Button type="submit" disabled={sending || form.subject.trim() === '' || form.description.trim() === ''}>
+          <Button type="submit" disabled={sending}>
             {sending ? 'Sending…' : 'Send request'}
           </Button>
         </form>

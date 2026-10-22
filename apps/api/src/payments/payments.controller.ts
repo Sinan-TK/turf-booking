@@ -3,10 +3,13 @@ import type { RawBodyRequest } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { parsePage, setTotalCount } from '../common/pagination';
+import { parseDateRange, parseEnumFilter, parseSearch } from '../common/list-filters';
+import { PaymentProviderType, PaymentStatus, RefundStatus } from '@venue/database';
 import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { OwnerRoles } from '../auth/decorators/owner-roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { PaymentsService } from './payments.service';
 import { CreateOrderDto, VerifyPaymentDto } from './dto/payment.dto';
@@ -63,14 +66,24 @@ export class AdminPaymentsController {
   @Get('payments')
   async listPayments(
     @Query('status') status?: string,
+    @Query('provider') provider?: string,
+    @Query('search') search?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
     @Res({ passthrough: true }) res?: Response,
   ) {
     const page = parsePage(limit, offset);
+    const filters = {
+      status: parseEnumFilter(status, Object.values(PaymentStatus), 'status'),
+      provider: parseEnumFilter(provider, Object.values(PaymentProviderType), 'provider'),
+      search: parseSearch(search),
+      range: parseDateRange(from, to),
+    };
     const [rows, total] = await Promise.all([
-      this.payments.listPaymentsForAdmin({ status, ...page }),
-      this.payments.countPaymentsForAdmin({ status }),
+      this.payments.listPaymentsForAdmin({ ...filters, ...page }),
+      this.payments.countPaymentsForAdmin(filters),
     ]);
     if (res) setTotalCount(res, total);
     return rows;
@@ -79,14 +92,22 @@ export class AdminPaymentsController {
   @Get('refunds')
   async listRefunds(
     @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
     @Res({ passthrough: true }) res?: Response,
   ) {
     const page = parsePage(limit, offset);
+    const filters = {
+      status: parseEnumFilter(status, Object.values(RefundStatus), 'status'),
+      search: parseSearch(search),
+      range: parseDateRange(from, to),
+    };
     const [rows, total] = await Promise.all([
-      this.payments.listRefundsForAdmin({ status, ...page }),
-      this.payments.countRefundsForAdmin({ status }),
+      this.payments.listRefundsForAdmin({ ...filters, ...page }),
+      this.payments.countRefundsForAdmin(filters),
     ]);
     if (res) setTotalCount(res, total);
     return rows;
@@ -96,30 +117,61 @@ export class AdminPaymentsController {
 @Controller('owner')
 @UseGuards(AuthGuard, RolesGuard)
 @Roles(Role.VENUE_OWNER)
+@OwnerRoles('OWNER_ADMIN') // money pages are not a staff member's
 export class OwnerPaymentsController {
   constructor(private readonly payments: PaymentsService) {}
 
   @Get('payments')
-  listPayments(
+  async listPayments(
     @CurrentUser() actor: AuthContext,
     @Query('status') status?: string,
+    @Query('provider') provider?: string,
+    @Query('search') search?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
     @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Res({ passthrough: true }) res?: Response,
   ) {
-    return this.payments.listPaymentsForOwner(actor.organizationId!, {
-      status,
-      limit: limit ? Number(limit) : undefined,
-    });
+    const page = parsePage(limit, offset);
+    const filters = {
+      organizationId: actor.organizationId!,
+      status: parseEnumFilter(status, Object.values(PaymentStatus), 'status'),
+      provider: parseEnumFilter(provider, Object.values(PaymentProviderType), 'provider'),
+      search: parseSearch(search),
+      range: parseDateRange(from, to),
+    };
+    const [rows, total] = await Promise.all([
+      this.payments.listPaymentsForAdmin({ ...filters, ...page }),
+      this.payments.countPaymentsForAdmin(filters),
+    ]);
+    if (res) setTotalCount(res, total);
+    return rows;
   }
 
   @Get('refunds')
-  listRefunds(
+  async listRefunds(
     @CurrentUser() actor: AuthContext,
     @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
     @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Res({ passthrough: true }) res?: Response,
   ) {
-    return this.payments.listRefundsForOwner(actor.organizationId!, {
-      status,
-      limit: limit ? Number(limit) : undefined,
-    });
+    const page = parsePage(limit, offset);
+    const filters = {
+      organizationId: actor.organizationId!,
+      status: parseEnumFilter(status, Object.values(RefundStatus), 'status'),
+      search: parseSearch(search),
+      range: parseDateRange(from, to),
+    };
+    const [rows, total] = await Promise.all([
+      this.payments.listRefundsForAdmin({ ...filters, ...page }),
+      this.payments.countRefundsForAdmin(filters),
+    ]);
+    if (res) setTotalCount(res, total);
+    return rows;
   }
 }

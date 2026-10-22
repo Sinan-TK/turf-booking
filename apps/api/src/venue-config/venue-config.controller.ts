@@ -1,11 +1,12 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { OwnerRoles } from '../auth/decorators/owner-roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { VenueConfigService } from './venue-config.service';
-import { CreateBlockedDateDto, CreatePricingRuleDto, UpsertOperatingHoursDto } from './dto/venue-config.dto';
+import { CreateBlockedDateDto, CreatePricingRuleDto, UpdatePricingRuleDto } from './dto/venue-config.dto';
 import type { AuthContext } from '../auth/auth.types';
 
 // Owner/Admin only — this is "how bookable is my venue" configuration,
@@ -14,6 +15,7 @@ import type { AuthContext } from '../auth/auth.types';
 @Controller()
 @UseGuards(AuthGuard, RolesGuard)
 @Roles(Role.SUPER_ADMIN, Role.VENUE_OWNER)
+@OwnerRoles('OWNER_ADMIN') // prices and closed days are not a staff member's
 export class VenueConfigController {
   constructor(private readonly config: VenueConfigService) {}
 
@@ -31,21 +33,14 @@ export class VenueConfigController {
     return this.config.listPricingRules(actor, resourceId, resourceGroupId);
   }
 
-  // Deliberately NOT under /venues/... — VenuesController's GET /venues/:id
-  // would otherwise swallow a literal path segment like
-  // /venues/operating-hours (Nest/Express match :id greedily against
-  // whatever the next module happens to register second), which is
-  // exactly what happened here before this module got its own prefix —
-  // confirmed live as a 500 ("invalid UUID: operating-hours") rather than
-  // assumed.
-  @Put('venue-config/operating-hours')
-  upsertOperatingHours(@Body() dto: UpsertOperatingHoursDto, @CurrentUser() actor: AuthContext) {
-    return this.config.upsertOperatingHours(dto, actor);
+  @Patch('resources/pricing-rules/:id')
+  updatePricingRule(@Param('id') id: string, @Body() dto: UpdatePricingRuleDto, @CurrentUser() actor: AuthContext) {
+    return this.config.updatePricingRule(id, dto, actor);
   }
 
-  @Get('venue-config/operating-hours')
-  listOperatingHours(@Query('venueId') venueId: string, @CurrentUser() actor: AuthContext) {
-    return this.config.listOperatingHours(venueId, actor);
+  @Delete('resources/pricing-rules/:id')
+  deletePricingRule(@Param('id') id: string, @CurrentUser() actor: AuthContext) {
+    return this.config.deletePricingRule(id, actor);
   }
 
   @Post('venue-config/blocked-dates')

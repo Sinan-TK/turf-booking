@@ -26,10 +26,12 @@ describe('Pooled inventory (kayak fleets)', () => {
   let venueId: string;
   let singleId: string;
   let doubleId: string;
+  let kayakCategoryId: string;
 
   async function createGroup(name: string, allocationMode: string, totalUnits?: number) {
     const res = await ownerAgent.post('/resources/groups').send({
       venueId,
+      categoryId: kayakCategoryId,
       name,
       allocationMode,
       ...(totalUnits === undefined ? {} : { totalUnits }),
@@ -71,10 +73,10 @@ describe('Pooled inventory (kayak fleets)', () => {
     // Pooled inventory belongs to a POOLED venue type (kayaking); exclusive
     // types such as the football default reject pooled groups.
     const kayakCategory = await prisma.venueCategory.findUniqueOrThrow({ where: { slug: 'KAYAKING' } });
+    kayakCategoryId = kayakCategory.id;
 
     const suffix = uniqueSuffix();
     const venueRes = await ownerAgent.post('/venues').send({
-      categoryId: kayakCategory.id,
       name: `E2E Kayak Base ${suffix}`,
       districtId,
       address: '2 Lake Road',
@@ -99,14 +101,6 @@ describe('Pooled inventory (kayak fleets)', () => {
     await priceGroup(singleId, 500);
     await priceGroup(doubleId, 900);
 
-    for (let weekday = 0; weekday <= 6; weekday++) {
-      const res = await ownerAgent
-        .put('/venue-config/operating-hours')
-        .send({ venueId, weekday, openTime: '00:00', closeTime: '23:59' });
-      if (res.status !== 200) {
-        throw new Error(`Operating hours upsert failed: ${res.status} ${JSON.stringify(res.body)}`);
-      }
-    }
   });
 
   afterAll(async () => {
@@ -345,6 +339,7 @@ describe('Pooled inventory (kayak fleets)', () => {
     // the pool (BlockedDate has no group column until the P3 cutover).
     const res = await ownerAgent.post('/resources').send({
       venueId,
+      categoryId: kayakCategoryId,
       name: 'Jetty',
       groundType: 'DOCK',
       isBookable: true,

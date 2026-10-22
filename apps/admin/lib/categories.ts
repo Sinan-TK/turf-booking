@@ -1,4 +1,4 @@
-/** Venue types (Super-Admin managed). Mirrors GET /categories and /admin/categories. */
+/** Facilities (Super-Admin managed catalogue). Mirrors GET /categories and /admin/categories. */
 
 export interface CategoryPolicy {
   slotIntervalMin: number;
@@ -29,11 +29,11 @@ export interface VenueCategory {
 }
 
 export interface AdminVenueCategory extends VenueCategory {
-  /** Venues (any status) using this type. */
+  /** Venues (any status) that have a unit under this facility. */
   venueCount: number;
 }
 
-/** The slice of a category every venue response carries. */
+/** The slice of a facility every venue / unit response carries. A venue's `facilities` are derived from its units. */
 export interface VenueCategorySummary {
   id: string;
   slug: string;

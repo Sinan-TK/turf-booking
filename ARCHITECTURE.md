@@ -202,6 +202,7 @@ erDiagram
 
 - `Venue` (the brief's "Facility") — id, organizationId FK, **facilityCode** (unique, human-readable, server-generated, e.g. `KLMPM10001` — see §6.6; never client-supplied, never derived from `name`, immutable after creation, no update endpoint exposes it), name, description, districtId FK, areaId?, address, lat, lng, timezone, status (`DRAFT`/`ACTIVE`/`INACTIVE`/`SUSPENDED`), cancellationPolicyId? (falls back to platform default policy), operatingHours (JSON: per-weekday open/close, or normalized `OperatingHours` table — see below), defaultSlotGranularityMinutes, timestamps, deletedAt. `id` (UUID) remains the primary key and the only foreign-key target everywhere — `facilityCode` is purely a public-facing identifier, never used as a key (confirmed requirement).
 - `OperatingHours` — id, venueId FK, weekday(0–6), openTime, closeTime. Normalized instead of JSON so the availability engine can query it with SQL/indexes.
+  **Retired:** there are no separate opening hours any more. A unit can be booked exactly where one of its active `PricingRule`s for the requested duration covers the venue-local weekday and start time (all-day or a `startWindow`/`endWindow`); overlapping or touching price windows merge into one bookable run, a booking must start and end inside one run, and no price means not bookable. See `coverageWindows` (pricing/pricing-rules.ts) and `ScheduleService.openWindows`. Blackouts are still `BlockedDate`/`BlockedPeriod`. This table and `AvailabilityRule` rows are no longer read for hours; `prisma/convert-hours-to-prices.ts` folded existing hours into prices.
 - `VenuePhoto` — id, venueId FK, url, sortOrder.
 - `VenueFacilityTag` — id, venueId FK, tag (`PARKING`/`WASHROOM`/`FLOODLIGHTS`/`DRINKING_WATER`/...). Simple tag join table, not a rigid enum-only column, so owners can add tags without a migration (tag master list + free text fallback).
 - `BlockedDate` — id, venueId FK, resourceId? (null = whole venue), startTime, endTime, reason, createdBy.
@@ -934,6 +935,12 @@ the real boundary; the frontend guard is UX only).
 ---
 
 ## 15. WhatsApp Integration
+
+> **Current state: outbound only.** There is no inbound chat bot, no webhook and no Redis. WhatsApp
+> carries exactly three messages: the website login one-time code, "booking confirmed" (with the
+> booking id) and "booking cancelled". Booking happens only on the website. The code is
+> `whatsapp/whatsapp-client.service.ts` and `whatsapp-customer-messenger.ts`. Everything below that
+> describes inbound messages, menus or conversation state is the retired design, kept for history.
 
 - Inbound webhook → `whatsapp` module parses message, resolves
   `CustomerProfile` by phone (creates one on first contact), tracks a

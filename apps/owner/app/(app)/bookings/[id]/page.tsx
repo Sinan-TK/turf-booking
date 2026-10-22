@@ -1,8 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useFetch } from '@/lib/use-fetch';
-import { Badge, Card, ErrorBanner, LoadingState, PageHeader } from '@/components/ui';
+import { api, ApiError } from '@/lib/api';
+import { formatMoney, remainingAmount } from '@/lib/money';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { Badge, Button, Card, ErrorBanner, LoadingState, PageHeader, SuccessBanner } from '@/components/ui';
 
 interface Payment {
   id: string;
@@ -23,6 +27,10 @@ interface BookingDetail {
   orderId: string;
   status: string;
   amount: string;
+  /** Charged online to hold the slot. */
+  advanceAmount: string;
+  /** Collected so far (online advance and anything recorded at the venue). */
+  paidAmount: string;
   currency: string;
   startTime: string;
   endTime: string;
@@ -38,7 +46,26 @@ interface BookingDetail {
 
 export default function BookingDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { data: booking, error, loading } = useFetch<BookingDetail>(`/owner/bookings/${id}`);
+  const { data: booking, error, loading, refetch } = useFetch<BookingDetail>(`/owner/bookings/${id}`);
+  const [collecting, setCollecting] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [collectError, setCollectError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function collect() {
+    setBusy(true);
+    setCollectError(null);
+    try {
+      await api.post(`/owner/bookings/${id}/collect`, {});
+      setCollecting(false);
+      setNotice('Balance recorded as received.');
+      refetch();
+    } catch (err) {
+      setCollectError(err instanceof ApiError ? err.message : 'Could not record this payment');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   if (loading) return <LoadingState />;
   if (error) return <ErrorBanner message={error} />;
@@ -46,7 +73,8 @@ export default function BookingDetailPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={`Booking ${booking.orderId}`} />
+      <PageHeader back={{ href: '/bookings', label: 'All bookings' }} title={`Booking ${booking.orderId}`} />
+      {notice && <SuccessBanner message={notice} />}
 
       <Card>
         <div className="mb-4">
@@ -70,13 +98,40 @@ export default function BookingDetailPage() {
             </dd>
           </div>
           <div>
-            <dt className="text-on-surface-variant">Ground Type</dt>
+            <dt className="text-on-surface-variant">Booked</dt>
             <dd>{booking.groundType}</dd>
           </div>
-          <div>
-            <dt className="text-on-surface-variant">Amount</dt>
+          <div className="col-span-1 sm:col-span-2">
+            <dt className="mb-1 text-on-surface-variant">Payment</dt>
             <dd>
-              {booking.currency} {booking.amount}
+              <dl className="grid grid-cols-3 gap-3 rounded-lg bg-surface-container-low p-3">
+                <div>
+                  <dt className="text-xs text-on-surface-variant">Total</dt>
+                  <dd className="font-semibold">{formatMoney(booking.currency, booking.amount)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-on-surface-variant">Paid</dt>
+                  <dd className="font-semibold">{formatMoney(booking.currency, booking.paidAmount)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-on-surface-variant">Remaining</dt>
+                  <dd className={`font-semibold ${remainingAmount(booking) > 0 ? 'text-error' : 'text-on-surface'}`}>
+                    {formatMoney(booking.currency, remainingAmount(booking))}
+                  </dd>
+                </div>
+              </dl>
+              {Number(booking.advanceAmount) > 0 && (
+                <p className="mt-1 text-xs text-on-surface-variant">
+                  {formatMoney(booking.currency, booking.advanceAmount)} was charged online to hold the slot.
+                </p>
+              )}
+              {remainingAmount(booking) > 0 && (booking.status === 'CONFIRMED' || booking.status === 'COMPLETED') && (
+                <div className="mt-3">
+                  <Button type="button" onClick={() => setCollecting(true)}>
+                    Record balance received
+                  </Button>
+                </div>
+              )}
             </dd>
           </div>
           <div>
@@ -143,6 +198,18 @@ export default function BookingDetailPage() {
           </div>
         )}
       </Card>
+      {collecting && (
+        <ConfirmDialog
+          title="Record balance received?"
+          confirmLabel="Yes, received"
+          busy={busy}
+          error={collectError}
+          onConfirm={collect}
+          onCancel={() => setCollecting(false)}
+        >
+          The customer paid the remaining {formatMoney(booking.currency, remainingAmount(booking))} at the venue.
+        </ConfirmDialog>
+      )}
     </div>
   );
 }

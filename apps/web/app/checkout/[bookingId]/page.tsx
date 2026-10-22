@@ -16,7 +16,10 @@ interface CheckoutBooking {
   orderId: string;
   customerId: string;
   status: string;
+  /** The full price. */
   amount: string;
+  /** The part charged now, online or with Coins, to hold the slot. */
+  advanceAmount?: string;
   currency: string;
   startTime: string;
   endTime: string;
@@ -209,7 +212,9 @@ export default function CheckoutPage() {
     }
   }
 
-  const insufficientCoins = !wallet || (booking ? Number(wallet.cachedBalance) < Number(booking.amount) : true);
+  // Only the booking amount (the advance) is paid now; the rest of the full price is paid at the venue.
+  const dueNow = booking ? (Number(booking.advanceAmount) > 0 ? Number(booking.advanceAmount) : Number(booking.amount)) : 0;
+  const insufficientCoins = !wallet || (booking ? Number(wallet.cachedBalance) < dueNow : true);
 
   return (
     <Screen>
@@ -260,12 +265,35 @@ export default function CheckoutPage() {
                 {mine.groundType}
               </dd>
             </div>
-            <div className="flex justify-between gap-3 border-t border-gray-100 pt-2">
-              <dt className="text-gray-500">Amount</dt>
-              <dd className="text-lg font-semibold text-gray-900">
-                {mine.currency} {mine.amount}
-              </dd>
-            </div>
+            {Number(mine.advanceAmount) > 0 && Number(mine.advanceAmount) < Number(mine.amount) ? (
+              <div className="space-y-2 border-t border-gray-100 pt-2">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-gray-500">Total</dt>
+                  <dd className="font-medium text-gray-900">
+                    {mine.currency} {mine.amount}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-gray-500">Pay now to hold the slot</dt>
+                  <dd className="text-lg font-semibold text-gray-900">
+                    {mine.currency} {mine.advanceAmount}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-gray-500">Pay at the venue</dt>
+                  <dd className="font-medium text-gray-900">
+                    {mine.currency} {(Number(mine.amount) - Number(mine.advanceAmount)).toFixed(2)}
+                  </dd>
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-between gap-3 border-t border-gray-100 pt-2">
+                <dt className="text-gray-500">Amount</dt>
+                <dd className="text-lg font-semibold text-gray-900">
+                  {mine.currency} {mine.amount}
+                </dd>
+              </div>
+            )}
           </dl>
 
           {payError && (
@@ -314,7 +342,7 @@ export default function CheckoutPage() {
                 </Button>
               </div>
               <p className="mt-4 text-center text-xs text-gray-400">
-                Pay with money or Coins — never both for the same mine.
+                Pay with money or Coins — never both for the same booking.
               </p>
             </>
           )}

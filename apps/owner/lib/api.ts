@@ -45,11 +45,17 @@ function send(path: string, options: RequestInit): Promise<Response> {
   });
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(
+  path: string,
+  options: RequestInit = {},
+  onResponse?: (res: Response) => void,
+): Promise<T> {
   let res = await send(path, options);
   if (res.status === 401 && !NO_REFRESH_PATH.test(path) && (await refreshSession())) {
     res = await send(path, options);
   }
+
+  onResponse?.(res);
 
   const contentType = res.headers.get('content-type') ?? '';
   const body = contentType.includes('application/json')
@@ -68,6 +74,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export const api = {
   get: <T>(path: string) => request<T>(path),
+  /** GET a page of a list: the rows plus the total match count the API
+   * reports in the X-Total-Count header. */
+  getPage: async <T>(path: string): Promise<{ rows: T[]; total: number }> => {
+    let total: number | null = null;
+    const rows = await request<T[]>(path, {}, (res) => {
+      const header = res.headers.get('x-total-count');
+      total = header === null ? null : Number(header);
+    });
+    return { rows, total: total ?? rows.length };
+  },
   post: <T>(path: string, data?: unknown) =>
     request<T>(path, { method: 'POST', body: data !== undefined ? JSON.stringify(data) : undefined }),
   patch: <T>(path: string, data?: unknown) =>

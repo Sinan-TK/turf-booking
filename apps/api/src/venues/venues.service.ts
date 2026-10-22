@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -10,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { FacilityCodeService } from '../locations/facility-code.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
+import { OwnerScopeService } from '../owner-scope/owner-scope.service';
 import type { CreateVenueDto, UpdateVenueDto } from './dto/venue.dto';
 
 // Status transitions a Venue Owner may make unassisted. Going live
@@ -17,26 +17,45 @@ import type { CreateVenueDto, UpdateVenueDto } from './dto/venue.dto';
 // actions reserved for Super Admin — not specified explicitly in the
 // brief, but a reasonable default for a marketplace where facility
 // quality/legitimacy needs a review gate before customers can book it.
-const OWNER_ALLOWED_STATUSES = new Set(['DRAFT', 'INACTIVE']);
+const OWNER_ALLOWED_STATUSES = new Set(['INACTIVE']);
 
-// Category fields every venue response carries, so clients can label the
-// venue ("Table" vs "Pitch") and validate unit types without a 2nd call.
-const CATEGORY_INCLUDE = {
-  category: {
-    select: {
-      id: true,
-      slug: true,
-      name: true,
-      iconKey: true,
-      unitLabel: true,
-      venueLabel: true,
-      unitTypes: true,
-      defaultAllocationMode: true,
-    },
-  },
+// A venue offers whatever facilities (football turf, swimming pool...) its
+// units belong to. Responses carry them as `facilities`, derived from the
+// units, so clients can label and group without a 2nd call.
+const FACILITY_SELECT = {
+  id: true,
+  slug: true,
+  name: true,
+  iconKey: true,
+  unitLabel: true,
+  venueLabel: true,
+  unitTypes: true,
+  defaultAllocationMode: true,
+  sortOrder: true,
 } as const;
 
-const DEFAULT_CATEGORY_SLUG = 'FOOTBALL_TURF';
+const FACILITIES_INCLUDE = {
+  resources: { select: { category: { select: FACILITY_SELECT } } },
+  resourceGroups: { select: { category: { select: FACILITY_SELECT } } },
+} as const;
+
+type FacilitySummary = { id: string; sortOrder: number; name: string };
+
+/** Replaces the raw unit rows with the venue's distinct facilities (catalogue order). */
+function withFacilities<
+  T extends {
+    resources: Array<{ category: FacilitySummary }>;
+    resourceGroups: Array<{ category: FacilitySummary }>;
+  },
+>(venue: T) {
+  const { resources, resourceGroups, ...rest } = venue;
+  const byId = new Map<string, T['resources'][number]['category']>();
+  for (const unit of [...resources, ...resourceGroups]) byId.set(unit.category.id, unit.category);
+  const facilities = [...byId.values()]
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+    .map(({ sortOrder: _sortOrder, ...facility }) => facility);
+  return { ...rest, facilities };
+}
 
 @Injectable()
 export class VenuesService {
@@ -44,6 +63,7 @@ export class VenuesService {
     private readonly prisma: PrismaService,
     private readonly facilityCodes: FacilityCodeService,
     private readonly audit: AuditService,
+    private readonly scope: OwnerScopeService,
   ) {}
 
   async create(dto: CreateVenueDto, actor: AuthContext) {
@@ -53,13 +73,17 @@ export class VenuesService {
       throw new BadRequestException('organizationId is required');
     }
 
-    const category = await this.resolveActiveCategory(dto.categoryId);
+    // The venue's timezone is its district's: nobody types it in.
+    const district = await this.prisma.client.district.findUnique({
+      where: { id: dto.districtId },
+      select: { timezone: true },
+    });
+    if (!district) throw new BadRequestException('Unknown district');
     const facilityCode = await this.facilityCodes.generate(dto.districtId);
 
-    const venue = await this.prisma.client.venue.create({
+    const created = await this.prisma.client.venue.create({
       data: {
         organizationId,
-        categoryId: category.id,
         facilityCode,
         name: dto.name,
         description: dto.description,
@@ -68,12 +92,13 @@ export class VenuesService {
         address: dto.address,
         lat: dto.lat,
         lng: dto.lng,
-        timezone: dto.timezone,
+        timezone: district.timezone,
         // defaultSlotGranularityMinutes is not settable — always the
         // platform-fixed 60-minute default from the Prisma schema.
       },
-      include: CATEGORY_INCLUDE,
+      include: FACILITIES_INCLUDE,
     });
+    const venue = withFacilities(created);
 
     await this.audit.record({
       actor,
@@ -87,22 +112,13 @@ export class VenuesService {
   }
 
   private async findOwned(id: string, actor: AuthContext) {
-    const venue = await this.prisma.client.venue.findUnique({ where: { id }, include: CATEGORY_INCLUDE });
+    const venue = await this.prisma.client.venue.findUnique({ where: { id }, include: FACILITIES_INCLUDE });
     if (!venue) throw new NotFoundException('Venue not found');
     if (actor.role === Role.VENUE_OWNER && venue.organizationId !== actor.organizationId) {
       throw new ForbiddenException("Cannot access another organization's venue");
     }
-    return venue;
-  }
-
-  /** The requested category, or FOOTBALL_TURF when none is given. Must be active. */
-  private async resolveActiveCategory(categoryId: string | undefined) {
-    const category = categoryId
-      ? await this.prisma.client.venueCategory.findUnique({ where: { id: categoryId } })
-      : await this.prisma.client.venueCategory.findUnique({ where: { slug: DEFAULT_CATEGORY_SLUG } });
-    if (!category) throw new BadRequestException('Unknown venue type');
-    if (!category.isActive) throw new BadRequestException('This venue type is not active');
-    return category;
+    await this.scope.assertVenue(actor, venue.id);
+    return withFacilities(venue);
   }
 
   async getById(id: string, actor: AuthContext) {
@@ -111,35 +127,34 @@ export class VenuesService {
 
   async listMine(actor: AuthContext) {
     if (actor.role === Role.SUPER_ADMIN) {
-      return this.prisma.client.venue.findMany({ orderBy: { createdAt: 'desc' }, include: CATEGORY_INCLUDE });
+      const venues = await this.prisma.client.venue.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: FACILITIES_INCLUDE,
+      });
+      return venues.map(withFacilities);
     }
-    return this.prisma.client.venue.findMany({
-      where: { organizationId: actor.organizationId },
+    const assigned = await this.scope.assignedVenueIds(actor);
+    const venues = await this.prisma.client.venue.findMany({
+      where: { organizationId: actor.organizationId, ...(assigned ? { id: { in: assigned } } : {}) },
       orderBy: { createdAt: 'desc' },
-      include: CATEGORY_INCLUDE,
+      include: FACILITIES_INCLUDE,
     });
+    return venues.map(withFacilities);
   }
 
   async update(id: string, dto: UpdateVenueDto, actor: AuthContext) {
-    const current = await this.findOwned(id, actor);
+    await this.findOwned(id, actor);
 
     if (dto.status && actor.role === Role.VENUE_OWNER && !OWNER_ALLOWED_STATUSES.has(dto.status)) {
       throw new ForbiddenException(`Venue Owners cannot set status to ${dto.status}`);
     }
 
-    if (dto.categoryId && dto.categoryId !== current.categoryId) {
-      await this.resolveActiveCategory(dto.categoryId);
-      const resourceCount = await this.prisma.client.resource.count({ where: { venueId: id } });
-      if (resourceCount > 0) {
-        throw new ConflictException('The venue type cannot be changed once the venue has resources.');
-      }
-    }
-
-    const venue = await this.prisma.client.venue.update({
+    const updated = await this.prisma.client.venue.update({
       where: { id },
       data: dto,
-      include: CATEGORY_INCLUDE,
+      include: FACILITIES_INCLUDE,
     });
+    const venue = withFacilities(updated);
 
     await this.audit.record({
       actor,

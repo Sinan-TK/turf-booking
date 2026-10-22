@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { durationLabel, type AdminVenueCategory } from '@/lib/categories';
-import { Button, ErrorBanner, Input, Label } from '@/components/ui';
+import { Button, ErrorBanner, FieldError, Input, Label, invalidClass } from '@/components/ui';
+import { hasErrors, intError, textError, type FieldErrors } from '@/lib/validation';
 import { Icon } from '@/components/icons';
 
 interface Props {
@@ -180,16 +181,20 @@ export function CategoryForm({ initial, onSaved }: Props) {
   const [slugTouched, setSlugTouched] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<FieldErrors<keyof typeof form>>({});
   const [submitting, setSubmitting] = useState(false);
 
   const { problem, durations } = useMemo(() => validatePolicy(policy), [policy]);
   const lockedMode = editing && (initial?.venueCount ?? 0) > 0;
 
-  const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
+  const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
+    setErrors((p) => (p[key] ? { ...p, [key]: undefined } : p));
+  };
   const setPol = (key: keyof PolicyForm) => (v: string) => setPolicy((p) => ({ ...p, [key]: v }));
 
   function onNameChange(name: string) {
+    setErrors((p) => ({ ...p, name: undefined, ...(editing || slugTouched ? {} : { slug: undefined }) }));
     setForm((f) => ({
       ...f,
       name,
@@ -210,6 +215,31 @@ export function CategoryForm({ initial, onSaved }: Props) {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const found: FieldErrors<keyof typeof form> = {
+      name: textError(form.name, 'Name', 1, 80),
+      slug: editing
+        ? undefined
+        : !form.slug.trim()
+          ? 'Enter an identifier, like CHESS.'
+          : !/^[A-Z][A-Z0-9_]{1,39}$/.test(form.slug.trim())
+            ? 'Use 2–40 characters: A–Z, 0–9 and underscores, starting with a letter.'
+            : undefined,
+      iconKey: !form.iconKey.trim()
+        ? 'Choose an icon or type a Material Symbols name.'
+        : !/^[a-z0-9_]{1,40}$/.test(form.iconKey.trim())
+          ? 'Use a Material Symbols icon name, like sports_esports.'
+          : undefined,
+      unitLabel: textError(form.unitLabel, 'Unit wording', 1, 40),
+      venueLabel: form.venueLabel.trim().length > 60 ? 'Venue wording can be at most 60 characters.' : undefined,
+      sortOrder: intError(form.sortOrder, 'Display order', 0, 100000),
+    };
+    setErrors(found);
+    if (hasErrors(found)) {
+      const ids = { name: 'cat-name', slug: 'cat-slug', iconKey: 'cat-icon', unitLabel: 'cat-unit-label', venueLabel: 'cat-venue-label', sortOrder: 'cat-sort-order' } as const;
+      const first = (Object.keys(ids) as Array<keyof typeof ids>).find((k) => found[k]);
+      if (first) document.getElementById(ids[first])?.focus();
+      return;
+    }
     if (customRules && problem) {
       setError(problem);
       return;
@@ -237,7 +267,7 @@ export function CategoryForm({ initial, onSaved }: Props) {
         : await api.post<AdminVenueCategory>('/admin/categories', { slug: form.slug.trim(), ...body });
       onSaved(saved);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to save venue type');
+      setError(err instanceof ApiError ? err.message : 'Failed to save facility');
     } finally {
       setSubmitting(false);
     }
@@ -253,36 +283,43 @@ export function CategoryForm({ initial, onSaved }: Props) {
   };
 
   return (
-    <form onSubmit={onSubmit} className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+    <form onSubmit={onSubmit} noValidate className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="space-y-5">
         {error && <ErrorBanner message={error} />}
 
-        <Section step={1} title="Basics" description="How this type appears in the platform.">
+        <Section step={1} title="Basics" description="How this facility appears in the platform.">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <Label>Name</Label>
+              <Label htmlFor="cat-name">Name</Label>
               <Input
-                required
+                id="cat-name"
+                aria-invalid={!!errors.name}
+                aria-describedby={errors.name ? 'cat-name-error' : undefined}
+                className={errors.name ? invalidClass : ''}
                 maxLength={80}
                 placeholder="e.g. Chess"
                 value={form.name}
                 onChange={(e) => onNameChange(e.target.value)}
               />
+              <FieldError id="cat-name-error" message={errors.name} />
               <Hint>Shown to customers and owners.</Hint>
             </div>
             <div>
-              <Label>Identifier</Label>
+              <Label htmlFor="cat-slug">Identifier</Label>
               <Input
-                required
+                id="cat-slug"
+                aria-invalid={!!errors.slug}
+                aria-describedby={errors.slug ? 'cat-slug-error' : undefined}
                 disabled={editing}
                 placeholder="CHESS"
-                className="font-mono"
+                className={`font-mono ${errors.slug ? invalidClass : ''}`}
                 value={form.slug}
                 onChange={(e) => {
                   setSlugTouched(true);
                   set('slug', e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '_'));
                 }}
               />
+              <FieldError id="cat-slug-error" message={errors.slug} />
               <Hint>{editing ? 'Fixed once created.' : 'Auto-filled from the name. Cannot be changed later.'}</Hint>
             </div>
           </div>
@@ -310,10 +347,13 @@ export function CategoryForm({ initial, onSaved }: Props) {
             </div>
             <div className="mt-3 flex items-center gap-2">
               <Input
-                required
+                id="cat-icon"
+                aria-label="Icon name"
+                aria-invalid={!!errors.iconKey}
+                aria-describedby={errors.iconKey ? 'cat-icon-error' : undefined}
                 maxLength={40}
                 placeholder="or type any Material Symbols name"
-                className="max-w-xs font-mono text-xs"
+                className={`max-w-xs font-mono text-xs ${errors.iconKey ? invalidClass : ''}`}
                 value={form.iconKey}
                 onChange={(e) => set('iconKey', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
               />
@@ -326,19 +366,22 @@ export function CategoryForm({ initial, onSaved }: Props) {
                 Browse icons
               </a>
             </div>
+            <FieldError id="cat-icon-error" message={errors.iconKey} />
           </div>
         </Section>
 
-        <Section step={2} title="Wording" description="So the app speaks naturally for this type.">
+        <Section step={2} title="Wording" description="So the app speaks naturally for this facility.">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <Label>One bookable unit is a…</Label>
-              <Input required maxLength={40} placeholder="Table" value={form.unitLabel} onChange={(e) => set('unitLabel', e.target.value)} />
+              <Label htmlFor="cat-unit-label">One bookable unit is a…</Label>
+              <Input id="cat-unit-label" aria-invalid={!!errors.unitLabel} className={errors.unitLabel ? invalidClass : ''} maxLength={40} placeholder="Table" value={form.unitLabel} onChange={(e) => set('unitLabel', e.target.value)} />
+              <FieldError id="cat-unit-label-error" message={errors.unitLabel} />
               <Hint>Table, Court, Pitch, Room…</Hint>
             </div>
             <div>
-              <Label>A venue of this type is a…</Label>
-              <Input maxLength={60} placeholder="Chess club" value={form.venueLabel} onChange={(e) => set('venueLabel', e.target.value)} />
+              <Label htmlFor="cat-venue-label">A venue offering this is a…</Label>
+              <Input id="cat-venue-label" aria-invalid={!!errors.venueLabel} className={errors.venueLabel ? invalidClass : ''} maxLength={60} placeholder="Chess club" value={form.venueLabel} onChange={(e) => set('venueLabel', e.target.value)} />
+              <FieldError id="cat-venue-label-error" message={errors.venueLabel} />
               <Hint>Chess club, Studio, Turf…</Hint>
             </div>
           </div>
@@ -381,7 +424,7 @@ export function CategoryForm({ initial, onSaved }: Props) {
           </div>
         </Section>
 
-        <Section step={3} title="Booking style" description="How customers reserve this type.">
+        <Section step={3} title="Booking style" description="How customers reserve this facility.">
           <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Booking style">
             {(
               [
@@ -417,13 +460,13 @@ export function CategoryForm({ initial, onSaved }: Props) {
               );
             })}
           </div>
-          {lockedMode && <Hint>Locked: venues already use this type.</Hint>}
+          {lockedMode && <Hint>Locked: units already use this facility.</Hint>}
         </Section>
 
         <Section
           step={4}
           title="Booking rules"
-          description="Applied to every venue of this type. A venue or unit can still be given its own rules later."
+          description="Applied to every unit of this facility. A venue or unit can still be given its own rules later."
         >
           {!editing && (
             <Switch
@@ -501,16 +544,17 @@ export function CategoryForm({ initial, onSaved }: Props) {
             hint="Customers can see it and owners can pick it when adding a venue."
           />
           <div className="max-w-[12rem]">
-            <Label>Display order</Label>
-            <Input type="number" min={0} value={form.sortOrder} onChange={(e) => set('sortOrder', e.target.value)} />
+            <Label htmlFor="cat-sort-order">Display order</Label>
+            <Input id="cat-sort-order" aria-invalid={!!errors.sortOrder} className={errors.sortOrder ? invalidClass : ''} type="number" min={0} value={form.sortOrder} onChange={(e) => set('sortOrder', e.target.value)} />
+            <FieldError id="cat-sort-order-error" message={errors.sortOrder} />
             <Hint>Lower numbers appear first.</Hint>
           </div>
         </Section>
 
         <div className="sticky bottom-0 -mx-4 flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50/90 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-xl sm:border sm:bg-white/90">
           {customRules && problem && <p className="mr-auto text-xs text-red-600">Fix the booking rules to save.</p>}
-          <Button type="submit" loading={submitting} disabled={customRules && !!problem}>
-            {submitting ? 'Saving…' : editing ? 'Save changes' : 'Create venue type'}
+          <Button type="submit" loading={submitting}>
+            {submitting ? 'Saving…' : editing ? 'Save changes' : 'Create facility'}
           </Button>
         </div>
       </div>
@@ -524,7 +568,7 @@ export function CategoryForm({ initial, onSaved }: Props) {
             <div className="flex flex-wrap gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-600 py-1.5 pl-2.5 pr-3.5 text-sm font-medium text-white shadow-sm">
                 <MaterialIcon name={form.iconKey} className="text-[18px]" />
-                {form.name.trim() || 'Venue type'}
+                {form.name.trim() || 'Facility'}
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white py-1.5 pl-2.5 pr-3.5 text-sm text-gray-500">
                 <MaterialIcon name="category" className="text-[18px]" />

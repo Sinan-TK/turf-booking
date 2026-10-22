@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useFetch } from '@/lib/use-fetch';
 import { api, ApiError } from '@/lib/api';
-import type { VenueCategory } from '@/lib/categories';
-import { Button, Card, ErrorBanner, Input, Label, LoadingState, PageHeader, Select } from '@/components/ui';
+import { Button, Card, ErrorBanner, FieldError, Input, Label, LoadingState, PageHeader, Select, invalidClass } from '@/components/ui';
+import { hasErrors, numberError, textError, type FieldErrors } from '@/lib/validation';
 
 // Leaflet touches `window` at import time, which breaks server-side
 // rendering — this page is SSR'd by default under the App Router, so
@@ -36,7 +36,6 @@ export default function NewVenuePage() {
   const [stateId, setStateId] = useState('');
   const { data: districts } = useFetch<District[]>(stateId ? `/districts?stateId=${stateId}` : null);
   const { data: organizations } = useFetch<Organization[]>('/admin/organizations');
-  const { data: categories } = useFetch<VenueCategory[]>('/categories');
 
   const [form, setForm] = useState({
     name: '',
@@ -45,20 +44,35 @@ export default function NewVenuePage() {
     address: '',
     lat: '',
     lng: '',
-    timezone: 'Asia/Kolkata',
     organizationId: '',
-    categoryId: '',
   });
   const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<FieldErrors<keyof typeof form>>({});
   const [submitting, setSubmitting] = useState(false);
 
   function update<K extends keyof typeof form>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
+    setErrors((p) => (p[key] ? { ...p, [key]: undefined } : p));
   }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const found: FieldErrors<keyof typeof form> = {
+      organizationId: form.organizationId ? undefined : 'Select the owner organization.',
+      name: textError(form.name, 'Venue name', 1, 150),
+      description: form.description.length > 2000 ? 'Description can be at most 2000 characters.' : undefined,
+      districtId: form.districtId ? undefined : stateId ? 'Select a district.' : 'Select a state, then a district.',
+      address: textError(form.address, 'Address', 1, 300),
+      lat: numberError(form.lat, 'Latitude', -90, 90),
+      lng: numberError(form.lng, 'Longitude', -180, 180),
+    };
+    setErrors(found);
+    if (hasErrors(found)) {
+      const first = (['organizationId', 'name', 'description', 'districtId', 'address', 'lat', 'lng'] as const).find((k) => found[k]);
+      document.getElementById('venue-' + first)?.focus();
+      return;
+    }
     setSubmitting(true);
     try {
       const venue = await api.post<{ id: string }>('/venues', {
@@ -68,9 +82,7 @@ export default function NewVenuePage() {
         address: form.address,
         lat: Number(form.lat),
         lng: Number(form.lng),
-        timezone: form.timezone,
         organizationId: form.organizationId,
-        categoryId: form.categoryId || categories?.[0]?.id,
       });
       router.push(`/venues/${venue.id}`);
     } catch (err) {
@@ -84,12 +96,13 @@ export default function NewVenuePage() {
     <div>
       <PageHeader title="New Venue" />
       <Card className="max-w-2xl">
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} noValidate className="space-y-4">
           {error && <ErrorBanner message={error} />}
 
           <div>
-            <Label>Owner Organization</Label>
-            <Select required value={form.organizationId} onChange={(e) => update('organizationId', e.target.value)}>
+            <Label htmlFor="venue-organizationId">Owner Organization</Label>
+            <Select id="venue-organizationId" aria-invalid={!!errors.organizationId}
+ className={errors.organizationId ? invalidClass : ''} value={form.organizationId} onChange={(e) => update('organizationId', e.target.value)}>
               <option value="">Select organization…</option>
               {organizations?.map((org) => (
                 <option key={org.id} value={org.id}>
@@ -97,34 +110,21 @@ export default function NewVenuePage() {
                 </option>
               ))}
             </Select>
+            <FieldError id="venue-organizationId-error" message={errors.organizationId} />
           </div>
 
           <div>
-            <Label>Venue type</Label>
-            <Select
-              required
-              value={form.categoryId || categories?.[0]?.id || ''}
-              onChange={(e) => update('categoryId', e.target.value)}
-            >
-              {categories?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
-            <p className="mt-1 text-xs text-gray-500">
-              Decides the slot length, allowed durations and the labels customers see.
-            </p>
+            <Label htmlFor="venue-name">Name</Label>
+            <Input id="venue-name" aria-invalid={!!errors.name}
+ className={errors.name ? invalidClass : ''} value={form.name} onChange={(e) => update('name', e.target.value)} />
+            <FieldError id="venue-name-error" message={errors.name} />
           </div>
 
           <div>
-            <Label>Name</Label>
-            <Input required value={form.name} onChange={(e) => update('name', e.target.value)} />
-          </div>
-
-          <div>
-            <Label>Description</Label>
-            <Input value={form.description} onChange={(e) => update('description', e.target.value)} />
+            <Label htmlFor="venue-description">Description</Label>
+            <Input id="venue-description" aria-invalid={!!errors.description}
+ className={errors.description ? invalidClass : ''} value={form.description} onChange={(e) => update('description', e.target.value)} />
+            <FieldError id="venue-description-error" message={errors.description} />
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -140,9 +140,11 @@ export default function NewVenuePage() {
               </Select>
             </div>
             <div>
-              <Label>District</Label>
+              <Label htmlFor="venue-districtId">District</Label>
               <Select
-                required
+                id="venue-districtId"
+                aria-invalid={!!errors.districtId}
+ className={errors.districtId ? invalidClass : ''}
                 disabled={!stateId}
                 value={form.districtId}
                 onChange={(e) => update('districtId', e.target.value)}
@@ -154,12 +156,15 @@ export default function NewVenuePage() {
                   </option>
                 ))}
               </Select>
+              <FieldError id="venue-districtId-error" message={errors.districtId} />
             </div>
           </div>
 
           <div>
-            <Label>Address</Label>
-            <Input required value={form.address} onChange={(e) => update('address', e.target.value)} />
+            <Label htmlFor="venue-address">Address</Label>
+            <Input id="venue-address" aria-invalid={!!errors.address}
+ className={errors.address ? invalidClass : ''} value={form.address} onChange={(e) => update('address', e.target.value)} />
+            <FieldError id="venue-address-error" message={errors.address} />
           </div>
 
           <div>
@@ -167,37 +172,46 @@ export default function NewVenuePage() {
             <MapLocationPicker
               lat={form.lat}
               lng={form.lng}
-              onChange={(lat, lng) => setForm((f) => ({ ...f, lat, lng }))}
+              onChange={(lat, lng) => {
+                setForm((f) => ({ ...f, lat, lng }));
+                setErrors((p) => ({ ...p, lat: undefined, lng: undefined }));
+              }}
             />
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <Label>Latitude</Label>
+              <Label htmlFor="venue-lat">Latitude</Label>
               <Input
-                required
+                id="venue-lat"
+                aria-invalid={!!errors.lat}
+ className={errors.lat ? invalidClass : ''}
                 type="number"
                 step="any"
                 value={form.lat}
                 onChange={(e) => update('lat', e.target.value)}
               />
+              <FieldError id="venue-lat-error" message={errors.lat} />
             </div>
             <div>
-              <Label>Longitude</Label>
+              <Label htmlFor="venue-lng">Longitude</Label>
               <Input
-                required
+                id="venue-lng"
+                aria-invalid={!!errors.lng}
+ className={errors.lng ? invalidClass : ''}
                 type="number"
                 step="any"
                 value={form.lng}
                 onChange={(e) => update('lng', e.target.value)}
               />
+              <FieldError id="venue-lng-error" message={errors.lng} />
             </div>
           </div>
 
-          <div>
-            <Label>Timezone</Label>
-            <Input required value={form.timezone} onChange={(e) => update('timezone', e.target.value)} />
-          </div>
+          <p className="text-xs text-gray-500">
+            Add the facilities (football turf, swimming pool…) and their units from the venue page after creating it.
+            The timezone follows the venue&apos;s district.
+          </p>
 
           <Button type="submit" loading={submitting}>
             {submitting ? 'Creating…' : 'Create Venue'}

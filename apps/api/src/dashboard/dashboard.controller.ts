@@ -3,6 +3,7 @@ import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { OwnerRoles } from '../auth/decorators/owner-roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { DashboardService } from './dashboard.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -22,6 +23,7 @@ export class DashboardController {
 @Controller('owner/dashboard')
 @UseGuards(AuthGuard, RolesGuard)
 @Roles(Role.VENUE_OWNER)
+@OwnerRoles('OWNER_ADMIN') // revenue and organization-wide totals
 export class OwnerDashboardController {
   constructor(private readonly dashboard: DashboardService) {}
 

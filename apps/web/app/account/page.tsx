@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
 import { LoginGate } from '@/components/login-gate';
-import { Button, Card, ErrorBanner, Icon, Input, Label, LoadingState, SuccessBanner } from '@/components/ui';
+import { Button, Card, ErrorBanner, FieldError, Icon, Input, Label, LoadingState, SuccessBanner, invalidClass } from '@/components/ui';
+import { nameError } from '@/lib/validation';
 import { Screen } from '@/components/screen';
 
 interface CoinWallet {
@@ -38,10 +39,17 @@ function Profile() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nameMsg, setNameMsg] = useState<string | undefined>();
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     if (saving) return;
+    const problem = nameError(name);
+    setNameMsg(problem);
+    if (problem) {
+      document.getElementById('account-name')?.focus();
+      return;
+    }
     setSaving(true);
     setError(null);
     setSaved(false);
@@ -59,7 +67,7 @@ function Profile() {
   return (
     <Card className="mb-4">
       <h2 className="mb-3 text-sm font-semibold text-gray-900">Profile</h2>
-      <form onSubmit={onSave} className="space-y-3">
+      <form onSubmit={onSave} noValidate className="space-y-3">
         {error && (
           <div role="alert">
             <ErrorBanner message={error} />
@@ -67,14 +75,26 @@ function Profile() {
         )}
         {saved && <SuccessBanner message="Saved." />}
         <div>
-          <Label>Name</Label>
-          <Input required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
+          <Label htmlFor="account-name">Name</Label>
+          <Input
+            id="account-name"
+            maxLength={80}
+            value={name}
+            aria-invalid={!!nameMsg}
+            aria-describedby={nameMsg ? 'account-name-error' : undefined}
+            className={nameMsg ? invalidClass : ''}
+            onChange={(e) => {
+              setName(e.target.value);
+              setNameMsg(undefined);
+            }}
+          />
+          <FieldError id="account-name-error" message={nameMsg} />
         </div>
         <div>
           <Label>WhatsApp number</Label>
           <Input readOnly value={customer?.phone ?? ''} className="bg-gray-50 text-gray-500" />
         </div>
-        <Button type="submit" disabled={saving || name.trim() === '' || name.trim() === (customer?.name ?? '')}>
+        <Button type="submit" disabled={saving || name.trim() === (customer?.name ?? '')}>
           {saving ? 'Saving…' : 'Save'}
         </Button>
       </form>

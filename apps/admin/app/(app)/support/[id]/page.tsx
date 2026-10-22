@@ -9,12 +9,15 @@ import {
   Button,
   Card,
   ErrorBanner,
+  FieldError,
   Label,
   PageHeader,
   Select,
   SkeletonDetailCard,
   SkeletonText,
+  invalidClass,
 } from '@/components/ui';
+import { textError } from '@/lib/validation';
 
 interface Message {
   id: string;
@@ -48,6 +51,7 @@ export default function SupportTicketDetailPage() {
   const [reply, setReply] = useState('');
   const [replyError, setReplyError] = useState<string | null>(null);
   const [replying, setReplying] = useState(false);
+  const [replyMsg, setReplyMsg] = useState<string | undefined>();
 
   async function updateField(field: 'status' | 'priority', value: string) {
     if (!ticket) return;
@@ -68,7 +72,13 @@ export default function SupportTicketDetailPage() {
   async function onReply(e: React.FormEvent) {
     e.preventDefault();
     const body = reply.trim();
-    if (!body || !ticket) return;
+    const problem = textError(reply, 'Reply', 1, 2000);
+    setReplyMsg(problem ? (reply.trim() ? problem : 'Write a reply before sending.') : undefined);
+    if (problem) {
+      document.getElementById('support-reply')?.focus();
+      return;
+    }
+    if (!ticket) return;
     setReplyError(null);
     setReplying(true);
     setReply('');
@@ -197,20 +207,30 @@ export default function SupportTicketDetailPage() {
           ))}
         </div>
 
-        <form onSubmit={onReply} className="border-t border-gray-100 pt-4">
+        <form onSubmit={onReply} noValidate className="border-t border-gray-100 pt-4">
           {replyError && (
             <div className="mb-2">
               <ErrorBanner message={replyError} />
             </div>
           )}
           <textarea
-            className="mb-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm transition-colors focus:border-gray-500 focus:outline-none"
+            id="support-reply"
+            aria-label="Reply"
+            aria-invalid={!!replyMsg}
+            aria-describedby={replyMsg ? 'support-reply-error' : undefined}
+            className={`w-full rounded-md border border-gray-300 px-3 py-2 text-sm transition-colors focus:border-gray-500 focus:outline-none ${replyMsg ? invalidClass : ''}`}
             rows={3}
             placeholder="Reply to the customer…"
             value={reply}
-            onChange={(e) => setReply(e.target.value)}
+            onChange={(e) => {
+              setReply(e.target.value);
+              setReplyMsg(undefined);
+            }}
           />
-          <Button type="submit" loading={replying} disabled={!reply.trim()}>
+          <div className="mb-2">
+            <FieldError id="support-reply-error" message={replyMsg} />
+          </div>
+          <Button type="submit" loading={replying}>
             {replying ? 'Sending…' : 'Send Reply'}
           </Button>
         </form>

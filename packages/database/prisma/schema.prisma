@@ -142,9 +142,25 @@ model VenueOwnerUser {
   createdPromotions   Promotion[]      @relation("OwnerPromotionCreator")
   auditLogs           AuditLog[]       @relation("OwnerAuditActor")
   notifications       OwnerNotification[]
+  venueAssignments    VenueStaffAssignment[]
 
   @@index([organizationId])
   @@map("venue_owner_users")
+}
+
+/// Which venues an OWNER_STAFF user may work in. An OWNER_ADMIN has no rows: they reach every
+/// venue of the organization. A staff user with no rows reaches no venue.
+model VenueStaffAssignment {
+  id          String         @id @default(uuid()) @db.Uuid
+  ownerUserId String         @db.Uuid
+  venueId     String         @db.Uuid
+  createdAt   DateTime       @default(now())
+  ownerUser   VenueOwnerUser @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  venue       Venue          @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerUserId, venueId])
+  @@index([venueId])
+  @@map("venue_staff_assignments")
 }
 
 enum OwnerUserStatus {
@@ -352,11 +368,11 @@ enum VenueStatus {
 model Venue {
   id                        String   @id @default(uuid()) @db.Uuid
   organizationId            String   @db.Uuid
-  /// Venue type (VenueCategory). Drives labels, allowed resource unit
-  /// types and the default BookingPolicy. Every existing venue was
-  /// backfilled to FOOTBALL_TURF by migration venue_categories_link.
-  categoryId                String   @db.Uuid
-  category                  VenueCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  /// DEPRECATED: the facility now lives on each Resource / ResourceGroup
+  /// (a venue's facilities are derived from its units). No longer written
+  /// or read; dropped in a later migration.
+  categoryId                String?  @db.Uuid
+  category                  VenueCategory? @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   organization              OwnerOrganization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   /// Generated server-side on creation by the facility-code service
   /// (§6.6) — never client-supplied, never derived from `name`, never
@@ -393,6 +409,7 @@ model Venue {
   bookingPolicies   BookingPolicy[]
   availabilityRules AvailabilityRule[]
   blockedPeriods    BlockedPeriod[]
+  staffAssignments  VenueStaffAssignment[]
 
   @@index([organizationId])
   @@index([categoryId])
@@ -462,6 +479,10 @@ model Resource {
   id          String   @id @default(uuid()) @db.Uuid
   venueId      String   @db.Uuid
   venue        Venue     @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  /// Facility (VenueCategory) this unit belongs to: drives its labels,
+  /// allowed groundType values and default BookingPolicy.
+  categoryId  String   @db.Uuid
+  category    VenueCategory @relation("ResourceCategory", fields: [categoryId], references: [id], onDelete: Restrict)
   name        String
   groundType  String   // open string ("5S", "7S", ...), not a hardcoded enum
   isBookable  Boolean  @default(true)
@@ -490,6 +511,7 @@ model Resource {
   closureAsDescendant ResourceClosure[] @relation("ClosureDescendant")
 
   @@index([venueId])
+  @@index([categoryId])
   @@map("resources")
 }
 
@@ -554,11 +576,23 @@ model PricingRule {
   resourceGroupId String?  @db.Uuid
   resourceGroup   ResourceGroup? @relation(fields: [resourceGroupId], references: [id], onDelete: Cascade)
   durationMinutes Int
-  dayType         DayType
-  startWindow     String?  // "HH:mm", optional peak/off-peak window
-  endWindow       String?
+  /// Deprecated: legacy WEEKDAY/WEEKEND/HOLIDAY bucket. New rules leave it null
+  /// and use weekdays; it is only read for a row whose weekdays is empty.
+  dayType         DayType?
+  /// ISO weekdays this rule applies to: 1 = Monday .. 7 = Sunday.
+  weekdays        Int[]    @default([])
+  startWindow     String?  // "HH:mm" slot-start window; null (with endWindow) = all day
+  endWindow       String?  // "HH:mm", or "24:00" for end of day
+  /// False = blocked by the owner: kept in the list but never used to price a slot.
+  isActive        Boolean  @default(true)
   pricingMode     PricingMode @default(PER_BOOKING)
-  price           Decimal  @db.Decimal(12, 2)
+  /// Normal price: the full price of a slot (when there is no offer).
+  normalPrice     Decimal  @db.Decimal(12, 2)
+  /// Optional offer: below the normal price; when set it is the full price instead.
+  offerPrice      Decimal? @db.Decimal(12, 2)
+  /// Booking price: the advance paid online to hold the slot. At most the full price (offer if set, else normal);
+  /// the rest (full price minus this) is paid at the venue.
+  bookingPrice    Decimal  @db.Decimal(12, 2)
   currency        String   @default("INR") @db.Char(3)
   effectiveFrom   DateTime @default(now())
   createdAt       DateTime @default(now())
@@ -761,7 +795,12 @@ model Booking {
   endTime                  DateTime @db.Timestamptz
   durationMinutes          Int
   groundType               String
+  /// The full price of the booking (the offer price when the slot had one, else the normal price).
   amount                   Decimal  @db.Decimal(12, 2)
+  /// The part charged online to hold the slot (the booking price). Offline walk-ins have none.
+  advanceAmount            Decimal  @default(0) @db.Decimal(12, 2)
+  /// Collected so far: the online advance, or what staff recorded at the venue. Remaining = amount - paidAmount.
+  paidAmount               Decimal  @default(0) @db.Decimal(12, 2)
   currency                 String   @default("INR") @db.Char(3)
   paymentMethod            PaymentMethod?
   status                   BookingStatus @default(PENDING_PAYMENT)
@@ -1273,6 +1312,8 @@ model VenueCategory {
 
   bookingPolicies BookingPolicy[]
   venues           Venue[]
+  resources        Resource[]      @relation("ResourceCategory")
+  resourceGroups   ResourceGroup[] @relation("ResourceGroupCategory")
 
   @@map("venue_categories")
 }
@@ -1285,6 +1326,9 @@ model ResourceGroup {
   id             String         @id @default(uuid()) @db.Uuid
   venueId         String         @db.Uuid
   venue           Venue           @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  /// Facility this pool belongs to (see Resource.categoryId).
+  categoryId     String         @db.Uuid
+  category       VenueCategory  @relation("ResourceGroupCategory", fields: [categoryId], references: [id], onDelete: Restrict)
   name           String
   allocationMode AllocationMode
   totalUnits     Int?
@@ -1302,6 +1346,7 @@ model ResourceGroup {
   bookings              Booking[]
 
   @@index([venueId])
+  @@index([categoryId])
   @@map("resource_groups")
 }
 

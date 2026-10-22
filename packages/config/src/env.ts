@@ -22,7 +22,6 @@ const envSchema = z.object({
 
   DATABASE_URL: z.string().url().or(z.string().startsWith('postgresql://')),
 
-  REDIS_URL: z.string().default('redis://localhost:6379'),
 
   // Admin/Owner auth — self-hosted: this API verifies passwords, issues
   // short-lived HS256 access JWTs and rotating refresh tokens (httpOnly
@@ -39,10 +38,10 @@ const envSchema = z.object({
   RESEND_API_KEY: optionalString(z.string().min(1)),
   MAIL_FROM: z.string().default('Venue Booking <onboarding@resend.dev>'),
 
-  // Where opening hours / blackouts are read from. "rules" = AvailabilityRule
-  // + BlockedPeriod (the P3 tables; hours fall back to legacy OperatingHours
-  // for a venue that has no rules yet). "legacy" = the old OperatingHours +
-  // BlockedDate tables only — the rollback switch. Writes always go to both.
+  // Where blackouts are read from. "rules" = BlockedPeriod (the P3 table).
+  // "legacy" = the old BlockedDate table — the rollback switch. Writes always go
+  // to both. (There are no opening hours any more: when a unit can be booked
+  // comes from its prices, see ScheduleService.openWindows.)
   AVAILABILITY_SOURCE: z.enum(['rules', 'legacy']).default('rules'),
 
   // Customer server-side sessions
@@ -71,11 +70,9 @@ const envSchema = z.object({
   RAZORPAY_KEY_SECRET: optionalString(z.string().min(1)),
   RAZORPAY_WEBHOOK_SECRET: optionalString(z.string().min(1)),
 
-  // Meta WhatsApp Cloud API
+  // Meta WhatsApp Cloud API: outbound only (login code, booking confirmation)
   WHATSAPP_PHONE_NUMBER_ID: optionalString(z.string().min(1)),
   WHATSAPP_ACCESS_TOKEN: optionalString(z.string().min(1)),
-  WHATSAPP_WEBHOOK_VERIFY_TOKEN: optionalString(z.string().min(1)),
-  WHATSAPP_APP_SECRET: optionalString(z.string().min(1)),
 
   // Object storage (S3-compatible)
   STORAGE_ENDPOINT: optionalString(z.string().url()),

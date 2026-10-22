@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useFetch } from '@/lib/use-fetch';
 import { api, ApiError } from '@/lib/api';
-import { Button, Card, ErrorBanner, Input, Label, PageHeader, Select, SkeletonText } from '@/components/ui';
+import { Button, Card, ErrorBanner, FieldError, Input, Label, PageHeader, Select, SkeletonText, invalidClass } from '@/components/ui';
+import { hasErrors, textError, type FieldErrors } from '@/lib/validation';
 import { Pagination, usePageSlice } from '@/components/pagination';
 
 interface State {
@@ -30,15 +31,31 @@ export default function LocationsPage() {
   const [districtForm, setDistrictForm] = useState({ name: '', code: '', timezone: 'Asia/Kolkata' });
   const [districtError, setDistrictError] = useState<string | null>(null);
   const [creatingDistrict, setCreatingDistrict] = useState(false);
+  const [districtErrors, setDistrictErrors] = useState<FieldErrors<'name' | 'code'>>({});
 
   async function onCreateDistrict(e: React.FormEvent) {
     e.preventDefault();
     if (!stateId) return;
     setDistrictError(null);
+    const found: FieldErrors<'name' | 'code'> = {
+      name: textError(districtForm.name, 'District name', 1, 100),
+      code:
+        districtForm.code.trim() === ''
+          ? 'Enter the district code, like MPM.'
+          : districtForm.code.trim().length > 10
+            ? 'The code can be at most 10 characters.'
+            : undefined,
+    };
+    setDistrictErrors(found);
+    if (hasErrors(found)) {
+      document.getElementById(found.name ? 'district-name' : 'district-code')?.focus();
+      return;
+    }
     setCreatingDistrict(true);
     try {
       await api.post('/admin/districts', { stateId, ...districtForm });
       setDistrictForm({ name: '', code: '', timezone: 'Asia/Kolkata' });
+      setDistrictErrors({});
       refetchDistricts();
     } catch (err) {
       setDistrictError(err instanceof ApiError ? err.message : 'Failed to create district');
@@ -104,27 +121,39 @@ export default function LocationsPage() {
             </div>
           )}
 
-          <form onSubmit={onCreateDistrict} className="grid grid-cols-1 gap-3 border-t border-gray-100 pt-4 sm:grid-cols-3">
+          <form onSubmit={onCreateDistrict} noValidate className="grid grid-cols-1 gap-3 border-t border-gray-100 pt-4 sm:grid-cols-3">
             {districtError && (
               <div className="col-span-3">
                 <ErrorBanner message={districtError} />
               </div>
             )}
             <div>
-              <Label>District Name</Label>
+              <Label htmlFor="district-name">District Name</Label>
               <Input
-                required
+                id="district-name"
+                aria-invalid={!!districtErrors.name}
+                className={districtErrors.name ? invalidClass : ''}
                 value={districtForm.name}
-                onChange={(e) => setDistrictForm((f) => ({ ...f, name: e.target.value }))}
+                onChange={(e) => {
+                  setDistrictForm((f) => ({ ...f, name: e.target.value }));
+                  setDistrictErrors((p) => ({ ...p, name: undefined }));
+                }}
               />
+              <FieldError id="district-name-error" message={districtErrors.name} />
             </div>
             <div>
-              <Label>District Code (e.g. MPM)</Label>
+              <Label htmlFor="district-code">District Code (e.g. MPM)</Label>
               <Input
-                required
+                id="district-code"
+                aria-invalid={!!districtErrors.code}
+                className={districtErrors.code ? invalidClass : ''}
                 value={districtForm.code}
-                onChange={(e) => setDistrictForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
+                onChange={(e) => {
+                  setDistrictForm((f) => ({ ...f, code: e.target.value.toUpperCase() }));
+                  setDistrictErrors((p) => ({ ...p, code: undefined }));
+                }}
               />
+              <FieldError id="district-code-error" message={districtErrors.code} />
             </div>
             <Button type="submit" loading={creatingDistrict}>
               {creatingDistrict ? 'Adding…' : 'Add District'}

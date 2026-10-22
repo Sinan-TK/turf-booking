@@ -1,8 +1,18 @@
 'use client';
 
-import { useState } from 'react';
-import { useFetch } from '@/lib/use-fetch';
-import { Badge, Card, EmptyState, ErrorBanner, LoadingState, PageHeader, SearchInput, Select } from '@/components/ui';
+import Link from 'next/link';
+import { useListFilters } from '@/lib/use-list-filters';
+import { PAGE_SIZE, usePagedFetch } from '@/lib/use-paged-fetch';
+import { Badge, ErrorBanner, PageHeader } from '@/components/ui';
+import {
+  DataTable,
+  DateRangeFilter,
+  FilterSelect,
+  ListToolbar,
+  Pagination,
+  ROW,
+  SearchBox,
+} from '@/components/list-kit';
 
 interface Refund {
   id: string;
@@ -12,86 +22,78 @@ interface Refund {
   coinAmountCredited: string;
   reason: string | null;
   createdAt: string;
-  booking: { orderId: string };
+  booking: { id: string; orderId: string };
 }
 
-const STATUSES = ['', 'PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'];
+const STATUS_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'PENDING', label: 'Pending' },
+  { value: 'PROCESSING', label: 'Processing' },
+  { value: 'COMPLETED', label: 'Completed' },
+  { value: 'FAILED', label: 'Failed' },
+];
 
 export default function RefundsPage() {
-  const [status, setStatus] = useState('');
-  const [search, setSearch] = useState('');
-  const { data, error, loading } = useFetch<Refund[]>(
-    `/owner/refunds?limit=100${status ? `&status=${status}` : ''}`,
-  );
-
-  const filtered = data?.filter((r) => {
-    const q = search.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      r.booking.orderId.toLowerCase().includes(q) ||
-      (r.reason ?? '').toLowerCase().includes(q)
-    );
-  });
+  const f = useListFilters({ search: '', status: '', from: '', to: '' });
+  const { rows, total, error, loading } = usePagedFetch<Refund>('/owner/refunds', f.query, f.page);
 
   return (
     <div>
-      <PageHeader
-        title="Refunds"
-        action={
-          <Select value={status} onChange={(e) => setStatus(e.target.value)} className="w-48">
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s || 'All statuses'}
-              </option>
-            ))}
-          </Select>
+      <PageHeader title="Refunds" subtitle="Cancelled bookings returned to customers as coins." />
+      <ListToolbar
+        active={f.active}
+        total={total}
+        noun="refund"
+        onClear={f.clear}
+        search={
+          <SearchBox
+            label="Search refunds"
+            placeholder="Search order, reason, customer…"
+            value={f.values.search}
+            onChange={(v) => f.set('search', v)}
+          />
         }
-      />
-      {data && data.length > 0 && (
-        <SearchInput
-          placeholder="Search by order or reason…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="mb-4 max-w-md"
+      >
+        <FilterSelect label="Status" value={f.values.status} options={STATUS_OPTIONS} onChange={(v) => f.set('status', v)} />
+        <DateRangeFilter
+          label="Date"
+          from={f.values.from}
+          to={f.values.to}
+          onFrom={(v) => f.set('from', v)}
+          onTo={(v) => f.set('to', v)}
         />
-      )}
-      {loading && <LoadingState />}
+      </ListToolbar>
+
       {error && <ErrorBanner message={error} />}
-      {data && data.length === 0 && <EmptyState message="No refunds found." />}
-      {filtered && filtered.length === 0 && data && data.length > 0 && (
-        <EmptyState message="No refunds match your search." />
-      )}
-      {filtered && filtered.length > 0 && (
-        <Card className="overflow-x-auto p-0">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-outline-variant/30 bg-surface-container-low text-xs uppercase text-on-surface-variant">
-              <tr>
-                <th className="px-4 py-3">Order</th>
-                <th className="px-4 py-3">Original Amount</th>
-                <th className="px-4 py-3">Coins Credited</th>
-                <th className="px-4 py-3">Reason</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((r) => (
-                <tr key={r.id} className="border-b border-outline-variant/20 last:border-0">
-                  <td className="px-4 py-3 font-mono text-xs">{r.booking.orderId}</td>
-                  <td className="px-4 py-3">
-                    {r.originalCurrency} {r.originalAmount}
-                  </td>
-                  <td className="px-4 py-3">🪙 {r.coinAmountCredited}</td>
-                  <td className="px-4 py-3 text-on-surface-variant">{r.reason || '—'}</td>
-                  <td className="px-4 py-3">
-                    <Badge value={r.status} />
-                  </td>
-                  <td className="px-4 py-3 text-on-surface-variant">{new Date(r.createdAt).toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+      {!error && (
+        <DataTable
+          columns={['Order', 'Original amount', 'Coins credited', 'Reason', 'Status', 'Date']}
+          loading={loading}
+          rowCount={rows.length}
+          empty={f.active ? 'No refunds match your search or filters.' : 'No refunds yet.'}
+          footer={<Pagination page={f.page} pageSize={PAGE_SIZE} total={total} onPage={f.setPage} />}
+        >
+          {rows.map((r) => (
+            <tr key={r.id} className={ROW}>
+              <td className="px-4 py-3 font-mono text-xs">
+                <Link href={`/bookings/${r.booking.id}`} className="text-primary hover:underline">
+                  {r.booking.orderId}
+                </Link>
+              </td>
+              <td className="whitespace-nowrap px-4 py-3">
+                {r.originalCurrency} {r.originalAmount}
+              </td>
+              <td className="whitespace-nowrap px-4 py-3">🪙 {r.coinAmountCredited}</td>
+              <td className="px-4 py-3 text-on-surface-variant">{r.reason || '—'}</td>
+              <td className="px-4 py-3">
+                <Badge value={r.status} />
+              </td>
+              <td className="whitespace-nowrap px-4 py-3 text-on-surface-variant">
+                {new Date(r.createdAt).toLocaleString()}
+              </td>
+            </tr>
+          ))}
+        </DataTable>
       )}
     </div>
   );

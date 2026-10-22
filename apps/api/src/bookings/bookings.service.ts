@@ -12,9 +12,9 @@ import {
 } from '@venue/shared';
 import { loadEnv } from '@venue/config';
 import { Prisma } from '@venue/database';
-import { DateTime } from 'luxon';
+import { pickPricingRule, effectivePrice } from '../pricing/pricing-rules';
 import { ResourcesService } from '../resources/resources.service';
-import { BOOKINGS_REPOSITORY, type BookingsRepository } from './bookings.repository';
+import { BOOKINGS_REPOSITORY, type AdminBookingFilters, type BookingsRepository } from './bookings.repository';
 import { PoliciesService } from '../policies/policies.service';
 import { AuditService } from '../audit/audit.service';
 import { CoinsService } from '../coins/coins.service';
@@ -25,6 +25,7 @@ import type { AuthContext } from '../auth/auth.types';
 import type { CreateOfflineBookingDto } from './dto/booking.dto';
 import { PolicyResolverService } from '../scheduling/policy-resolver.service';
 import { ScheduleService } from '../scheduling/schedule.service';
+import { OwnerScopeService } from '../owner-scope/owner-scope.service';
 import { assertPolicyAllowsBooking, paddedRange } from '../scheduling/policy-validation';
 
 // Postgres SQLSTATEs that mean "the exclusion constraint on
@@ -66,6 +67,7 @@ export class BookingsService {
     private readonly notifications: NotificationsService,
     private readonly policyResolver: PolicyResolverService,
     private readonly schedule: ScheduleService,
+    private readonly scope: OwnerScopeService,
   ) {}
 
   /**
@@ -146,14 +148,13 @@ export class BookingsService {
     });
     if (
       !(await this.schedule.isWithinOpeningHours(
-        venue.id,
         { resourceId: resource.id },
         startTime,
         endTime,
         venue.timezone,
       ))
     ) {
-      throw new BadRequestException("This time is outside the venue's opening hours.");
+      throw new BadRequestException("This can't be booked at that time: no price covers it.");
     }
 
     const pricingRule = await this.resolvePricing(
@@ -191,14 +192,20 @@ export class BookingsService {
         lockEndTime: lockRange.end,
         holdExpiresAt,
         priceSnapshot: {
-          amount: pricingRule.price.toString(),
+          amount: String(effectivePrice(pricingRule)),
           currency: pricingRule.currency,
           durationMinutes: dto.durationMinutes,
+          normalPrice: pricingRule.normalPrice.toString(),
+          offerPrice: pricingRule.offerPrice?.toString() ?? null,
+          bookingPrice: pricingRule.bookingPrice.toString(),
         },
         footprintIds,
         durationMinutes: dto.durationMinutes,
-        groundType: resource.groundType,
-        amount: pricingRule.price,
+        // A unit with no sub-type is recorded under its name so the booking still says what was booked.
+        groundType: resource.groundType || resource.name,
+        // The full price (offer if there is one); only the booking price (the advance) is charged online.
+        amount: new Prisma.Decimal(effectivePrice(pricingRule)),
+        advanceAmount: pricingRule.bookingPrice,
         currency: pricingRule.currency,
       });
     } catch (error) {
@@ -276,17 +283,16 @@ export class BookingsService {
     });
     if (
       !(await this.schedule.isWithinOpeningHours(
-        venue.id,
         { resourceGroupId: group.id },
         startTime,
         endTime,
         venue.timezone,
       ))
     ) {
-      throw new BadRequestException("This time is outside the venue's opening hours.");
+      throw new BadRequestException("This can't be booked at that time: no price covers it.");
     }
 
-    const { rule, amount } = await this.resolveGroupPricing(
+    const { rule, amount, advance } = await this.resolveGroupPricing(
       group.id,
       dto.durationMinutes,
       dto.quantity,
@@ -323,11 +329,13 @@ export class BookingsService {
           currency: rule.currency,
           durationMinutes: dto.durationMinutes,
           quantity: dto.quantity,
-          unitPrice: rule.price.toString(),
+          unitPrice: String(effectivePrice(rule)),
+          bookingPrice: rule.bookingPrice.toString(),
         },
         durationMinutes: dto.durationMinutes,
         unitLabel: group.name,
         amount,
+        advanceAmount: advance,
         currency: rule.currency,
       });
     } catch (error) {
@@ -363,7 +371,7 @@ export class BookingsService {
   }
 
   /**
-   * Read-only pooled preview mirroring previewSlot: remaining capacity
+   * Read-only pooled preview: remaining capacity
    * + price for an explicit start time, no rows written. Two customers
    * previewing the same units both see them as available; the atomic
    * writer decides who wins.
@@ -380,7 +388,7 @@ export class BookingsService {
         venue: { id: string; name: string; facilityCode: string; timezone: string };
         group: { id: string; name: string; allocationMode: string; totalUnits: number | null };
         remaining: number;
-        price: { amount: string; currency: string; unitPrice: string; quantity: number } | null;
+        price: { amount: string; advanceAmount: string; currency: string; unitPrice: string; quantity: number } | null;
       }
   > {
     if (!Number.isInteger(quantity) || quantity < 1) return { available: false };
@@ -414,63 +422,12 @@ export class BookingsService {
       price: rule
         ? {
             amount: this.priceGroupAmount(rule, quantity).toString(),
+            advanceAmount: this.advanceGroupAmount(rule, quantity).toString(),
             currency: rule.currency,
-            unitPrice: rule.price.toString(),
+            unitPrice: String(effectivePrice(rule)),
             quantity,
           }
         : null,
-    };
-  }
-
-  /**
-   * Read-only availability + price check for a specific resource/time,
-   * with none of createHold's side effects (no SlotHold/ResourceLock rows
-   * created). Used by the WhatsApp "Book This Slot" deep-link flow
-   * (WhatsAppMenuService.handleBookIntent) to show the customer a price
-   * and ask them to confirm BEFORE actually reserving the slot — createHold
-   * itself is still what performs the real, atomic reservation once they
-   * say yes, so this is deliberately a plain read: two customers previewing
-   * the same slot at once both see it as available, and whichever one
-   * actually confirms first is the one createHold's exclusion constraint
-   * lets through.
-   */
-  async previewSlot(
-    resourceId: string,
-    startTime: Date,
-    durationMinutes: number,
-  ): Promise<
-    | { available: false }
-    | {
-        available: true;
-        venue: { id: string; name: string; facilityCode: string; timezone: string };
-        resource: { id: string; name: string; groundType: string };
-        price: { amount: string; currency: string } | null;
-      }
-  > {
-    const resource = await this.bookings.findResourceById(resourceId);
-    if (!resource || !resource.isBookable) return { available: false };
-    const venue = await this.bookings.findVenueById(resource.venueId);
-    if (!venue || venue.status !== 'ACTIVE') return { available: false };
-
-    const endTime = new Date(startTime.getTime() + durationMinutes * 60 * 1000);
-    const footprintIds = await this.resources.getFootprintResourceIds(resourceId);
-
-    // Locks are stored buffer-padded, so the preview pads the candidate too.
-    const policy = (await this.policyResolver.forVenue(venue)).resolve({ resourceId: resource.id });
-    const padded = paddedRange(policy, startTime, endTime);
-    const lock = await this.bookings.findOverlappingLock(footprintIds, padded.start, padded.end);
-    if (lock) return { available: false };
-
-    if (await this.schedule.isBlocked(venue.id, { footprintIds }, startTime, endTime)) {
-      return { available: false };
-    }
-
-    const rule = await this.findPricingRule(resource.id, durationMinutes, startTime, venue.timezone);
-    return {
-      available: true,
-      venue: { id: venue.id, name: venue.name, facilityCode: venue.facilityCode, timezone: venue.timezone },
-      resource: { id: resource.id, name: resource.name, groundType: resource.groundType },
-      price: rule ? { amount: rule.price.toString(), currency: rule.currency } : null,
     };
   }
 
@@ -501,9 +458,10 @@ export class BookingsService {
     if (venue.organizationId !== actor.organizationId) {
       throw new ForbiddenException("Cannot book another organization's venue");
     }
+    await this.scope.assertVenue(actor, venue.id);
     // Owner walk-ins keep the grid + duration rules but may be logged after
     // the fact or far ahead (no lead-time / advance-window limits) and are not
-    // restricted to opening hours — the owner is on site.
+    // restricted to the times a price covers — the owner is on site.
     const policy = (await this.policyResolver.forVenue(venue)).resolve({ resourceId: resource.id });
     assertPolicyAllowsBooking(policy, {
       startTime,
@@ -521,8 +479,14 @@ export class BookingsService {
           'No pricing configured for this resource/duration — enter an amount manually',
         );
       }
-      amount = Number(rule.price);
+      amount = effectivePrice(rule);
       currency = rule.currency;
+    }
+    // A walk-in is paid at the venue. By default it was paid in full; staff can record less (an advance),
+    // and the rest shows as remaining on the booking.
+    const amountPaid = dto.amountPaid ?? amount;
+    if (amountPaid > amount) {
+      throw new BadRequestException("The amount collected can't be more than the booking amount.");
     }
 
     const footprintIds = await this.resources.getFootprintResourceIds(resource.id);
@@ -550,8 +514,10 @@ export class BookingsService {
         priceSnapshot: { amount: String(amount), currency, durationMinutes: dto.durationMinutes },
         footprintIds,
         durationMinutes: dto.durationMinutes,
-        groundType: resource.groundType,
+        groundType: resource.groundType || resource.name,
         amount,
+        advanceAmount: 0,
+        paidAmount: amountPaid,
         currency,
         paymentMethod: 'OFFLINE',
       });
@@ -602,13 +568,12 @@ export class BookingsService {
     at: Date,
     venueTimezone: string,
   ) {
-    // Weekday/weekend must be evaluated in the VENUE's local time, not the
+    // The day and time of day are evaluated in the VENUE's local time, not the
     // server's (ARCHITECTURE.md engineering rule #11) — a booking a few
     // hours either side of local midnight can otherwise land on the
-    // wrong calendar day and price against the wrong DayType.
-    const localWeekday = DateTime.fromJSDate(at, { zone: venueTimezone }).weekday; // luxon: 1=Mon..7=Sun
-    const dayType = localWeekday === 6 || localWeekday === 7 ? 'WEEKEND' : 'WEEKDAY';
-    return this.bookings.findPricingRule(resourceId, durationMinutes, dayType, at);
+    // wrong calendar day and price against the wrong rule.
+    const rules = await this.bookings.findPricingRules(resourceId, durationMinutes, at);
+    return pickPricingRule(rules, at, venueTimezone);
   }
 
   private async resolvePricing(
@@ -630,18 +595,23 @@ export class BookingsService {
     at: Date,
     venueTimezone: string,
   ) {
-    // Same venue-local DayType rule as the exclusive path (§11) — a
-    // booking near local midnight must price against the right day.
-    const localWeekday = DateTime.fromJSDate(at, { zone: venueTimezone }).weekday; // luxon: 1=Mon..7=Sun
-    const dayType = localWeekday === 6 || localWeekday === 7 ? 'WEEKEND' : 'WEEKDAY';
-    return this.bookings.findGroupPricingRule(resourceGroupId, durationMinutes, dayType, at);
+    // Same venue-local day/time rule as the exclusive path (§11).
+    const rules = await this.bookings.findGroupPricingRules(resourceGroupId, durationMinutes, at);
+    return pickPricingRule(rules, at, venueTimezone);
   }
 
+  /** The full price of a pooled booking: the offer (else normal) price, times the quantity for PER_UNIT. */
   private priceGroupAmount(
-    rule: { price: Prisma.Decimal; pricingMode: string },
+    rule: { normalPrice: Prisma.Decimal; offerPrice: Prisma.Decimal | null; pricingMode: string },
     quantity: number,
   ) {
-    return rule.pricingMode === 'PER_UNIT' ? rule.price.mul(quantity) : rule.price;
+    const full = new Prisma.Decimal(effectivePrice(rule));
+    return rule.pricingMode === 'PER_UNIT' ? full.mul(quantity) : full;
+  }
+
+  /** The advance charged online for a pooled booking (the booking price, times the quantity for PER_UNIT). */
+  private advanceGroupAmount(rule: { bookingPrice: Prisma.Decimal; pricingMode: string }, quantity: number) {
+    return rule.pricingMode === 'PER_UNIT' ? rule.bookingPrice.mul(quantity) : rule.bookingPrice;
   }
 
   private async resolveGroupPricing(
@@ -655,7 +625,11 @@ export class BookingsService {
     if (!rule) {
       throw new BadRequestException('No pricing configured for this group/duration');
     }
-    return { rule, amount: this.priceGroupAmount(rule, quantity) };
+    return {
+      rule,
+      amount: this.priceGroupAmount(rule, quantity),
+      advance: this.advanceGroupAmount(rule, quantity),
+    };
   }
 
   async getForCustomer(bookingId: string, actor: AuthContext) {
@@ -695,32 +669,49 @@ export class BookingsService {
    * has visibility across every organization, unlike a Venue Owner who is
    * always org-scoped). Filters are all optional and additive.
    */
-  async listForAdmin(filters: {
-    status?: string;
-    venueId?: string;
-    organizationId?: string;
-    limit?: number;
-    offset?: number;
-  }) {
+  async listForAdmin(filters: AdminBookingFilters & { limit?: number; offset?: number }) {
     return this.bookings.listForAdmin(filters);
   }
 
-  async countForAdmin(filters: { status?: string; venueId?: string; organizationId?: string }) {
+  async countForAdmin(filters: AdminBookingFilters) {
     return this.bookings.countForAdmin(filters);
   }
 
   /** Org-scoped listing for the Venue Owner Portal (§12: an owner sees
    * only their own organization's venues, never platform-wide). */
-  async listForOwner(organizationId: string, filters: { status?: string; venueId?: string; limit?: number }) {
-    return this.bookings.listForOwner(organizationId, filters);
-  }
-
   async getForOwner(bookingId: string, organizationId: string) {
     const booking = await this.getForAdmin(bookingId);
     if (booking.venue.organizationId !== organizationId) {
       throw new ForbiddenException("Cannot access another organization's booking");
     }
     return booking;
+  }
+
+  /**
+   * Records the balance of a booking being paid at the venue (the part of the full price not charged online).
+   * Owner admins and the staff assigned to the venue only; only a confirmed or completed booking can be paid up.
+   */
+  async collectBalance(bookingId: string, amount: number | undefined, actor: AuthContext) {
+    const booking = await this.getForOwner(bookingId, actor.organizationId!);
+    await this.scope.assertVenue(actor, booking.venue.id);
+    if (booking.status !== 'CONFIRMED' && booking.status !== 'COMPLETED') {
+      throw new BadRequestException(`A ${booking.status.toLowerCase().replace('_', ' ')} booking can't be paid.`);
+    }
+    const remaining = booking.amount.sub(booking.paidAmount);
+    if (remaining.lte(0)) throw new BadRequestException('Nothing is left to collect on this booking.');
+    const collect = amount === undefined ? remaining : new Prisma.Decimal(amount);
+    if (collect.gt(remaining)) {
+      throw new BadRequestException(`Only ${booking.currency} ${remaining.toString()} is left to collect.`);
+    }
+    const updated = await this.bookings.addPaidAmount(bookingId, collect);
+    await this.audit.record({
+      actor,
+      action: 'BOOKING_BALANCE_COLLECTED',
+      entityType: 'Booking',
+      entityId: bookingId,
+      metadata: { orderId: booking.orderId, collected: collect.toString(), paidAmount: updated.paidAmount.toString() },
+    });
+    return updated;
   }
 
   async getForAdmin(bookingId: string) {
@@ -743,7 +734,10 @@ export class BookingsService {
   async cancel(bookingId: string, reason: string | undefined, actor: AuthContext) {
     const booking = await this.getForCustomer(bookingId, actor);
     assertTransition('Booking', BOOKING_TRANSITIONS, booking.status, 'CANCELLED');
-    const wasPaid = booking.status === 'CONFIRMED';
+    // Refunds are of what was actually paid online (the booking price), never of the full price: the rest was
+    // due at the venue. A walk-in has no online payment, so nothing to return as Coins.
+    const refundBase = booking.advanceAmount;
+    const wasPaid = booking.status === 'CONFIRMED' && refundBase.gt(0);
 
     let refundPlan: {
       policyId: string;
@@ -763,7 +757,7 @@ export class BookingsService {
         policyId: policy.id,
         refundPercent,
         hoursBeforeStart,
-        coinAmountCredited: booking.amount.mul(refundPercent).div(100),
+        coinAmountCredited: refundBase.mul(refundPercent).div(100),
       };
     }
 
@@ -774,7 +768,7 @@ export class BookingsService {
       reason,
       refundData: refundPlan
         ? {
-            originalAmount: booking.amount,
+            originalAmount: refundBase,
             originalCurrency: booking.currency,
             coinAmountCredited: refundPlan.coinAmountCredited,
             policySnapshot: refundPlan,

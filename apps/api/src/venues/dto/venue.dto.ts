@@ -9,10 +9,9 @@ export const createVenueSchema = z.object({
   address: z.string().min(1).max(300),
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
-  timezone: z.string().min(1),
-  // Venue type. Optional for backward compatibility: omitted = FOOTBALL_TURF.
-  // Must be an ACTIVE category.
-  categoryId: z.string().uuid().optional(),
+  // No timezone or facility here: the timezone comes from the district, and
+  // the facilities (football turf, pool...) are the categories of the units
+  // added under the venue.
   // defaultSlotGranularityMinutes is a fixed platform constant (60 minutes,
   // see packages/database/prisma/schema.prisma) — every venue runs on
   // whole-hour slots, so it's no longer client-settable here.
@@ -30,9 +29,6 @@ export const updateVenueSchema = z.object({
   address: z.string().min(1).max(300).optional(),
   lat: z.number().min(-90).max(90).optional(),
   lng: z.number().min(-180).max(180).optional(),
-  timezone: z.string().min(1).optional(),
-  // Changeable only while the venue has no resources yet.
-  categoryId: z.string().uuid().optional(),
   status: z.enum(['DRAFT', 'ACTIVE', 'INACTIVE', 'SUSPENDED']).optional(),
 });
 export class UpdateVenueDto extends createZodDto(updateVenueSchema) {}

@@ -96,7 +96,6 @@ async function main() {
     const venue = await prisma.venue.create({
       data: {
         organizationId: org.id,
-        categoryId: footballCategory.id,
         facilityCode,
         name: t.name,
         description: `Floodlit football turf in ${t.town}, Malappuram. Online slot booking available.`,
@@ -111,14 +110,6 @@ async function main() {
       },
     });
 
-    await prisma.operatingHours.createMany({
-      data: Array.from({ length: 7 }, (_, weekday) => ({
-        venueId: venue.id,
-        weekday,
-        openTime: '06:00',
-        closeTime: '22:00',
-      })),
-    });
     await prisma.venueFacilityTag.createMany({
       data: ['PARKING', 'WASHROOM', 'FLOODLIGHTS', 'DRINKING_WATER'].map((tag) => ({
         venueId: venue.id,
@@ -129,13 +120,13 @@ async function main() {
     // Resource graph: 7s Full composed of 5s A + 5s B (self closure rows
     // included, mirroring ResourcesService.create/addComposition).
     const full = await prisma.resource.create({
-      data: { venueId: venue.id, name: '7s Full Ground', groundType: '7S', isBookable: true, sortOrder: 0 },
+      data: { venueId: venue.id, categoryId: footballCategory.id, name: '7s Full Ground', groundType: '7S', isBookable: true, sortOrder: 0 },
     });
     const halfA = await prisma.resource.create({
-      data: { venueId: venue.id, name: '5s Ground A', groundType: '5S', isBookable: true, sortOrder: 1 },
+      data: { venueId: venue.id, categoryId: footballCategory.id, name: '5s Ground A', groundType: '5S', isBookable: true, sortOrder: 1 },
     });
     const halfB = await prisma.resource.create({
-      data: { venueId: venue.id, name: '5s Ground B', groundType: '5S', isBookable: true, sortOrder: 2 },
+      data: { venueId: venue.id, categoryId: footballCategory.id, name: '5s Ground B', groundType: '5S', isBookable: true, sortOrder: 2 },
     });
     await prisma.resourceClosure.createMany({
       data: [
@@ -157,17 +148,18 @@ async function main() {
       ],
     });
 
-    // Pricing: 60-min slots, weekday/weekend, INR.
+    // Pricing: 60-min slots, weekday/weekend, INR. The prices carry the opening hours (06:00-22:00):
+    // a unit can be booked only where a price covers it.
     const base7 = 1100 + i * 50;
     const base5 = 650 + i * 25;
     await prisma.pricingRule.createMany({
       data: [
-        { resourceId: full.id, durationMinutes: 60, dayType: 'WEEKDAY', price: base7, currency: 'INR' },
-        { resourceId: full.id, durationMinutes: 60, dayType: 'WEEKEND', price: base7 + 300, currency: 'INR' },
-        { resourceId: halfA.id, durationMinutes: 60, dayType: 'WEEKDAY', price: base5, currency: 'INR' },
-        { resourceId: halfA.id, durationMinutes: 60, dayType: 'WEEKEND', price: base5 + 150, currency: 'INR' },
-        { resourceId: halfB.id, durationMinutes: 60, dayType: 'WEEKDAY', price: base5, currency: 'INR' },
-        { resourceId: halfB.id, durationMinutes: 60, dayType: 'WEEKEND', price: base5 + 150, currency: 'INR' },
+        { resourceId: full.id, durationMinutes: 60, weekdays: [1, 2, 3, 4, 5], startWindow: '06:00', endWindow: '22:00', normalPrice: base7, bookingPrice: base7, currency: 'INR' },
+        { resourceId: full.id, durationMinutes: 60, weekdays: [6, 7], startWindow: '06:00', endWindow: '22:00', normalPrice: base7 + 300, bookingPrice: base7 + 300, currency: 'INR' },
+        { resourceId: halfA.id, durationMinutes: 60, weekdays: [1, 2, 3, 4, 5], startWindow: '06:00', endWindow: '22:00', normalPrice: base5, bookingPrice: base5, currency: 'INR' },
+        { resourceId: halfA.id, durationMinutes: 60, weekdays: [6, 7], startWindow: '06:00', endWindow: '22:00', normalPrice: base5 + 150, bookingPrice: base5 + 150, currency: 'INR' },
+        { resourceId: halfB.id, durationMinutes: 60, weekdays: [1, 2, 3, 4, 5], startWindow: '06:00', endWindow: '22:00', normalPrice: base5, bookingPrice: base5, currency: 'INR' },
+        { resourceId: halfB.id, durationMinutes: 60, weekdays: [6, 7], startWindow: '06:00', endWindow: '22:00', normalPrice: base5 + 150, bookingPrice: base5 + 150, currency: 'INR' },
       ],
     });
 

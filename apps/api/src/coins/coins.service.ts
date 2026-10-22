@@ -53,14 +53,16 @@ export class CoinsService {
     assertTransition('Booking', BOOKING_TRANSITIONS, booking.status, 'CONFIRMED');
     assertTransition('SlotHold', SLOT_HOLD_TRANSITIONS, slotHold.status, 'CONFIRMED');
 
+    // Coins pay the booking price (the advance), the same part a card payment would charge online.
+    const charge = booking.advanceAmount.gt(0) ? booking.advanceAmount : booking.amount;
     const result = await this.coins.redeemBookingAtomic({
       bookingId: booking.id,
       expectedBookingStatus: booking.status,
       slotHoldId: slotHold.id,
       expectedSlotHoldStatus: slotHold.status,
       customerId: actor.id,
-      debitAmount: booking.amount.neg(),
-      amount: booking.amount,
+      debitAmount: charge.neg(),
+      amount: charge,
       currency: booking.currency,
     });
 
@@ -69,7 +71,7 @@ export class CoinsService {
       action: 'BOOKING_PAID_WITH_COINS',
       entityType: 'Booking',
       entityId: bookingId,
-      metadata: { amount: booking.amount.toString() },
+      metadata: { amount: charge.toString() },
     });
 
     // Best-effort and awaited (not fire-and-forget), mirroring

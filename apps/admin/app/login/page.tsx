@@ -3,27 +3,48 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { Button, ErrorBanner, Input, Label } from '@/components/ui';
+import { Button, ErrorBanner, FieldError, Input, Label, invalidClass } from '@/components/ui';
+import { ApiError } from '@/lib/api';
+import { emailError, hasErrors, type FieldErrors } from '@/lib/validation';
 import { Icon } from '@/components/icons';
+import { PasswordInput } from '@/components/password-input';
 
 export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [banner, setBanner] = useState<string | null>(null);
+  const [errors, setErrors] = useState<FieldErrors<'email' | 'password'>>({});
   const [submitting, setSubmitting] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    setBanner(null);
+    const found: FieldErrors<'email' | 'password'> = {
+      email: emailError(email),
+      password: password ? undefined : 'Enter your password.',
+    };
+    setErrors(found);
+    if (hasErrors(found)) {
+      document.getElementById(found.email ? 'login-email' : 'login-password')?.focus();
+      return;
+    }
     setSubmitting(true);
     try {
-      await login(email, password);
+      await login(email.trim(), password);
       router.push('/dashboard');
-    } catch {
-      setError('Invalid email or password');
+    } catch (err) {
+      const status = err instanceof ApiError ? err.status : 0;
+      if (status === 401 || status === 400) {
+        // Which half was wrong is deliberately not revealed.
+        setErrors({ password: 'Incorrect email or password.' });
+        document.getElementById('login-password')?.focus();
+      } else if (status === 429) {
+        setBanner('Too many sign-in attempts. Wait a minute and try again.');
+      } else {
+        setBanner('We could not sign you in right now. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -52,51 +73,54 @@ export default function LoginPage() {
       </aside>
 
       <section className="flex items-center justify-center bg-gray-50 p-6">
-        <form onSubmit={onSubmit} className="w-full max-w-sm animate-[rise_0.35s_ease-out_both]">
+        <form onSubmit={onSubmit} noValidate className="w-full max-w-sm animate-[rise_0.35s_ease-out_both]">
           <span className="mb-6 flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white shadow-lg shadow-brand-600/30 lg:hidden">
             <Icon name="venue" className="h-5 w-5" />
           </span>
           <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Welcome back</h1>
           <p className="mb-8 mt-1.5 text-sm text-gray-500">Sign in to manage the platform.</p>
 
-          {error && (
+          {banner && (
             <div className="mb-4">
-              <ErrorBanner message={error} />
+              <ErrorBanner message={banner} />
             </div>
           )}
 
           <div className="mb-4">
-            <Label>Email</Label>
+            <Label htmlFor="login-email">Email</Label>
             <Input
+              id="login-email"
               type="email"
-              required
               autoComplete="username"
               placeholder="you@company.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              aria-invalid={!!errors.email}
+              aria-describedby={errors.email ? 'login-email-error' : undefined}
+              className={errors.email ? invalidClass : ''}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setBanner(null);
+                setErrors((p) => ({ ...p, email: undefined }));
+              }}
             />
+            <FieldError id="login-email-error" message={errors.email} />
           </div>
           <div className="mb-6">
-            <Label>Password</Label>
-            <div className="relative">
-              <Input
-                type={showPassword ? 'text' : 'password'}
-                required
-                autoComplete="current-password"
-                className="pr-10"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-                aria-pressed={showPassword}
-                className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-lg text-gray-400 transition-colors hover:text-gray-700"
-              >
-                <Icon name={showPassword ? 'eyeOff' : 'eye'} className="h-[18px] w-[18px]" />
-              </button>
-            </div>
+            <Label htmlFor="login-password">Password</Label>
+            <PasswordInput
+              id="login-password"
+              autoComplete="current-password"
+              value={password}
+              aria-invalid={!!errors.password}
+              aria-describedby={errors.password ? 'login-password-error' : undefined}
+              className={errors.password ? invalidClass : ''}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setBanner(null);
+                setErrors((p) => ({ ...p, password: undefined }));
+              }}
+            />
+            <FieldError id="login-password-error" message={errors.password} />
           </div>
           <Button type="submit" loading={submitting} className="w-full py-2.5">
             {submitting ? 'Signing in…' : 'Sign in'}

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { usePagedFetch, PAGE_SIZE } from '@/lib/use-paged-fetch';
+import { useListFilters } from '@/lib/use-list-filters';
+import { DateRangeFilter, ListToolbar, SearchBox } from '@/components/list-toolbar';
 import { Dropdown } from '@/components/dropdown';
 import { ListSection } from '@/components/list-section';
 import { Pagination } from '@/components/pagination';
@@ -28,32 +29,38 @@ const STATUS_OPTIONS = [
 ];
 
 export default function RefundsPage() {
-  const [status, setStatus] = useState('');
-  const [page, setPage] = useState(1);
-  const { rows, total, error, loading } = usePagedFetch<Refund>(
-    '/admin/refunds',
-    status ? `status=${status}` : '',
-    page,
-  );
+  const { values, set, clear, active, page, setPage, query } = useListFilters({ search: '', status: '', from: '', to: '' });
+  const { rows, total, error, loading } = usePagedFetch<Refund>('/admin/refunds', query, page);
 
   return (
     <div>
       <ListSection
         title="Refunds"
-        subtitle={loading && total === 0 ? 'Every refund on the platform.' : `${total} refund${total === 1 ? '' : 's'}${status ? ' match this filter' : ' on the platform'}.`}
+        subtitle={loading && total === 0 ? 'undefined' : `${total} refund${total === 1 ? '' : 's'}${active ? ' match your filters' : ' on the platform'}.`}
       >
-        <div className="flex flex-wrap items-center gap-3">
-          <Dropdown
-            label="Status"
-            value={status}
-            neutral=""
-            options={STATUS_OPTIONS}
-            onChange={(v) => {
-              setStatus(v);
-              setPage(1);
-            }}
+        <ListToolbar
+          search={
+            <SearchBox
+              value={values.search}
+              onChange={(v) => set('search', v)}
+              placeholder="Search by order ID, reason, customer or phone…"
+              label="Search refunds"
+            />
+          }
+          active={active}
+          total={total}
+          noun="refund"
+          onClear={clear}
+        >
+          <Dropdown label="Status" value={values.status} neutral="" options={STATUS_OPTIONS} onChange={(v) => set('status', v)} />
+          <DateRangeFilter
+            label="Date"
+            from={values.from}
+            to={values.to}
+            onFrom={(v) => set('from', v)}
+            onTo={(v) => set('to', v)}
           />
-        </div>
+        </ListToolbar>
       </ListSection>
 
       {loading && rows.length === 0 && <SkeletonTable columns={7} />}

@@ -111,7 +111,7 @@ export default function VenueTypesPage() {
       <section className="mb-4 rounded-xl border border-gray-200/80 bg-white shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
           <div className="min-w-0">
-            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Venue types</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Facilities</h1>
             <p className="mt-1 text-sm text-gray-500">
               {data
                 ? `${data.length} type${data.length === 1 ? '' : 's'} · ${activeCount} active. Each sets its own start times, lengths and wording.`
@@ -121,7 +121,7 @@ export default function VenueTypesPage() {
           <Link href="/venue-types/new" className="shrink-0">
             <Button>
               <Icon name="plus" className="h-4 w-4" />
-              New venue type
+              New facility
             </Button>
           </Link>
         </div>
@@ -138,7 +138,7 @@ export default function VenueTypesPage() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search by name, identifier or sub-type…"
-                  aria-label="Search venue types"
+                  aria-label="Search facilities"
                   className="h-10 pl-9"
                 />
               </div>
@@ -222,9 +222,9 @@ export default function VenueTypesPage() {
       )}
       {loading && <SkeletonTable columns={7} />}
       {error && <ErrorBanner message={error} />}
-      {data && data.length === 0 && <EmptyState message="No venue types yet. Create the first one." />}
+      {data && data.length === 0 && <EmptyState message="No facilities yet. Create the first one." />}
       {data && data.length > 0 && visible.length === 0 && (
-        <EmptyState message="No venue types match your search or filters." />
+        <EmptyState message="No facilities match your search or filters." />
       )}
       {data && visible.length > 0 && (
         <Card className="overflow-x-auto p-0">

@@ -82,29 +82,28 @@ describe('Venue policy engine', () => {
       address: '1 Test Lane',
       lat: 10,
       lng: 76,
-      timezone: TZ,
-      categoryId: category.body.id,
     });
     expect(venue.status).toBe(201);
     expect((await adminAgent.patch(`/venues/${venue.body.id}`).send({ status: 'ACTIVE' })).status).toBe(200);
 
     const resource = await ownerAgent
       .post('/resources')
-      .send({ venueId: venue.body.id, name: 'Board 1', groundType: 'Standard' });
+      .send({ venueId: venue.body.id, categoryId: category.body.id, name: 'Board 1', groundType: 'Standard' });
     expect(resource.status).toBe(201);
 
     await Promise.all([
-      ...[0, 1, 2, 3, 4, 5, 6].map((weekday) =>
-        ownerAgent
-          .put('/venue-config/operating-hours')
-          .send({ venueId: venue.body.id, weekday, openTime: hours[0], closeTime: hours[1] })
-          .then((r) => expect(r.status).toBe(200)),
-      ),
       ...prices.flatMap((duration) =>
         ['WEEKDAY', 'WEEKEND'].map((dayType) =>
           ownerAgent
             .post('/resources/pricing-rules')
-            .send({ resourceId: resource.body.id, durationMinutes: duration, dayType, price: duration * 2 })
+            .send({
+              resourceId: resource.body.id,
+              durationMinutes: duration,
+              dayType,
+              startWindow: hours[0],
+              endWindow: hours[1],
+              price: duration * 2,
+            })
             .then((r) => expect(r.status).toBe(201)),
         ),
       ),
@@ -144,6 +143,56 @@ describe('Venue policy engine', () => {
     await app.close();
   });
 
+  describe('one venue, two facilities, two rule sets', () => {
+    test('each unit resolves the policy of its own facility', async () => {
+      // Chess: 30-minute grid. Swimming: 60-minute grid with 60-minute durations only.
+      const chess = await createVenue({});
+      const pool = await adminAgent.post('/admin/categories').send({
+        slug: `E2E_${uniqueSuffix().toUpperCase()}`,
+        name: 'E2E Pool',
+        unitLabel: 'Lane',
+        policy: { ...basePolicy, slotIntervalMin: 60, minDurationMin: 60, maxDurationMin: 60, durationIncrementMin: 60 },
+      });
+      expect(pool.status).toBe(201);
+      const lane = await ownerAgent
+        .post('/resources')
+        .send({ venueId: chess.venueId, categoryId: pool.body.id, name: 'Lane 1', groundType: 'Lap' });
+      expect(lane.status).toBe(201);
+      for (const dayType of ['WEEKDAY', 'WEEKEND']) {
+        expect(
+          (
+            await ownerAgent
+              .post('/resources/pricing-rules')
+              .send({ resourceId: lane.body.id, durationMinutes: 60, dayType, price: 200 })
+          ).status,
+        ).toBe(201);
+      }
+
+      const res = await search(chess.facilityCode, localStart(3, 12), 60);
+      expect(res.status).toBe(200);
+      const byId = (id: string) => res.body.find((r: { resource: { id: string } }) => r.resource.id === id);
+      expect(byId(chess.resourceId).policy.durations).toEqual([30, 60, 90, 120]);
+      expect(byId(chess.resourceId).category.venueLabel).toBe('Chess club');
+      expect(byId(lane.body.id).policy.durations).toEqual([60]);
+      expect(byId(lane.body.id).category.id).toBe(pool.body.id);
+      expect(byId(lane.body.id).availableStartTimes.map(hhmm).every((t: string) => t.endsWith(':00'))).toBe(true);
+
+      // The pool does not offer 30 minutes, the chess boards do.
+      const half = await search(chess.facilityCode, localStart(3, 12), 30);
+      expect(half.body.map((r: { resource: { id: string } }) => r.resource.id)).toEqual([chess.resourceId]);
+
+      // Category filter narrows to that facility's units only.
+      const onlyPool = await request(app.getHttpServer()).get('/search').query({
+        facilityCode: chess.facilityCode,
+        date: localDate(localStart(3, 12)),
+        timeWindow: 'ALL',
+        durationMinutes: 60,
+        categoryId: pool.body.id,
+      });
+      expect(onlyPool.body.map((r: { resource: { id: string } }) => r.resource.id)).toEqual([lane.body.id]);
+    });
+  });
+
   describe('chess venue: 30-minute interval, 30–120 minute durations', () => {
     let v: Venue;
     beforeAll(async () => {
@@ -165,7 +214,7 @@ describe('Venue policy engine', () => {
         durations: [30, 60, 90, 120],
       });
       expect(res30.body[0].category.venueLabel).toBe('Chess club');
-      expect(res30.body[0].price).toEqual({ amount: '60', currency: 'INR' });
+      expect(res30.body[0].price).toMatchObject({ amount: '60', currency: 'INR', normalAmount: null, bookingAmount: '60' });
 
       // A 60-minute game must still finish by closing time: last start 13:00.
       const res60 = await search(v.facilityCode, day, 60);
@@ -191,11 +240,11 @@ describe('Venue policy engine', () => {
       }
     });
 
-    test('opening hours are enforced on holds, not only in search', async () => {
+    test('the priced hours are enforced on holds, not only in search', async () => {
       const early = await hold(v.resourceId, localStart(5, 9, 30), 30);
       expect(early.status).toBe(400);
-      expect(early.body.message).toMatch(/opening hours/);
-      // 13:30 + 60 min ends 14:30, after the 14:00 close.
+      expect(early.body.message).toMatch(/no price covers/i);
+      // 13:30 + 60 min ends 14:30, after the last priced time (14:00).
       expect((await hold(v.resourceId, localStart(5, 13, 30), 60)).status).toBe(400);
       expect((await hold(v.resourceId, localStart(5, 13, 30), 30)).status).toBe(201);
     });
@@ -203,10 +252,11 @@ describe('Venue policy engine', () => {
     test('a duration the policy allows but nobody priced is rejected, not invented', async () => {
       const unpriced = await hold(v.resourceId, localStart(6, 10, 0), 90);
       expect(unpriced.status).toBe(400);
-      expect(unpriced.body.message).toMatch(/No pricing configured/);
+      expect(unpriced.body.message).toMatch(/no price covers/i);
 
+      // ...and a duration nobody priced is not offered in search either (a unit is bookable only where a price covers it).
       const res = await search(v.facilityCode, localStart(6, 12), 90);
-      expect(res.body[0].price).toBeNull();
+      expect(res.body).toEqual([]);
     });
 
     test('pricing rules can only be created for durations the policy offers', async () => {
@@ -253,18 +303,6 @@ describe('Venue policy engine', () => {
       await ownerAgent.delete(`/venue-config/blocked-dates/${blocked.body.id}`);
       expect(await prisma.blockedPeriod.count({ where: { sourceBlockedDateId: blocked.body.id } })).toBe(0);
       expect((await hold(v.resourceId, localStart(day, 11, 0), 30)).status).toBe(201);
-    });
-
-    test('operating hours are dual-written: one twin rule per weekday, updated in place', async () => {
-      const before = await prisma.availabilityRule.count({ where: { venueId: v.venueId } });
-      expect(before).toBe(7);
-      const res = await ownerAgent
-        .put('/venue-config/operating-hours')
-        .send({ venueId: v.venueId, weekday: 2, openTime: '10:00', closeTime: '14:00' });
-      expect(res.status).toBe(200);
-      expect(await prisma.availabilityRule.count({ where: { venueId: v.venueId } })).toBe(7);
-      const legacy = await prisma.operatingHours.count({ where: { venueId: v.venueId } });
-      expect(legacy).toBe(7);
     });
   });
 
@@ -398,11 +436,10 @@ describe('Venue policy engine', () => {
   });
 
   describe('tenant isolation on configuration reads', () => {
-    test("an owner cannot read another organization's pricing, hours or blocks", async () => {
+    test("an owner cannot read another organization's pricing or blocks", async () => {
       const v = await createVenue({});
       const { ownerAgent: other } = await createOwnerFixture(app, adminAgent);
       expect((await other.get(`/resources/pricing-rules?resourceId=${v.resourceId}`)).status).toBe(403);
-      expect((await other.get(`/venue-config/operating-hours?venueId=${v.venueId}`)).status).toBe(403);
       expect((await other.get(`/venue-config/blocked-dates?venueId=${v.venueId}`)).status).toBe(403);
 
       const own = await ownerAgent.get(`/resources/pricing-rules?resourceId=${v.resourceId}`);

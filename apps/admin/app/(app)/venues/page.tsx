@@ -17,10 +17,10 @@ interface Venue {
   status: string;
   address: string;
   organizationId: string;
-  category?: VenueCategorySummary;
+  facilities?: VenueCategorySummary[];
 }
 
-type SortKey = 'code' | 'name' | 'type' | 'status';
+type SortKey = 'code' | 'name' | 'status';
 type SortChoice = `${SortKey}:${SortDir}`;
 
 const PAGE_SIZE = 25;
@@ -35,7 +35,6 @@ const STATUS_LABELS: Record<string, string> = {
 const SORTERS: Record<SortKey, (a: Venue, b: Venue) => number> = {
   code: (a, b) => a.facilityCode.localeCompare(b.facilityCode),
   name: (a, b) => a.name.localeCompare(b.name),
-  type: (a, b) => (a.category?.name ?? '').localeCompare(b.category?.name ?? '') || a.name.localeCompare(b.name),
   status: (a, b) => a.status.localeCompare(b.status) || a.name.localeCompare(b.name),
 };
 
@@ -48,9 +47,9 @@ export default function VenuesPage() {
 
   const typeOptions = useMemo(() => {
     const names = new Map<string, string>();
-    for (const v of data ?? []) if (v.category) names.set(v.category.slug, v.category.name);
+    for (const v of data ?? []) for (const f of v.facilities ?? []) names.set(f.slug, f.name);
     return [
-      { value: 'all', label: 'All types' },
+      { value: 'all', label: 'All facilities' },
       ...[...names.entries()].sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => ({ value, label })),
     ];
   }, [data]);
@@ -72,9 +71,9 @@ export default function VenuesPage() {
     const q = query.trim().toLowerCase();
     const rows = (data ?? []).filter((v) => {
       if (status !== 'all' && v.status !== status) return false;
-      if (type !== 'all' && v.category?.slug !== type) return false;
+      if (type !== 'all' && !v.facilities?.some((f) => f.slug === type)) return false;
       if (!q) return true;
-      return [v.name, v.facilityCode, v.address, v.category?.name ?? ''].some((s) => s.toLowerCase().includes(q));
+      return [v.name, v.facilityCode, v.address, ...(v.facilities ?? []).map((f) => f.name)].some((s) => s.toLowerCase().includes(q));
     });
     rows.sort(SORTERS[sort.key]);
     if (sort.dir === 'desc') rows.reverse();
@@ -121,14 +120,14 @@ export default function VenuesPage() {
                   type="search"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search by name, facility code, address or type…"
+                  placeholder="Search by name, venue code, address or facility…"
                   aria-label="Search venues"
                   className="h-10 pl-9"
                 />
               </div>
 
               <Dropdown label="Status" value={status} neutral="all" options={statusOptions} onChange={setStatus} />
-              <Dropdown label="Type" value={type} neutral="all" options={typeOptions} onChange={setType} />
+              <Dropdown label="Facility" value={type} neutral="all" options={typeOptions} onChange={setType} />
               <Dropdown<SortChoice>
                 label="Sort"
                 value={`${sort.key}:${sort.dir}` as SortChoice}
@@ -141,7 +140,6 @@ export default function VenuesPage() {
                   { value: 'name:asc', label: 'Name A–Z' },
                   { value: 'name:desc', label: 'Name Z–A' },
                   { value: 'code:asc', label: 'Facility code' },
-                  { value: 'type:asc', label: 'Type' },
                   { value: 'status:asc', label: 'Status' },
                 ]}
               />
@@ -174,7 +172,7 @@ export default function VenuesPage() {
               <tr>
                 <SortHeader label="Facility code" k="code" sortKey={sort.key} dir={sort.dir} onSort={onSort} />
                 <SortHeader label="Name" k="name" sortKey={sort.key} dir={sort.dir} onSort={onSort} />
-                <SortHeader label="Type" k="type" sortKey={sort.key} dir={sort.dir} onSort={onSort} />
+                <th className="px-4 py-3">Facilities</th>
                 <th className="px-4 py-3">Address</th>
                 <SortHeader label="Status" k="status" sortKey={sort.key} dir={sort.dir} onSort={onSort} />
                 <th className="px-4 py-3" />
@@ -185,7 +183,9 @@ export default function VenuesPage() {
                 <tr key={venue.id} className="border-b border-gray-100 last:border-0 transition-colors hover:bg-brand-50/40">
                   <td className="px-4 py-3 font-mono text-xs">{venue.facilityCode}</td>
                   <td className="px-4 py-3 font-medium text-gray-900">{venue.name}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-600">{venue.category?.name ?? '—'}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {venue.facilities?.length ? venue.facilities.map((f) => f.name).join(', ') : '—'}
+                  </td>
                   <td className="px-4 py-3 text-gray-600">{venue.address}</td>
                   <td className="px-4 py-3">
                     <Badge value={venue.status} />

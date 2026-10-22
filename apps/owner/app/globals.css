@@ -11,9 +11,24 @@
   letter-spacing: normal;
   text-transform: none;
   display: inline-block;
+  /* Reserve the glyph box and clip, so the ligature name never shows as text or shifts the layout while the font loads. */
+  width: 1em;
+  height: 1em;
+  overflow: hidden;
   white-space: nowrap;
   word-wrap: normal;
   direction: ltr;
   -webkit-font-feature-settings: 'liga';
   -webkit-font-smoothing: antialiased;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }

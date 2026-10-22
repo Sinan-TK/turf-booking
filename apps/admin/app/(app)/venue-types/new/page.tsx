@@ -10,11 +10,11 @@ export default function NewVenueTypePage() {
   return (
     <div>
       <Link href="/venue-types" className="mb-3 inline-block text-sm text-gray-500 hover:text-gray-800">
-        ← Venue types
+        ← Facilities
       </Link>
       <PageHeader
-        title="New venue type"
-        subtitle="Set up something new to book — Chess, Badminton, Studio — then owners can add venues of this type."
+        title="New facility"
+        subtitle="Set up something new to book — Chess, Swimming, Studio — then owners can add units of it to any venue."
       />
       <CategoryForm onSaved={() => router.push('/venue-types')} />
     </div>

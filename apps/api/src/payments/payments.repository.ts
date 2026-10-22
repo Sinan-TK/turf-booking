@@ -7,6 +7,26 @@ import type {
   SlotHold,
   WebhookEvent,
 } from '@venue/database';
+import type { DateRange } from '../common/list-filters';
+
+export interface AdminPaymentFilters {
+  /** Restrict to one owner organization's venues (the owner portal's own list). */
+  organizationId?: string;
+  status?: string;
+  provider?: string;
+  /** Matches order id, gateway order/payment id, customer name/number. */
+  search?: string;
+  /** Window on when the payment was created. */
+  range?: DateRange;
+}
+
+export interface AdminRefundFilters {
+  organizationId?: string;
+  status?: string;
+  /** Matches order id, reason, customer name/number. */
+  search?: string;
+  range?: DateRange;
+}
 
 /** Booking with the venue organization needed for owner notifications. */
 export type BookingWithOrg = Booking & {
@@ -52,6 +72,8 @@ export interface ConfirmPaymentAtomicParams {
   bookingStatus: string;
   slotHoldId: string;
   slotHoldStatus: string;
+  /** What this payment collected: the booking is paid up to this much. */
+  paidAmount: Prisma.Decimal | number | string;
 }
 
 /**
@@ -88,18 +110,10 @@ export interface PaymentsRepository {
   recordLatePaymentAtomic(params: LatePaymentAtomicParams): Promise<Refund>;
   confirmPaymentAtomic(params: ConfirmPaymentAtomicParams): Promise<void>;
   findCustomerById(id: string): Promise<CustomerProfile | null>;
-  listPaymentsForAdmin(filters: { status?: string; limit?: number; offset?: number }): Promise<PaymentListItem[]>;
-  countPaymentsForAdmin(filters: { status?: string }): Promise<number>;
-  listRefundsForAdmin(filters: { status?: string; limit?: number; offset?: number }): Promise<RefundListItem[]>;
-  countRefundsForAdmin(filters: { status?: string }): Promise<number>;
-  listPaymentsForOwner(
-    organizationId: string,
-    filters: { status?: string; limit?: number },
-  ): Promise<PaymentListItem[]>;
-  listRefundsForOwner(
-    organizationId: string,
-    filters: { status?: string; limit?: number },
-  ): Promise<RefundListItem[]>;
+  listPaymentsForAdmin(filters: AdminPaymentFilters & { limit?: number; offset?: number }): Promise<PaymentListItem[]>;
+  countPaymentsForAdmin(filters: AdminPaymentFilters): Promise<number>;
+  listRefundsForAdmin(filters: AdminRefundFilters & { limit?: number; offset?: number }): Promise<RefundListItem[]>;
+  countRefundsForAdmin(filters: AdminRefundFilters): Promise<number>;
   findFailedPaymentView(gatewayOrderId: string): Promise<FailedPaymentView | null>;
   markPaymentFailed(params: {
     paymentId: string;

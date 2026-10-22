@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { usePagedFetch, PAGE_SIZE } from '@/lib/use-paged-fetch';
+import { useListFilters } from '@/lib/use-list-filters';
+import { ListToolbar, SearchBox } from '@/components/list-toolbar';
 import { Dropdown } from '@/components/dropdown';
 import { ListSection } from '@/components/list-section';
 import { Pagination } from '@/components/pagination';
@@ -18,6 +19,23 @@ interface Ticket {
   customer: { whatsappNumber: string; name: string | null };
 }
 
+const PRIORITY_OPTIONS = [
+  { value: '', label: 'Any' },
+  { value: 'URGENT', label: 'Urgent' },
+  { value: 'HIGH', label: 'High' },
+  { value: 'MEDIUM', label: 'Medium' },
+  { value: 'LOW', label: 'Low' },
+];
+
+const CATEGORY_OPTIONS = [
+  { value: '', label: 'Any' },
+  { value: 'REFUND_ISSUE', label: 'Refund issue' },
+  { value: 'PAID_BUT_BOOKING_FAILED', label: 'Paid, booking failed' },
+  { value: 'BOOKING_ISSUE', label: 'Booking issue' },
+  { value: 'ACCOUNT_PROFILE_ISSUE', label: 'Account / profile' },
+  { value: 'OTHER', label: 'Other' },
+];
+
 const STATUS_OPTIONS = [
   { value: '', label: 'All' },
   { value: 'OPEN', label: 'Open' },
@@ -27,32 +45,33 @@ const STATUS_OPTIONS = [
 ];
 
 export default function SupportPage() {
-  const [status, setStatus] = useState('');
-  const [page, setPage] = useState(1);
-  const { rows, total, error, loading } = usePagedFetch<Ticket>(
-    '/admin/support-tickets',
-    status ? `status=${status}` : '',
-    page,
-  );
+  const { values, set, clear, active, page, setPage, query } = useListFilters({ search: '', status: '', priority: '', category: '' });
+  const { rows, total, error, loading } = usePagedFetch<Ticket>('/admin/support-tickets', query, page);
 
   return (
     <div>
       <ListSection
         title="Support"
-        subtitle={loading && total === 0 ? 'Customer support tickets.' : `${total} ticket${total === 1 ? '' : 's'}${status ? ' match this filter' : ' in total'}.`}
+        subtitle={loading && total === 0 ? 'undefined' : `${total} ticket${total === 1 ? '' : 's'}${active ? ' match your filters' : ' in total'}.`}
       >
-        <div className="flex flex-wrap items-center gap-3">
-          <Dropdown
-            label="Status"
-            value={status}
-            neutral=""
-            options={STATUS_OPTIONS}
-            onChange={(v) => {
-              setStatus(v);
-              setPage(1);
-            }}
-          />
-        </div>
+        <ListToolbar
+          search={
+            <SearchBox
+              value={values.search}
+              onChange={(v) => set('search', v)}
+              placeholder="Search by subject, customer, phone or order ID…"
+              label="Search tickets"
+            />
+          }
+          active={active}
+          total={total}
+          noun="ticket"
+          onClear={clear}
+        >
+          <Dropdown label="Status" value={values.status} neutral="" options={STATUS_OPTIONS} onChange={(v) => set('status', v)} />
+          <Dropdown label="Priority" value={values.priority} neutral="" options={PRIORITY_OPTIONS} onChange={(v) => set('priority', v)} />
+          <Dropdown label="Category" value={values.category} neutral="" options={CATEGORY_OPTIONS} onChange={(v) => set('category', v)} />
+        </ListToolbar>
       </ListSection>
 
       {loading && rows.length === 0 && <SkeletonTable columns={6} />}

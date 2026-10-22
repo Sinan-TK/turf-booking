@@ -1,3 +1,8 @@
+'use client';
+
+import Link from 'next/link';
+import { useState } from 'react';
+import { SvgIcon } from '@/components/svg-icons';
 import type { ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes } from 'react';
 
 export function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
@@ -32,7 +37,7 @@ export function Button({
 export function Input({ className = '', ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className={`w-full rounded-lg border-none bg-surface-container px-3 py-2 text-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30 ${className}`}
+      className={`w-full rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-3 py-2.5 text-body-md text-on-surface transition-colors placeholder:text-on-surface-variant/60 hover:border-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-surface-container disabled:text-on-surface-variant ${className}`}
       {...props}
     />
   );
@@ -64,14 +69,14 @@ export function SearchInput({
 export function Select({ className = '', ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
-      className={`w-full rounded-lg border-none bg-surface-container px-3 py-2 text-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30 ${className}`}
+      className={`w-full rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-3 py-2.5 text-body-md text-on-surface transition-colors placeholder:text-on-surface-variant/60 hover:border-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-surface-container disabled:text-on-surface-variant ${className}`}
       {...props}
     />
   );
 }
 
-export function Label({ children }: { children: React.ReactNode }) {
-  return <label className="mb-1 block font-label-md text-label-md text-on-surface-variant">{children}</label>;
+export function Label({ children, htmlFor }: { children: React.ReactNode; htmlFor?: string }) {
+  return <label htmlFor={htmlFor} className="mb-1 block font-label-md text-label-md text-on-surface-variant">{children}</label>;
 }
 
 const BADGE_COLORS: Record<string, string> = {
@@ -133,14 +138,35 @@ export function EmptyState({ message }: { message: string }) {
   );
 }
 
-export function PageHeader({ title, action }: { title: string; action?: React.ReactNode }) {
+export function PageHeader({
+  title,
+  subtitle,
+  action,
+  back,
+}: {
+  title: string;
+  subtitle?: string;
+  action?: React.ReactNode;
+  /** Link to the parent page, shown above the title. */
+  back?: { href: string; label: string };
+}) {
   return (
     <div className="mb-8 flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-end">
       <div>
+        {back && (
+          <Link
+            href={back.href}
+            className="mb-3 inline-flex items-center gap-1.5 rounded-lg py-1 pr-2 text-body-md font-medium text-on-surface-variant transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          >
+            <SvgIcon name="back" className="h-4 w-4" />
+            {back.label}
+          </Link>
+        )}
         <p className="mb-1 font-label-md text-label-md uppercase tracking-wider text-on-surface-variant">
           Owner Portal
         </p>
         <h1 className="font-headline-md text-headline-md text-on-surface">{title}</h1>
+        {subtitle && <p className="mt-1 text-body-md text-on-surface-variant">{subtitle}</p>}
       </div>
       {action}
     </div>
@@ -153,3 +179,35 @@ export function PageHeader({ title, action }: { title: string; action?: React.Re
 export function Icon({ name, className = '' }: { name: string; className?: string }) {
   return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
 }
+
+/** Password field with a show/hide toggle. */
+export function PasswordInput({ className = '', ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="relative">
+      <Input type={visible ? 'text' : 'password'} className={`pr-11 ${className}`} {...props} />
+      <button
+        type="button"
+        onClick={() => setVisible((v) => !v)}
+        aria-label={visible ? 'Hide password' : 'Show password'}
+        aria-pressed={visible}
+        className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-gray-400 transition-colors hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      >
+        <SvgIcon name={visible ? 'eyeOff' : 'eye'} className="h-[18px] w-[18px]" />
+      </button>
+    </div>
+  );
+}
+
+/** The red message under a form field; pair it with `aria-invalid` and `aria-describedby` on the input. */
+export function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null;
+  return (
+    <p id={id} role="alert" className="mt-1 text-xs font-medium text-error">
+      {message}
+    </p>
+  );
+}
+
+/** Class to add to an Input/Select/PasswordInput that has an error. */
+export const invalidClass = '!border-error focus:!ring-error/20';

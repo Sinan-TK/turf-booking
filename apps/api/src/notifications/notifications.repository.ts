@@ -19,7 +19,7 @@ export interface NotificationsRepository {
   findActiveOwnerIdsByIds(ownerIds: string[]): Promise<string[]>;
   findActiveOwnerIdsByOrganization(
     organizationId: string,
-    opts?: { excludeOwnerId?: string },
+    opts?: { excludeOwnerId?: string; venueId?: string },
   ): Promise<string[]>;
   listRecipientOwners(): Promise<
     Array<{ id: string; name: string; email: string; organizationName: string }>
