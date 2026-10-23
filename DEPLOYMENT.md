@@ -31,6 +31,7 @@ OWNER_APP_URL=https://owner.example.com
 WEB_APP_URL=https://example.com
 RAZORPAY_KEY_ID=...  RAZORPAY_KEY_SECRET=...  RAZORPAY_WEBHOOK_SECRET=...
 WHATSAPP_*=...
+GOOGLE_CLIENT_ID=<Google Cloud OAuth Web client ID>   # GOOGLE_AUTH_MODE must stay "google" (fake is refused)
 TRUST_PROXY=<see below>
 ```
 
@@ -46,6 +47,16 @@ TRUST_PROXY=<see below>
 
 - Env: `NEXT_PUBLIC_API_URL=https://api.example.com` (baked at build time; redeploy to change).
 - Install: `pnpm install` at repo root (enable "include files outside the Root Directory"). Build: `pnpm --filter @venue/admin build` / `pnpm --filter @venue/owner build`.
+
+### Google sign-in
+
+Customers and owner-portal users can sign in with Google (not the Super Admin). In Google Cloud: OAuth consent screen,
+then Credentials > OAuth client ID > Web application. Add every app origin (customer site, owner portal, and
+`http://localhost:3000` / `:3002` for development) under Authorized JavaScript origins; no redirect URI is needed.
+Set the same ID as `GOOGLE_CLIENT_ID` on the API and `NEXT_PUBLIC_GOOGLE_CLIENT_ID` on the customer and owner apps
+(build time). Owner Google sign-in only works for an address already invited as an owner user. Customers can also
+use email + password; reset links need `RESEND_API_KEY` and `MAIL_FROM`. The WhatsApp-code login stays in the API
+but is hidden in the customer app unless `NEXT_PUBLIC_CUSTOMER_LOGIN_METHODS` includes `phone` (default `google,email`).
 
 ## API release order
 

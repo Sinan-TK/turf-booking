@@ -90,7 +90,7 @@ export class OwnerOrganizationsService {
           currency: true,
           startTime: true,
           venue: { select: { name: true } },
-          customer: { select: { name: true, whatsappNumber: true } },
+          customer: { select: { name: true, whatsappNumber: true, phoneVerified: true, email: true } },
         },
       }),
     ]);

@@ -35,7 +35,7 @@ interface BookingDetail {
   cancellationReasonCode: string | null;
   cancellationNote: string | null;
   venue: { name: string; facilityCode: string };
-  customer: { whatsappNumber: string; name: string | null };
+  customer: { whatsappNumber: string | null; phoneVerified: boolean; email: string | null; name: string | null };
   payments: Payment[];
   refunds: Refund[];
 }
@@ -76,7 +76,7 @@ export default function BookingDetailPage() {
           </div>
           <div>
             <dt className="text-gray-500">Customer</dt>
-            <dd>{booking.customer.name || booking.customer.whatsappNumber}</dd>
+            <dd>{booking.customer.name || booking.customer.whatsappNumber || booking.customer.email || 'Customer'}</dd>
           </div>
           <div>
             <dt className="text-gray-500">Time</dt>

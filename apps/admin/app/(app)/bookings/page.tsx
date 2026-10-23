@@ -17,7 +17,7 @@ interface Booking {
   currency: string;
   startTime: string;
   venue: { name: string; facilityCode: string };
-  customer: { whatsappNumber: string; name: string | null };
+  customer: { whatsappNumber: string | null; phoneVerified: boolean; email: string | null; name: string | null };
 }
 
 const PAYMENT_METHOD_OPTIONS = [
@@ -94,7 +94,7 @@ export default function BookingsPage() {
                 <tr key={b.id} className="border-b border-gray-100 last:border-0 transition-colors hover:bg-brand-50/40">
                   <td className="px-4 py-3 font-mono text-xs">{b.orderId}</td>
                   <td className="px-4 py-3">{b.venue.name}</td>
-                  <td className="px-4 py-3 text-gray-600">{b.customer.name || b.customer.whatsappNumber}</td>
+                  <td className="px-4 py-3 text-gray-600">{b.customer.name || b.customer.whatsappNumber || b.customer.email || 'Customer'}</td>
                   <td className="px-4 py-3 text-gray-600">{new Date(b.startTime).toLocaleString()}</td>
                   <td className="px-4 py-3">
                     {b.currency} {b.amount}

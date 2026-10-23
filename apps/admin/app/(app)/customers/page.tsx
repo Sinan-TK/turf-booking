@@ -11,7 +11,9 @@ import { Badge, Card, EmptyState, ErrorBanner, SkeletonTable } from '@/component
 
 interface Customer {
   id: string;
-  whatsappNumber: string;
+  whatsappNumber: string | null;
+  phoneVerified: boolean;
+  emailVerified: boolean;
   name: string | null;
   email: string | null;
   status: string;
@@ -71,7 +73,7 @@ export default function CustomersPage() {
             <tbody>
               {rows.map((c) => (
                 <tr key={c.id} className="border-b border-gray-100 last:border-0 transition-colors hover:bg-brand-50/40">
-                  <td className="px-4 py-3 font-mono text-xs">{c.whatsappNumber}</td>
+                  <td className="px-4 py-3 font-mono text-xs">{c.whatsappNumber ?? c.email ?? '—'}{c.whatsappNumber && !c.phoneVerified && <span className="ml-1 font-sans text-gray-400">(unverified)</span>}</td>
                   <td className="px-4 py-3">{c.name || '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{c.email || '—'}</td>
                   <td className="px-4 py-3">

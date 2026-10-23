@@ -518,7 +518,7 @@ export class BookingsService {
     }
     const lockRange = paddedRange(policy, startTime, endTime);
 
-    const customer = await this.customers.findOrCreateByWhatsAppNumber(dto.customerWhatsappNumber);
+    const customer = await this.customers.findOrCreateGuestByPhone(dto.customerWhatsappNumber);
     if (dto.customerName && !customer.name) {
       await this.customers.updateName(customer.id, dto.customerName);
     }
@@ -963,7 +963,8 @@ export class BookingsService {
     result: { booking: { orderId: string }; refund: { coinAmountCredited: Prisma.Decimal } | null },
   ): Promise<void> {
     const customer = await this.bookings.findCustomerById(customerId);
-    if (!customer) return;
+    // WhatsApp goes only to a number the customer has verified, never one that was merely typed in.
+    if (!customer?.whatsappNumber || !customer.phoneVerified) return;
     await this.messenger.bookingCancelled(
       customer.whatsappNumber,
       result.booking.orderId,

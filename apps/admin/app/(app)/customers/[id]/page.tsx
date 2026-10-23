@@ -27,7 +27,11 @@ import {
 
 interface CustomerDetail {
   id: string;
-  whatsappNumber: string;
+  whatsappNumber: string | null;
+  phoneVerified: boolean;
+  emailVerified: boolean;
+  hasPassword?: boolean;
+  googleSub?: string | null;
   name: string | null;
   email: string | null;
   status: string;
@@ -91,8 +95,8 @@ export default function CustomerDetailPage() {
     <div className="space-y-6">
       <PageHeader
         back={{ href: '/customers', label: 'Customers' }}
-        title={customer.name || customer.whatsappNumber}
-        subtitle={customer.name ? customer.whatsappNumber : undefined}
+        title={customer.name || customer.whatsappNumber || customer.email || 'Customer'}
+        subtitle={customer.name ? customer.whatsappNumber ?? customer.email ?? undefined : undefined}
         action={
           <StatusAction
             path={`/admin/customers/${customer.id}/status`}
@@ -150,10 +154,25 @@ export default function CustomerDetailPage() {
               <Detail label="Status">
                 <Badge value={customer.status} />
               </Detail>
-              <Detail label="WhatsApp number">
-                <span className="font-mono">{customer.whatsappNumber}</span>
+              <Detail label="Phone">
+                {customer.whatsappNumber ? (
+                  <>
+                    <span className="font-mono">{customer.whatsappNumber}</span>{' '}
+                    <span className="text-xs text-gray-500">{customer.phoneVerified ? 'Verified' : 'Not verified'}</span>
+                  </>
+                ) : (
+                  '—'
+                )}
               </Detail>
-              <Detail label="Email">{customer.email || '—'}</Detail>
+              <Detail label="Email">
+                {customer.email ? (
+                  <>
+                    {customer.email} <span className="text-xs text-gray-500">{customer.emailVerified ? 'Verified' : 'Not verified'}</span>
+                  </>
+                ) : (
+                  '—'
+                )}
+              </Detail>
               <Detail label="Joined">{dateTime(customer.createdAt)}</Detail>
               <Detail label="First booking">{date(customer.stats.firstBookedAt)}</Detail>
               <Detail label="Last active on web">{dateTime(customer.stats.lastSeenAt)}</Detail>

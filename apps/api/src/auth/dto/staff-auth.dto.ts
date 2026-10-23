@@ -11,6 +11,10 @@ export const staffLoginSchema = z.object({
 });
 export class StaffLoginDto extends createZodDto(staffLoginSchema) {}
 
+/** Google's signed ID token from the owner portal's "Continue with Google" button. */
+export const staffGoogleSchema = z.object({ credential: z.string().min(1).max(4000) });
+export class StaffGoogleDto extends createZodDto(staffGoogleSchema) {}
+
 export const forgotPasswordSchema = z.object({ email: z.string().email().max(254) });
 export class ForgotPasswordDto extends createZodDto(forgotPasswordSchema) {}
 

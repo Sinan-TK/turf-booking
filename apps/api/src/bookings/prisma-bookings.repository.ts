@@ -99,7 +99,7 @@ export class PrismaBookingsRepository implements BookingsRepository {
         resourceGroup: {
           select: { id: true, name: true, allocationMode: true, totalUnits: true },
         },
-        customer: { select: { id: true, whatsappNumber: true, name: true } },
+        customer: { select: { id: true, whatsappNumber: true, phoneVerified: true, email: true, name: true } },
         payments: true,
         refunds: true,
       },
@@ -137,6 +137,7 @@ export class PrismaBookingsRepository implements BookingsRepository {
             { orderId: contains(q) },
             { customer: { whatsappNumber: contains(q) } },
             { customer: { name: contains(q) } },
+            { customer: { email: contains(q) } },
             { venue: { name: contains(q) } },
             { venue: { facilityCode: contains(q) } },
           ]
@@ -154,7 +155,7 @@ export class PrismaBookingsRepository implements BookingsRepository {
       where: this.adminBookingWhere(filters),
       include: {
         venue: { select: { id: true, name: true, facilityCode: true, organizationId: true } },
-        customer: { select: { id: true, whatsappNumber: true, name: true } },
+        customer: { select: { id: true, whatsappNumber: true, phoneVerified: true, email: true, name: true } },
       },
       orderBy: [{ startTime: 'desc' }, { id: 'asc' }],
       take: limit,

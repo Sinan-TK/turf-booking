@@ -67,6 +67,7 @@ export class SupportService {
             { subject: contains(q) },
             { customer: { whatsappNumber: contains(q) } },
             { customer: { name: contains(q) } },
+            { customer: { email: contains(q) } },
             { booking: { orderId: contains(q) } },
           ]
         : undefined,
@@ -77,7 +78,7 @@ export class SupportService {
     const limit = Math.min(filters.limit ?? 50, 200);
     return this.prisma.client.supportTicket.findMany({
       where: this.adminTicketWhere(filters),
-      include: { customer: { select: { id: true, whatsappNumber: true, name: true } } },
+      include: { customer: { select: { id: true, whatsappNumber: true, phoneVerified: true, email: true, name: true } } },
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
       take: limit,
       skip: filters.offset ?? 0,
@@ -92,7 +93,7 @@ export class SupportService {
     const ticket = await this.prisma.client.supportTicket.findUnique({
       where: { id: ticketId },
       include: {
-        customer: { select: { id: true, whatsappNumber: true, name: true } },
+        customer: { select: { id: true, whatsappNumber: true, phoneVerified: true, email: true, name: true } },
         messages: { orderBy: { createdAt: 'asc' } },
       },
     });

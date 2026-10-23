@@ -21,7 +21,7 @@ export class BookingSessionsService {
 
   async start(whatsappNumber: string, source: BookingSessionSource) {
     const env = loadEnv();
-    const customer = await this.customers.findOrCreateByWhatsAppNumber(whatsappNumber);
+    const customer = await this.customers.findOrCreateGuestByPhone(whatsappNumber);
 
     const rawToken = generateSecureToken();
     const session = await this.prisma.client.bookingSession.create({

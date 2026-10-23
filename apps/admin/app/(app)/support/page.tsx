@@ -16,7 +16,7 @@ interface Ticket {
   status: string;
   priority: string;
   createdAt: string;
-  customer: { whatsappNumber: string; name: string | null };
+  customer: { whatsappNumber: string | null; phoneVerified: boolean; email: string | null; name: string | null };
 }
 
 const PRIORITY_OPTIONS = [
@@ -95,7 +95,7 @@ export default function SupportPage() {
                 <tr key={t.id} className="border-b border-gray-100 last:border-0 transition-colors hover:bg-brand-50/40">
                   <td className="px-4 py-3 font-medium text-gray-900">{t.subject}</td>
                   <td className="px-4 py-3 text-gray-600">{t.category}</td>
-                  <td className="px-4 py-3 text-gray-600">{t.customer.name || t.customer.whatsappNumber}</td>
+                  <td className="px-4 py-3 text-gray-600">{t.customer.name || t.customer.whatsappNumber || t.customer.email || 'Customer'}</td>
                   <td className="px-4 py-3">{t.priority}</td>
                   <td className="px-4 py-3">
                     <Badge value={t.status} />

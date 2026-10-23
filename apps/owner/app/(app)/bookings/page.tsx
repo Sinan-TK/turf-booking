@@ -28,7 +28,7 @@ interface Booking {
   groundType: string;
   paymentMethod: string | null;
   venue: { name: string; facilityCode: string };
-  customer: { whatsappNumber: string; name: string | null };
+  customer: { whatsappNumber: string | null; phoneVerified: boolean; email: string | null; name: string | null };
 }
 
 const STATUS_OPTIONS = [
@@ -112,7 +112,7 @@ export default function BookingsPage() {
                 <p className="font-medium text-on-surface">{b.venue.name}</p>
                 <p className="text-xs text-on-surface-variant">{b.groundType}</p>
               </td>
-              <td className="px-4 py-3 text-on-surface-variant">{b.customer.name || b.customer.whatsappNumber}</td>
+              <td className="px-4 py-3 text-on-surface-variant">{b.customer.name || b.customer.whatsappNumber || b.customer.email || 'Customer'}</td>
               <td className="whitespace-nowrap px-4 py-3 text-on-surface-variant">
                 {new Date(b.startTime).toLocaleString()}
               </td>

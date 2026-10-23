@@ -79,7 +79,7 @@ export class CoinsService {
     // BookingsService.cancel's — see the latter for the message-ordering
     // bug that pattern fixes.
     const customer = await this.coins.findCustomerById(actor.id);
-    if (customer) {
+    if (customer?.whatsappNumber && customer.phoneVerified) {
       await this.messenger
         .bookingConfirmed(customer.whatsappNumber, booking.orderId)
         .catch(() => undefined);

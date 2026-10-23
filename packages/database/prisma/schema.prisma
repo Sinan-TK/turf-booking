@@ -131,6 +131,8 @@ model VenueOwnerUser {
   organizationId String        @db.Uuid
   organization   OwnerOrganization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   email          String        @unique
+  /// Google account id, bound at the first Google sign-in (see StaffAuthService.googleLogin).
+  googleSub      String?       @unique
   name           String
   phone          String?
   role           OwnerUserRole @default(OWNER_STAFF)
@@ -177,9 +179,19 @@ enum CustomerStatus {
 
 model CustomerProfile {
   id               String    @id @default(uuid()) @db.Uuid
-  whatsappNumber   String    @unique
+  /// The customer's phone number. An identity only while `phoneVerified`: at most one profile can hold a
+  /// number verified (partial unique index in the migration); unverified numbers may repeat, and are cleared
+  /// from the other accounts when someone verifies the number (CustomersService.markPhoneVerified).
+  whatsappNumber   String?
+  phoneVerified    Boolean   @default(false)
   name             String?
+  /// Lower-case, unique across all accounts. `emailVerified` once Google (or a reset link) proved the mailbox.
   email            String?   @unique
+  emailVerified    Boolean   @default(false)
+  /// Google account id ("sub" claim), bound on first Google sign-in.
+  googleSub        String?   @unique
+  /// scrypt hash; null until the customer sets a password (Google-only customers have none).
+  passwordHash     String?
   profilePhotoUrl  String?
   defaultLat       Decimal?  @db.Decimal(9, 6)
   defaultLng       Decimal?  @db.Decimal(9, 6)
@@ -200,8 +212,24 @@ model CustomerProfile {
   coinWallet       CoinWallet?
   coinTransactions CoinTransaction[]
   notifications    Notification[]
+  authTokens       CustomerAuthToken[]
 
+  @@index([whatsappNumber])
   @@map("customer_profiles")
+}
+
+/// Single-use password-reset links for customers (only the sha256 of the token is stored).
+model CustomerAuthToken {
+  id         String          @id @default(uuid()) @db.Uuid
+  customerId String          @db.Uuid
+  customer   CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tokenHash  String          @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime        @default(now())
+
+  @@index([customerId])
+  @@map("customer_auth_tokens")
 }
 
 enum CustomerSessionSourceLinkType {

@@ -48,3 +48,20 @@ export async function plantLoginCode(phone: string, code = '123456'): Promise<vo
 export async function closeDatabase(): Promise<void> {
   if (db) await (await db).$disconnect();
 }
+
+/** Makes a known password-reset link token for the customer with this email (the API stores only its hash). */
+export async function plantResetToken(email: string): Promise<string> {
+  const { createHash, randomBytes } = await import('node:crypto');
+  const prisma = await database();
+  const customer = await prisma.customerProfile.findFirstOrThrow({ where: { email: email.toLowerCase() } });
+  const raw = randomBytes(32).toString('base64url');
+  await prisma.customerAuthToken.updateMany({ where: { customerId: customer.id, usedAt: null }, data: { usedAt: new Date() } });
+  await prisma.customerAuthToken.create({
+    data: {
+      customerId: customer.id,
+      tokenHash: createHash('sha256').update(raw).digest('hex'),
+      expiresAt: new Date(Date.now() + 3_600_000),
+    },
+  });
+  return raw;
+}

@@ -11,6 +11,8 @@ import { IdentityModule } from '../identity/identity.module';
 import { CustomersModule } from '../customers/customers.module';
 import { CustomerMessagingModule } from '../customer-messaging/customer-messaging.module';
 import { CustomerOtpService } from './customer-otp.service';
+import { CustomerPasswordService } from './customer-password.service';
+import { ConfiguredGoogleTokenVerifier, GOOGLE_TOKEN_VERIFIER } from './google-token-verifier';
 
 /**
  * @Global so AuthGuard/CustomerSessionService/IdentityService are
@@ -21,7 +23,15 @@ import { CustomerOtpService } from './customer-otp.service';
 @Module({
   imports: [IdentityModule, CustomersModule, CustomerMessagingModule],
   controllers: [AdminAuthController, OwnerAuthController, StaffAuthController, CustomerAuthController],
-  providers: [CustomerSessionService, CustomerOtpService, StaffAuthService, AuthGuard, RolesGuard],
-  exports: [CustomerSessionService, CustomerOtpService, AuthGuard, RolesGuard, IdentityModule],
+  providers: [
+    CustomerSessionService,
+    CustomerOtpService,
+    CustomerPasswordService,
+    StaffAuthService,
+    AuthGuard,
+    RolesGuard,
+    { provide: GOOGLE_TOKEN_VERIFIER, useClass: ConfiguredGoogleTokenVerifier },
+  ],
+  exports: [CustomerSessionService, CustomerOtpService, GOOGLE_TOKEN_VERIFIER, AuthGuard, RolesGuard, IdentityModule],
 })
 export class AuthModule {}

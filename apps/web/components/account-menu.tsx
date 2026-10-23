@@ -47,7 +47,7 @@ export function AccountMenu() {
     );
   }
 
-  const initial = (customer.name?.trim() || customer.phone.replace(/\D/g, '')).charAt(0).toUpperCase();
+  const initial = (customer.name?.trim() || customer.email || customer.phone?.replace(/\D/g, '') || '?').charAt(0).toUpperCase();
 
   return (
     <div ref={root} className="relative">
@@ -68,7 +68,7 @@ export function AccountMenu() {
         >
           <div className="border-b border-slate-100 px-4 py-2.5">
             <p className="truncate text-sm font-semibold text-slate-900">{customer.name ?? 'Your account'}</p>
-            <p className="truncate text-xs text-slate-500">{customer.phone}</p>
+            <p className="truncate text-xs text-slate-500">{customer.email ?? customer.phone}</p>
           </div>
           {ITEMS.map((item) => (
             <Link

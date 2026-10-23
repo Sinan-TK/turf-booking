@@ -11,6 +11,7 @@ import { Role } from '@venue/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { StaffTokenService } from '../identity/staff-token.service';
 import { IDENTITY_PROVIDER, type IdentityProvider } from '../identity/identity-provider.interface';
+import { GOOGLE_TOKEN_VERIFIER, type GoogleTokenVerifier } from './google-token-verifier';
 import type { AuthContext } from './auth.types';
 
 interface StaffRecord {
@@ -46,6 +47,7 @@ export class StaffAuthService {
     private readonly prisma: PrismaService,
     private readonly tokens: StaffTokenService,
     @Inject(IDENTITY_PROVIDER) private readonly identity: IdentityProvider,
+    @Inject(GOOGLE_TOKEN_VERIFIER) private readonly google: GoogleTokenVerifier,
   ) {}
 
   async login(portal: StaffPortal, email: string, password: string): Promise<StaffSession> {
@@ -58,6 +60,45 @@ export class StaffAuthService {
       throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
     return this.startSession(portal, user.ctx);
+  }
+
+  /**
+   * Owner-portal sign-in with Google. Google proves the email; the email must already belong to an invited,
+   * active owner or staff member, in an active organization. Nothing is ever created here. The first sign-in
+   * binds that user to the Google account (`googleSub`), so a recycled email address can't take the login over.
+   * Every refusal is the same 401.
+   */
+  async googleLoginOwner(credential: string): Promise<StaffSession> {
+    const identity = await this.google.verify(credential);
+    const refused = () =>
+      new UnauthorizedException(
+        `This Google account hasn't been invited to the owner portal. Ask your owner admin to invite ${identity.email}.`,
+      );
+    const row = await this.prisma.client.venueOwnerUser.findFirst({
+      where: { email: { equals: identity.email, mode: 'insensitive' } },
+      include: { organization: { select: { status: true } } },
+    });
+    if (!row || row.status !== 'ACTIVE' || row.organization.status !== 'ACTIVE') throw refused();
+    if (row.googleSub && row.googleSub !== identity.sub) throw refused();
+    if (!row.googleSub) {
+      try {
+        // Only the first sign-in binds; a concurrent one for another Google account loses.
+        const bound = await this.prisma.client.venueOwnerUser.updateMany({
+          where: { id: row.id, googleSub: null },
+          data: { googleSub: identity.sub },
+        });
+        if (bound.count === 0) {
+          const again = await this.prisma.client.venueOwnerUser.findUnique({ where: { id: row.id }, select: { googleSub: true } });
+          if (again?.googleSub !== identity.sub) throw refused();
+        }
+      } catch (error) {
+        if (error instanceof UnauthorizedException) throw error;
+        throw refused(); // the Google account is already bound to another owner login
+      }
+    }
+    const user = await this.load(StaffPortal.OWNER, { id: row.id });
+    if (!user || !user.active) throw refused();
+    return this.startSession(StaffPortal.OWNER, user.ctx);
   }
 
   async refresh(portal: StaffPortal, rawRefreshToken: string): Promise<StaffSession> {

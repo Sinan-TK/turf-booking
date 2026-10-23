@@ -12,7 +12,7 @@ import { createHmac, randomInt } from 'node:crypto';
 import { loadEnv } from '@venue/config';
 import { constantTimeEquals } from '@venue/shared';
 import { PrismaService } from '../prisma/prisma.service';
-import { CustomersService } from '../customers/customers.service';
+import { CustomersService, customerView } from '../customers/customers.service';
 import { CustomerSessionService } from './customer-session.service';
 import { CUSTOMER_MESSENGER, type CustomerMessenger } from '../customer-messaging/customer-messenger.port';
 import { normalizePhone } from '../common/phone';
@@ -129,7 +129,7 @@ export class CustomerOtpService {
     const { rawToken } = await this.sessions.createSession(customer.id, 'LOGIN');
     return {
       rawToken,
-      customer: { id: customer.id, name: customer.name, phone: customer.whatsappNumber },
+      customer: customerView(customer),
       needsName: !customer.name,
     };
   }

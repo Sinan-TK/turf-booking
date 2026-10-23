@@ -199,6 +199,7 @@ export class PrismaPaymentsRepository implements PaymentsRepository {
             { booking: { orderId: contains(q) } },
             { booking: { customer: { whatsappNumber: contains(q) } } },
             { booking: { customer: { name: contains(q) } } },
+            { booking: { customer: { email: contains(q) } } },
           ]
         : undefined,
     };
@@ -216,6 +217,7 @@ export class PrismaPaymentsRepository implements PaymentsRepository {
             { booking: { orderId: contains(q) } },
             { booking: { customer: { whatsappNumber: contains(q) } } },
             { booking: { customer: { name: contains(q) } } },
+            { booking: { customer: { email: contains(q) } } },
           ]
         : undefined,
     };

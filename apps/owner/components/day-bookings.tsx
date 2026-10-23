@@ -18,7 +18,7 @@ export interface DayBooking {
   groundType: string;
   paymentMethod: string | null;
   quantity?: number | null;
-  customer: { whatsappNumber: string; name: string | null };
+  customer: { whatsappNumber: string | null; phoneVerified: boolean; email: string | null; name: string | null };
 }
 
 /** Today as a YYYY-MM-DD string in the browser's own calendar (the venue's, as everywhere in this portal). */
@@ -129,7 +129,7 @@ export function DayBookings({ venueId, initialDate }: { venueId: string; initial
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-body-md font-medium text-on-surface">
-                    {b.customer.name || b.customer.whatsappNumber}
+                    {b.customer.name || b.customer.whatsappNumber || b.customer.email || 'Customer'}
                   </p>
                   <p className="font-mono text-xs text-on-surface-variant">{b.orderId}</p>
                 </div>

@@ -5,7 +5,8 @@ import { api, ApiError } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
 import { LoginGate } from '@/components/login-gate';
 import { Button, Card, ErrorBanner, FieldError, Icon, Input, Label, LoadingState, SuccessBanner, invalidClass } from '@/components/ui';
-import { nameError } from '@/lib/validation';
+import { emailError, nameError, newPasswordError, passwordError, phoneError } from '@/lib/validation';
+import { PasswordInput } from '@/components/password-input';
 import { Screen } from '@/components/screen';
 
 interface CoinWallet {
@@ -33,32 +34,67 @@ function labelFor(type: string): string {
   return TYPE_LABELS[type] ?? type.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
 }
 
+/** "Verified" / "Not verified", next to a phone number or an email. */
+function VerifiedChip({ verified, what }: { verified: boolean; what: string }) {
+  return (
+    <span
+      className={`ml-2 rounded-full px-2 py-0.5 align-middle text-[11px] font-semibold ${
+        verified ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'
+      }`}
+      aria-label={`${what} ${verified ? 'verified' : 'not verified'}`}
+    >
+      {verified ? 'Verified' : 'Not verified'}
+    </span>
+  );
+}
+
 function Profile() {
   const { customer, refresh } = useCustomer();
   const [name, setName] = useState(customer?.name ?? '');
+  const [phone, setPhone] = useState(customer?.phone ?? '');
+  const [email, setEmail] = useState(customer?.email ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [nameMsg, setNameMsg] = useState<string | undefined>();
+  const [msgs, setMsgs] = useState<Partial<Record<'name' | 'phone' | 'email', string>>>({});
+
+  // A verified phone or email is the customer's identity: shown, not editable.
+  const phoneLocked = !!customer?.phoneVerified;
+  const emailLocked = !!customer?.emailVerified;
+  const changed = {
+    name: name.trim() !== (customer?.name ?? ''),
+    phone: !phoneLocked && phone.trim() !== (customer?.phone ?? ''),
+    email: !emailLocked && email.trim().toLowerCase() !== (customer?.email ?? ''),
+  };
+  const dirty = changed.name || changed.phone || changed.email;
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     if (saving) return;
-    const problem = nameError(name);
-    setNameMsg(problem);
-    if (problem) {
-      document.getElementById('account-name')?.focus();
-      return;
-    }
+    const found = {
+      name: changed.name ? nameError(name) : undefined,
+      phone: changed.phone ? phoneError(phone) : undefined,
+      email: changed.email ? emailError(email) : undefined,
+    };
+    setMsgs(found);
+    const first = (['name', 'phone', 'email'] as const).find((k) => found[k]);
+    if (first) return void document.getElementById(`account-${first}`)?.focus();
     setSaving(true);
     setError(null);
     setSaved(false);
     try {
-      await api.patch('/customer-auth/me', { name: name.trim() });
+      await api.patch('/customer-auth/me', {
+        ...(changed.name ? { name: name.trim() } : {}),
+        ...(changed.phone ? { phone: phone.trim() } : {}),
+        ...(changed.email ? { email: email.trim() } : {}),
+      });
       await refresh();
       setSaved(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not save your name.');
+      const message = err instanceof ApiError ? err.message : 'Could not save your details.';
+      // A number or email that belongs to someone else is shown under its own field.
+      if (err instanceof ApiError && err.status === 409) setMsgs({ [/number/i.test(message) ? 'phone' : 'email']: message });
+      else setError(message);
     } finally {
       setSaving(false);
     }
@@ -80,22 +116,166 @@ function Profile() {
             id="account-name"
             maxLength={80}
             value={name}
-            aria-invalid={!!nameMsg}
-            aria-describedby={nameMsg ? 'account-name-error' : undefined}
-            className={nameMsg ? invalidClass : ''}
+            aria-invalid={!!msgs.name}
+            className={msgs.name ? invalidClass : ''}
             onChange={(e) => {
               setName(e.target.value);
-              setNameMsg(undefined);
+              setMsgs((m) => ({ ...m, name: undefined }));
             }}
           />
-          <FieldError id="account-name-error" message={nameMsg} />
+          <FieldError id="account-name-error" message={msgs.name} />
         </div>
         <div>
-          <Label>WhatsApp number</Label>
-          <Input readOnly value={customer?.phone ?? ''} className="bg-gray-50 text-gray-500" />
+          <Label htmlFor="account-email">
+            Email
+            {customer?.email && <VerifiedChip verified={emailLocked} what="Email" />}
+          </Label>
+          <Input
+            id="account-email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            readOnly={emailLocked}
+            value={email}
+            aria-invalid={!!msgs.email}
+            className={`${emailLocked ? 'bg-gray-50 text-gray-500' : ''} ${msgs.email ? invalidClass : ''}`}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setMsgs((m) => ({ ...m, email: undefined }));
+            }}
+          />
+          <FieldError id="account-email-error" message={msgs.email} />
+          {customer && !customer.email && <p className="mt-1 text-xs text-gray-500">Add an email so you can also sign in with it.</p>}
         </div>
-        <Button type="submit" disabled={saving || name.trim() === (customer?.name ?? '')}>
+        <div>
+          <Label htmlFor="account-phone">
+            Phone number
+            {customer?.phone && <VerifiedChip verified={phoneLocked} what="Phone number" />}
+          </Label>
+          <Input
+            id="account-phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            readOnly={phoneLocked}
+            value={phone}
+            placeholder="98765 43210"
+            aria-invalid={!!msgs.phone}
+            className={`${phoneLocked ? 'bg-gray-50 text-gray-500' : ''} ${msgs.phone ? invalidClass : ''}`}
+            onChange={(e) => {
+              setPhone(e.target.value);
+              setMsgs((m) => ({ ...m, phone: undefined }));
+            }}
+          />
+          <FieldError id="account-phone-error" message={msgs.phone} />
+          {customer?.phone && !phoneLocked && (
+            <p className="mt-1 text-xs text-gray-500">We don&apos;t check this number yet. Venues use it to reach you about your bookings.</p>
+          )}
+        </div>
+        <Button type="submit" disabled={saving || !dirty}>
           {saving ? 'Saving…' : 'Save'}
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
+/** Only for customers who have a password. Google-only customers set one through Forgot password on the sign-in screen. */
+function ChangePassword() {
+  const { refresh } = useCustomer();
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [msgs, setMsgs] = useState<Partial<Record<'current' | 'next' | 'confirm', string>>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (saving) return;
+    const found = {
+      current: passwordError(current),
+      next: newPasswordError(next),
+      confirm: next !== confirm ? 'The two passwords are not the same.' : undefined,
+    };
+    setMsgs(found);
+    const first = (['current', 'next', 'confirm'] as const).find((k) => found[k]);
+    if (first) return void document.getElementById(`password-${first}`)?.focus();
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      await api.post('/customer-auth/change-password', { currentPassword: current, newPassword: next });
+      setCurrent('');
+      setNext('');
+      setConfirm('');
+      setSaved(true);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not change your password.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card className="mb-4">
+      <h2 className="mb-3 text-sm font-semibold text-gray-900">Change password</h2>
+      <form onSubmit={onSubmit} noValidate className="space-y-3">
+        {error && (
+          <div role="alert">
+            <ErrorBanner message={error} />
+          </div>
+        )}
+        {saved && <SuccessBanner message="Password changed. Other devices have been signed out." />}
+        <div>
+          <Label htmlFor="password-current">Current password</Label>
+          <PasswordInput
+            id="password-current"
+            autoComplete="current-password"
+            value={current}
+            aria-invalid={!!msgs.current}
+            className={msgs.current ? invalidClass : ''}
+            onChange={(e) => {
+              setCurrent(e.target.value);
+              setMsgs((m) => ({ ...m, current: undefined }));
+            }}
+          />
+          <FieldError id="password-current-error" message={msgs.current} />
+        </div>
+        <div>
+          <Label htmlFor="password-next">New password</Label>
+          <PasswordInput
+            id="password-next"
+            autoComplete="new-password"
+            value={next}
+            aria-invalid={!!msgs.next}
+            className={msgs.next ? invalidClass : ''}
+            onChange={(e) => {
+              setNext(e.target.value);
+              setMsgs((m) => ({ ...m, next: undefined }));
+            }}
+          />
+          <FieldError id="password-next-error" message={msgs.next} />
+        </div>
+        <div>
+          <Label htmlFor="password-confirm">Repeat the new password</Label>
+          <PasswordInput
+            id="password-confirm"
+            autoComplete="new-password"
+            value={confirm}
+            aria-invalid={!!msgs.confirm}
+            className={msgs.confirm ? invalidClass : ''}
+            onChange={(e) => {
+              setConfirm(e.target.value);
+              setMsgs((m) => ({ ...m, confirm: undefined }));
+            }}
+          />
+          <FieldError id="password-confirm-error" message={msgs.confirm} />
+        </div>
+        <Button type="submit" disabled={saving}>
+          {saving ? 'Saving…' : 'Change password'}
         </Button>
       </form>
     </Card>
@@ -158,6 +338,17 @@ function Wallet() {
   );
 }
 
+/** Profile, and a Change password card only for customers who have a password (Google-only customers have none). */
+function ProfileSections() {
+  const { customer } = useCustomer();
+  return (
+    <>
+      <Profile />
+      {customer?.hasPassword && <ChangePassword />}
+    </>
+  );
+}
+
 export default function AccountPage() {
   return (
     <Screen>
@@ -166,7 +357,7 @@ export default function AccountPage() {
         My account
       </h1>
       <LoginGate message="Log in to see your account.">
-        <Profile />
+        <ProfileSections />
         <Wallet />
       </LoginGate>
     </Screen>

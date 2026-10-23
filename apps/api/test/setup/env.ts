@@ -21,3 +21,7 @@ if (existsSync(testEnv)) loadDotenv({ path: testEnv, override: true });
 // for the secure-cookie check in auth.constants.ts (anything !==
 // "production") — this is what the test suite actually is.
 process.env.NODE_ENV = 'test';
+
+// Customer and owner Google sign-in run against the fake verifier (accepts test:<email>|<name>|<sub> tokens);
+// the real one is covered by google-verifier.e2e-spec.ts with a stubbed Google client.
+process.env.GOOGLE_AUTH_MODE = 'fake';

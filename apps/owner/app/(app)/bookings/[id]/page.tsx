@@ -39,7 +39,7 @@ interface BookingDetail {
   cancellationReasonCode: string | null;
   cancellationNote: string | null;
   venue: { name: string; facilityCode: string };
-  customer: { whatsappNumber: string; name: string | null };
+  customer: { whatsappNumber: string | null; phoneVerified: boolean; email: string | null; name: string | null };
   payments: Payment[];
   refunds: Refund[];
 }
@@ -114,7 +114,16 @@ export default function BookingDetailPage() {
           </div>
           <div>
             <dt className="text-on-surface-variant">Customer</dt>
-            <dd>{booking.customer.name || booking.customer.whatsappNumber}</dd>
+            <dd>
+              {booking.customer.name || booking.customer.whatsappNumber || booking.customer.email || 'Customer'}
+              {booking.customer.name && booking.customer.whatsappNumber && (
+                <span className="block text-xs text-on-surface-variant">
+                  {booking.customer.whatsappNumber}
+                  {!booking.customer.phoneVerified && ' (number not verified)'}
+                </span>
+              )}
+              {booking.customer.email && <span className="block text-xs text-on-surface-variant">{booking.customer.email}</span>}
+            </dd>
           </div>
           <div>
             <dt className="text-on-surface-variant">Time</dt>

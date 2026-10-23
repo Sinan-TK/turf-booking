@@ -19,7 +19,7 @@ export type BookingDetail = Prisma.BookingGetPayload<{
   include: {
     venue: { select: { id: true; name: true; facilityCode: true; organizationId: true } };
     resourceGroup: { select: { id: true; name: true; allocationMode: true; totalUnits: true } };
-    customer: { select: { id: true; whatsappNumber: true; name: true } };
+    customer: { select: { id: true; whatsappNumber: true; phoneVerified: true; email: true; name: true } };
     payments: true;
     refunds: true;
   };
@@ -38,7 +38,7 @@ export type BookingCheckoutView = Prisma.BookingGetPayload<{
 export type BookingListItem = Prisma.BookingGetPayload<{
   include: {
     venue: { select: { id: true; name: true; facilityCode: true; organizationId: true } };
-    customer: { select: { id: true; whatsappNumber: true; name: true } };
+    customer: { select: { id: true; whatsappNumber: true; phoneVerified: true; email: true; name: true } };
   };
 }>;
 

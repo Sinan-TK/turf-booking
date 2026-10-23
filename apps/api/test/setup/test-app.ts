@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import { randomUUID } from 'node:crypto';
+import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module';
 import { RazorpayProvider } from '../../src/payments/razorpay.provider';
 import { PAYMENT_PROVIDER } from '../../src/payments/payment-provider.interface';
@@ -14,8 +15,14 @@ import {
 export class FakeCustomerMessenger implements CustomerMessenger {
   codes: Array<{ phone: string; code: string }> = [];
   failNext = false;
-  async bookingConfirmed() {}
-  async bookingCancelled() {}
+  confirmed: Array<{ phone: string; orderId: string }> = [];
+  cancelled: Array<{ phone: string; orderId: string }> = [];
+  async bookingConfirmed(phone: string, orderId: string) {
+    this.confirmed.push({ phone, orderId });
+  }
+  async bookingCancelled(phone: string, orderId: string) {
+    this.cancelled.push({ phone, orderId });
+  }
   async loginCode(phone: string, code: string) {
     if (this.failNext) {
       this.failNext = false;
@@ -53,15 +60,25 @@ if (!(BigInt.prototype as any).toJSON) {
   };
 }
 
-export async function createTestApp(): Promise<INestApplication> {
-  const moduleFixture = await Test.createTestingModule({ imports: [AppModule] })
+/**
+ * `throttle: false` switches the rate limiter off, for specs that must call one endpoint more often than its
+ * per-minute limit allows (the limits themselves are covered where they are the point, e.g. customer-auth).
+ */
+export async function createTestApp(options: { throttle?: boolean } = {}): Promise<INestApplication> {
+  let builder = Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(RazorpayProvider)
     .useClass(FakeRazorpayProvider)
     .overrideProvider(PAYMENT_PROVIDER)
     .useClass(FakeRazorpayProvider)
     .overrideProvider(CUSTOMER_MESSENGER)
-    .useValue(new FakeCustomerMessenger())
-    .compile();
+    .useValue(new FakeCustomerMessenger());
+  if (options.throttle === false) {
+    // Every request counts as the first one in its window, so no limit is ever reached.
+    builder = builder.overrideProvider(ThrottlerStorage).useValue({
+      increment: async () => ({ totalHits: 1, timeToExpire: 60, isBlocked: false, timeToBlockExpire: 0 }),
+    });
+  }
+  const moduleFixture = await builder.compile();
 
   const app = moduleFixture.createNestApplication({ rawBody: true });
   app.use(cookieParser());

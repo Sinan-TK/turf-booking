@@ -1,6 +1,5 @@
 import { request } from '@playwright/test';
-import { logIn, searchNear, settled, shareLocation } from '../../support/customer-ui';
-import { uniquePhone } from '../../support/dates';
+import { searchNear, settled, shareLocation } from '../../support/customer-ui';
 import { URLS } from '../../support/env';
 import { expect, test } from '../../support/fixtures';
 
@@ -87,48 +86,5 @@ test.describe('customer site: finding a venue', () => {
     await expect(page.locator('article')).toHaveCount(0);
     await page.getByPlaceholder('Search venues, names or areas...').fill(remoteVenue.name);
     await expect(page.locator('article').filter({ hasText: remoteVenue.name }).first()).toBeVisible();
-  });
-});
-
-test.describe('customer site: logging in', () => {
-  test('the code dialog validates, refuses a wrong code, and a right code logs in and asks for a name', async ({ page }) => {
-    const phone = uniquePhone();
-    await page.goto('/');
-    await page.getByRole('button', { name: 'Log in' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Log in to book' });
-    const send = dialog.getByRole('button', { name: 'Send code' });
-    await expect(send).toBeEnabled();
-    await send.click(); // no number yet: the field says so
-    await expect(dialog.getByText('Enter your WhatsApp number.')).toBeVisible();
-    await dialog.getByPlaceholder('98765 43210').fill('12345');
-    await expect(dialog.getByText('Enter your WhatsApp number.')).toHaveCount(0);
-    await send.click();
-    await expect(dialog.getByText('Enter the full 10-digit number.')).toBeVisible();
-    await dialog.getByPlaceholder('98765 43210').fill(phone.slice(3));
-    await send.click();
-
-    const code = page.getByPlaceholder('000000');
-    await expect(code).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Change number' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Resend in \d+s/ })).toBeDisabled();
-
-    // An incomplete code is flagged on the field; a wrong one is refused by the server.
-    await code.fill('123');
-    await page.getByRole('button', { name: 'Verify and continue' }).click();
-    await expect(page.getByText('The code is 6 digits.')).toBeVisible();
-    await code.fill('000000');
-    await expect(page.getByText('The code is 6 digits.')).toHaveCount(0);
-    await page.getByRole('button', { name: 'Verify and continue' }).click();
-    await expect(page.getByText(/Invalid or expired code/i)).toBeVisible();
-
-    // Then the full login, ending signed in.
-    // (A new number for the full login: a number can only be sent a code every 30 seconds.)
-    const phone2 = uniquePhone();
-    await page.reload();
-    await logIn(page, phone2, 'PW Login Test');
-    await page.goto('/account');
-    await expect(page.getByRole('heading', { name: 'My account' })).toBeVisible();
-    await expect(page.getByRole('textbox').nth(0)).toHaveValue('PW Login Test');
-    await expect(page.getByRole('textbox').nth(1)).toHaveValue(phone2);
   });
 });

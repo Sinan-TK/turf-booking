@@ -1,5 +1,4 @@
 import { expect, type BrowserContext, type Page } from '@playwright/test';
-import { plantLoginCode } from './customer';
 
 /** Points the browser's location at a spot, so the site's "Use my current location" finds venues there. */
 export async function shareLocation(context: BrowserContext, lat: number, lng: number): Promise<void> {
@@ -21,20 +20,23 @@ export async function settled(page: Page): Promise<void> {
   await expect(page.getByText('Checking live availability…')).toHaveCount(0, { timeout: 60_000 });
 }
 
-/** Logs in through the real dialog: phone, a planted one-time code (see support/customer.ts), then the name step. */
+/**
+ * Logs in through the real dialog using the test Google sign-in (the apps run with NEXT_PUBLIC_GOOGLE_AUTH_MODE=fake and
+ * the API with GOOGLE_AUTH_MODE=fake), then the profile step: name and phone. The email is derived from the phone, so a
+ * given phone always signs in as the same customer.
+ */
 export async function logIn(page: Page, phone: string, name = 'PW Customer'): Promise<void> {
   await page.getByRole('button', { name: 'Log in' }).click();
-  await page.getByPlaceholder('98765 43210').fill(phone.slice(3)); // national number, without +91
-  await page.getByRole('button', { name: 'Send code' }).click();
-  const code = page.getByPlaceholder('000000');
-  await expect(code).toBeVisible();
-  await plantLoginCode(phone);
-  await code.fill('123456');
-  await page.getByRole('button', { name: 'Verify and continue' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Test Google email').fill(`pw${phone.replace(/\D/g, '')}@example.com`);
+  await dialog.getByLabel('Test Google name').fill(name);
+  await dialog.getByRole('button', { name: 'Continue with Google (test)' }).click();
 
-  const nameDialog = page.getByRole('dialog', { name: 'What should we call you?' });
-  await expect(nameDialog).toBeVisible();
-  await nameDialog.getByRole('textbox').fill(name);
-  await nameDialog.getByRole('button', { name: 'Continue' }).click();
+  const nameField = dialog.getByLabel('Your name');
+  await expect(nameField).toBeVisible();
+  await nameField.fill(name);
+  const phoneField = dialog.getByLabel('Phone number');
+  if (await phoneField.isVisible()) await phoneField.fill(phone.slice(3)); // national number, without +91
+  await dialog.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 }

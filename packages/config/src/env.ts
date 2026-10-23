@@ -60,6 +60,12 @@ const envSchema = z.object({
   // the code is sent as a plain text message.
   WHATSAPP_OTP_TEMPLATE: optionalString(z.string().min(1)),
 
+  // Google sign-in (customers and owner-portal users): the OAuth web client ID the browser button uses. The API
+  // verifies Google's signed ID token against it. Unset = Google sign-in answers 503.
+  GOOGLE_CLIENT_ID: optionalString(z.string().min(1)),
+  // 'fake' accepts test:<email>|<name>|<sub> tokens, for tests and local development only.
+  GOOGLE_AUTH_MODE: z.enum(['google', 'fake']).default('google'),
+
   // BookingSession / SlotHold durations (minutes) — configurable, not hardcoded
   BOOKING_SESSION_TTL_MINUTES: z.coerce.number().int().positive().default(20),
   SLOT_HOLD_TTL_MINUTES: z.coerce.number().int().positive().default(10),
@@ -119,6 +125,14 @@ const productionChecks = envSchema.superRefine((env, ctx) => {
       code: z.ZodIssueCode.custom,
       path: ['AUTH_OTP_DELIVERY'],
       message: 'log is development only; use whatsapp in production',
+    });
+  }
+
+  if (env.GOOGLE_AUTH_MODE === 'fake') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['GOOGLE_AUTH_MODE'],
+      message: 'fake accepts unsigned test tokens and is development only; use google in production',
     });
   }
 

@@ -21,7 +21,7 @@ interface RecentBooking {
   currency: string;
   startTime: string;
   venue: { name: string };
-  customer: { whatsappNumber: string; name: string | null };
+  customer: { whatsappNumber: string | null; phoneVerified: boolean; email: string | null; name: string | null };
 }
 
 const CARDS: Array<{
@@ -106,7 +106,7 @@ function OwnerAdminDashboard() {
                     >
                       <div className="min-w-0">
                         <p className="truncate text-body-md font-medium text-on-surface">
-                          {b.customer.name || b.customer.whatsappNumber}
+                          {b.customer.name || b.customer.whatsappNumber || b.customer.email || 'Customer'}
                           <span className="font-normal text-on-surface-variant"> · {b.venue.name}</span>
                         </p>
                         <p className="text-xs text-on-surface-variant">

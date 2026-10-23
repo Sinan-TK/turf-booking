@@ -7,7 +7,15 @@ import { LoginDialog } from '@/components/login-dialog';
 export interface Customer {
   id: string;
   name: string | null;
-  phone: string;
+  /** null until the customer adds one (Google and email accounts); a verified number is their identity. */
+  phone: string | null;
+  email: string | null;
+  phoneVerified: boolean;
+  emailVerified: boolean;
+  /** Google-only customers have none: they set one through Forgot password. */
+  hasPassword: boolean;
+  /** Still missing a name or a phone number, which a booking needs. */
+  needsProfile: boolean;
 }
 
 interface CustomerContextValue {
@@ -34,6 +42,8 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  // Set when someone already signed in is asked for what their profile is missing (e.g. a phone number).
+  const [completing, setCompleting] = useState<Customer | null>(null);
   const pending = useRef<Pending | null>(null);
   const customerRef = useRef<Customer | null>(null);
   const initial = useRef<Promise<void> | null>(null);
@@ -60,8 +70,12 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
 
   const requireLogin = useCallback(async (): Promise<Customer> => {
     await initial.current;
-    if (customerRef.current) return customerRef.current;
+    const current = customerRef.current;
+    // Signed in and complete: nothing to ask. Signed in without a phone number (a new Google or email
+    // account, or one whose number was verified on another account): ask for it now, before booking.
+    if (current && !current.needsProfile) return current;
     if (pending.current) return pending.current.promise;
+    setCompleting(current);
 
     let resolve!: (c: Customer) => void;
     let reject!: (e: Error) => void;
@@ -86,7 +100,21 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     (c: Customer) => {
       apply(c);
       setDialogOpen(false);
+      setCompleting(null);
       pending.current?.resolve(c);
+      pending.current = null;
+    },
+    [apply],
+  );
+
+  // Signed in (the session cookie exists) but the profile step was closed: they are logged in, yet whatever
+  // asked for the login is not continued, because it needs the missing details.
+  const onIncomplete = useCallback(
+    (c: Customer) => {
+      apply(c);
+      setDialogOpen(false);
+      setCompleting(null);
+      pending.current?.reject(new Error(DISMISSED));
       pending.current = null;
     },
     [apply],
@@ -94,6 +122,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
 
   const onDismiss = useCallback(() => {
     setDialogOpen(false);
+    setCompleting(null);
     pending.current?.reject(new Error(DISMISSED));
     pending.current = null;
   }, []);
@@ -106,7 +135,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   return (
     <CustomerContext.Provider value={value}>
       {children}
-      {dialogOpen && <LoginDialog onLoggedIn={onLoggedIn} onDismiss={onDismiss} />}
+      {dialogOpen && <LoginDialog customer={completing} onLoggedIn={onLoggedIn} onIncomplete={onIncomplete} onDismiss={onDismiss} />}
     </CustomerContext.Provider>
   );
 }

@@ -15,6 +15,6 @@ import { LocalIdentityAdapter } from './local-identity.adapter';
     LocalIdentityAdapter,
     { provide: IDENTITY_PROVIDER, useExisting: LocalIdentityAdapter },
   ],
-  exports: [IdentityService, StaffTokenService, IDENTITY_PROVIDER],
+  exports: [IdentityService, StaffTokenService, MailService, IDENTITY_PROVIDER],
 })
 export class IdentityModule {}

@@ -32,7 +32,7 @@ interface Ticket {
   category: string;
   status: string;
   priority: string;
-  customer: { whatsappNumber: string; name: string | null };
+  customer: { whatsappNumber: string | null; phoneVerified: boolean; email: string | null; name: string | null };
   messages: Message[];
 }
 
@@ -132,7 +132,7 @@ export default function SupportTicketDetailPage() {
         <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-gray-500">Customer</dt>
-            <dd>{ticket.customer.name || ticket.customer.whatsappNumber}</dd>
+            <dd>{ticket.customer.name || ticket.customer.whatsappNumber || ticket.customer.email || 'Customer'}</dd>
           </div>
           <div>
             <dt className="text-gray-500">Category</dt>

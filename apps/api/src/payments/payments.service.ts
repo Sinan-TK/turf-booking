@@ -278,7 +278,8 @@ export class PaymentsService {
 
   private async notifyBookingConfirmed(customerId: string, orderId: string): Promise<void> {
     const customer = await this.payments.findCustomerById(customerId);
-    if (!customer) return;
+    // WhatsApp goes only to a number the customer has verified, never one that was merely typed in.
+    if (!customer?.whatsappNumber || !customer.phoneVerified) return;
     await this.messenger.bookingConfirmed(customer.whatsappNumber, orderId);
   }
 
