@@ -1,5 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { googleMapsUrlProblem, optionalGoogleMapsUrlSchema } from '@venue/shared';
 
 export const createVenueSchema = z.object({
   name: z.string().min(1).max(150),
@@ -9,6 +10,7 @@ export const createVenueSchema = z.object({
   address: z.string().min(1).max(300),
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
+  googleMapsUrl: optionalGoogleMapsUrlSchema,
   // No timezone or facility here: the timezone comes from the district, and
   // the facilities (football turf, pool...) are the categories of the units
   // added under the venue.
@@ -29,6 +31,11 @@ export const updateVenueSchema = z.object({
   address: z.string().min(1).max(300).optional(),
   lat: z.number().min(-90).max(90).optional(),
   lng: z.number().min(-180).max(180).optional(),
+  // undefined = leave as is; empty or null = remove the link.
+  googleMapsUrl: z.string().nullable().optional().transform((v) => (v === undefined ? undefined : v === null || v.trim() === '' ? null : v.trim())).superRefine((v, ctx) => {
+    const problem = v ? googleMapsUrlProblem(v) : undefined;
+    if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem });
+  }),
   status: z.enum(['DRAFT', 'ACTIVE', 'INACTIVE', 'SUSPENDED']).optional(),
 });
 export class UpdateVenueDto extends createZodDto(updateVenueSchema) {}

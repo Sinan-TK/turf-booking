@@ -15,12 +15,19 @@ interface WorkerFixtures {
   makeVenue: () => Promise<PwVenue>;
   /** A venue at its own coordinates far from every other venue, so a location-based customer search sees only it. */
   remoteVenue: PwVenue;
+  /** Venues in two Malappuram towns about 25 km apart (Manjeri and Nilambur), the second with its own Google Maps link. */
+  manjeriVenue: PwVenue;
+  nilamburVenue: PwVenue;
 }
+
+export const NILAMBUR_MAPS_LINK = 'https://maps.app.goo.gl/PwNilamburLink1';
 
 /** A random spot in the open sea west of India, where no real or test venue sits (a radius search there sees only this venue). */
 const remoteSpot = () => ({ lat: 8 + Math.random() * 10, lng: 60 + Math.random() * 10 });
 
-async function newVenue(where?: { lat: number; lng: number }): Promise<PwVenue> {
+type Where = { lat?: number; lng?: number; district?: string; town?: string; googleMapsUrl?: string };
+
+async function newVenue(where?: Where): Promise<PwVenue> {
   await ensureFreshSession('owner');
   await ensureFreshSession('admin');
   const [owner, admin] = [await apiAs('owner'), await apiAs('admin')];
@@ -54,6 +61,12 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   },
   venue: [async ({}, use) => use(await newVenue()), { scope: 'worker' }],
   remoteVenue: [async ({}, use) => use(await newVenue(remoteSpot())), { scope: 'worker' }],
+  manjeriVenue: [async ({}, use) => use(await newVenue({ district: 'Malappuram', town: 'Manjeri', lat: 11.121, lng: 76.121 })), { scope: 'worker' }],
+  nilamburVenue: [
+    async ({}, use) =>
+      use(await newVenue({ district: 'Malappuram', town: 'Nilambur', lat: 11.277, lng: 76.224, googleMapsUrl: NILAMBUR_MAPS_LINK })),
+    { scope: 'worker' },
+  ],
   makeVenue: [async ({}, use) => use(() => newVenue()), { scope: 'worker' }],
 });
 

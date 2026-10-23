@@ -8,6 +8,7 @@ import { api, ApiError } from '@/lib/api';
 import type { VenueCategory, VenueCategorySummary } from '@/lib/categories';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SvgIcon } from '@/components/svg-icons';
+import { VenueMapLink } from '@/components/venue-map-link';
 import {
   Badge,
   Button,
@@ -28,6 +29,7 @@ interface Venue {
   name: string;
   description: string | null;
   address: string;
+  googleMapsUrl: string | null;
   status: string;
   timezone: string;
   defaultSlotGranularityMinutes: number;
@@ -187,6 +189,8 @@ export default function VenueDetailPage() {
           </Link>
         </div>
       </section>
+
+      <VenueMapLink venueId={venue.id} link={venue.googleMapsUrl} onSaved={() => refetch()} />
 
       <div className="grid grid-cols-2 gap-card-gap lg:grid-cols-4">
         <Stat label="Facilities" value={venue.facilities.length} />

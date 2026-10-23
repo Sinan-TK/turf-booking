@@ -24,6 +24,20 @@ const KERALA_DISTRICTS: Array<{ name: string; code: string }> = [
   { name: 'Wayanad', code: 'WYD' },
 ];
 
+// Town centres, the same values as migration 20261024000000_area_coordinates_venue_maps_link.
+const MALAPPURAM_TOWNS: Array<{ name: string; lat: number; lng: number }> = [
+  { name: 'Kottakkal', lat: 11.001, lng: 76.001 },
+  { name: 'Manjeri', lat: 11.121, lng: 76.121 },
+  { name: 'Perinthalmanna', lat: 10.978, lng: 76.226 },
+  { name: 'Tirur', lat: 10.917, lng: 75.926 },
+  { name: 'Ponnani', lat: 10.767, lng: 75.926 },
+  { name: 'Kondotty', lat: 11.146, lng: 75.961 },
+  { name: 'Tanur', lat: 10.975, lng: 75.87 },
+  { name: 'Nilambur', lat: 11.277, lng: 76.224 },
+  { name: 'Valanchery', lat: 10.895, lng: 76.072 },
+  { name: 'Edappal', lat: 10.786, lng: 76.01 },
+];
+
 /**
  * Bootstrap reference data every environment needs before the platform
  * is usable: India/Kerala + its districts (with Facility Code sequences
@@ -65,6 +79,19 @@ async function main() {
     });
   }
   console.log(`Seeded ${KERALA_DISTRICTS.length} Kerala districts under ${kerala.code}.`);
+
+  // The customer site opens on Malappuram: its towns (with their centres) are reference data too.
+  const malappuram = await prisma.district.findUniqueOrThrow({
+    where: { stateId_code: { stateId: kerala.id, code: 'MPM' } },
+  });
+  for (const t of MALAPPURAM_TOWNS) {
+    await prisma.area.upsert({
+      where: { districtId_name: { districtId: malappuram.id, name: t.name } },
+      update: {},
+      create: { districtId: malappuram.id, name: t.name, lat: t.lat, lng: t.lng },
+    });
+  }
+  console.log(`Seeded ${MALAPPURAM_TOWNS.length} Malappuram towns.`);
 
   const cancellationPolicy = await prisma.cancellationPolicy.upsert({
     where: { id: '00000000-0000-0000-0000-000000000001' },

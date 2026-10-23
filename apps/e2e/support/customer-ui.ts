@@ -10,8 +10,8 @@ export async function shareLocation(context: BrowserContext, lat: number, lng: n
 /** Opens the location picker and uses the browser's (faked) location. */
 export async function searchNear(page: Page, venueName: string): Promise<void> {
   await page.goto('/');
-  await page.getByRole('button', { name: /Select Location/ }).click();
-  await page.getByRole('button', { name: 'Use my current location' }).click();
+  await page.getByRole('button', { name: /Change location/ }).click();
+  await page.getByRole('dialog', { name: 'Choose your location' }).getByRole('button', { name: 'Use my current location' }).click();
   await expect(page.getByRole('heading', { name: venueName }).first()).toBeVisible({ timeout: 30_000 });
   await settled(page);
 }

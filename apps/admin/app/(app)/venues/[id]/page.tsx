@@ -21,6 +21,7 @@ import {
 } from '@/components/ui';
 import { hasErrors, textError, type FieldErrors } from '@/lib/validation';
 import { VenueTermsSection } from '@/components/venue-terms-section';
+import { VenueMapLink } from '@/components/venue-map-link';
 
 interface Venue {
   id: string;
@@ -28,6 +29,7 @@ interface Venue {
   name: string;
   description: string | null;
   address: string;
+  googleMapsUrl: string | null;
   status: string;
   timezone: string;
   organizationId: string;
@@ -469,6 +471,8 @@ export default function VenueDetailPage() {
           </form>
         )}
       </Card>
+
+      <VenueMapLink venueId={venue.id} link={venue.googleMapsUrl} onSaved={(googleMapsUrl) => mutate((v) => (v ? { ...v, googleMapsUrl } : v))} />
 
       <VenueTermsSection venueId={id} />
     </div>

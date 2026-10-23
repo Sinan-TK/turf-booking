@@ -155,6 +155,7 @@ export class AvailabilityService {
             photoUrl: venue.photos[0]?.url ?? null,
             lat: Number(venue.lat),
             lng: Number(venue.lng),
+            googleMapsUrl: venue.googleMapsUrl,
           },
           category: resource.category,
           resource: { id: resource.id, name: resource.name, groundType: resource.groundType },

@@ -4,20 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { DISMISSED, useCustomer } from '@/lib/customer';
-import { ErrorBanner, Icon, LoadingState, Select } from '@/components/ui';
+import { ErrorBanner, Icon, LoadingState } from '@/components/ui';
 import { AccountMenu } from '@/components/account-menu';
+import { LocationPicker } from '@/components/location-picker';
+import { headerLines, locationParams, useLocationChoice } from '@/lib/location';
 import { durationLabel, shortDuration, type VenueCategory } from '@/lib/categories';
 
-interface StateOption {
-  id: string;
-  name: string;
-}
-interface District {
-  id: string;
-  name: string;
-}
 interface SearchResult {
-  venue: { id: string; name: string; facilityCode: string; address: string; photoUrl: string | null; lat: number; lng: number };
+  venue: { id: string; name: string; facilityCode: string; address: string; photoUrl: string | null; lat: number; lng: number; googleMapsUrl?: string | null };
   resource: { id: string; name: string; groundType: string };
   category?: { slug: string; name: string; iconKey: string; unitLabel: string; venueLabel: string };
   distanceKm?: number;
@@ -165,14 +159,17 @@ function formatPrice(price: { amount: string; currency: string }): string {
   return symbol ? `${symbol}${value}` : `${price.currency} ${value}`;
 }
 
-/** Google Maps directions/search link for a venue — precise pin when
- * coordinates exist, address-text search otherwise. */
-function googleMapsLink(venue: { lat?: number; lng?: number; name: string; address: string }): string {
-  const query =
-    venue.lat !== undefined && venue.lng !== undefined
-      ? `${venue.lat},${venue.lng}`
-      : `${venue.name}, ${venue.address}`;
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+/**
+ * Where a venue's Directions button goes: the Google Maps link the venue saved, otherwise a route to its map
+ * pin (opens directions from wherever the customer is). Only a venue with no coordinates falls back to a search
+ * by name and address.
+ */
+function googleMapsLink(venue: { googleMapsUrl?: string | null; lat?: number; lng?: number; name: string; address: string }): string {
+  if (venue.googleMapsUrl) return venue.googleMapsUrl;
+  if (venue.lat !== undefined && venue.lng !== undefined) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`;
+  }
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${venue.name}, ${venue.address}`)}`;
 }
 
 /** Next 7 calendar days (today first), for the 1-tap date strip. */
@@ -225,35 +222,20 @@ function useBookSlot(resourceId: string, durationMinutes: number) {
 }
 
 export default function HomePage() {
-  const [states, setStates] = useState<StateOption[]>([]);
-  const [districts, setDistricts] = useState<District[]>([]);
-  const [stateId, setStateId] = useState('');
-
-  const [locationMode, setLocationMode] = useState<'district' | 'geo'>('district');
-  const [geo, setGeo] = useState<{ lat: number; lng: number } | null>(null);
-  const [geoError, setGeoError] = useState<string | null>(null);
-  const [locating, setLocating] = useState(false);
-  const [locationModalOpen, setLocationModalOpen] = useState(false);
+  // Where to search: the saved choice, otherwise Malappuram. Nothing is searched until that is known.
+  const { choice, setChoice, ready } = useLocationChoice();
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const [form, setForm] = useState({
-    districtId: '',
     categorySlug: '',
     groundType: '',
     date: todayIso(),
     timeWindow: 'ALL',
     durationMinutes: 60,
   });
-  const [districtName, setDistrictName] = useState('');
-  // Granular reverse-geocoded place names for the header: town (or
-  // suburb) and city, plus the raw state name when it matches nothing
-  // seeded (e.g. outside Kerala). districtName stays the district-level
-  // label used for searching and headings.
-  const [townName, setTownName] = useState('');
-  const [cityName, setCityName] = useState('');
-  const [fallbackStateName, setFallbackStateName] = useState('');
 
   const [nameFilter, setNameFilter] = useState('');
-  const [sortBy, setSortBy] = useState<'price' | 'distance'>('price');
+  const [sortBy] = useState<'price' | 'distance'>('price');
 
   // Active venue types (Super-Admin managed) drive the filter chips.
   const [categories, setCategories] = useState<VenueCategory[]>([]);
@@ -262,16 +244,6 @@ export default function HomePage() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Both /states and /districts are public reads (apps/api/src/locations/
-  // locations.controller.ts) — no booking session needed for a first-time
-  // visitor just browsing.
-  useEffect(() => {
-    api
-      .get<StateOption[]>('/states')
-      .then(setStates)
-      .catch(() => undefined);
-  }, []);
-
   useEffect(() => {
     api
       .get<VenueCategory[]>('/categories?available=true')
@@ -279,123 +251,8 @@ export default function HomePage() {
       .catch(() => undefined);
   }, []);
 
-  useEffect(() => {
-    if (!stateId) {
-      setDistricts([]);
-      return;
-    }
-    api
-      .get<District[]>(`/districts?stateId=${stateId}`)
-      .then(setDistricts)
-      .catch(() => undefined);
-  }, [stateId]);
-
-  /**
-   * Reverse-geocodes a coordinate (via OpenStreetMap's free Nominatim
-   * API — no key required, but best-effort only: no retry, and any
-   * failure is swallowed since the geo-radius search itself already
-   * works off raw lat/lng regardless) and matches the result against
-   * this platform's own seeded states/districts. Also captures the
-   * granular town/city for the header ("town, city" / district on line
-   * two, falling back to "city, district" / state when there is no
-   * town). Falls back to the raw geocoded place name when it doesn't
-   * match a seeded district (e.g. outside Kerala) rather than showing
-   * nothing at all.
-   */
-  async function resolveLocationLabel(lat: number, lng: number) {
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`,
-        { headers: { Accept: 'application/json' } },
-      );
-      if (!res.ok) return;
-      const data: { address?: Record<string, string> } = await res.json();
-      const addr = data.address ?? {};
-      const geocodedState = addr.state;
-      const geocodedDistrictCandidates = [addr.county, addr.state_district, addr.city, addr.town, addr.suburb].filter(
-        (v): v is string => Boolean(v),
-      );
-      const town = addr.town ?? addr.suburb ?? '';
-      const city = addr.city ?? addr.county ?? '';
-
-      const matchedState = geocodedState
-        ? states.find(
-            (s) =>
-              s.name.toLowerCase() === geocodedState.toLowerCase() ||
-              geocodedState.toLowerCase().includes(s.name.toLowerCase()),
-          )
-        : undefined;
-
-      if (matchedState) {
-        const districtList = await api.get<District[]>(`/districts?stateId=${matchedState.id}`);
-        const matchedDistrict = districtList.find((d) =>
-          geocodedDistrictCandidates.some(
-            (c) =>
-              c.toLowerCase() === d.name.toLowerCase() ||
-              c.toLowerCase().includes(d.name.toLowerCase()) ||
-              d.name.toLowerCase().includes(c.toLowerCase()),
-          ),
-        );
-        if (matchedDistrict) {
-          setStateId(matchedState.id);
-          setDistricts(districtList);
-          setForm((f) => ({ ...f, districtId: matchedDistrict.id }));
-          setDistrictName(matchedDistrict.name);
-          // Don't echo the district back as town/city on line one.
-          const sameAsDistrict = (v: string) =>
-            v !== '' && v.toLowerCase() === matchedDistrict.name.toLowerCase();
-          setTownName(sameAsDistrict(town) ? '' : town);
-          setCityName(sameAsDistrict(city) ? '' : city);
-          setFallbackStateName('');
-          return;
-        }
-      }
-
-      setTownName(town);
-      setCityName(city);
-      setFallbackStateName(geocodedState ?? '');
-      const fallbackLabel = [geocodedDistrictCandidates[0], geocodedState].filter(Boolean).join(', ');
-      if (fallbackLabel) setDistrictName(fallbackLabel);
-    } catch {
-      // Best-effort — the geo-radius search doesn't depend on this label.
-    }
-  }
-
-  /** `onSuccess` fires only once a real position comes back — used by the
-   * location sidebar to close itself, without closing on a failed/denied
-   * attempt (the error needs to stay visible instead). */
-  function useMyLocation(onSuccess?: () => void) {
-    setGeoError(null);
-    if (!navigator.geolocation) {
-      setGeoError('Your browser does not support location access.');
-      return;
-    }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setGeo({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setLocationMode('geo');
-        setLocating(false);
-        void resolveLocationLabel(pos.coords.latitude, pos.coords.longitude);
-        onSuccess?.();
-      },
-      () => {
-        setGeoError('Could not get your location — please allow location access, or pick a district instead.');
-        setLocating(false);
-      },
-      { timeout: 10_000 },
-    );
-  }
-
   const runSearch = useCallback(async () => {
-    if (locationMode === 'district' && !form.districtId) {
-      setErrorMessage('Please select a district, or use your location instead.');
-      return;
-    }
-    if (locationMode === 'geo' && !geo) {
-      setErrorMessage('Please share your location first.');
-      return;
-    }
+    if (!choice) return;
     setSearching(true);
     setErrorMessage(null);
     try {
@@ -403,14 +260,8 @@ export default function HomePage() {
         date: form.date,
         timeWindow: form.timeWindow,
         durationMinutes: String(form.durationMinutes),
+        ...locationParams(choice),
       });
-      if (locationMode === 'geo' && geo) {
-        params.set('lat', String(geo.lat));
-        params.set('lng', String(geo.lng));
-        params.set('radiusKm', '15');
-      } else {
-        params.set('districtId', form.districtId);
-      }
       // Both filters are optional: no category = every venue type, no
       // sub-type = every kind of unit. The API owns the filtering.
       if (form.categorySlug) params.set('categorySlug', form.categorySlug);
@@ -423,36 +274,13 @@ export default function HomePage() {
     } finally {
       setSearching(false);
     }
-  }, [
-    locationMode,
-    geo,
-    form.districtId,
-    form.categorySlug,
-    form.groundType,
-    form.date,
-    form.timeWindow,
-    form.durationMinutes,
-  ]);
+  }, [choice, form.categorySlug, form.groundType, form.date, form.timeWindow, form.durationMinutes]);
 
-  // Re-search automatically whenever a filter that's cheap to react to
-  // changes (date, ground type, duration, or district once picked) —
-  // matches the "1-tap" feel: no separate submit button to hunt for.
+  // Re-search automatically whenever the place or a filter changes: no
+  // separate submit button to hunt for.
   useEffect(() => {
-    if (locationMode === 'district' && form.districtId) runSearch();
-    if (locationMode === 'geo' && geo) runSearch();
-    // Deliberately omits runSearch itself from the dependency array —
-    // it already reads every field listed below, and depending on its
-    // own identity here would re-run this effect on every render.
-  }, [
-    locationMode,
-    geo,
-    form.districtId,
-    form.categorySlug,
-    form.groundType,
-    form.date,
-    form.timeWindow,
-    form.durationMinutes,
-  ]);
+    if (ready && choice) runSearch();
+  }, [ready, runSearch]);
 
   const visibleResults = useMemo(() => {
     const q = nameFilter.trim().toLowerCase();
@@ -484,22 +312,7 @@ export default function HomePage() {
 
   const days = useMemo(() => next7Days(), []);
 
-  // Header location lines: line one is a single value — the most
-  // granular place known (town, else city, else district); line two
-  // carries the next two levels ("city, district"), falling back to the
-  // state when there is nothing below line one. Nothing selected yet →
-  // the "Select Location / Tap to change" placeholder pair.
-  const headerStateName =
-    states.find((s) => s.id === stateId)?.name ?? fallbackStateName;
-  const headerLineOne = townName || cityName || districtName || 'Select Location';
-  const headerLineTwo =
-    headerLineOne === 'Select Location'
-      ? 'Tap to change'
-      : [cityName, districtName]
-          .filter(
-            (v) => v !== '' && v.toLowerCase() !== headerLineOne.toLowerCase(),
-          )
-          .join(', ') || headerStateName || 'Tap to change';
+  const { title: locationTitle, subtitle: locationSubtitle } = headerLines(choice);
 
   return (
     <>
@@ -508,12 +321,12 @@ export default function HomePage() {
         <div className="mx-auto w-full max-w-screen-xl px-4 sm:px-6 lg:px-8">
         {/* Top row: location · (search, inline from md up) · account. Below md the search box wraps to its own full-width row. */}
         <div className="flex flex-wrap items-center justify-between gap-x-3 md:flex-nowrap md:gap-x-6">
-          <button onClick={() => setLocationModalOpen(true)} className="flex items-center gap-2 text-slate-700 hover:text-slate-900 transition py-1 text-left group md:order-1" type="button">
+          <button onClick={() => setPickerOpen(true)} aria-label={`Change location, now ${locationTitle}`} aria-haspopup="dialog" className="flex items-center gap-2 text-slate-700 hover:text-slate-900 transition py-1 text-left group md:order-1" type="button">
             <svg className="w-6 h-6 text-brand-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"></path></svg>
             <div className="flex flex-col items-start text-left">
-              <span className="font-black text-slate-900 text-sm tracking-tight leading-tight">{headerLineOne}</span>
+              <span className="font-black text-slate-900 text-sm tracking-tight leading-tight">{locationTitle}</span>
               <span className="text-[10px] font-medium text-slate-500 leading-tight">
-                {headerLineTwo}
+                {locationSubtitle}
               </span>
             </div>
           </button>
@@ -591,12 +404,32 @@ export default function HomePage() {
       </section>
 
       <main className="mx-auto w-full max-w-screen-xl flex-1 px-4 pb-24 sm:px-6 lg:px-8">
-        {geoError && <p className="mb-4 text-xs text-red-600">{geoError}</p>}
         {errorMessage && <div className="mb-4"><ErrorBanner message={errorMessage} /></div>}
         {searching && <LoadingState message="Checking live availability…" />}
         {!searching && searched && visibleResults.length === 0 && (
           <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-sm">
-            Nothing available for that search. Try a different time, date, type, or location.
+            {choice && choice.mode !== 'district' ? (
+              <>
+                <p>No venues are open near {choice.mode === 'town' ? choice.townName : 'you'} for that search.</p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setChoice({
+                      mode: 'district',
+                      stateId: choice.stateId,
+                      stateName: choice.stateName,
+                      districtId: choice.districtId,
+                      districtName: choice.districtName,
+                    })
+                  }
+                  className="mt-4 rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+                >
+                  Browse all of {choice.districtName}
+                </button>
+              </>
+            ) : (
+              'Nothing available for that search. Try a different time, date, type, or location.'
+            )}
           </div>
         )}
         <div className="flex flex-col gap-3 sm:gap-5">
@@ -624,194 +457,17 @@ export default function HomePage() {
         </div>
       </main>
 
-      {locationModalOpen && (
-        <LocationSidebar
-          states={states}
-          districts={districts}
-          stateId={stateId}
-          districtId={form.districtId}
-          locating={locating}
-          geoError={geoError}
-          usingMyLocation={locationMode === 'geo' && geo !== null}
-          onSelectState={setStateId}
-          onSelectDistrict={(id, name) => {
-            setDistrictName(name);
-            // Manual district pick has no granular place — clear any
-            // stale town/city from an earlier geolocation.
-            setTownName('');
-            setCityName('');
-            setFallbackStateName('');
-            setLocationMode('district');
-            setForm((f) => ({ ...f, districtId: id }));
-            setLocationModalOpen(false);
+      {pickerOpen && (
+        <LocationPicker
+          current={choice}
+          onChoose={(next) => {
+            setChoice(next);
+            setPickerOpen(false);
           }}
-          onUseMyLocation={() => useMyLocation(() => setLocationModalOpen(false))}
-          onClose={() => setLocationModalOpen(false)}
+          onClose={() => setPickerOpen(false)}
         />
       )}
     </>
-  );
-}
-
-interface LocationSidebarProps {
-  states: StateOption[];
-  districts: District[];
-  stateId: string;
-  districtId: string;
-  locating: boolean;
-  geoError: string | null;
-  usingMyLocation: boolean;
-  onSelectState: (id: string) => void;
-  onSelectDistrict: (id: string, name: string) => void;
-  onUseMyLocation: () => void;
-  onClose: () => void;
-}
-
-function LocationSidebar({
-  states,
-  districts,
-  stateId,
-  districtId,
-  locating,
-  geoError,
-  usingMyLocation,
-  onSelectState,
-  onSelectDistrict,
-  onUseMyLocation,
-  onClose,
-}: LocationSidebarProps) {
-  const [shown, setShown] = useState(false);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Trigger the opening animation safely after the component mounts
-  useEffect(() => {
-    // A slight delay (50ms) is much more robust across different browsers
-    // than requestAnimationFrame for ensuring the initial off-screen paint finishes
-    // before the transition begins.
-    const openTimer = setTimeout(() => {
-      setShown(true);
-    }, 50);
-
-    return () => clearTimeout(openTimer);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (closeTimer.current) clearTimeout(closeTimer.current);
-    };
-  }, []);
-
-  function beginClose() {
-    setShown(false);
-    if (closeTimer.current) clearTimeout(closeTimer.current);
-    // Wait for the duration of the transition (300ms) before unmounting
-    closeTimer.current = setTimeout(onClose, 300);
-  }
-
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') beginClose();
-    }
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
-
-  // Prevent background scrolling while the sidebar is open
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    const previousPaddingRight = document.body.style.paddingRight;
-    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-    
-    document.body.style.overflow = 'hidden';
-    if (scrollbarWidth > 0) {
-      document.body.style.paddingRight = `${scrollbarWidth}px`;
-    }
-    
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.body.style.paddingRight = previousPaddingRight;
-    };
-  }, []);
-
-  return (
-    <div className="fixed inset-0 z-[60] flex" role="dialog" aria-modal="true" aria-label="Choose your location">
-      {/* Sidebar Panel */}
-      <div
-        className={`relative z-10 flex h-full w-full max-w-xs flex-col overflow-y-auto bg-white p-5 shadow-xl transition-transform duration-300 ease-in-out sm:p-6 ${
-          shown ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="flex items-center gap-1.5 text-base font-extrabold text-slate-900">
-            <Icon name="location_on" className="text-[20px]" />
-            Choose your location
-          </h3>
-          <button type="button" onClick={beginClose} aria-label="Close" className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-            <Icon name="close" className="text-[18px]" />
-          </button>
-        </div>
-
-        <button
-          type="button"
-          disabled={locating}
-          onClick={onUseMyLocation}
-          className={`mb-4 flex items-center gap-2 rounded-xl border px-3.5 py-3 text-sm font-bold transition-all ${
-            usingMyLocation ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-          }`}
-        >
-          <Icon name="my_location" className="text-[18px]" />
-          {locating ? 'Locating…' : usingMyLocation ? 'Using your current location' : 'Use my current location'}
-        </button>
-        
-        {geoError && <p className="mb-4 -mt-2 text-xs text-red-600">{geoError}</p>}
-
-        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-          <span className="h-px flex-1 bg-slate-200" /> or pick manually <span className="h-px flex-1 bg-slate-200" />
-        </div>
-
-        <div className="mt-4 space-y-3">
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-500">State</label>
-            <Select value={stateId} onChange={(e) => onSelectState(e.target.value)} className="w-full">
-              <option value="">Select state…</option>
-              {states.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-500">District</label>
-            <Select
-              disabled={!stateId}
-              value={districtId}
-              onChange={(e) => {
-                const d = districts.find((x) => x.id === e.target.value);
-                if (d) onSelectDistrict(d.id, d.name);
-              }}
-              className="w-full"
-            >
-              <option value="">Select district…</option>
-              {districts.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-        </div>
-      </div>
-
-      {/* Backdrop */}
-      <div
-        className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ease-in-out ${
-          shown ? 'opacity-100' : 'opacity-0'
-        }`}
-        onClick={beginClose}
-        aria-hidden="true"
-      />
-    </div>
   );
 }
 
@@ -940,11 +596,6 @@ function SlotBookingModal({
                 {r.venue.address}
               </p>
               <div className="mt-1.5 flex items-center gap-2">
-                {r.distanceKm !== undefined && (
-                  <span className="text-[11px] font-semibold text-emerald-700">
-                    {r.distanceKm} km away
-                  </span>
-                )}
                 <a
                   href={googleMapsLink(r.venue)}
                   target="_blank"
@@ -1118,12 +769,6 @@ function MobileVenueCard({
               <span className="text-[11px] text-slate-400">{r.resource.name}</span>
             </div>
             <div className="mt-1.5 flex items-center gap-2">
-              {r.distanceKm !== undefined && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
-                  <svg className="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
-                  {r.distanceKm} km away
-                </span>
-              )}
               <a
                 href={googleMapsLink(r.venue)}
                 target="_blank"
@@ -1246,11 +891,6 @@ function DesktopVenueCard({
                     {r.venue.address}
                   </p>
                   <div className="mt-1.5 flex items-center gap-2">
-                    {r.distanceKm !== undefined && (
-                      <span className="text-[11px] font-semibold text-emerald-700">
-                        {r.distanceKm} km away
-                      </span>
-                    )}
                     <a
                       href={googleMapsLink(r.venue)}
                       target="_blank"

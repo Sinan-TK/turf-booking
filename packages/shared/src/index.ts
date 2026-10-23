@@ -5,5 +5,8 @@ export * from './order-id';
 export * from './coin-idempotency';
 export * from './facility-code';
 export * from './commercial';
+export * from './maps-url';
+export * from './maps';
+export * from './location';
 export * from './schemas/search';
 export * from './schemas/booking';

@@ -65,8 +65,8 @@ async function main() {
   for (const t of VENUES) {
     const area = await prisma.area.upsert({
       where: { districtId_name: { districtId: district.id, name: t.town } },
-      update: {},
-      create: { districtId: district.id, name: t.town },
+      update: { lat: t.lat, lng: t.lng },
+      create: { districtId: district.id, name: t.town, lat: t.lat, lng: t.lng },
     });
     areaByTown.set(t.town, area.id);
   }

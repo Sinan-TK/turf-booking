@@ -335,6 +335,9 @@ model Area {
   districtId String   @db.Uuid
   district   District @relation(fields: [districtId], references: [id], onDelete: Cascade)
   name       String
+  /// Centre of the town, for the customer site ("venues near {town}" and naming a customer's position). Optional.
+  lat        Decimal? @db.Decimal(9, 6)
+  lng        Decimal? @db.Decimal(9, 6)
   status     LocationStatus @default(ACTIVE)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -389,6 +392,8 @@ model Venue {
   address                   String
   lat                       Decimal  @db.Decimal(9, 6)
   lng                       Decimal  @db.Decimal(9, 6)
+  /// Optional Google Maps link the Directions button opens; without it the pin (lat/lng) is used.
+  googleMapsUrl             String?
   timezone                  String
   status                    VenueStatus @default(DRAFT)
   cancellationPolicyId      String?  @unique @db.Uuid

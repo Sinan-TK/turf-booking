@@ -1,6 +1,8 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes } from 'react';
 
 import {
+  ArrowLeft,
+  Check,
   MapPin,
   ChevronDown,
   Search,
@@ -62,6 +64,8 @@ const ICON_MAP: Record<string, LucideIcon> = {
   schedule: Clock,
   close: X,
   my_location: LocateFixed,
+  arrow_back: ArrowLeft,
+  check: Check,
   handshake: Handshake,
 };
 

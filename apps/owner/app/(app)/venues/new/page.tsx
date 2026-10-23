@@ -8,6 +8,7 @@ import { useFetch } from '@/lib/use-fetch';
 import { api, ApiError } from '@/lib/api';
 import { Button, ErrorBanner, FieldError, Input, Label, PageHeader, Select, invalidClass } from '@/components/ui';
 import { hasErrors, numberError, textError, type FieldErrors } from '@/lib/validation';
+import { googleMapsUrlProblem } from '@venue/shared/dist/maps-url';
 
 // Leaflet touches `window` at import time, which breaks server-side
 // rendering — this page is SSR'd by default under the App Router, so
@@ -46,6 +47,7 @@ export default function NewVenuePage() {
     address: '',
     lat: '',
     lng: '',
+    googleMapsUrl: '',
   });
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldErrors<keyof typeof form>>({});
@@ -64,6 +66,7 @@ export default function NewVenuePage() {
       address: textError(form.address, 'Street address', 1, 300),
       lat: numberError(form.lat, 'Latitude', -90, 90),
       lng: numberError(form.lng, 'Longitude', -180, 180),
+      googleMapsUrl: googleMapsUrlProblem(form.googleMapsUrl),
     };
   }
 
@@ -73,7 +76,7 @@ export default function NewVenuePage() {
     const found = validate();
     setErrors(found);
     if (hasErrors(found)) {
-      const first = (['name', 'description', 'districtId', 'address', 'lat', 'lng'] as const).find((k) => found[k]);
+      const first = (['name', 'description', 'districtId', 'address', 'lat', 'lng', 'googleMapsUrl'] as const).find((k) => found[k]);
       document.getElementById('venue-' + first)?.focus();
       return;
     }
@@ -89,6 +92,7 @@ export default function NewVenuePage() {
         address: form.address,
         lat: Number(form.lat),
         lng: Number(form.lng),
+        googleMapsUrl: form.googleMapsUrl.trim() || undefined,
       });
       router.push(`/venues/${venue.id}`);
     } catch (err) {
@@ -250,6 +254,21 @@ export default function NewVenuePage() {
                   <FieldError id="venue-lng-error" message={errors.lng} />
                 </div>
               </div>
+            <div className="mt-4">
+              <Label htmlFor="venue-googleMapsUrl">Google Maps link (optional)</Label>
+              <Input
+                id="venue-googleMapsUrl"
+                type="url"
+                inputMode="url"
+                aria-invalid={!!errors.googleMapsUrl}
+                className={errors.googleMapsUrl ? invalidClass : ''}
+                placeholder="https://maps.app.goo.gl/…"
+                value={form.googleMapsUrl}
+                onChange={(e) => update('googleMapsUrl', e.target.value)}
+              />
+              <FieldError id="venue-googleMapsUrl-error" message={errors.googleMapsUrl} />
+              <p className="mt-1 text-xs text-gray-500">Open the place in Google Maps, choose Share, then Copy link. Customers' Directions button opens it; leave it empty to use the map pin.</p>
+            </div>
             </Section>
           </div>
         </div>

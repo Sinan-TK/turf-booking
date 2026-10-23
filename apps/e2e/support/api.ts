@@ -52,14 +52,20 @@ async function json<T>(res: ApiResponse): Promise<T> {
 export async function createVenue(
   owner: APIRequestContext,
   admin: APIRequestContext,
-  where: { lat?: number; lng?: number } = {},
+  where: { lat?: number; lng?: number; district?: string; town?: string; googleMapsUrl?: string } = {},
 ): Promise<PwVenue> {
   const name = `PW Venue ${unique()}`;
-  const states = await json<Array<{ id: string }>>(await owner.get('/states'));
-  const districts = await json<Array<{ id: string }>>(await owner.get(`/districts?stateId=${states[0]!.id}`));
+  const states = await json<Array<{ id: string; name: string }>>(await owner.get('/states'));
+  const state = where.district ? states.find((s) => s.name === 'Kerala') ?? states[0]! : states[0]!;
+  const districts = await json<Array<{ id: string; name: string }>>(await owner.get(`/districts?stateId=${state.id}`));
+  const district = where.district ? districts.find((d) => d.name === where.district)! : districts[0]!;
+  expect(district, `district ${where.district} not found`).toBeTruthy();
+  const areas = where.town ? await json<Array<{ id: string; name: string }>>(await owner.get(`/areas?districtId=${district.id}`)) : [];
+  const area = where.town ? areas.find((t) => t.name === where.town) : undefined;
+  expect(!where.town || area, `town ${where.town} not found`).toBeTruthy();
   const venue = await json<{ id: string; facilityCode: string }>(
     await owner.post('/venues', {
-      data: { name, description: 'Created by the Playwright suite', districtId: districts[0]!.id, address: '1 Test Lane', lat: where.lat ?? 11.05, lng: where.lng ?? 76.07 },
+      data: { name, description: 'Created by the Playwright suite', districtId: district.id, ...(area ? { areaId: area.id } : {}), address: '1 Test Lane', lat: where.lat ?? 11.05, lng: where.lng ?? 76.07, ...(where.googleMapsUrl ? { googleMapsUrl: where.googleMapsUrl } : {}) },
     }),
   );
   await json(await sturdy(() => admin.patch(`/venues/${venue.id}`, { data: { status: 'ACTIVE' } })));

@@ -1,6 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+/** Prisma returns decimals as strings; the town centre goes out as plain numbers (or null). */
+function withCentre<T extends { lat: { toString(): string } | null; lng: { toString(): string } | null }>(area: T) {
+  return {
+    ...area,
+    lat: area.lat === null ? null : Number(area.lat.toString()),
+    lng: area.lng === null ? null : Number(area.lng.toString()),
+  };
+}
+
 @Injectable()
 export class LocationsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -44,14 +53,15 @@ export class LocationsService {
     });
   }
 
-  createArea(dto: { districtId: string; name: string }) {
-    return this.prisma.client.area.create({ data: dto });
+  async createArea(dto: { districtId: string; name: string; lat?: number; lng?: number }) {
+    return withCentre(await this.prisma.client.area.create({ data: dto }));
   }
 
-  listAreas(districtId?: string) {
-    return this.prisma.client.area.findMany({
+  async listAreas(districtId?: string) {
+    const areas = await this.prisma.client.area.findMany({
       where: districtId ? { districtId } : undefined,
       orderBy: { name: 'asc' },
     });
+    return areas.map(withCentre);
   }
 }
