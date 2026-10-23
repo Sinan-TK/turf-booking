@@ -60,7 +60,14 @@ node apps/api/dist/main.js
 - Postgres needs the `btree_gist` extension (created by the first migration). The `no_overlapping_resource_locks` exclusion constraint is what prevents double booking; `migrate dev` would drop its backing `resource_locks.during` column.
 - Create the first Super Admin with `pnpm --filter @venue/database exec tsx prisma/provision-admin.ts <email> "<name>"` (e.g. via `railway run`). It prints a single-use set-password link; open it, choose a password, sign in. Never run `seed:identity` in production (it refuses to).
 - Migration `20261015000000_rename_turf_to_venue` only renames tables, columns, the status enum and the policy-scope enum value (no data is rewritten). The API and all three portals must be deployed together with it: the old API cannot read the renamed tables, and the old portals call `/turfs/*` paths that no longer exist. Staff sessions issued before the rename carry the old `TURF_OWNER` role, so owners sign in again once. Historical `audit_logs` rows keep their old `TURF_*` action names.
-- Redis is required (WhatsApp session state, jobs).
+- Redis is not used by the API today: scheduled jobs (hold expiry, completing and settling played bookings, preparing payouts) run inside the API process via `@nestjs/schedule`. Run **one** API instance, or move those jobs to a single worker, before scaling out (the rate limiter's counters are also per instance).
+
+## Commission, cancellation and weekly payouts
+
+- Terms live in `commercial_policies` (platform default → facility → one venue's own deal, merged field by field) and are edited by the Super Admin: **Commercial terms** (platform default, payout day) and each facility's page (commission tiers, monthly cap, fee after the cap, minimum advance, cancellation windows and cut-off). Nothing commercial is hard-coded. A booking keeps the terms it was made under (`bookings.commercialTerms`), so later edits never change it.
+- Played bookings are completed and settled every 5 minutes (`SettlementsService.completeAndSettle`); payouts for slots before the payout day are prepared hourly and on demand (`POST /admin/payouts/run`). The admin pays each owner by bank transfer and marks the payout paid with the transfer reference (**Payouts** page). Razorpay Route automation is a later step.
+- Refunds are only ever coins. Cancelling inside the cut-off is blocked for customers; owners and admins can always cancel and refund everything as coins.
+- Tests must not run against a shared database: put `DATABASE_URL` of a local Postgres (`docker compose up -d`, then `prisma migrate deploy` and the seed) in `apps/api/.env.test` (gitignored). The Playwright helpers read `DATABASE_URL` from the environment first, so set it to the same local database when running `pnpm e2e`.
 
 ## Post-deploy verification
 

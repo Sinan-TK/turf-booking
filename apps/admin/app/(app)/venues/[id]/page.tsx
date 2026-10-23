@@ -20,6 +20,7 @@ import {
   invalidClass,
 } from '@/components/ui';
 import { hasErrors, textError, type FieldErrors } from '@/lib/validation';
+import { VenueTermsSection } from '@/components/venue-terms-section';
 
 interface Venue {
   id: string;
@@ -468,6 +469,8 @@ export default function VenueDetailPage() {
           </form>
         )}
       </Card>
+
+      <VenueTermsSection venueId={id} />
     </div>
   );
 }

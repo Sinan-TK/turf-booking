@@ -7,6 +7,7 @@ import { useFetch } from '@/lib/use-fetch';
 import type { AdminVenueCategory } from '@/lib/categories';
 import { ErrorBanner, PageHeader, SkeletonDetailCard, SuccessBanner } from '@/components/ui';
 import { CategoryForm } from '@/components/category-form';
+import { FacilityTermsSection } from '@/components/facility-terms-section';
 
 export default function EditVenueTypePage() {
   const { id } = useParams<{ id: string }>();
@@ -41,6 +42,7 @@ export default function EditVenueTypePage() {
           router.refresh();
         }}
       />
+      <FacilityTermsSection categoryId={data.id} />
     </div>
   );
 }

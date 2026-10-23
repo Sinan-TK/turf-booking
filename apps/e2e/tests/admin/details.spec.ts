@@ -17,8 +17,8 @@ test.describe('admin: venue details', () => {
   test('units can be blocked and reopened, and a unit can be added', async ({ page, makeVenue }) => {
     const venue = await makeVenue();
     await page.goto(`/venues/${venue.id}`);
-    await expect(page.getByRole('heading', { name: 'Football Turf', level: 3 })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Badminton Court', level: 3 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Football Turf', level: 3, exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Badminton Court', level: 3, exact: true })).toBeVisible();
 
     await page.getByRole('switch', { name: `Block ${venue.turfName}` }).click();
     await expect(page.getByRole('switch', { name: `Reopen ${venue.turfName}` })).not.toBeChecked();

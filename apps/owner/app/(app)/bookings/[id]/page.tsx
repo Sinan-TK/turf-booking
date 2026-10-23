@@ -51,6 +51,9 @@ export default function BookingDetailPage() {
   const [busy, setBusy] = useState(false);
   const [collectError, setCollectError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   async function collect() {
     setBusy(true);
@@ -67,9 +70,26 @@ export default function BookingDetailPage() {
     }
   }
 
+  async function cancelBooking() {
+    setBusy(true);
+    setCancelError(null);
+    try {
+      await api.post(`/owner/bookings/${id}/cancel`, { reason: cancelReason.trim() || undefined });
+      setCancelling(false);
+      setCancelReason('');
+      setNotice('Booking cancelled. The customer has been refunded in coins.');
+      refetch();
+    } catch (err) {
+      setCancelError(err instanceof ApiError ? err.message : 'Could not cancel this booking');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loading) return <LoadingState />;
   if (error) return <ErrorBanner message={error} />;
   if (!booking) return null;
+  const canCancel = booking.status === 'CONFIRMED' || booking.status === 'PENDING_PAYMENT';
 
   return (
     <div className="space-y-6">
@@ -77,8 +97,13 @@ export default function BookingDetailPage() {
       {notice && <SuccessBanner message={notice} />}
 
       <Card>
-        <div className="mb-4">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <Badge value={booking.status} />
+          {canCancel && (
+            <Button type="button" variant="secondary" onClick={() => setCancelling(true)}>
+              Cancel this booking
+            </Button>
+          )}
         </div>
         <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
           <div>
@@ -198,6 +223,34 @@ export default function BookingDetailPage() {
           </div>
         )}
       </Card>
+      {cancelling && (
+        <ConfirmDialog
+          title="Cancel this booking?"
+          confirmLabel="Yes, cancel it"
+          tone="danger"
+          busy={busy}
+          error={cancelError}
+          onConfirm={cancelBooking}
+          onCancel={() => setCancelling(false)}
+        >
+          <p>
+            {Number(booking.advanceAmount) > 0 && booking.status === 'CONFIRMED'
+              ? `The customer gets all ${formatMoney(booking.currency, booking.advanceAmount)} they paid online back as coins, and the slot becomes free again. You earn nothing from this booking.`
+              : 'The slot becomes free again. Nothing was paid online, so there is nothing to refund.'}
+          </p>
+          <label htmlFor="cancel-reason" className="mt-3 block text-xs font-medium text-on-surface-variant">
+            Reason (shown to the customer)
+          </label>
+          <input
+            id="cancel-reason"
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            maxLength={500}
+            placeholder="e.g. Heavy rain, ground closed"
+            className="mt-1 w-full rounded-lg border border-outline-variant/50 bg-surface-container-lowest px-3 py-2 text-sm"
+          />
+        </ConfirmDialog>
+      )}
       {collecting && (
         <ConfirmDialog
           title="Record balance received?"

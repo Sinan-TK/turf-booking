@@ -32,6 +32,11 @@ test.describe('customer site: booking a slot', () => {
     await expect(page.getByRole('button', { name: 'Pay online' })).toBeEnabled();
     await expect(page.getByRole('button', { name: /Pay with Coins/ })).toBeDisabled(); // a new customer has no coins
     await expect(page.getByText(/never both for the same booking\./)).toBeVisible();
+    // The cancellation windows are shown before paying, as times, and refunds are only ever coins.
+    await expect(page.getByText('Cancelling', { exact: true })).toBeVisible();
+    await expect(page.getByText(/^Until .*: (full refund|\d+% back|no refund) as coins$/).first()).toBeVisible();
+    await expect(page.getByText(/can't be cancelled\.$/)).toBeVisible();
+    await expect(page.getByText('Refunds are always paid as coins you can use on your next booking.')).toBeVisible();
 
     // The same customer cannot hold the same slot twice.
     const checkoutUrl = page.url();

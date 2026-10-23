@@ -48,16 +48,30 @@ test.describe('admin: field errors on forms', () => {
     await expect(page.getByText('Enter a full phone number, like +91 98765 43210.')).toBeVisible();
   });
 
-  test('policies: refund tiers and the commission value are range-checked', async ({ page }) => {
+  test('commercial terms: percentages, shares and tiers are checked before anything is sent', async ({ page }) => {
     await page.goto('/policies');
-    await page.getByPlaceholder('Refund %').fill('150');
-    await page.getByRole('button', { name: 'Create Policy' }).click();
-    await expect(page.getByText('Refund % must be between 0 and 100.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Commission', level: 3 })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Create Commission' }).click();
-    await expect(page.getByText('Enter the value.')).toBeVisible();
-    await page.getByLabel(/^Value/).fill('120');
-    await page.getByRole('button', { name: 'Create Commission' }).click();
-    await expect(page.getByText('Value must be between 0 and 100.')).toBeVisible();
+    await page.getByLabel('Minimum advance').fill('150');
+    await page.getByLabel('Window 1 customer share').fill('80');
+    await page.getByLabel('Window 1 owner share').fill('40');
+    await page.getByLabel('Fee after the cap').fill('-1');
+    await page.getByLabel('Tier 1 value').fill('');
+    await page.getByRole('button', { name: 'Save terms' }).click();
+
+    await expect(page.getByText('The minimum advance must be between 0 and 100.')).toBeVisible();
+    await expect(page.getByText('Window 1: the customer and owner shares add up to more than 100%.')).toBeVisible();
+    await expect(page.getByText('The after-cap fee must be between 0 and 100.')).toBeVisible();
+    await expect(page.getByText('Tier 1: enter the commission.')).toBeVisible();
+    await expect(page.getByText(/^Saved\./)).toHaveCount(0);
+  });
+
+  test('commercial terms: the server refuses a commission above the minimum advance', async ({ page }) => {
+    await page.goto('/policies');
+    await page.getByLabel('Minimum advance').fill('10');
+    await page.getByLabel('Tier 1 type').selectOption('PERCENTAGE');
+    await page.getByLabel('Tier 1 value').fill('30');
+    await page.getByRole('button', { name: 'Save terms' }).click();
+    await expect(page.getByText(/can't be more than the minimum online advance/)).toBeVisible();
   });
 });

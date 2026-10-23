@@ -10,6 +10,7 @@ import { formatCountdown, formatDay, formatTimeRange, useCountdown } from '@/lib
 import type { RazorpayCheckoutOptions } from '@/lib/razorpay';
 import { Badge, Button, Card, ErrorBanner, Icon, LoadingState, SuccessBanner } from '@/components/ui';
 import { Screen } from '@/components/screen';
+import { CancellationTerms, useCancellationPreview } from '@/components/cancellation-terms';
 
 interface CheckoutBooking {
   id: string;
@@ -50,6 +51,7 @@ export default function CheckoutPage() {
   const [confirmingPayment, setConfirmingPayment] = useState(false);
   const payingRef = useRef(false);
   const mounted = useRef(true);
+  const preview = useCancellationPreview(bookingId, booking?.status);
 
   useEffect(() => {
     mounted.current = true;
@@ -295,6 +297,12 @@ export default function CheckoutPage() {
               </div>
             )}
           </dl>
+
+          {preview && preview.windows.length > 0 && (
+            <div className="mb-5 -mt-2">
+              <CancellationTerms preview={preview} />
+            </div>
+          )}
 
           {payError && (
             <div role="alert" className="mb-4">

@@ -15,6 +15,15 @@ interface Summary {
   revenueThisMonth: string;
 }
 
+interface MoneySummary {
+  coinsOutstanding: string;
+  platformEarningsThisMonth: string;
+  commissionThisMonth: string;
+  pendingPayouts: { count: number; total: string };
+}
+
+const inr = (v: string) => `₹${Number(v).toLocaleString('en-IN')}`;
+
 const CARDS: Array<{
   key: keyof Summary;
   label: string;
@@ -46,6 +55,7 @@ const SHORTCUTS: Array<{ href: string; label: string; hint: string; icon: IconNa
 
 export default function DashboardPage() {
   const { data, error, loading } = useFetch<Summary>('/admin/dashboard/summary');
+  const { data: money } = useFetch<MoneySummary>('/admin/payouts/summary');
 
   return (
     <div>
@@ -65,6 +75,23 @@ export default function DashboardPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {money && (
+        <>
+          <h2 className="mb-3 mt-10 text-sm font-semibold text-gray-900">Money</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard label="Platform earnings this month" icon="card" tone="brand" value={inr(money.platformEarningsThisMonth)} />
+            <StatCard label="Commission this month" icon="refund" tone="sky" value={inr(money.commissionThisMonth)} />
+            <StatCard label="Coins customers hold" icon="users" tone="violet" value={inr(money.coinsOutstanding)} />
+            <StatCard
+              label="Owner payouts to pay"
+              icon="rupee"
+              tone="amber"
+              value={`${money.pendingPayouts.count} · ${inr(money.pendingPayouts.total)}`}
+            />
+          </div>
+        </>
       )}
 
       <h2 className="mb-3 mt-10 text-sm font-semibold text-gray-900">Quick actions</h2>

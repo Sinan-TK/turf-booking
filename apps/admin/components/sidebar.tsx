@@ -26,6 +26,7 @@ const NAV_GROUPS: Array<{ title: string; items: Array<{ href: string; label: str
       { href: '/bookings', label: 'Bookings', icon: 'calendar' },
       { href: '/payments', label: 'Payments', icon: 'card' },
       { href: '/refunds', label: 'Refunds', icon: 'refund' },
+      { href: '/payouts', label: 'Payouts', icon: 'rupee' },
       { href: '/customers', label: 'Customers', icon: 'users' },
       { href: '/support', label: 'Support', icon: 'support' },
     ],
@@ -33,7 +34,7 @@ const NAV_GROUPS: Array<{ title: string; items: Array<{ href: string; label: str
   {
     title: 'Platform',
     items: [
-      { href: '/policies', label: 'Policies', icon: 'shield' },
+      { href: '/policies', label: 'Commercial terms', icon: 'shield' },
       { href: '/announcements', label: 'Announcements', icon: 'megaphone' },
     ],
   },

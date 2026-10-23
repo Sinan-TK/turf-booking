@@ -730,6 +730,15 @@ UPDATE wallet SET cachedBalance = newBalance; COMMIT.` Locking the wallet
 
 ## 11. Cancellation & Refund
 
+> **Current behaviour (commercial terms).** The flow below was the original design. Today the refund share, the
+> owner share and the cut-off come from the booking's commercial terms (`packages/shared/src/commercial.ts`,
+> `CommercialPolicy`), not from `CancellationPolicy`. A customer cancelling a paid booking at least X hours ahead
+> gets 100% back as coins; in a later window the paid amount is split coins / owner / platform (written as a
+> `LATE_CANCEL` `BookingSettlement`); inside the cut-off customers can't cancel. Played and no-show bookings are
+> settled when the slot ends: commission by the venue's booking count in the month, limited by a monthly cap,
+> then an after-cap fee. Owners are paid weekly (`Payout`). Owners and admins can cancel any time (100% coins).
+> See DEPLOYMENT.md "Commission, cancellation and weekly payouts".
+
 ```
 Customer selects Upcoming booking → Cancel
   → GET policy for booking (venue override or platform default)

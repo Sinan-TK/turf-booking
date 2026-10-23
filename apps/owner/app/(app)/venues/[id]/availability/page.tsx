@@ -79,6 +79,11 @@ const DAY_PRESETS = [
 ];
 
 /** "Mon–Fri", "Sat, Sun", "Every day" — runs of 3+ consecutive days become a range. */
+/** The smallest advance for a full price, rounded up to the paisa (the API checks the same rule). */
+function minAdvanceOf(fullPrice: number, percent: number): number {
+  return Math.ceil(Math.round(fullPrice * 100) * percent / 100) / 100;
+}
+
 function daysLabel(rule: Pick<PricingRule, 'weekdays' | 'dayType'>): string {
   const days = rule.weekdays.length
     ? rule.weekdays
@@ -124,6 +129,7 @@ function PriceModal({
   rule,
   resourceId,
   durations,
+  minAdvancePercent,
   onClose,
   onSaved,
 }: {
@@ -131,6 +137,8 @@ function PriceModal({
   rule?: PricingRule;
   resourceId: string;
   durations: number[];
+  /** The least the customer must pay online, as a percentage of the full price (set by the platform for this facility). */
+  minAdvancePercent?: number;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -207,7 +215,9 @@ function PriceModal({
           ? 'The booking amount must be more than 0.'
           : Number(form.booking) > fullPrice
             ? `The booking amount can\u2019t be more than the ${offerGiven ? 'offer' : 'normal'} price (${fullPrice}).`
-            : undefined),
+            : minAdvancePercent !== undefined && Number(form.booking) < minAdvanceOf(fullPrice, minAdvancePercent)
+              ? `The booking amount must be at least ${minAdvancePercent}% of the ${offerGiven ? 'offer' : 'normal'} price (${minAdvanceOf(fullPrice, minAdvancePercent)}).`
+              : undefined),
     };
     setErrors(found);
     if (hasErrors(found)) return;
@@ -424,7 +434,10 @@ function PriceModal({
                       onChange={(e) => setPrice('booking', e.target.value)}
                     />
                     <FieldError id="price-booking-error" message={errors.booking} />
-                    <p className="mt-1 text-xs text-on-surface-variant">The advance paid online to hold the slot.</p>
+                    <p className="mt-1 text-xs text-on-surface-variant">
+                      The advance paid online to hold the slot
+                      {minAdvancePercent !== undefined && ` (at least ${minAdvancePercent}% of the full price${Number.isFinite(full) && full > 0 ? `, INR ${minAdvanceOf(full, minAdvancePercent).toLocaleString('en-IN')}` : ''})`}.
+                    </p>
                   </div>
                 </div>
                 {form.normal.trim() !== '' && form.booking.trim() !== '' && Number.isFinite(full) && Number(form.booking) >= 0 && Number(form.booking) <= full && (
@@ -464,9 +477,12 @@ const ICON_BUTTON =
 function PricingRulesSection({
   resources,
   categories,
+  minAdvance,
 }: {
   resources: Resource[];
   categories: VenueCategory[];
+  /** Minimum online advance (% of the full price) by facility id, from the platform's terms for this venue. */
+  minAdvance: Record<string, number>;
 }) {
   const [resourceId, setResourceId] = useState(resources[0]?.id ?? '');
   const durations = durationsFor(
@@ -665,6 +681,7 @@ function PricingRulesSection({
           rule={editing.rule}
           resourceId={resourceId}
           durations={durations}
+          minAdvancePercent={minAdvance[resources.find((r) => r.id === resourceId)?.category.id ?? '']}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
@@ -963,6 +980,10 @@ export default function AvailabilityPage() {
   const { data: venue } = useFetch<{ name: string }>(`/venues/${id}`);
   const { data: resources, loading, error } = useFetch<Resource[]>(`/resources?venueId=${id}`);
   const { data: categories } = useFetch<VenueCategory[]>('/categories');
+  const { data: terms } = useFetch<Array<{ categoryId: string; terms: { minAdvancePercent: number } }>>(
+    `/owner/commercial-terms?venueId=${id}`,
+  );
+  const minAdvance = Object.fromEntries((terms ?? []).map((t) => [t.categoryId, t.terms.minAdvancePercent]));
   const [tab, setTab] = useState<TabKey>('pricing');
   const current = TABS.find((t) => t.key === tab)!;
 
@@ -1009,7 +1030,7 @@ export default function AvailabilityPage() {
           </div>
           <div id="tab-panel" role="tabpanel" aria-labelledby={`tab-${tab}`}>
             {tab === 'pricing' && (
-              <PricingRulesSection resources={resources} categories={categories} />
+              <PricingRulesSection resources={resources} categories={categories} minAdvance={minAdvance} />
             )}
             {tab === 'closed' && <BlockedDatesSection venueId={id} resources={resources} />}
             {tab === 'walkin' && (

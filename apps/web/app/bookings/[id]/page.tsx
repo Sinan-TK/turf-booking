@@ -7,6 +7,7 @@ import { useCustomer } from '@/lib/customer';
 import { LoginGate } from '@/components/login-gate';
 import { Badge, Button, Card, ErrorBanner, LoadingState, SuccessBanner } from '@/components/ui';
 import { Screen } from '@/components/screen';
+import { CancellationTerms, useCancellationPreview } from '@/components/cancellation-terms';
 
 interface Booking {
   id: string;
@@ -69,6 +70,7 @@ function BookingDetail() {
   }
 
   const cancellable = booking && ['CONFIRMED', 'PENDING_PAYMENT'].includes(booking.status);
+  const preview = useCancellationPreview(id, booking?.status);
 
   return (
     <>
@@ -125,7 +127,21 @@ function BookingDetail() {
             </div>
           </dl>
 
-          {cancellable && !cancelResultMessage && (
+          {cancellable && !cancelResultMessage && preview && preview.windows.length > 0 && booking.status === 'CONFIRMED' && (
+            <CancellationTerms preview={preview} />
+          )}
+
+          {cancellable && !cancelResultMessage && preview && !preview.canCancel && (
+            <p className="mt-4 text-center text-sm text-gray-600">
+              This booking can no longer be cancelled. If something has gone wrong, contact the venue or{' '}
+              <a href="/support" className="font-medium text-gray-900 underline">
+                our support
+              </a>
+              .
+            </p>
+          )}
+
+          {cancellable && !cancelResultMessage && (!preview || preview.canCancel) && (
             <div className="mt-6 border-t border-gray-100 pt-4">
               {!confirmingCancel ? (
                 <Button variant="danger" className="w-full" onClick={() => setConfirmingCancel(true)}>
@@ -134,9 +150,13 @@ function BookingDetail() {
               ) : (
                 <div className="space-y-2">
                   <p className="text-center text-xs text-gray-500">
-                    {booking.status === 'CONFIRMED'
-                      ? "You'll receive Coins back based on the cancellation policy."
-                      : "This booking hasn't been paid yet — cancelling releases the slot with no charge."}
+                    {booking.status !== 'CONFIRMED'
+                      ? "This booking hasn't been paid yet — cancelling releases the slot with no charge."
+                      : preview?.now
+                        ? preview.now.refundPercent === 0
+                          ? 'Cancelling now returns no Coins.'
+                          : `Cancelling now returns ${preview.now.refundCoins} Coins (${preview.now.refundPercent}% of what you paid).`
+                        : "You'll receive Coins back based on the cancellation policy."}
                   </p>
                   <div className="flex gap-2">
                     <Button

@@ -60,7 +60,7 @@ test.describe('admin: dashboard and reference pages', () => {
 
   for (const [path, heading] of [
     ['/locations', 'Locations'],
-    ['/policies', 'Policies & Commissions'],
+    ['/policies', 'Commercial terms'],
     ['/announcements', 'Announcements'],
   ] as const) {
     test(`${heading} loads`, async ({ page }) => {

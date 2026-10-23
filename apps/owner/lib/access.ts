@@ -23,6 +23,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/venues', label: 'My Venues', icon: 'storefront', roles: ADMIN },
   { href: '/staff', label: 'Staff', icon: 'group', roles: ADMIN },
   { href: '/notifications', label: 'Notifications', icon: 'notifications', roles: ALL },
+  { href: '/earnings', label: 'Earnings', icon: 'account_balance_wallet', roles: ADMIN },
   { href: '/payments', label: 'Payments', icon: 'payments', roles: ADMIN },
   { href: '/refunds', label: 'Refunds', icon: 'currency_exchange', roles: ADMIN },
   { href: '/settings', label: 'Settings', icon: 'settings', roles: ALL },
