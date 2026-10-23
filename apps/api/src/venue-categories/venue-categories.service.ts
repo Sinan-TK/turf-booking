@@ -2,6 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import type { Prisma, BookingPolicy, VenueCategory } from '@venue/database';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { CommercialTermsService } from '../commercial/commercial-terms.service';
 import type { AuthContext } from '../auth/auth.types';
 import {
   LEGACY_POLICY_DEFAULTS,
@@ -33,6 +34,7 @@ export class VenueCategoriesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly commercialTerms: CommercialTermsService,
   ) {}
 
   /** Public: active categories only, in display order, each with the policy
@@ -99,6 +101,8 @@ export class VenueCategoriesService {
       if (dto.policy) {
         await tx.bookingPolicy.create({ data: this.policyData(created.id, dto.policy) });
       }
+      // Its own commercial terms, pre-filled from the platform default.
+      await this.commercialTerms.createFacilityTerms(tx, created.id);
       return created;
     });
 

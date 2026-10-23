@@ -1,8 +1,10 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { TIME_WINDOW_HOURS, normalizeFacilityCode } from '@venue/shared';
-import type { TimeWindow } from '@venue/shared';
+import type { CommercialTerms, TimeWindow } from '@venue/shared';
+import { Prisma } from '@venue/database';
 import { DateTime } from 'luxon';
-import { effectivePrice, pickPricingRule } from '../pricing/pricing-rules';
+import { atLeastMinAdvance, effectivePrice, pickPricingRule } from '../pricing/pricing-rules';
+import { CommercialTermsService } from '../commercial/commercial-terms.service';
 import { ResourcesService } from '../resources/resources.service';
 import { PolicyResolverService, type ResolvedPolicy } from '../scheduling/policy-resolver.service';
 import { ScheduleService, type OpenWindow } from '../scheduling/schedule.service';
@@ -46,7 +48,18 @@ export class AvailabilityService {
     private readonly resources: ResourcesService,
     private readonly policies: PolicyResolverService,
     private readonly schedule: ScheduleService,
+    private readonly commercialTerms: CommercialTermsService,
   ) {}
+
+  private async termsFor(venueId: string, categoryId: string, cache: Map<string, CommercialTerms>) {
+    const key = `${venueId}:${categoryId}`;
+    let terms = cache.get(key);
+    if (!terms) {
+      terms = (await this.commercialTerms.resolve(venueId, categoryId)).terms;
+      cache.set(key, terms);
+    }
+    return terms;
+  }
 
   /**
    * Read-path only (ARCHITECTURE.md §6.5) — never touches ResourceLock's
@@ -73,6 +86,7 @@ export class AvailabilityService {
 
     const now = new Date();
     const results = [];
+    const termsCache = new Map<string, CommercialTerms>();
     for (const venue of candidateVenues) {
       const resources = await this.availability.findBookableResources(venue.id, params.groundType, categoryId);
       if (resources.length === 0) continue;
@@ -127,6 +141,10 @@ export class AvailabilityService {
           null,
         );
         const priceVaries = new Set(startPrices.map((r) => (r ? effectivePrice(r) : null))).size > 1;
+        // The advance shown is what a hold will charge: never below the facility's minimum.
+        const terms = await this.termsFor(venue.id, resource.categoryId, termsCache);
+        const advanceOf = (r: NonNullable<(typeof startPrices)[number]>) =>
+          atLeastMinAdvance(r.bookingPrice, new Prisma.Decimal(effectivePrice(r)), terms).toString();
 
         results.push({
           venue: {
@@ -167,7 +185,7 @@ export class AvailabilityService {
                 amount: String(effectivePrice(pricingRule)),
                 currency: pricingRule.currency,
                 normalAmount: pricingRule.offerPrice != null ? pricingRule.normalPrice.toString() : null,
-                bookingAmount: pricingRule.bookingPrice.toString(),
+                bookingAmount: advanceOf(pricingRule),
               }
             : null,
           // True when different start times cost different amounts, so the UI can say "from".
@@ -175,7 +193,7 @@ export class AvailabilityService {
           // Aligned with availableStartTimes; null where no price rule covers that time.
           startPrices: startPrices.map((r) => (r ? String(effectivePrice(r)) : null)),
           startNormalPrices: startPrices.map((r) => (r && r.offerPrice != null ? r.normalPrice.toString() : null)),
-          startBookingPrices: startPrices.map((r) => (r ? r.bookingPrice.toString() : null)),
+          startBookingPrices: startPrices.map((r) => (r ? advanceOf(r) : null)),
         });
       }
     }

@@ -4,5 +4,6 @@ export * from './tokens';
 export * from './order-id';
 export * from './coin-idempotency';
 export * from './facility-code';
+export * from './commercial';
 export * from './schemas/search';
 export * from './schemas/booking';

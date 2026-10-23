@@ -9,13 +9,18 @@ import {
 import {
   BOOKING_TRANSITIONS,
   assertTransition,
+  cancellationDeadlines,
+  cancellationOutcome,
+  commercialTermsSchema,
+  fromMinor,
+  toMinor,
+  type CommercialTerms,
 } from '@venue/shared';
 import { loadEnv } from '@venue/config';
-import { Prisma } from '@venue/database';
-import { pickPricingRule, effectivePrice } from '../pricing/pricing-rules';
+import { Prisma, type BookingStatus } from '@venue/database';
+import { pickPricingRule, effectivePrice, atLeastMinAdvance } from '../pricing/pricing-rules';
 import { ResourcesService } from '../resources/resources.service';
 import { BOOKINGS_REPOSITORY, type AdminBookingFilters, type BookingsRepository } from './bookings.repository';
-import { PoliciesService } from '../policies/policies.service';
 import { AuditService } from '../audit/audit.service';
 import { CoinsService } from '../coins/coins.service';
 import { CUSTOMER_MESSENGER, type CustomerMessenger } from '../customer-messaging/customer-messenger.port';
@@ -26,6 +31,8 @@ import type { CreateOfflineBookingDto } from './dto/booking.dto';
 import { PolicyResolverService } from '../scheduling/policy-resolver.service';
 import { ScheduleService } from '../scheduling/schedule.service';
 import { OwnerScopeService } from '../owner-scope/owner-scope.service';
+import { CommercialTermsService } from '../commercial/commercial-terms.service';
+import { SettlementsService } from '../settlements/settlements.service';
 import { assertPolicyAllowsBooking, paddedRange } from '../scheduling/policy-validation';
 
 // Postgres SQLSTATEs that mean "the exclusion constraint on
@@ -59,7 +66,6 @@ export class BookingsService {
   constructor(
     @Inject(BOOKINGS_REPOSITORY) private readonly bookings: BookingsRepository,
     private readonly resources: ResourcesService,
-    private readonly policies: PoliciesService,
     private readonly audit: AuditService,
     private readonly coins: CoinsService,
     @Inject(CUSTOMER_MESSENGER) private readonly messenger: CustomerMessenger,
@@ -68,6 +74,8 @@ export class BookingsService {
     private readonly policyResolver: PolicyResolverService,
     private readonly schedule: ScheduleService,
     private readonly scope: OwnerScopeService,
+    private readonly commercialTerms: CommercialTermsService,
+    private readonly settlements: SettlementsService,
   ) {}
 
   /**
@@ -163,6 +171,10 @@ export class BookingsService {
       startTime,
       venue.timezone,
     );
+    // The facility's commercial terms at booking time, kept on the booking (cancellation windows, commission).
+    const { terms } = await this.commercialTerms.resolve(venue.id, resource.categoryId);
+    const amount = new Prisma.Decimal(effectivePrice(pricingRule));
+    const advanceAmount = atLeastMinAdvance(pricingRule.bookingPrice, amount, terms);
     const footprintIds = await this.resources.getFootprintResourceIds(resource.id);
 
     // Owner-configured blackout (ARCHITECTURE.md's Phase 10 notes) — the
@@ -203,10 +215,12 @@ export class BookingsService {
         durationMinutes: dto.durationMinutes,
         // A unit with no sub-type is recorded under its name so the booking still says what was booked.
         groundType: resource.groundType || resource.name,
-        // The full price (offer if there is one); only the booking price (the advance) is charged online.
-        amount: new Prisma.Decimal(effectivePrice(pricingRule)),
-        advanceAmount: pricingRule.bookingPrice,
+        // The full price (offer if there is one); only the booking price (the advance) is charged online,
+        // never less than the facility's minimum advance.
+        amount,
+        advanceAmount,
         currency: pricingRule.currency,
+        commercialTerms: terms,
       });
     } catch (error) {
       if (isSlotConflictError(error)) {
@@ -292,13 +306,15 @@ export class BookingsService {
       throw new BadRequestException("This can't be booked at that time: no price covers it.");
     }
 
-    const { rule, amount, advance } = await this.resolveGroupPricing(
+    const { rule, amount, advance: ruleAdvance } = await this.resolveGroupPricing(
       group.id,
       dto.durationMinutes,
       dto.quantity,
       startTime,
       venue.timezone,
     );
+    const { terms } = await this.commercialTerms.resolve(venue.id, group.categoryId);
+    const advance = atLeastMinAdvance(ruleAdvance, amount, terms);
 
     // Venue-wide blackout fast-fail (authoritative state for pooled
     // capacity itself lives in the atomic writer, same split as the
@@ -337,6 +353,7 @@ export class BookingsService {
         amount,
         advanceAmount: advance,
         currency: rule.currency,
+        commercialTerms: terms,
       });
     } catch (error) {
       // ConflictException from the atomic writer (race lost) passes
@@ -409,6 +426,7 @@ export class BookingsService {
     if (remaining < quantity) return { available: false };
 
     const rule = await this.findGroupPricingRule(group.id, durationMinutes, startTime, venue.timezone);
+    const { terms } = await this.commercialTerms.resolve(venue.id, group.categoryId);
     return {
       available: true,
       venue: { id: venue.id, name: venue.name, facilityCode: venue.facilityCode, timezone: venue.timezone },
@@ -422,7 +440,11 @@ export class BookingsService {
       price: rule
         ? {
             amount: this.priceGroupAmount(rule, quantity).toString(),
-            advanceAmount: this.advanceGroupAmount(rule, quantity).toString(),
+            advanceAmount: atLeastMinAdvance(
+              this.advanceGroupAmount(rule, quantity),
+              this.priceGroupAmount(rule, quantity),
+              terms,
+            ).toString(),
             currency: rule.currency,
             unitPrice: String(effectivePrice(rule)),
             quantity,
@@ -721,59 +743,163 @@ export class BookingsService {
   }
 
   /**
-   * A never-paid (PENDING_PAYMENT) booking is a legal cancellation
-   * target too (BOOKING_TRANSITIONS allows it — e.g. the customer backs
-   * out before paying) but must NOT produce a refund: nothing was paid,
-   * so there is nothing to return as coins. Only a CONFIRMED booking
-   * goes through the cancellation-policy/refund path. Where a Refund IS
-   * created, it's left in PENDING status here — actually crediting Venue
-   * Coins is Phase 7's CoinsService, which will pick up PENDING refunds
-   * and move them through PROCESSING -> COMPLETED (§7/§11). Intentionally
-   * incomplete pending that phase, not a bug.
+   * The commercial terms a booking runs on: the snapshot taken when it was made, or (bookings made before
+   * commercial terms existed) the facility's current terms.
+   */
+  private async termsForBooking(booking: {
+    venueId: string;
+    resourceId: string | null;
+    resourceGroupId: string | null;
+    commercialTerms: Prisma.JsonValue;
+  }): Promise<CommercialTerms> {
+    const snapshot = commercialTermsSchema.safeParse(booking.commercialTerms);
+    if (snapshot.success) return snapshot.data;
+    const categoryId = await this.commercialTerms.categoryOf(booking);
+    return (await this.commercialTerms.resolve(booking.venueId, categoryId)).terms;
+  }
+
+  /** What was paid online for a booking (0 when nothing was: unpaid, or a walk-in). */
+  private paidOnlineMinor(booking: { status: string; advanceAmount: Prisma.Decimal }): number {
+    return booking.status === 'CONFIRMED' && booking.advanceAmount.gt(0) ? toMinor(booking.advanceAmount.toString()) : 0;
+  }
+
+  /**
+   * What cancelling would do right now, for the customer's booking page and checkout: the windows as absolute
+   * times, when cancelling closes, and what cancelling now returns as coins.
+   */
+  async cancellationPreview(bookingId: string, actor: AuthContext) {
+    const booking = await this.getForCustomer(bookingId, actor);
+    const cancellable = BOOKING_TRANSITIONS[booking.status]?.includes('CANCELLED') ?? false;
+    const terms = await this.termsForBooking(booking);
+    const { windows, closesAt } = cancellationDeadlines(terms, booking.startTime);
+    const paidMinor = this.paidOnlineMinor(booking);
+    const outcome = paidMinor > 0 ? cancellationOutcome(terms, minutesUntil(booking.startTime), paidMinor) : null;
+    return {
+      canCancel: cancellable && (outcome === null || outcome.allowed),
+      currency: booking.currency,
+      paidOnline: fromMinor(paidMinor),
+      // null when nothing was paid (an unpaid hold is simply dropped) or cancelling is closed.
+      now:
+        outcome && outcome.allowed
+          ? { refundPercent: outcome.tier.refundPercent, refundCoins: fromMinor(outcome.refundMinor) }
+          : null,
+      windows: windows.map((w) => ({ until: w.until.toISOString(), refundPercent: w.refundPercent })),
+      closesAt: closesAt.toISOString(),
+    };
+  }
+
+  /**
+   * A customer cancels their own booking, under the terms it was made with (ARCHITECTURE.md §11): inside a
+   * window the paid amount is split into coins back / owner share / platform share (a share for the owner or
+   * the platform is recorded as a LATE_CANCEL settlement); inside the cut-off a paid booking can't be
+   * cancelled. An unpaid (PENDING_PAYMENT) hold can always be dropped and refunds nothing.
    */
   async cancel(bookingId: string, reason: string | undefined, actor: AuthContext) {
     const booking = await this.getForCustomer(bookingId, actor);
-    assertTransition('Booking', BOOKING_TRANSITIONS, booking.status, 'CANCELLED');
-    // Refunds are of what was actually paid online (the booking price), never of the full price: the rest was
-    // due at the venue. A walk-in has no online payment, so nothing to return as Coins.
-    const refundBase = booking.advanceAmount;
-    const wasPaid = booking.status === 'CONFIRMED' && refundBase.gt(0);
+    assertCancellable(booking.status);
 
-    let refundPlan: {
-      policyId: string;
-      refundPercent: number;
-      hoursBeforeStart: number;
-      coinAmountCredited: Prisma.Decimal;
-    } | null = null;
-    if (wasPaid) {
-      const policy = await this.policies.resolveCancellationPolicy(booking.venueId);
-      const hoursBeforeStart = (booking.startTime.getTime() - Date.now()) / (1000 * 60 * 60);
-      const tiers = policy.tiers as Array<{ minHoursBeforeStart: number; refundPercent: number }>;
-      const applicableTier = [...tiers]
-        .sort((a, b) => b.minHoursBeforeStart - a.minHoursBeforeStart)
-        .find((tier) => hoursBeforeStart >= tier.minHoursBeforeStart);
-      const refundPercent = applicableTier?.refundPercent ?? 0;
-      refundPlan = {
-        policyId: policy.id,
-        refundPercent,
-        hoursBeforeStart,
-        coinAmountCredited: refundBase.mul(refundPercent).div(100),
-      };
+    const paidMinor = this.paidOnlineMinor(booking);
+    if (paidMinor === 0) {
+      return this.performCancellation(booking, { reasonCode: 'CUSTOMER_REQUESTED', reason, actor, refund: null, settlement: null });
     }
 
+    const terms = await this.termsForBooking(booking);
+    const minutesBeforeStart = minutesUntil(booking.startTime);
+    const outcome = cancellationOutcome(terms, minutesBeforeStart, paidMinor);
+    if (!outcome.allowed) {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'Bad Request',
+        code: 'CANCELLATION_CLOSED',
+        message: `This booking can no longer be cancelled: cancelling closes ${describeMinutes(terms.cancelCutoffMinutes)} before the start.`,
+      });
+    }
+    const context = await this.settlements.contextOf(booking);
+    return this.performCancellation(booking, {
+      reasonCode: 'CUSTOMER_REQUESTED',
+      reason,
+      actor,
+      refund: {
+        coinMinor: outcome.refundMinor,
+        paidMinor,
+        snapshot: {
+          refundPercent: outcome.tier.refundPercent,
+          ownerPercent: outcome.tier.ownerPercent,
+          minutesBeforeStart: Math.round(minutesBeforeStart),
+          coinAmountCredited: fromMinor(outcome.refundMinor),
+          ownerAmount: fromMinor(outcome.ownerMinor),
+          platformAmount: fromMinor(outcome.platformMinor),
+        },
+      },
+      settlement: this.settlements.lateCancelData(booking, context, paidMinor, outcome, minutesBeforeStart),
+    });
+  }
+
+  /**
+   * The venue (owner admin or its assigned staff) or the Super Admin cancels a booking — rain, closure, a
+   * double sale. Allowed at any time before it is completed, and everything paid online goes back to the
+   * customer as coins; nobody keeps a share.
+   */
+  async cancelByStaff(bookingId: string, reason: string | undefined, actor: AuthContext) {
+    const booking =
+      actor.role === 'SUPER_ADMIN'
+        ? await this.getForAdmin(bookingId)
+        : await this.getForOwner(bookingId, actor.organizationId!);
+    if (actor.role !== 'SUPER_ADMIN') await this.scope.assertVenue(actor, booking.venue.id);
+    assertCancellable(booking.status);
+
+    const paidMinor = this.paidOnlineMinor(booking);
+    return this.performCancellation(booking, {
+      reasonCode: actor.role === 'SUPER_ADMIN' ? 'ADMIN_ACTION' : 'OWNER_ACTION',
+      reason,
+      actor,
+      refund:
+        paidMinor > 0
+          ? {
+              coinMinor: paidMinor,
+              paidMinor,
+              snapshot: { refundPercent: 100, ownerPercent: 0, cancelledBy: actor.role, coinAmountCredited: fromMinor(paidMinor) },
+            }
+          : null,
+      settlement: null,
+    });
+  }
+
+  private async performCancellation(
+    booking: {
+      id: string;
+      orderId: string;
+      status: string;
+      slotHoldId: string;
+      customerId: string;
+      venueId: string;
+      currency: string;
+      resourceId: string | null;
+      resourceGroupId: string | null;
+    },
+    plan: {
+      reasonCode: 'CUSTOMER_REQUESTED' | 'OWNER_ACTION' | 'ADMIN_ACTION';
+      reason: string | undefined;
+      actor: AuthContext;
+      refund: { coinMinor: number; paidMinor: number; snapshot: Prisma.InputJsonObject } | null;
+      settlement: Prisma.BookingSettlementUncheckedCreateInput | null;
+    },
+  ) {
     const result = await this.bookings.cancelAtomic({
-      bookingId,
+      bookingId: booking.id,
       expectedBookingStatus: booking.status,
       slotHoldId: booking.slotHoldId,
-      reason,
-      refundData: refundPlan
+      reason: plan.reason,
+      reasonCode: plan.reasonCode,
+      refundData: plan.refund
         ? {
-            originalAmount: refundBase,
+            originalAmount: fromMinor(plan.refund.paidMinor),
             originalCurrency: booking.currency,
-            coinAmountCredited: refundPlan.coinAmountCredited,
-            policySnapshot: refundPlan,
+            coinAmountCredited: fromMinor(plan.refund.coinMinor),
+            policySnapshot: plan.refund.snapshot,
           }
         : null,
+      settlementData: plan.settlement,
     });
 
     // Completing the refund (actually crediting coins) is a separate
@@ -784,61 +910,48 @@ export class BookingsService {
     // intermediate state if this second step fails; nothing here can
     // double-credit thanks to the idempotency key).
     if (result.refund) {
-      // Overwrite the stale PENDING snapshot from inside the transaction
-      // above with the post-completion row, so the response the caller
-      // sees matches what's actually in the database by the time they
-      // see it (caught live: the DB and the ledger were always correct,
-      // but the HTTP response briefly claimed PENDING for an already-
-      // COMPLETED refund).
+      // The response then matches what's in the database (COMPLETED, not the in-transaction PENDING).
       result.refund = await this.coins.completeRefund(result.refund.id);
     }
 
     await this.audit.record({
-      actor,
+      actor: plan.actor,
       action: 'BOOKING_CANCELLED',
       entityType: 'Booking',
-      entityId: bookingId,
-      metadata: result.refund
-        ? {
-            refundId: result.refund.id,
-            refundPercent: refundPlan?.refundPercent,
-            coinAmountCredited: refundPlan?.coinAmountCredited.toString(),
-          }
-        : { refund: 'none (booking was never paid)' },
+      entityId: booking.id,
+      metadata: {
+        reasonCode: plan.reasonCode,
+        ...(result.refund
+          ? { refundId: result.refund.id, ...plan.refund!.snapshot }
+          : { refund: 'none (nothing was paid online)' }),
+      },
     });
 
-    // Sent from here, not per-channel — a cancellation initiated from
-    // the web app notifies over WhatsApp exactly the same as one
-    // initiated from WhatsApp itself (§15). Awaited (errors swallowed,
-    // never thrown) rather than fire-and-forget: when this cancellation
-    // was itself triggered from the WhatsApp menu, the menu handler
-    // sends its own "back to main menu" message right after this method
-    // returns — firing the notification without awaiting it let that
-    // next message race ahead and arrive first, confirmed live (the
-    // "cancelled" confirmation showed up *after* the main menu in
-    // testing). Awaiting fixes the ordering; the .catch keeps a
-    // notification failure from failing the cancellation itself.
+    // Sent from here, not per-channel, so every cancellation path notifies the same way (§15). Awaited with
+    // errors swallowed: a notification failure must never fail the cancellation itself.
     await this.notifyCancellation(booking.customerId, result).catch(() => undefined);
 
-    // Cancellation here is always customer-initiated (there's no
-    // owner/admin cancel endpoint in this codebase today) — the venue's
-    // organization always needs to hear about it.
     const venue = await this.bookings.findVenueById(booking.venueId);
     if (venue) {
       await this.notifications
-        .notifyOrganizationOwners(venue.organizationId, {
-          type: 'BOOKING_CANCELLED',
-          title: 'Booking cancelled',
-          message: `Booking ${booking.orderId} has been cancelled.`,
-          // P2: exactly one of resourceId/resourceGroupId is set.
-          data: {
-            bookingId: booking.id,
-            orderId: booking.orderId,
-            venueId: booking.venueId,
-            ...(booking.resourceId ? { resourceId: booking.resourceId } : {}),
-            ...(booking.resourceGroupId ? { resourceGroupId: booking.resourceGroupId } : {}),
+        .notifyOrganizationOwners(
+          venue.organizationId,
+          {
+            type: 'BOOKING_CANCELLED',
+            title: 'Booking cancelled',
+            message: `Booking ${booking.orderId} has been cancelled.`,
+            // P2: exactly one of resourceId/resourceGroupId is set.
+            data: {
+              bookingId: booking.id,
+              orderId: booking.orderId,
+              venueId: booking.venueId,
+              ...(booking.resourceId ? { resourceId: booking.resourceId } : {}),
+              ...(booking.resourceGroupId ? { resourceGroupId: booking.resourceGroupId } : {}),
+            },
           },
-        })
+          // The owner who cancelled already knows; their teammates still need to hear.
+          { excludeOwnerId: plan.actor.role === 'VENUE_OWNER' ? plan.actor.id : undefined },
+        )
         .catch(() => undefined);
     }
 
@@ -857,4 +970,27 @@ export class BookingsService {
       result.refund ? result.refund.coinAmountCredited.toString() : undefined,
     );
   }
+}
+
+/** A clear 400 for a booking that is already cancelled, completed or a no-show (not an illegal-transition 500). */
+function assertCancellable(status: BookingStatus) {
+  if (!BOOKING_TRANSITIONS[status]?.includes('CANCELLED')) {
+    throw new BadRequestException(
+      status === 'CANCELLED' ? 'This booking is already cancelled.' : `A ${status.toLowerCase().replace('_', ' ')} booking can't be cancelled.`,
+    );
+  }
+  assertTransition('Booking', BOOKING_TRANSITIONS, status, 'CANCELLED');
+}
+
+function minutesUntil(time: Date): number {
+  return (time.getTime() - Date.now()) / 60_000;
+}
+
+/** "45 minutes", "1 hour", "48 hours", "1 hour 30 minutes". */
+function describeMinutes(total: number): string {
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+  const part = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'}`;
+  if (hours === 0) return part(minutes, 'minute');
+  return minutes === 0 ? part(hours, 'hour') : `${part(hours, 'hour')} ${part(minutes, 'minute')}`;
 }

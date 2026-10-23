@@ -1,5 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { DateTime } from 'luxon';
+import { Prisma } from '@venue/database';
+import { fromMinor, minAdvanceMinor, toMinor, type CommercialTerms } from '@venue/shared';
 
 /** ISO weekdays: 1 = Monday .. 7 = Sunday. */
 export const ALL_WEEKDAYS = [1, 2, 3, 4, 5, 6, 7] as const;
@@ -161,13 +163,17 @@ export function effectivePrice(rule: { normalPrice: Money; offerPrice?: Money | 
 /**
  * Checks a rule's three prices and fills in the booking price. Normal is the full price; an offer must
  * be below it and then replaces it as the full price; the booking price (the advance paid online) can
- * equal the full price but never exceed it, and defaults to it (pay everything up front).
+ * equal the full price but never exceed it, and defaults to it (pay everything up front). It must also be at
+ * least the facility's minimum advance (`minAdvancePercent` of the full price, from its commercial terms).
  */
-export function resolvePrices(input: {
-  normalPrice: number;
-  offerPrice?: number | null;
-  bookingPrice?: number | null;
-}): { normalPrice: number; offerPrice: number | null; bookingPrice: number } {
+export function resolvePrices(
+  input: {
+    normalPrice: number;
+    offerPrice?: number | null;
+    bookingPrice?: number | null;
+  },
+  minAdvancePercent?: number,
+): { normalPrice: number; offerPrice: number | null; bookingPrice: number } {
   const normalPrice = cents(input.normalPrice);
   const offerPrice = input.offerPrice == null ? null : cents(input.offerPrice);
   if (offerPrice !== null && offerPrice >= normalPrice) {
@@ -183,7 +189,29 @@ export function resolvePrices(input: {
       `The booking amount can't be more than the ${offerPrice !== null ? 'offer' : 'normal'} price (${full}).`,
     );
   }
+  if (minAdvancePercent !== undefined) {
+    const minimum = fromMinor(minAdvanceMinor(toMinor(full), { minAdvancePercent }));
+    if (bookingPrice < Number(minimum)) {
+      throw new BadRequestException(
+        `The booking amount must be at least ${minAdvancePercent}% of the ${offerPrice !== null ? 'offer' : 'normal'} price (${minimum}).`,
+      );
+    }
+  }
   return { normalPrice, offerPrice, bookingPrice };
+}
+
+/**
+ * The advance actually charged online: the rule's booking price, raised to the facility's current minimum
+ * (a price saved before the minimum went up never under-collects), and never above the full price.
+ */
+export function atLeastMinAdvance(
+  advance: Prisma.Decimal,
+  amount: Prisma.Decimal,
+  terms: Pick<CommercialTerms, 'minAdvancePercent'>,
+): Prisma.Decimal {
+  const minimum = new Prisma.Decimal(fromMinor(minAdvanceMinor(toMinor(amount.toString()), terms)));
+  const raised = advance.lt(minimum) ? minimum : advance;
+  return raised.gt(amount) ? amount : raised;
 }
 
 /** A rule as the API returns it: the stored three prices plus `price`, the effective full price. */

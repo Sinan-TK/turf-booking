@@ -58,6 +58,12 @@ export class BookingsController {
     return this.bookings.getCheckoutViewForCustomer(id, actor);
   }
 
+  // What cancelling would return now, and the cancellation deadlines as times.
+  @Get('me/bookings/:id/cancellation')
+  cancellationPreview(@Param('id') id: string, @CurrentUser() actor: AuthContext) {
+    return this.bookings.cancellationPreview(id, actor);
+  }
+
   @Post('me/bookings/:id/cancel')
   cancel(
     @Param('id') id: string,
@@ -111,6 +117,12 @@ export class AdminBookingsController {
   @Get(':id')
   getById(@Param('id') id: string) {
     return this.bookings.getForAdmin(id);
+  }
+
+  // Cancels on the venue's behalf: everything paid online back as coins.
+  @Post(':id/cancel')
+  cancel(@Param('id') id: string, @Body() dto: CancelBookingDto, @CurrentUser() actor: AuthContext) {
+    return this.bookings.cancelByStaff(id, dto.reason, actor);
   }
 }
 
@@ -187,6 +199,13 @@ export class OwnerBookingsController {
   @Post(':id/collect')
   collect(@Param('id') id: string, @Body() dto: CollectBalanceDto, @CurrentUser() actor: AuthContext) {
     return this.bookings.collectBalance(id, dto.amount, actor);
+  }
+
+  // Rain, closure, a double sale: the venue cancels (any time before it is played), everything paid online
+  // back to the customer as coins. Owner admins and the staff assigned to the venue.
+  @Post(':id/cancel')
+  cancel(@Param('id') id: string, @Body() dto: CancelBookingDto, @CurrentUser() actor: AuthContext) {
+    return this.bookings.cancelByStaff(id, dto.reason, actor);
   }
 
   @Get(':id')

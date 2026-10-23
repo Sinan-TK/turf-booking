@@ -15,6 +15,7 @@ import { OwnerOrganizationsModule } from './owner-organizations/owner-organizati
 import { ResourcesModule } from './resources/resources.module';
 import { VenueConfigModule } from './venue-config/venue-config.module';
 import { PoliciesModule } from './policies/policies.module';
+import { CommercialModule } from './commercial/commercial.module';
 import { CustomersModule } from './customers/customers.module';
 import { SavedVenuesModule } from './saved-venues/saved-venues.module';
 import { BookingSessionsModule } from './booking-sessions/booking-sessions.module';
@@ -42,6 +43,7 @@ import { HealthModule } from './health/health.module';
     ResourcesModule,
     VenueConfigModule,
     PoliciesModule,
+    CommercialModule,
     CustomersModule,
     SavedVenuesModule,
     BookingSessionsModule,

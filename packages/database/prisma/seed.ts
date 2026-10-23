@@ -152,6 +152,62 @@ const P1_VENUE_CATEGORIES: Array<{
   { slug: 'GENERIC', name: 'Generic Hourly Venue', mode: 'EXCLUSIVE', iconKey: 'category', unitLabel: 'Unit', venueLabel: 'Venue', unitTypes: [], sortOrder: 1000 },
 ];
 
+// Starting commercial terms (founder/pricing-strategy.md), the same values
+// as migration 20261023000000_commercial_terms_settlements_payouts. Only
+// written where a row is missing: once a facility exists, its terms are
+// admin-managed.
+const SPORTS_TERMS = {
+  commissionTiers: [{ fromBooking: 1, type: 'PERCENTAGE', value: 10 }],
+  monthlyCommissionCap: 2500,
+  afterCapFeePercent: 2.5,
+  minAdvancePercent: 25,
+  cancellationTiers: [
+    { minHoursBeforeStart: 6, refundPercent: 100, ownerPercent: 0 },
+    { minHoursBeforeStart: 1, refundPercent: 30, ownerPercent: 50 },
+  ],
+  cancelCutoffMinutes: 60,
+};
+const FACILITY_STARTING_TERMS: Record<string, typeof SPORTS_TERMS | Record<string, unknown>> = {
+  KAYAKING: {
+    commissionTiers: [{ fromBooking: 1, type: 'PERCENTAGE', value: 18 }],
+    monthlyCommissionCap: null,
+    afterCapFeePercent: 0,
+    minAdvancePercent: 50,
+    cancellationTiers: [
+      { minHoursBeforeStart: 24, refundPercent: 100, ownerPercent: 0 },
+      { minHoursBeforeStart: 3, refundPercent: 30, ownerPercent: 50 },
+    ],
+    cancelCutoffMinutes: 180,
+  },
+  ...Object.fromEntries(
+    ['BILLIARDS', 'SNOOKER', 'GAMING_STATION', 'PHOTO_STUDIO', 'STUDIO'].map((slug) => [
+      slug,
+      { ...SPORTS_TERMS, monthlyCommissionCap: 2000 },
+    ]),
+  ),
+};
+
+async function seedCommercialTerms() {
+  const platformDefault = await prisma.commercialPolicy.findFirst({ where: { scope: 'PLATFORM_DEFAULT' } });
+  if (!platformDefault) {
+    await prisma.commercialPolicy.create({
+      data: {
+        scope: 'PLATFORM_DEFAULT',
+        terms: { ...SPORTS_TERMS, payoutWeekday: 1, payoutTimezone: 'Asia/Kolkata' },
+      },
+    });
+  }
+  const categories = await prisma.venueCategory.findMany({
+    where: { commercialPolicies: { none: { scope: 'FACILITY' } } },
+  });
+  for (const category of categories) {
+    await prisma.commercialPolicy.create({
+      data: { scope: 'FACILITY', categoryId: category.id, terms: FACILITY_STARTING_TERMS[category.slug] ?? SPORTS_TERMS },
+    });
+  }
+  console.log(`Seeded commercial terms for ${categories.length} facilities.`);
+}
+
 const P1_BASE_CANCELLATION_POLICY_ID = '00000000-0000-0000-0000-000000000001';
 const P1_PLATFORM_POLICY_ID = '00000000-0000-0000-0000-000000000101';
 
@@ -182,6 +238,8 @@ async function seedP1VenueSkeleton() {
     });
   }
   console.log(`Seeded ${P1_VENUE_CATEGORIES.length} venue categories.`);
+
+  await seedCommercialTerms();
 
   const basePolicy = await prisma.cancellationPolicy.findUnique({
     where: { id: P1_BASE_CANCELLATION_POLICY_ID },

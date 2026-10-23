@@ -212,6 +212,7 @@ export class PrismaBookingsRepository implements BookingsRepository {
           amount: params.amount,
           advanceAmount: params.advanceAmount,
           currency: params.currency,
+          commercialTerms: params.commercialTerms,
         },
       });
     });
@@ -305,6 +306,7 @@ export class PrismaBookingsRepository implements BookingsRepository {
           amount: params.amount,
           advanceAmount: params.advanceAmount,
           currency: params.currency,
+          commercialTerms: params.commercialTerms,
         },
       });
       // Contenders queue on the group's row lock and the clock starts at
@@ -379,7 +381,7 @@ export class PrismaBookingsRepository implements BookingsRepository {
         where: { id: params.bookingId, status: params.expectedBookingStatus as BookingStatus },
         data: {
           status: 'CANCELLED',
-          cancellationReasonCode: 'CUSTOMER_REQUESTED',
+          cancellationReasonCode: params.reasonCode,
           cancellationNote: params.reason,
           cancelledAt: new Date(),
         },
@@ -400,6 +402,10 @@ export class PrismaBookingsRepository implements BookingsRepository {
         where: { slotHoldId: params.slotHoldId },
         data: { status: 'RELEASED' },
       });
+
+      if (params.settlementData) {
+        await tx.bookingSettlement.create({ data: params.settlementData });
+      }
 
       if (!params.refundData) {
         return { booking: updated, refund: null };

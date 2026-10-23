@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PolicyResolverService } from '../scheduling/policy-resolver.service';
+import { CommercialTermsService } from '../commercial/commercial-terms.service';
 import { isDurationAllowed } from '../scheduling/policy-validation';
 import { allowedDurations } from '../common/booking-policy.defaults';
 import {
@@ -33,6 +34,7 @@ export class VenueConfigService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly policies: PolicyResolverService,
+    private readonly commercialTerms: CommercialTermsService,
   ) {}
 
   private async assertVenueOwnership(venueId: string, actor: AuthContext) {
@@ -58,6 +60,18 @@ export class VenueConfigService {
     }
   }
 
+  /** The minimum online advance (% of the full price) of the facility this unit belongs to, in its venue. */
+  private async minAdvancePercentFor(target: { resourceId?: string | null; resourceGroupId?: string | null }) {
+    const unit = target.resourceId
+      ? await this.prisma.client.resource.findUnique({ where: { id: target.resourceId } })
+      : target.resourceGroupId
+        ? await this.prisma.client.resourceGroup.findUnique({ where: { id: target.resourceGroupId } })
+        : null;
+    // A missing unit is reported (404) by the caller's own lookup.
+    if (!unit) return undefined;
+    return (await this.commercialTerms.resolve(unit.venueId, unit.categoryId)).terms.minAdvancePercent;
+  }
+
   // --- Pricing rules ---------------------------------------------------
 
   async createPricingRule(dto: CreatePricingRuleDto, actor: AuthContext) {
@@ -71,11 +85,14 @@ export class VenueConfigService {
       ? [...new Set(dto.days)].sort((a, b) => a - b)
       : legacyDayTypeToWeekdays(dto.dayType!);
     if (weekdays.length === 0) throw new BadRequestException('Choose the days this price applies to');
-    const prices = resolvePrices({
-      normalPrice: (dto.normalPrice ?? dto.price)!,
-      offerPrice: dto.offerPrice,
-      bookingPrice: dto.bookingPrice,
-    });
+    const prices = resolvePrices(
+      {
+        normalPrice: (dto.normalPrice ?? dto.price)!,
+        offerPrice: dto.offerPrice,
+        bookingPrice: dto.bookingPrice,
+      },
+      await this.minAdvancePercentFor({ resourceId: dto.resourceId, resourceGroupId: dto.resourceGroupId }),
+    );
     const candidate = {
       resourceId: dto.resourceId ?? null,
       resourceGroupId: dto.resourceGroupId ?? null,
@@ -236,12 +253,15 @@ export class VenueConfigService {
       dto.bookingPrice !== undefined;
     const oldFull = effectivePrice(rule);
     const prices = touchesPrice
-      ? resolvePrices({
-          normalPrice: dto.normalPrice ?? dto.price ?? Number(rule.normalPrice),
-          offerPrice:
-            dto.offerPrice === undefined ? (rule.offerPrice == null ? null : Number(rule.offerPrice)) : dto.offerPrice,
-          bookingPrice: dto.bookingPrice ?? (Number(rule.bookingPrice) === oldFull ? undefined : Number(rule.bookingPrice)),
-        })
+      ? resolvePrices(
+          {
+            normalPrice: dto.normalPrice ?? dto.price ?? Number(rule.normalPrice),
+            offerPrice:
+              dto.offerPrice === undefined ? (rule.offerPrice == null ? null : Number(rule.offerPrice)) : dto.offerPrice,
+            bookingPrice: dto.bookingPrice ?? (Number(rule.bookingPrice) === oldFull ? undefined : Number(rule.bookingPrice)),
+          },
+          await this.minAdvancePercentFor({ resourceId: rule.resourceId, resourceGroupId: rule.resourceGroupId }),
+        )
       : undefined;
     if (next.weekdays.length === 0) throw new BadRequestException('Choose the days this price applies to');
     if (dto.durationMinutes !== undefined && dto.durationMinutes !== rule.durationMinutes) {

@@ -140,6 +140,45 @@ export async function createStaffFixture(app: INestApplication, organizationId: 
   return { staffId: user.id, agent };
 }
 
+/**
+ * A fresh facility (VenueCategory) on the same hourly rules as the default venue fixture, created through the
+ * admin API (so it gets its own commercial terms, copied from the platform default). `terms`, when given, then
+ * replaces the facility's own commercial terms — tests use this to pick exact, test-friendly numbers.
+ */
+export async function createCategoryFixture(
+  adminAgent: TestAgent,
+  terms?: Record<string, unknown>,
+  options: { allocationMode?: 'EXCLUSIVE' | 'POOLED' } = {},
+): Promise<string> {
+  const slug = `E2E_${uniqueSuffix().toUpperCase().replace(/-/g, '')}`;
+  const res = await adminAgent.post('/admin/categories').send({
+    slug,
+    name: `E2E ${slug}`,
+    defaultAllocationMode: options.allocationMode ?? 'EXCLUSIVE',
+    iconKey: 'category',
+    unitLabel: 'Unit',
+    venueLabel: 'Venue',
+    unitTypes: [],
+    policy: {
+      slotIntervalMin: 60,
+      minDurationMin: 60,
+      maxDurationMin: 180,
+      durationIncrementMin: 60,
+      bufferBeforeMin: 0,
+      bufferAfterMin: 0,
+      maxAdvanceDays: 60,
+      minLeadMinutes: 0,
+    },
+  });
+  if (res.status !== 201) throw new Error(`Category creation failed: ${res.status} ${JSON.stringify(res.body)}`);
+  const categoryId = res.body.id as string;
+  if (terms) {
+    const put = await adminAgent.put(`/admin/categories/${categoryId}/commercial-terms`).send(terms);
+    if (put.status !== 200) throw new Error(`Setting commercial terms failed: ${put.status} ${JSON.stringify(put.body)}`);
+  }
+  return categoryId;
+}
+
 interface VenueFixture {
   venueId: string;
   fullGroundId: string;

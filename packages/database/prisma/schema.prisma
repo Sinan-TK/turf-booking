@@ -64,6 +64,8 @@ model OwnerOrganization {
   venues       Venue[]
   commissions Commission[]
   promotions  Promotion[]
+  settlements BookingSettlement[]
+  payouts     Payout[]
 
   @@map("owner_organizations")
 }
@@ -410,6 +412,8 @@ model Venue {
   availabilityRules AvailabilityRule[]
   blockedPeriods    BlockedPeriod[]
   staffAssignments  VenueStaffAssignment[]
+  commercialPolicies CommercialPolicy[]
+  settlements        BookingSettlement[]
 
   @@index([organizationId])
   @@index([categoryId])
@@ -807,6 +811,10 @@ model Booking {
   cancellationReasonCode   BookingCancellationReasonCode?
   cancellationNote         String?
   cancelledAt              DateTime?
+  /// The resolved commercial terms when the booking was made (commission,
+  /// cap, cancellation windows...). Later term changes never touch it.
+  /// Null for walk-ins and bookings made before commercial terms existed.
+  commercialTerms          Json?
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
@@ -815,6 +823,7 @@ model Booking {
   coinTransactions     CoinTransaction[]
   supportTickets       SupportTicket[]
   promotionRedemption  PromotionRedemption?
+  settlement           BookingSettlement?
 
   @@index([customerId, status])
   @@index([venueId, status])
@@ -990,6 +999,128 @@ model Commission {
 
   @@index([organizationId, effectiveFrom])
   @@map("commissions")
+}
+
+/// Where a set of commercial terms applies. Terms merge field by field:
+/// VENUE_FACILITY (one venue's deal for one facility) > FACILITY (the
+/// facility, i.e. VenueCategory) > PLATFORM_DEFAULT (complete; pre-fills
+/// new facilities and holds the platform-only payout settings).
+enum CommercialPolicyScope {
+  PLATFORM_DEFAULT
+  FACILITY
+  VENUE_FACILITY
+}
+
+/// Commission, monthly cap, minimum advance, cancellation windows and
+/// payout schedule (packages/shared/src/commercial.ts). `terms` holds only
+/// the keys this level sets; a missing key inherits from the next level.
+/// One row per level target (partial unique indexes in the migration).
+model CommercialPolicy {
+  id         String                @id @default(uuid()) @db.Uuid
+  scope      CommercialPolicyScope
+  categoryId String?               @db.Uuid
+  category   VenueCategory?        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  venueId    String?               @db.Uuid
+  venue      Venue?                @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  terms      Json
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+
+  @@index([categoryId])
+  @@index([venueId])
+  @@map("commercial_policies")
+}
+
+enum SettlementKind {
+  PLAYED
+  NO_SHOW
+  LATE_CANCEL
+}
+
+/// How the money collected online for one booking is split between the
+/// venue owner and the platform. Written once (unique bookingId) when the
+/// booking is played / no-show, or when a customer cancels inside a window
+/// that pays the owner or the platform. Owners are paid from these rows.
+model BookingSettlement {
+  id             String            @id @default(uuid()) @db.Uuid
+  bookingId      String            @unique @db.Uuid
+  booking        Booking           @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  organizationId String            @db.Uuid
+  organization   OwnerOrganization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  venueId        String            @db.Uuid
+  venue          Venue             @relation(fields: [venueId], references: [id], onDelete: Restrict)
+  categoryId     String            @db.Uuid
+  category       VenueCategory     @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  kind           SettlementKind
+  slotStart      DateTime
+  /// "yyyy-MM" of slotStart in the venue's timezone: the cap/tier month.
+  periodMonth    String
+  currency       String            @default("INR")
+  /// Paid online for the booking (money or coins).
+  collected      Decimal           @db.Decimal(12, 2)
+  commission     Decimal           @db.Decimal(12, 2)
+  /// The after-cap fee.
+  fee            Decimal           @db.Decimal(12, 2)
+  /// Returned to the customer as coins (late cancellations).
+  refunded       Decimal           @default(0) @db.Decimal(12, 2)
+  ownerAmount    Decimal           @db.Decimal(12, 2)
+  platformAmount Decimal           @db.Decimal(12, 2)
+  /// Tier, cap position and the terms used, for statements and audits.
+  details        Json
+  payoutId       String?           @db.Uuid
+  payout         Payout?           @relation(fields: [payoutId], references: [id], onDelete: SetNull)
+  createdAt      DateTime          @default(now())
+
+  @@index([organizationId, payoutId])
+  @@index([venueId, categoryId, periodMonth])
+  @@map("booking_settlements")
+}
+
+/// Running cap/tier counter per venue + facility + month, row-locked while
+/// a booking is settled so concurrent settlements can't both slip under
+/// the cap.
+model VenueCommissionMonth {
+  venueId         String   @db.Uuid
+  categoryId      String   @db.Uuid
+  periodMonth     String
+  bookingCount    Int      @default(0)
+  commissionTotal Decimal  @default(0) @db.Decimal(12, 2)
+  updatedAt       DateTime @updatedAt
+
+  @@id([venueId, categoryId, periodMonth])
+  @@map("venue_commission_months")
+}
+
+enum PayoutStatus {
+  PENDING
+  PAID
+}
+
+/// One weekly payout to an owner organization: every unpaid settlement
+/// whose slot started before periodEnd. Phase 1 is paid by bank transfer
+/// and marked paid with the transfer reference.
+model Payout {
+  id               String            @id @default(uuid()) @db.Uuid
+  organizationId   String            @db.Uuid
+  organization     OwnerOrganization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  /// Exclusive end of the payout week.
+  periodEnd        DateTime
+  currency         String            @default("INR")
+  totalOwnerAmount Decimal           @db.Decimal(12, 2)
+  settlementCount  Int
+  status           PayoutStatus      @default(PENDING)
+  /// Bank transfer reference (UTR) once paid.
+  reference        String?
+  paidAt           DateTime?
+  paidByAdminId    String?           @db.Uuid
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  settlements BookingSettlement[]
+
+  @@unique([organizationId, periodEnd, currency])
+  @@index([status, periodEnd])
+  @@map("payouts")
 }
 
 enum PromotionScope {
@@ -1314,6 +1445,8 @@ model VenueCategory {
   venues           Venue[]
   resources        Resource[]      @relation("ResourceCategory")
   resourceGroups   ResourceGroup[] @relation("ResourceGroupCategory")
+  commercialPolicies CommercialPolicy[]
+  settlements        BookingSettlement[]
 
   @@map("venue_categories")
 }

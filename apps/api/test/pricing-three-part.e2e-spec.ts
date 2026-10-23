@@ -139,7 +139,7 @@ describe('Normal, offer and booking prices', () => {
       const { agent: customer } = await createCustomerFixture(app);
       const hold = await customer
         .post('/bookings/hold')
-        .send({ resourceId: unitId, startTime: futureStart(30, 9).toISOString(), durationMinutes: 60 })
+        .send({ resourceId: unitId, startTime: futureStart(21, 9).toISOString(), durationMinutes: 60 })
         .expect(201);
       expect(Number(hold.body.amount)).toBe(800);
       expect(Number(hold.body.advanceAmount)).toBe(300);

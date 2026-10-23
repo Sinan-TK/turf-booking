@@ -9,11 +9,13 @@ import { CoinsModule } from '../coins/coins.module';
 import { CustomerMessagingModule } from '../customer-messaging/customer-messaging.module';
 import { CustomersModule } from '../customers/customers.module';
 import { SchedulingModule } from '../scheduling/scheduling.module';
+import { SettlementsModule } from '../settlements/settlements.module';
 
 @Module({
   imports: [
     ResourcesModule,
     PoliciesModule,
+    SettlementsModule,
     CoinsModule,
     CustomerMessagingModule,
     CustomersModule,

@@ -1,5 +1,6 @@
 import type {
   Booking,
+  BookingCancellationReasonCode,
   CustomerProfile,
   InventoryReservation,
   PaymentMethod,
@@ -81,6 +82,8 @@ export interface HoldAtomicParams {
   /** The part charged online to hold the slot (0 for an offline walk-in). */
   advanceAmount: Prisma.Decimal | number | string;
   currency: string;
+  /** Resolved commercial terms the booking is made under (none for walk-ins). */
+  commercialTerms?: Prisma.InputJsonValue;
 }
 
 export interface OfflineAtomicParams extends HoldAtomicParams {
@@ -118,6 +121,7 @@ export interface PooledHoldAtomicParams {
   amount: Prisma.Decimal | number | string;
   advanceAmount: Prisma.Decimal | number | string;
   currency: string;
+  commercialTerms: Prisma.InputJsonValue;
 }
 
 export interface CancelAtomicParams {
@@ -125,6 +129,9 @@ export interface CancelAtomicParams {
   expectedBookingStatus: string;
   slotHoldId: string;
   reason: string | undefined;
+  reasonCode: BookingCancellationReasonCode;
+  /** A late cancellation's owner/platform split, written in the same transaction. */
+  settlementData?: Prisma.BookingSettlementUncheckedCreateInput | null;
   refundData:
     | {
         originalAmount: Prisma.Decimal | number | string;
