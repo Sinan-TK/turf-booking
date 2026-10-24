@@ -53,7 +53,7 @@ export async function closeDatabase(): Promise<void> {
  * Makes `code` the valid emailed code for this address (the API stores only an HMAC of each code and the email
  * cannot be read by a test). The row is created by the real sign-up or forgot-password call.
  */
-export async function plantEmailCode(email: string, purpose: 'SIGNUP' | 'RESET', code = '123456'): Promise<void> {
+export async function plantEmailCode(email: string, purpose: 'SIGNUP' | 'RESET' | 'VERIFY', code = '123456'): Promise<void> {
   const secret = apiEnv().CUSTOMER_SESSION_SECRET;
   if (!secret) throw new Error('CUSTOMER_SESSION_SECRET is not set in apps/api/.env');
   const prisma = await database();

@@ -17,7 +17,7 @@ import { CustomersService, normalizeEmail } from '../customers/customers.service
 import { MailService } from '../identity/mail.service';
 import { INDIAN_MOBILE_MESSAGE, normalizeIndianMobile } from '../common/phone';
 
-type CodePurpose = 'SIGNUP' | 'RESET';
+type CodePurpose = 'SIGNUP' | 'RESET' | 'VERIFY';
 interface SignUpPayload {
   name: string;
   phone: string;
@@ -84,6 +84,27 @@ export class CustomerPasswordService {
     });
     const payload = row.payload as unknown as SignUpPayload;
     return this.customers.signUp({ name: payload.name, phone: payload.phone, passwordHash: payload.passwordHash, email });
+  }
+
+  /** Emails a code to the address on the account, to prove it is theirs (the Verify button on the profile). */
+  async sendEmailVerification(customerId: string) {
+    const env = loadEnv();
+    const customer = await this.prisma.client.customerProfile.findUnique({ where: { id: customerId } });
+    if (!customer) throw new UnauthorizedException('Authentication required');
+    if (!customer.email) throw new BadRequestException('Add an email address first.');
+    if (customer.emailVerified) throw new BadRequestException('Your email is already verified.');
+    await this.issueCode(customer.email, 'VERIFY', null, customer.name ?? 'there', { explicit: true });
+    return { expiresInMinutes: env.EMAIL_OTP_TTL_MINUTES, resendAfterSeconds: env.OTP_RESEND_COOLDOWN_SECONDS };
+  }
+
+  /** The emailed code marks the account's email verified. A code sent to an earlier address can't verify a new one. */
+  async confirmEmailVerification(customerId: string, code: string) {
+    const customer = await this.prisma.client.customerProfile.findUnique({ where: { id: customerId } });
+    if (!customer) throw new UnauthorizedException('Authentication required');
+    if (!customer.email) throw new BadRequestException('Add an email address first.');
+    if (customer.emailVerified) return customer;
+    await this.consumeCode(customer.email, 'VERIFY', code);
+    return this.prisma.client.customerProfile.update({ where: { id: customerId }, data: { emailVerified: true } });
   }
 
   async login(email: string, password: string) {
@@ -201,14 +222,17 @@ export class CustomerPasswordService {
     const env = loadEnv();
     const name = rawName || 'there';
     const minutes = env.EMAIL_OTP_TTL_MINUTES;
-    const signup = purpose === 'SIGNUP';
-    const heading = signup ? 'Verify your email' : 'Reset your password';
-    const intro = signup
-      ? 'Use this code to finish creating your Venue Booking account.'
-      : 'Use this code to set a new password for your Venue Booking account.';
+    const reset = purpose === 'RESET';
+    const heading = reset ? 'Reset your password' : 'Verify your email';
+    const intro =
+      purpose === 'SIGNUP'
+        ? 'Use this code to finish creating your Venue Booking account.'
+        : purpose === 'VERIFY'
+          ? 'Use this code to verify the email address on your Venue Booking account.'
+          : 'Use this code to set a new password for your Venue Booking account.';
     return this.mail.send({
       to,
-      subject: signup ? `${code} is your Venue Booking verification code` : `${code} is your Venue Booking password reset code`,
+      subject: reset ? `${code} is your Venue Booking password reset code` : `${code} is your Venue Booking verification code`,
       text: `Hi ${name},\n\n${intro}\n\nYour code: ${code}\n\nIt works once and expires in ${minutes} minutes. If you did not ask for it, you can ignore this email.`,
       html: `<p>Hi ${escapeHtml(name)},</p><p>${intro}</p><p style="font-size:28px;font-weight:700;letter-spacing:6px">${code}</p><p>It works once and expires in ${minutes} minutes. If you did not ask for it, you can ignore this email.</p>`,
       template: env.RESEND_OTP_TEMPLATE_ID

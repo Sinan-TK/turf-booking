@@ -24,6 +24,7 @@ import {
   SignUpDto,
   UpdateProfileDto,
   VerifyCodeDto,
+  VerifyEmailDto,
   VerifySignUpDto,
 } from './dto/customer-auth.dto';
 
@@ -119,6 +120,29 @@ export class CustomerAuthController {
   async changePassword(@CurrentUser() actor: AuthContext, @Body() dto: ChangePasswordDto, @Res({ passthrough: true }) res: Response) {
     await this.passwords.changePassword(actor.id, dto.currentPassword, dto.newPassword);
     return { customer: await this.signIn(res, actor.id) };
+  }
+
+  // --- Verifying the email on the account -------------------------------------
+
+  /** Emails a code to the account's (unverified) email. */
+  @Post('email/send-code')
+  @HttpCode(200)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.CUSTOMER)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  sendEmailCode(@CurrentUser() actor: AuthContext) {
+    return this.passwords.sendEmailVerification(actor.id);
+  }
+
+  /** The emailed code marks the email verified. */
+  @Post('email/verify')
+  @HttpCode(200)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.CUSTOMER)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async verifyEmail(@CurrentUser() actor: AuthContext, @Body() dto: VerifyEmailDto) {
+    await this.passwords.confirmEmailVerification(actor.id, dto.code);
+    return this.customers.getOwnView(actor.id);
   }
 
   // --- Phone one-time code (built, not shown in the web app by default) ------

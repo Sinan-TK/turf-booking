@@ -103,6 +103,7 @@ export class BookingsService {
     if (!!dto.resourceId === !!dto.resourceGroupId) {
       throw new BadRequestException('Exactly one of resourceId, resourceGroupId is required');
     }
+    await this.assertContactVerified(actor.id);
     if (dto.resourceGroupId) {
       return this.createPooledHold(
         {
@@ -122,6 +123,23 @@ export class BookingsService {
       },
       actor,
     );
+  }
+
+  /**
+   * Booking needs a way to reach the customer that has been proved: a verified email or a verified phone number.
+   * Someone who has verified neither (an email typed into a profile, a number nobody confirmed) can look, but not book.
+   */
+  private async assertContactVerified(customerId: string) {
+    const customer = await this.bookings.findCustomerById(customerId);
+    if (!customer) throw new NotFoundException('Customer not found');
+    if (!customer.emailVerified && !customer.phoneVerified) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        error: 'Forbidden',
+        code: 'CONTACT_NOT_VERIFIED',
+        message: 'Verify your email or phone number before booking a slot.',
+      });
+    }
   }
 
   private async createExclusiveHold(

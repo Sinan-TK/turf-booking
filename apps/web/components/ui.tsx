@@ -39,6 +39,8 @@ import {
   LogOut,
   Eye,
   EyeOff,
+  KeyRound,
+  ShieldCheck,
   type LucideIcon
 } from 'lucide-react';
 
@@ -84,6 +86,8 @@ const ICON_MAP: Record<string, LucideIcon> = {
   logout: LogOut,
   visibility: Eye,
   visibility_off: EyeOff,
+  lock: KeyRound,
+  verified: ShieldCheck,
 };
 
 export function Icon({ name, className = '' }: { name: string; className?: string; filled?: boolean }) {

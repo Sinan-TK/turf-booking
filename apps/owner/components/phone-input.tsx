@@ -2,14 +2,24 @@
 
 import type { InputHTMLAttributes } from 'react';
 
-/** The Indian flag as a small inline image (flag emoji do not render on Windows). */
+/** The Indian flag as a small inline image (flag emoji do not render on Windows): three equal bands and the Ashoka Chakra. */
+const CHAKRA_SPOKES = Array.from({ length: 24 }, (_, i) => {
+  const angle = (i * 15 * Math.PI) / 180;
+  return { x: 450 + 75 * Math.cos(angle), y: 300 + 75 * Math.sin(angle) };
+});
 function IndiaFlag() {
   return (
-    <svg viewBox="0 0 30 20" width="22" height="15" aria-hidden="true" className="shrink-0 rounded-[2px] ring-1 ring-black/10">
-      <rect width="30" height="20" fill="#fff" />
-      <rect width="30" height="6.67" fill="#ff9933" />
-      <rect y="13.33" width="30" height="6.67" fill="#138808" />
-      <circle cx="15" cy="10" r="2.6" fill="none" stroke="#000080" strokeWidth="0.7" />
+    <svg viewBox="0 0 900 600" width="24" height="16" role="img" aria-label="Flag of India" className="shrink-0 rounded-[3px] ring-1 ring-black/10">
+      <rect width="900" height="600" fill="#fff" />
+      <rect width="900" height="200" fill="#ff9933" />
+      <rect y="400" width="900" height="200" fill="#138808" />
+      <g stroke="#000080" fill="none">
+        <circle cx="450" cy="300" r="75" strokeWidth="9" />
+        {CHAKRA_SPOKES.map((p, i) => (
+          <line key={i} x1="450" y1="300" x2={p.x} y2={p.y} strokeWidth="4" />
+        ))}
+      </g>
+      <circle cx="450" cy="300" r="14" fill="#000080" />
     </svg>
   );
 }

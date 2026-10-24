@@ -38,6 +38,9 @@ const emailCode = z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code.');
 export const verifySignUpSchema = z.object({ email, code: emailCode, ticket: z.string().min(20).max(200) });
 export class VerifySignUpDto extends createZodDto(verifySignUpSchema) {}
 
+export const verifyEmailSchema = z.object({ code: emailCode });
+export class VerifyEmailDto extends createZodDto(verifyEmailSchema) {}
+
 export const resetPasswordSchema = z.object({ email, code: emailCode, password: newPassword });
 export class ResetPasswordDto extends createZodDto(resetPasswordSchema) {}
 

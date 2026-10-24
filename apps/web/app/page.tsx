@@ -6,6 +6,7 @@ import { api, ApiError } from '@/lib/api';
 import { DISMISSED, useCustomer } from '@/lib/customer';
 import { ErrorBanner, Icon, LoadingState } from '@/components/ui';
 import { AccountMenu } from '@/components/account-menu';
+import { useToast } from '@/components/toast';
 import { LocationPicker } from '@/components/location-picker';
 import { headerLines, locationParams, useLocationChoice } from '@/lib/location';
 import { durationLabel, shortDuration, type VenueCategory } from '@/lib/categories';
@@ -196,7 +197,8 @@ function next7Days(): Array<{ iso: string; weekday: string; day: string; month: 
  */
 function useBookSlot(resourceId: string, durationMinutes: number) {
   const router = useRouter();
-  const { requireLogin } = useCustomer();
+  const { requireLogin, refresh } = useCustomer();
+  const toast = useToast();
   const [busyStart, setBusyStart] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(false);
@@ -214,6 +216,13 @@ function useBookSlot(resourceId: string, durationMinutes: number) {
       inFlight.current = false;
       setBusyStart(null);
       if (err instanceof Error && err.message === DISMISSED) return;
+      // Booking needs a verified email or phone: take them to the profile, where the Verify button is.
+      if (err instanceof ApiError && (err.details as { code?: string } | undefined)?.code === 'CONTACT_NOT_VERIFIED') {
+        toast.show(err.message);
+        await refresh().catch(() => undefined); // the profile must show the account as the server sees it now
+        router.push('/account?tab=profile&verify=email');
+        return;
+      }
       setError(err instanceof ApiError ? err.message : 'Could not hold that slot. Please try another.');
     }
   }
@@ -251,8 +260,13 @@ export default function HomePage() {
       .catch(() => undefined);
   }, []);
 
+  // Searches can overlap (the default place, then a chosen place, then another day) and finish in any order: only the
+  // newest one may put its answer on the page, so a slow old search can never overwrite a newer one.
+  const latestSearch = useRef(0);
+
   const runSearch = useCallback(async () => {
     if (!choice) return;
+    const mine = ++latestSearch.current;
     setSearching(true);
     setErrorMessage(null);
     try {
@@ -267,12 +281,14 @@ export default function HomePage() {
       if (form.categorySlug) params.set('categorySlug', form.categorySlug);
       if (form.groundType) params.set('groundType', form.groundType);
       const data = await api.get<SearchResult[]>(`/search?${params.toString()}`);
+      if (mine !== latestSearch.current) return;
       setResults(data);
       setSearched(true);
     } catch (err) {
+      if (mine !== latestSearch.current) return;
       setErrorMessage(err instanceof ApiError ? err.message : 'Search failed.');
     } finally {
-      setSearching(false);
+      if (mine === latestSearch.current) setSearching(false);
     }
   }, [choice, form.categorySlug, form.groundType, form.date, form.timeWindow, form.durationMinutes]);
 

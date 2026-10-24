@@ -1,3 +1,4 @@
+import { database, plantEmailCode } from '../../support/customer';
 import { logIn, searchNear, settled, shareLocation } from '../../support/customer-ui';
 import { addDays, isoWeekday, istInstant, istToday, uniquePhone } from '../../support/dates';
 import { unique, URLS } from '../../support/env';
@@ -54,6 +55,45 @@ test.describe('customer site: booking a slot', () => {
     await expect(row).toContainText('PENDING_PAYMENT');
     await row.click();
     await expect(page).toHaveURL(checkoutUrl);
+  });
+});
+
+test.describe('customer site: booking needs a verified email or phone', () => {
+  test('a customer with neither verified is sent to verify first, and can book once the email is verified', async ({ page, context, remoteVenue }) => {
+    test.setTimeout(150_000);
+    const db = await database(); // opened now, so the later flip is instant and the page is not left waiting
+    await shareLocation(context, remoteVenue.lat, remoteVenue.lng);
+    await searchNear(page, remoteVenue.name);
+    const phone = uniquePhone();
+    const email = `pw${phone.replace(/[^0-9]/g, "")}@example.com`;
+    await logIn(page, phone, 'PW Unverified');
+    await settled(page);
+    // The sign-in proved the email; take that away, so nothing about this customer is verified (the typed phone never is).
+    await db.customerProfile.updateMany({ where: { email }, data: { emailVerified: false } });
+
+    // 11 AM, because the booking test above holds the 10 AM slot of this same venue.
+    const day = addDays(istToday(), 2);
+    const price = isoWeekday(day) >= 6 ? 1000 : 800;
+    await page.getByRole("button", { name: /[0-9]+ [A-Za-z]{3}$/ }).nth(2).click();
+    await settled(page);
+    const turf = page.locator('article').filter({ hasText: remoteVenue.name }).filter({ hasText: 'Turf A' });
+    await turf.getByRole('button', { name: new RegExp('^11:00 AM ₹' + price) }).click();
+
+    // No hold, no checkout: the profile opens with the verification dialog.
+    await expect(page).toHaveURL(/[/]account[?]tab=profile&verify=email/);
+    await expect(page.getByRole('status').filter({ hasText: 'Verify your email or phone number before booking a slot.' })).toBeVisible();
+    const dialog = page.getByRole('dialog', { name: 'Verify your email' });
+    await expect(dialog).toBeVisible();
+    await plantEmailCode(email, 'VERIFY', '123456');
+    await dialog.getByLabel('6-digit code').fill('123456');
+    await dialog.getByRole('button', { name: 'Verify' }).click();
+    await expect(dialog).toHaveCount(0);
+
+    // Now a hold is allowed (the same call the Book button makes).
+    const hold = await page.request.post(`${URLS.api}/bookings/hold`, {
+      data: { resourceId: remoteVenue.turfId, startTime: istInstant(day, 11), durationMinutes: 60 },
+    });
+    expect(hold.status(), await hold.text()).toBe(201);
   });
 });
 

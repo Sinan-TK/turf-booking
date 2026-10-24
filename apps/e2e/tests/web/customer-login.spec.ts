@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { plantEmailCode } from '../../support/customer';
+import { database, plantEmailCode } from '../../support/customer';
 import { logIn } from '../../support/customer-ui';
 import { uniquePhone } from '../../support/dates';
 import { unique } from '../../support/env';
@@ -146,6 +146,39 @@ test.describe('customer sign-in', () => {
     await page.getByRole('button', { name: 'Log out' }).click();
     await page.getByRole('alertdialog', { name: 'Log out?' }).getByRole('button', { name: 'Log out' }).click();
     await expect(page.getByText('Log in to see your account.')).toBeVisible();
+  });
+
+  test('an unverified email has a Verify button that proves it with an emailed code', async ({ page }) => {
+    const phone = uniquePhone();
+    const email = `pw${phone.replace(/[^0-9]/g, "")}@example.com`; // what the test sign-in derives from the phone
+    await page.goto('/');
+    await logIn(page, phone, 'PW Verify Person');
+    await (await database()).customerProfile.updateMany({ where: { email }, data: { emailVerified: false } });
+
+    await page.goto('/account?tab=profile');
+    await expect(page.getByText(email)).toBeVisible();
+    await expect(page.getByLabel('Email not verified')).toBeVisible();
+    const verify = page.getByRole('button', { name: 'Verify', exact: true });
+    await expect(verify).toBeVisible();
+    await expect(verify.locator('svg')).toBeVisible(); // with an icon
+    await verify.click();
+
+    const dialog = page.getByRole('dialog', { name: 'Verify your email' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(email)).toBeVisible();
+    await expect(dialog.getByRole("button", { name: /Resend in [0-9]+s/ })).toBeDisabled();
+    await expect(dialog.getByRole('button', { name: 'Verify' })).toBeDisabled(); // needs all six digits
+    await plantEmailCode(email, 'VERIFY', '123456');
+    await dialog.getByLabel('6-digit code').fill('000000');
+    await dialog.getByRole('button', { name: 'Verify' }).click();
+    await expect(dialog.getByText(/incorrect or has expired/i)).toBeVisible();
+    await dialog.getByLabel('6-digit code').fill('123456');
+    await dialog.getByRole('button', { name: 'Verify' }).click();
+
+    await expect(page.getByRole('status').filter({ hasText: 'Email verified.' })).toBeVisible();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByLabel('Email verified')).toBeVisible();
+    await expect(verify).toHaveCount(0); // nothing left to verify
   });
 
   test('logging out asks for confirmation first', async ({ page }) => {

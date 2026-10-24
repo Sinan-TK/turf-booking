@@ -13,6 +13,7 @@ import { PhoneInput, formatPhone, toNationalDigits } from '@/components/phone-in
 import { useToast } from '@/components/toast';
 import { BookingsPanel } from '@/components/bookings-panel';
 import { LogoutButton } from '@/components/logout-button';
+import { VerifyEmailDialog } from '@/components/verify-email-dialog';
 import { SupportPanel } from '@/components/support-panel';
 import { Screen } from '@/components/screen';
 
@@ -58,6 +59,12 @@ function VerifiedChip({ verified, what }: { verified: boolean; what: string }) {
 function Profile() {
   const { customer, refresh } = useCustomer();
   const toast = useToast();
+  // Opened by the Verify button, or straight away when a booking was refused until the email is verified (?verify=email).
+  const [verifying, setVerifying] = useState(false);
+  const askedToVerify = useSearchParams().get('verify') === 'email';
+  useEffect(() => {
+    if (askedToVerify && customer?.email && !customer.emailVerified) setVerifying(true);
+  }, [askedToVerify, customer?.email, customer?.emailVerified]);
   const [name, setName] = useState(customer?.name ?? '');
   // The 10 digits after +91; the flag and +91 are shown in front of the field.
   const [phone, setPhone] = useState(toNationalDigits(customer?.phone));
@@ -149,6 +156,16 @@ function Profile() {
                 <>
                   {customer.email}
                   <VerifiedChip verified={emailLocked} what="Email" />
+                  {!emailLocked && (
+                    <button
+                      type="button"
+                      onClick={() => setVerifying(true)}
+                      className="ml-2 inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-2.5 py-1 align-middle text-xs font-semibold text-white transition hover:bg-emerald-600"
+                    >
+                      <Icon name="verified" className="text-[13px]" />
+                      Verify
+                    </button>
+                  )}
                 </>
               ) : (
                 <span className="text-gray-400">Not added</span>
@@ -169,6 +186,17 @@ function Profile() {
             </dd>
           </div>
         </dl>
+      )}
+      {verifying && customer?.email && (
+        <VerifyEmailDialog
+          email={customer.email}
+          onClose={() => setVerifying(false)}
+          onVerified={async () => {
+            setVerifying(false);
+            await refresh();
+            toast.show('Email verified.');
+          }}
+        />
       )}
       {editing && (
       <form onSubmit={onSave} noValidate className="space-y-3 md:grid md:grid-cols-3 md:gap-4 md:space-y-0">
@@ -368,7 +396,8 @@ function ChangePassword() {
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-gray-900">Change password</h2>
         {!open && (
-          <Button type="button" variant="secondary" className="!px-3 !py-1.5" onClick={() => setOpen(true)}>
+          <Button type="button" className="inline-flex items-center gap-1.5 !px-3 !py-1.5" onClick={() => setOpen(true)}>
+            <Icon name="lock" className="text-[14px]" />
             Change
           </Button>
         )}
