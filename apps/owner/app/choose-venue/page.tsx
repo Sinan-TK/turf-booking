@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { AuthShell } from '@/components/auth-shell';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button, LoadingState } from '@/components/ui';
 
 /**
@@ -14,6 +15,8 @@ import { Button, LoadingState } from '@/components/ui';
 export default function ChooseVenuePage() {
   const { user, loading, isStaff, selectedVenueId, selectVenue, logout } = useAuth();
   const router = useRouter();
+  const [confirmingLogout, setConfirmingLogout] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     if (loading) return;
@@ -77,14 +80,32 @@ export default function ChooseVenuePage() {
           type="button"
           variant="secondary"
           className="w-full"
-          onClick={async () => {
-            await logout();
-            router.replace('/login');
-          }}
+          onClick={() => setConfirmingLogout(true)}
         >
           Sign out
         </Button>
       </div>
+      {confirmingLogout && (
+        <ConfirmDialog
+          title="Sign out?"
+          confirmLabel="Sign out"
+          tone="danger"
+          busy={loggingOut}
+          onCancel={() => setConfirmingLogout(false)}
+          onConfirm={async () => {
+            setLoggingOut(true);
+            try {
+              await logout();
+              router.replace('/login');
+            } finally {
+              setLoggingOut(false);
+              setConfirmingLogout(false);
+            }
+          }}
+        >
+          You will need to sign in again to continue.
+        </ConfirmDialog>
+      )}
     </AuthShell>
   );
 }

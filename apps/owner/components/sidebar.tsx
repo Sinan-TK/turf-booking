@@ -3,7 +3,9 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '../lib/auth-context';
+import { useState } from 'react';
 import { Icon } from './ui';
+import { ConfirmDialog } from './confirm-dialog';
 import { NAV_ITEMS } from '../lib/access';
 
 interface SidebarProps {
@@ -17,6 +19,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { logout, user } = useAuth();
+  const [confirmingLogout, setConfirmingLogout] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   // Each role sees only the pages it may open (staff: bookings, day view, walk-in, notifications).
   const items = NAV_ITEMS.filter((i) => !user || i.roles.includes(user.ownerRole));
   // The longest matching href wins, so /bookings/day does not also light up /bookings.
@@ -77,10 +81,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         </nav>
         <div className="border-t border-outline-variant/30 px-4 py-4">
           <button
-            onClick={async () => {
-              await logout();
-              router.replace('/login');
-            }}
+            onClick={() => setConfirmingLogout(true)}
             className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-error transition-all hover:bg-error-container"
           >
             <Icon name="logout" />
@@ -88,6 +89,27 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           </button>
         </div>
       </aside>
+      {confirmingLogout && (
+        <ConfirmDialog
+          title="Log out?"
+          confirmLabel="Log out"
+          tone="danger"
+          busy={loggingOut}
+          onCancel={() => setConfirmingLogout(false)}
+          onConfirm={async () => {
+            setLoggingOut(true);
+            try {
+              await logout();
+              router.replace('/login');
+            } finally {
+              setLoggingOut(false);
+              setConfirmingLogout(false);
+            }
+          }}
+        >
+          You will need to sign in again to continue.
+        </ConfirmDialog>
+      )}
     </>
   );
 }

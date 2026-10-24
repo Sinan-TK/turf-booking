@@ -44,7 +44,15 @@ test.describe('owner portal: shell and dashboard', () => {
     await page.getByRole('button', { name: 'Sign in' }).click();
     await expect(page).toHaveURL(/\/dashboard/);
 
+    // Logging out asks first: Cancel keeps the session, Log out ends it.
     await page.getByRole('button', { name: /Log out/ }).click();
+    const confirm = page.getByRole('alertdialog', { name: 'Log out?' });
+    await expect(confirm).toBeVisible();
+    await confirm.getByRole('button', { name: 'Cancel' }).click();
+    await expect(confirm).toHaveCount(0);
+    await expect(page).toHaveURL(/\/dashboard/);
+    await page.getByRole('button', { name: /Log out/ }).click();
+    await page.getByRole('alertdialog', { name: 'Log out?' }).getByRole('button', { name: 'Log out' }).click();
     await expect(page).toHaveURL(/\/login/);
     await page.goto('/venues');
     await expect(page).toHaveURL(/\/login/);

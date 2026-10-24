@@ -21,6 +21,23 @@ test.describe('customer sign-in', () => {
     await expect(dialog.getByText('Send code')).toHaveCount(0);
   });
 
+  test('logging out asks for confirmation first', async ({ page }) => {
+    await page.goto('/');
+    await logIn(page, uniquePhone(), 'PW Logout Person');
+    await page.getByRole('button', { name: 'Account menu' }).click();
+    await page.getByRole('menuitem', { name: 'Log out' }).click();
+    const confirm = page.getByRole('alertdialog', { name: 'Log out?' });
+    await expect(confirm).toBeVisible();
+    await confirm.getByRole('button', { name: 'Cancel' }).click();
+    await expect(confirm).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Account menu' })).toBeVisible(); // still signed in
+
+    await page.getByRole('button', { name: 'Account menu' }).click();
+    await page.getByRole('menuitem', { name: 'Log out' }).click();
+    await page.getByRole('alertdialog', { name: 'Log out?' }).getByRole('button', { name: 'Log out' }).click();
+    await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();
+  });
+
   test('Google sign-in asks for a name and phone, then lands on an account with an unverified phone', async ({ page }) => {
     const phone = uniquePhone();
     await page.goto('/');

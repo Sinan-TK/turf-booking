@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useCustomer } from '@/lib/customer';
+import { ConfirmLogout } from '@/components/confirm-logout';
 
 const ITEMS = [
   { href: '/bookings', label: 'My bookings' },
@@ -15,6 +16,8 @@ const ITEMS = [
 export function AccountMenu() {
   const { customer, loading, requireLogin, logout } = useCustomer();
   const [open, setOpen] = useState(false);
+  const [confirmingLogout, setConfirmingLogout] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -86,13 +89,30 @@ export function AccountMenu() {
             role="menuitem"
             onClick={() => {
               setOpen(false);
-              logout().catch(() => undefined);
+              setConfirmingLogout(true);
             }}
             className="block w-full border-t border-slate-100 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
           >
             Log out
           </button>
         </div>
+      )}
+      {confirmingLogout && (
+        <ConfirmLogout
+          busy={loggingOut}
+          onCancel={() => setConfirmingLogout(false)}
+          onConfirm={async () => {
+            setLoggingOut(true);
+            try {
+              await logout();
+            } catch {
+              // a failed request still leaves the dialog to close; the header shows the real state
+            } finally {
+              setLoggingOut(false);
+              setConfirmingLogout(false);
+            }
+          }}
+        />
       )}
     </div>
   );

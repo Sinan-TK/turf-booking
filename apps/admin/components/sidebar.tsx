@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '../lib/auth-context';
 import { Icon, type IconName } from './icons';
+import { ConfirmLogout } from './confirm-logout';
 
 const NAV_GROUPS: Array<{ title: string; items: Array<{ href: string; label: string; icon: IconName }> }> = [
   {
@@ -57,6 +58,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { logout } = useAuth();
+  const [confirmingLogout, setConfirmingLogout] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   // The rail is expanded by pointer hover or keyboard focus — driven by
   // state rather than CSS :hover so it can collapse the moment a link is
@@ -170,10 +173,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
         <div className="border-t border-white/10 p-3">
           <button
-            onClick={async () => {
-              await logout();
-              router.replace('/login');
-            }}
+            onClick={() => setConfirmingLogout(true)}
             title="Log out"
             className="flex w-full items-center gap-3 rounded-lg px-[15px] py-2 text-left text-sm font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
           >
@@ -182,6 +182,22 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           </button>
         </div>
       </aside>
+      {confirmingLogout && (
+        <ConfirmLogout
+          busy={loggingOut}
+          onCancel={() => setConfirmingLogout(false)}
+          onConfirm={async () => {
+            setLoggingOut(true);
+            try {
+              await logout();
+              router.replace('/login');
+            } finally {
+              setLoggingOut(false);
+              setConfirmingLogout(false);
+            }
+          }}
+        />
+      )}
     </>
   );
 }
