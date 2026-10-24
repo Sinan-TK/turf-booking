@@ -60,3 +60,22 @@ export function passwordStrength(value: string): { level: 0 | 1 | 2 | 3; label: 
 export function passwordError(value: string): string | undefined {
   if (!value) return 'Enter your password.';
 }
+
+export interface PasswordRule {
+  id: 'length' | 'different';
+  label: string;
+  ok: boolean;
+}
+
+/** The rules a new password must pass, one by one, for the checklist shown while typing. The server enforces the same. */
+export function passwordRules(next: string, current: string): PasswordRule[] {
+  return [
+    { id: 'length', label: '8 to 128 characters', ok: next.length >= 8 && next.length <= 128 },
+    { id: 'different', label: 'Different from your current password', ok: !!next && (!current || next !== current) },
+  ];
+}
+
+/** The first rule a new password fails, or undefined when it passes all of them. */
+export function newPasswordProblem(next: string, current: string): string | undefined {
+  return passwordRules(next, current).find((r) => !r.ok)?.label;
+}

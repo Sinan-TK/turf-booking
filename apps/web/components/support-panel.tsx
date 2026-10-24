@@ -149,9 +149,11 @@ export function SupportPanel() {
             />
             <FieldError id="support-description-error" message={errors.description} />
           </div>
-          <Button type="submit" disabled={sending}>
-            {sending ? 'Sending…' : 'Send request'}
-          </Button>
+          <div className="flex justify-end">
+            <Button type="submit" disabled={sending}>
+              {sending ? 'Sending…' : 'Send request'}
+            </Button>
+          </div>
         </form>
       </Card>
 

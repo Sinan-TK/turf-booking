@@ -62,6 +62,9 @@ test.describe('customer sign-in', () => {
     await expect(field).toHaveValue('9876543210'); // never more than ten
 
     const save = page.getByRole('button', { name: 'Save' });
+    const editCancel = (await page.getByRole('button', { name: 'Cancel' }).boundingBox())!;
+    const phoneBox = (await field.boundingBox())!;
+    expect(editCancel.x + editCancel.width).toBeGreaterThan(phoneBox.x + phoneBox.width - 2); // Save / Cancel sit on the right edge, not the left
     await field.fill('98765');
     await save.click();
     await expect(page.getByText('Enter the full 10-digit mobile number.')).toBeVisible();
@@ -222,6 +225,17 @@ test.describe('customer sign-in', () => {
     expect(xs[0]).toBeLessThan(xs[1]!);
     expect(xs[1]).toBeLessThan(xs[2]!);
 
+    // The buttons sit on the right, under the last box; Update stays disabled until everything is right.
+    const update = page.getByRole('button', { name: 'Update password' });
+    const cancel = page.getByRole('button', { name: 'Cancel' });
+    const lastBox = (await boxes[2]!.boundingBox())!;
+    const cancelBox = (await cancel.boundingBox())!;
+    expect(Math.abs(cancelBox.x + cancelBox.width - (lastBox.x + lastBox.width))).toBeLessThan(2);
+    await expect(update).toBeDisabled();
+    const rulesList = page.getByRole('list', { name: 'Password rules' });
+    await expect(rulesList.getByText('8 to 128 characters')).toBeVisible();
+    await expect(rulesList.getByText('Different from your current password')).toBeVisible();
+
     // The show/hide control is an eye icon inside the box, not the words Show / Hide.
     const eye = page.getByRole('button', { name: 'Show password' }).nth(1);
     await expect(eye.locator('svg')).toBeVisible();
@@ -234,20 +248,31 @@ test.describe('customer sign-in', () => {
     // Browser checks wait until typing pauses (debounce), then speak.
     await page.locator('#password-current').fill(PASSWORD);
     await page.locator('#password-next').fill('abc');
-    await expect(page.getByText('Use at least 8 characters.')).toHaveCount(0); // not yet: still "typing"
-    await expect(page.getByText('Use at least 8 characters.')).toBeVisible();
+    await expect(rulesList.locator('li', { hasText: '8 to 128 characters' })).not.toHaveClass(/text-red-600/); // not yet: still "typing"
     await expect(page.getByText('Strength: Too short')).toBeVisible();
+    await expect(rulesList.locator('li', { hasText: '8 to 128 characters' })).toHaveClass(/text-red-600/);
+    // The repeat is not judged while the new password is not good yet.
+    await page.locator('#password-confirm').fill('zzz');
+    await page.waitForTimeout(700);
+    await expect(page.getByText('The two passwords are not the same.')).toHaveCount(0);
+    await expect(update).toBeDisabled();
     await page.locator('#password-next').fill(PASSWORD);
-    await expect(page.getByText('Choose a password different from your current one.')).toBeVisible();
+    await expect(rulesList.locator('li', { hasText: 'Different from your current password' })).toHaveClass(/text-red-600/);
+    await expect(page.locator('#password-next')).toHaveAttribute('aria-invalid', 'true');
     await page.locator('#password-next').fill('BrandNew456!y');
     await expect(page.getByText('Strength: Strong')).toBeVisible();
+    await expect(rulesList.locator('li', { hasText: 'Different from your current password' })).toHaveClass(/text-emerald-700/);
+    await expect(page.getByText('The two passwords are not the same.')).toBeVisible(); // now that the new password is good, the repeat ('zzz') is judged
+    await expect(update).toBeDisabled();
     await page.locator('#password-confirm').fill('Different456!y');
     await expect(page.getByText('The two passwords are not the same.')).toBeVisible();
 
     // Then the server checks too: a wrong current password is reported under that field, not in a banner.
     await page.locator('#password-current').fill('NotMyPassword1!');
     await page.locator('#password-confirm').fill('BrandNew456!y');
-    await page.getByRole('button', { name: 'Update password' }).click();
+    await expect(page.getByText('Passwords match')).toBeVisible();
+    await expect(update).toBeEnabled();
+    await update.click();
     await expect(page.locator('#password-current-error')).toHaveText('Current password is incorrect');
     await expect(page.locator('form [role=alert]')).toHaveCount(1); // just that field's message, no banner above the form
     await page.locator('#password-current').fill(PASSWORD);

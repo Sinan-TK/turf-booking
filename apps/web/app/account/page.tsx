@@ -6,7 +6,7 @@ import { api, ApiError } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
 import { LoginGate } from '@/components/login-gate';
 import { Button, Card, ErrorBanner, FieldError, Icon, Input, Label, LoadingState, invalidClass } from '@/components/ui';
-import { emailError, indianPhoneError, nameError, newPasswordError, passwordError, passwordStrength } from '@/lib/validation';
+import { emailError, indianPhoneError, nameError, newPasswordError, newPasswordProblem, passwordError, passwordRules, passwordStrength } from '@/lib/validation';
 import { useDebounced } from '@/lib/use-debounced';
 import { PasswordInput } from '@/components/password-input';
 import { PhoneInput, formatPhone, toNationalDigits } from '@/components/phone-input';
@@ -235,7 +235,7 @@ function Profile() {
             <p className="mt-1 text-xs text-gray-500">We don&apos;t check this number yet. Venues use it to reach you about your bookings.</p>
           )}
         </div>
-        <div className="flex gap-2 md:col-span-3">
+        <div className="flex justify-end gap-2 md:col-span-3">
           <Button type="submit" disabled={saving || !dirty}>
             {saving ? 'Saving…' : 'Save'}
           </Button>
@@ -278,12 +278,21 @@ function ChangePassword() {
     const out: Partial<Record<PasswordField, string>> = {};
     // While typing only a field that has something in it is judged; after Update, every field is.
     if (!live || c) out.current = passwordError(c);
-    if (!live || n) out.next = newPasswordError(n) ?? (c && n === c ? 'Choose a password different from your current one.' : undefined);
-    if (!live || r) out.confirm = n !== r ? 'The two passwords are not the same.' : undefined;
+    // While typing, the rule list under the box says what is wrong with the new password, so no second message.
+    if (!live) out.next = newPasswordError(n) ?? (c && n === c ? 'Choose a password different from your current one.' : undefined);
+    // The repeat is only judged once the new password itself is good.
+    if (!live || (r && !newPasswordProblem(n, c))) out.confirm = n !== r ? 'The two passwords are not the same.' : undefined;
     return out;
   }
   const live = check(dCurrent, dNext, dConfirm, true);
+  const rules = passwordRules(dNext, dCurrent);
+  const newIsGood = !!dNext && rules.every((r) => r.ok);
+  const confirmMatches = newIsGood && !!dConfirm && dConfirm === dNext;
+  // Update works only when the current password is filled in, the new one passes every rule and the repeat is the same.
+  const canSubmit = !!current && !newPasswordProblem(next, current) && confirm === next;
   const msg = (k: PasswordField) => serverMsgs[k] ?? (submitted ? check(current, next, confirm, false)[k] : live[k]);
+  // The new password's box turns red from the rule list too, not only from a message.
+  const invalid = (k: PasswordField) => !!msg(k) || (k === 'next' && !!dNext && !newIsGood);
   const strength = passwordStrength(next);
 
   function close() {
@@ -345,8 +354,8 @@ function ChangePassword() {
         id={id}
         autoComplete={autoComplete}
         value={value}
-        aria-invalid={!!msg(k)}
-        className={msg(k) ? invalidClass : ''}
+        aria-invalid={invalid(k)}
+        className={invalid(k) ? invalidClass : ''}
         onChange={edit(k, set)}
       />
       <FieldError id={`${id}-error`} message={msg(k)} />
@@ -386,12 +395,33 @@ function ChangePassword() {
                   <span key={n} className={`h-1.5 flex-1 rounded-full ${next && strength.level >= n ? STRENGTH_BAR[strength.level] : 'bg-gray-200'}`} />
                 ))}
               </div>
-              <p className="mt-1 text-xs text-gray-500">{strength.label ? `Strength: ${strength.label}` : 'At least 8 characters.'}</p>
+              {strength.label && <p className="mt-1 text-xs text-gray-500">Strength: {strength.label}</p>}
+              <ul className="mt-2 space-y-1 text-xs" aria-label="Password rules">
+                {rules.map((r) => (
+                  <li key={r.id} className={`flex items-center gap-1.5 ${r.ok ? 'text-emerald-700' : dNext ? 'text-red-600' : 'text-gray-500'}`}>
+                    {r.ok ? <Icon name="check" className="text-[14px]" /> : dNext ? <Icon name="close" className="text-[14px]" /> : <span aria-hidden="true" className="inline-block h-3 w-3 shrink-0 rounded-full border border-gray-300" />}
+                    <span>{r.label}</span>
+                  </li>
+                ))}
+              </ul>
             </div>,
           )}
-          {field('confirm', 'password-confirm', 'Repeat the new password', confirm, setConfirm, 'new-password')}
-          <div className="flex gap-2 md:col-span-3">
-            <Button type="submit" disabled={saving}>
+          {field(
+            'confirm',
+            'password-confirm',
+            'Repeat the new password',
+            confirm,
+            setConfirm,
+            'new-password',
+            confirmMatches && !msg('confirm') ? (
+              <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+                <Icon name="check" className="text-[14px]" />
+                Passwords match
+              </p>
+            ) : undefined,
+          )}
+          <div className="flex justify-end gap-2 md:col-span-3">
+            <Button type="submit" disabled={saving || !canSubmit}>
               {saving ? 'Saving…' : 'Update password'}
             </Button>
             <Button type="button" variant="secondary" disabled={saving} onClick={close}>
