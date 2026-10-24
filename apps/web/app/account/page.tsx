@@ -11,7 +11,7 @@ import { PasswordInput } from '@/components/password-input';
 import { PhoneInput, formatPhone, toNationalDigits } from '@/components/phone-input';
 import { useToast } from '@/components/toast';
 import { BookingsPanel } from '@/components/bookings-panel';
-import { ConfirmLogout } from '@/components/confirm-logout';
+import { LogoutButton } from '@/components/logout-button';
 import { SupportPanel } from '@/components/support-panel';
 import { Screen } from '@/components/screen';
 
@@ -437,34 +437,11 @@ type TabId = (typeof TABS)[number]['id'];
 
 /** Details, and a Change password card for customers who have a password (Google-only customers have none). */
 function ProfileTab() {
-  const { customer, logout } = useCustomer();
-  const [confirming, setConfirming] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
+  const { customer } = useCustomer();
   return (
     <>
       <Profile />
       {customer?.hasPassword && <ChangePassword />}
-      <Button type="button" variant="secondary" className="inline-flex w-full items-center justify-center gap-2 !border-red-200 !text-red-600 hover:!bg-red-50 lg:w-auto" onClick={() => setConfirming(true)}>
-        <Icon name="logout" className="text-[16px]" />
-        Log out
-      </Button>
-      {confirming && (
-        <ConfirmLogout
-          busy={loggingOut}
-          onCancel={() => setConfirming(false)}
-          onConfirm={async () => {
-            setLoggingOut(true);
-            try {
-              await logout();
-            } catch {
-              // the header and the page show the real state either way
-            } finally {
-              setLoggingOut(false);
-              setConfirming(false);
-            }
-          }}
-        />
-      )}
     </>
   );
 }
@@ -519,7 +496,7 @@ function AccountTabs() {
 
 export default function AccountPage() {
   return (
-    <Screen showAccountMenu={false} wide>
+    <Screen topRight={<LogoutButton />} wide>
       <h1 className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold text-gray-900">
         <Icon name="handshake" />
         My account

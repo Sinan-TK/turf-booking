@@ -121,7 +121,14 @@ test.describe('customer sign-in', () => {
     await expect(page.getByRole('button', { name: 'Account menu' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Log in' })).toHaveCount(0);
 
-    await page.getByRole('button', { name: 'Log out' }).click();
+    // Log out sits in the top right corner, on the back button's row, where the profile icon used to be.
+    const logout = page.getByRole('button', { name: 'Log out' });
+    const out = (await logout.boundingBox())!;
+    const bk = (await back.boundingBox())!;
+    const view = page.viewportSize()!;
+    expect(Math.abs(out.y + out.height / 2 - (bk.y + bk.height / 2))).toBeLessThan(6);
+    expect(out.x).toBeGreaterThan(view.width / 2); // on the right, opposite the back button
+    await logout.click();
     const confirm = page.getByRole('alertdialog', { name: 'Log out?' });
     await expect(confirm).toBeVisible();
     await confirm.getByRole('button', { name: 'Cancel' }).click();
