@@ -48,6 +48,11 @@ test.describe('owner portal: shell and dashboard', () => {
     await page.getByRole('button', { name: /Log out/ }).click();
     const confirm = page.getByRole('alertdialog', { name: 'Log out?' });
     await expect(confirm).toBeVisible();
+    // Centered in the window, not stuck inside the sidebar it was opened from.
+    const box = (await confirm.boundingBox())!;
+    const view = page.viewportSize()!;
+    expect(Math.abs(box.x + box.width / 2 - view.width / 2)).toBeLessThan(16); // the dialog is still easing in
+    expect(Math.abs(box.y + box.height / 2 - view.height / 2)).toBeLessThan(16); // the dialog is still easing in
     await confirm.getByRole('button', { name: 'Cancel' }).click();
     await expect(confirm).toHaveCount(0);
     await expect(page).toHaveURL(/\/dashboard/);

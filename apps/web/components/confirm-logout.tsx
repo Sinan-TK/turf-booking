@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 /**
  * "Log out?" confirmation. Mount it to open it, unmount it to close it. Esc and a click on the backdrop cancel
  * (unless the request is running), Tab stays inside, focus starts on Cancel so Enter never logs anyone out by
- * accident, and focus returns to whatever opened it.
+ * accident, and focus returns to whatever opened it. It renders into the page body: opened from inside a header
+ * or sidebar that uses blur or a transform, a fixed overlay would otherwise be laid out inside that element.
  */
 export function ConfirmLogout({ busy = false, onConfirm, onCancel }: { busy?: boolean; onConfirm: () => void; onCancel: () => void }) {
   const panel = useRef<HTMLDivElement>(null);
@@ -48,7 +50,7 @@ export function ConfirmLogout({ busy = false, onConfirm, onCancel }: { busy?: bo
     };
   }, []);
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40 p-4 sm:items-center"
       onMouseDown={(e) => {
@@ -89,6 +91,7 @@ export function ConfirmLogout({ busy = false, onConfirm, onCancel }: { busy?: bo
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

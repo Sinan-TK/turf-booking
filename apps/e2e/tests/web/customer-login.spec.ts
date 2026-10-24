@@ -28,6 +28,12 @@ test.describe('customer sign-in', () => {
     await page.getByRole('menuitem', { name: 'Log out' }).click();
     const confirm = page.getByRole('alertdialog', { name: 'Log out?' });
     await expect(confirm).toBeVisible();
+    // It covers the whole page and sits in the middle of the window, not inside the header it was opened from.
+    const box = (await confirm.boundingBox())!;
+    const view = page.viewportSize()!;
+    expect(Math.abs(box.x + box.width / 2 - view.width / 2)).toBeLessThan(4);
+    expect(Math.abs(box.y + box.height / 2 - view.height / 2)).toBeLessThan(4);
+    expect(box.y).toBeGreaterThan(50);
     await confirm.getByRole('button', { name: 'Cancel' }).click();
     await expect(confirm).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Account menu' })).toBeVisible(); // still signed in

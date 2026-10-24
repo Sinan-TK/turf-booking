@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '../lib/auth-context';
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from './ui';
 import { ConfirmDialog } from './confirm-dialog';
 import { NAV_ITEMS } from '../lib/access';
@@ -89,7 +90,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           </button>
         </div>
       </aside>
-      {confirmingLogout && (
+      {confirmingLogout &&
+        createPortal(
         <ConfirmDialog
           title="Log out?"
           confirmLabel="Log out"
@@ -108,8 +110,9 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           }}
         >
           You will need to sign in again to continue.
-        </ConfirmDialog>
-      )}
+        </ConfirmDialog>,
+          document.body,
+        )}
     </>
   );
 }
