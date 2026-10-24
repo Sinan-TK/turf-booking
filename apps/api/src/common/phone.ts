@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 export const INDIAN_MOBILE_MESSAGE = 'Enter a valid 10-digit Indian mobile number starting with 6, 7, 8 or 9.';
 
 /**
@@ -17,3 +19,13 @@ export function normalizeIndianMobile(input: string): string | null {
   if (/[^\d\s\-().+]/.test(input)) return null;
   return `+91${national}`;
 }
+
+/** For request bodies: a phone number that must be a real Indian mobile number, stored in the canonical +91 form. */
+export const indianMobileSchema = z.string().transform((value, ctx) => {
+  const phone = normalizeIndianMobile(value);
+  if (!phone) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: INDIAN_MOBILE_MESSAGE });
+    return z.NEVER;
+  }
+  return phone;
+});

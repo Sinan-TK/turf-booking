@@ -18,7 +18,8 @@ import {
   SuccessBanner,
   invalidClass,
 } from '@/components/ui';
-import { emailError, hasErrors, textError, type FieldErrors } from '@/lib/validation';
+import { emailError, hasErrors, indianPhoneError, textError, type FieldErrors } from '@/lib/validation';
+import { PhoneInput } from '@/components/phone-input';
 
 interface Staff {
   id: string;
@@ -99,7 +100,7 @@ function InviteModal({ venues, onClose, onDone }: { venues: VenueOption[]; onClo
     const found: FieldErrors<'name' | 'email' | 'phone' | 'venues'> = {
       name: textError(form.name, 'Name', 1, 150),
       email: emailError(form.email),
-      phone: phone && (phone.length < 6 || phone.length > 20) ? 'Enter 6 to 20 characters, or leave it empty.' : undefined,
+      phone: phone ? indianPhoneError(phone) : undefined,
       venues: venueIds.length === 0 ? noVenue : undefined,
     };
     setErrors(found);
@@ -159,13 +160,11 @@ function InviteModal({ venues, onClose, onDone }: { venues: VenueOption[]; onClo
           </div>
           <div>
             <Label htmlFor="staff-phone">Phone (optional)</Label>
-            <Input
+            <PhoneInput
               id="staff-phone"
-              type="tel"
               value={form.phone}
-              aria-invalid={!!errors.phone}
-              className={errors.phone ? invalidClass : ''}
-              onChange={(e) => set('phone', e.target.value)}
+              invalid={!!errors.phone}
+              onValueChange={(digits) => set('phone', digits)}
             />
             <FieldError id="staff-phone-error" message={errors.phone} />
           </div>

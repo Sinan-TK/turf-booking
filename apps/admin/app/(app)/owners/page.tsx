@@ -10,7 +10,8 @@ import { ListSection, FilterSummary } from '@/components/list-section';
 import { Pagination, usePageSlice } from '@/components/pagination';
 import { SortHeader, type SortDir } from '@/components/sort-header';
 import { Badge, Button, Card, EmptyState, ErrorBanner, FieldError, Input, Label, SkeletonTable, invalidClass } from '@/components/ui';
-import { emailError, hasErrors, phoneError, textError, type FieldErrors } from '@/lib/validation';
+import { emailError, hasErrors, indianPhoneError, textError, type FieldErrors } from '@/lib/validation';
+import { PhoneInput, formatPhone } from '@/components/phone-input';
 
 interface Organization {
   id: string;
@@ -61,7 +62,7 @@ export default function OwnersPage() {
     const found: FieldErrors<keyof typeof EMPTY_FORM> = {
       name: textError(form.name, 'Organization name', 1, 150),
       contactEmail: emailError(form.contactEmail, 'the contact email'),
-      contactPhone: phoneError(form.contactPhone, 'the contact phone'),
+      contactPhone: indianPhoneError(form.contactPhone, 'the contact phone'),
     };
     setErrors(found);
     if (hasErrors(found)) {
@@ -71,7 +72,7 @@ export default function OwnersPage() {
     }
     setSubmitting(true);
     try {
-      await api.post('/admin/organizations', { ...form, name: form.name.trim(), contactEmail: form.contactEmail.trim(), contactPhone: form.contactPhone.trim() });
+      await api.post('/admin/organizations', { ...form, name: form.name.trim(), contactEmail: form.contactEmail.trim(), contactPhone: form.contactPhone });
       setForm(EMPTY_FORM);
       setErrors({});
       setShowForm(false);
@@ -101,7 +102,7 @@ export default function OwnersPage() {
     const rows = (data ?? []).filter((o) => {
       if (status !== 'all' && o.status !== status) return false;
       if (!q) return true;
-      return [o.name, o.contactEmail, o.contactPhone].some((s) => s.toLowerCase().includes(q));
+      return [o.name, o.contactEmail, o.contactPhone, formatPhone(o.contactPhone)].some((s) => s.toLowerCase().includes(q));
     });
     rows.sort(SORTERS[sort.key]);
     if (sort.dir === 'desc') rows.reverse();
@@ -201,13 +202,11 @@ export default function OwnersPage() {
             </div>
             <div>
               <Label htmlFor="org-contactPhone">Contact phone</Label>
-              <Input
+              <PhoneInput
                 id="org-contactPhone"
-                type="tel"
                 value={form.contactPhone}
-                aria-invalid={!!errors.contactPhone}
-                className={errors.contactPhone ? invalidClass : ''}
-                onChange={(e) => edit('contactPhone', e.target.value)}
+                invalid={!!errors.contactPhone}
+                onValueChange={(digits) => edit('contactPhone', digits)}
               />
               <FieldError id="org-contactPhone-error" message={errors.contactPhone} />
             </div>
@@ -242,7 +241,7 @@ export default function OwnersPage() {
                   <td className="px-4 py-3 text-gray-600">
                     {org.contactEmail}
                     <br />
-                    {org.contactPhone}
+                    {formatPhone(org.contactPhone)}
                   </td>
                   <td className="px-4 py-3">
                     <Badge value={org.status} />

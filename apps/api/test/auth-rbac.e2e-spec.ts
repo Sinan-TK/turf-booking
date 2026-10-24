@@ -53,7 +53,7 @@ describe('Auth & RBAC boundaries', () => {
     const res = await ownerAgent.post('/admin/organizations').send({
       name: 'Should not be creatable',
       contactEmail: 'nope@example.com',
-      contactPhone: '+910000000000',
+      contactPhone: '+919000000000',
     });
     expect(res.status).toBe(403);
   });

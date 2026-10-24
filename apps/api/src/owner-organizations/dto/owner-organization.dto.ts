@@ -1,17 +1,18 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { indianMobileSchema } from '../../common/phone';
 
 export const createOrganizationSchema = z.object({
   name: z.string().min(1).max(150),
   contactEmail: z.string().email(),
-  contactPhone: z.string().min(6).max(20),
+  contactPhone: indianMobileSchema,
 });
 export class CreateOrganizationDto extends createZodDto(createOrganizationSchema) {}
 
 export const createOwnerUserSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1).max(150),
-  phone: z.string().min(6).max(20).optional(),
+  phone: indianMobileSchema.optional(),
   role: z.enum(['OWNER_ADMIN', 'OWNER_STAFF']).default('OWNER_ADMIN'),
   // Staff only: the venues they work in (an owner admin reaches every venue of the organization).
   venueIds: z.array(z.string().uuid()).max(200).optional(),

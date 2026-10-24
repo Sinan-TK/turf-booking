@@ -24,7 +24,8 @@ import {
   SuccessBanner,
   invalidClass,
 } from '@/components/ui';
-import { emailError, hasErrors, phoneError, textError, type FieldErrors } from '@/lib/validation';
+import { emailError, hasErrors, indianPhoneError, textError, type FieldErrors } from '@/lib/validation';
+import { PhoneInput, formatPhone } from '@/components/phone-input';
 
 interface Organization {
   id: string;
@@ -97,7 +98,7 @@ export default function OwnerOrgDetailPage() {
     const found: FieldErrors<'name' | 'email' | 'phone' | 'venues'> = {
       name: textError(form.name, 'Name', 1, 150),
       email: emailError(form.email, 'their email address'),
-      phone: phoneError(form.phone, 'their phone number', false),
+      phone: indianPhoneError(form.phone, 'their phone number', false),
       venues: form.role === 'OWNER_STAFF' && venueIds.length === 0 ? 'Choose at least one venue for staff.' : undefined,
     };
     setErrors(found);
@@ -112,7 +113,7 @@ export default function OwnerOrgDetailPage() {
         ...form,
         name: form.name.trim(),
         email: form.email.trim(),
-        phone: form.phone.trim() || undefined,
+        phone: form.phone || undefined,
         venueIds: form.role === 'OWNER_STAFF' ? venueIds : undefined,
       });
       setForm({ email: '', name: '', phone: '', role: 'OWNER_ADMIN' });
@@ -143,7 +144,7 @@ export default function OwnerOrgDetailPage() {
       <PageHeader
         back={{ href: '/owners', label: 'Owners' }}
         title={org.name}
-        subtitle={`${org.contactEmail} · ${org.contactPhone}`}
+        subtitle={`${org.contactEmail} · ${formatPhone(org.contactPhone)}`}
         action={
           <StatusAction
             path={`/admin/organizations/${org.id}/status`}
@@ -204,7 +205,7 @@ export default function OwnerOrgDetailPage() {
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-gray-500">Contact phone</dt>
-              <dd>{org.contactPhone}</dd>
+              <dd>{formatPhone(org.contactPhone)}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-gray-500">Onboarded</dt>
@@ -421,13 +422,11 @@ export default function OwnerOrgDetailPage() {
           </div>
           <div>
             <Label htmlFor="invite-phone">Phone (optional)</Label>
-            <Input
+            <PhoneInput
               id="invite-phone"
-              type="tel"
               value={form.phone}
-              aria-invalid={!!errors.phone}
-              className={errors.phone ? invalidClass : ''}
-              onChange={(e) => edit('phone', e.target.value)}
+              invalid={!!errors.phone}
+              onValueChange={(digits) => edit('phone', digits)}
             />
             <FieldError id="invite-phone-error" message={errors.phone} />
           </div>

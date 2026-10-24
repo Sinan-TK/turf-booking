@@ -45,7 +45,10 @@ test.describe('admin: field errors on forms', () => {
     await page.getByLabel('Contact phone').fill('12');
     await page.getByRole('button', { name: 'Create organization' }).click();
     await expect(page.getByText(/Enter a valid email address/)).toBeVisible();
-    await expect(page.getByText('Enter a full phone number, like +91 98765 43210.')).toBeVisible();
+    await expect(page.getByText('Enter the full 10-digit mobile number.')).toBeVisible();
+    await page.getByLabel('Contact phone').fill('5876543210');
+    await page.getByRole('button', { name: 'Create organization' }).click();
+    await expect(page.getByText('Indian mobile numbers start with 6, 7, 8 or 9.')).toBeVisible();
   });
 
   test('commercial terms: percentages, shares and tiers are checked before anything is sent', async ({ page }) => {

@@ -45,6 +45,14 @@ test.describe('owner portal: staff page (owner admin)', () => {
     await dialog.locator('#staff-email').fill(email);
     await dialog.getByRole('checkbox', { name: venue.name }).check();
     await expect(dialog.getByText('Choose at least one venue.')).toHaveCount(0);
+    // The phone is optional, but when given it must be an Indian mobile number (the +91 is shown outside the box).
+    await dialog.locator('#staff-phone').fill('12345');
+    await dialog.getByRole('button', { name: 'Send invite' }).click();
+    await expect(dialog.getByText('Enter the full 10-digit mobile number.')).toBeVisible();
+    await dialog.locator('#staff-phone').fill('5876543210');
+    await dialog.getByRole('button', { name: 'Send invite' }).click();
+    await expect(dialog.getByText('Indian mobile numbers start with 6, 7, 8 or 9.')).toBeVisible();
+    await dialog.locator('#staff-phone').fill('');
     await dialog.getByRole('button', { name: 'Send invite' }).click();
     await expect(page.getByText(`Invite sent to ${email}.`)).toBeVisible();
 
