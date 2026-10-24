@@ -122,14 +122,24 @@ export function LoginDialog({
     go('profile');
   }
 
-  async function run(action: () => Promise<void>, fallback: string) {
+  /**
+   * Runs a request. A failure shows in the banner at the top, unless `field` says it belongs to a field (a function
+   * decides from the error): then it is shown under that field, in red, so it is next to what is wrong.
+   */
+  async function run(action: () => Promise<void>, fallback: string, field?: keyof Msgs | ((err: ApiError) => keyof Msgs | undefined)) {
     if (busy) return;
     setBusy(true);
     setError(null);
     try {
       await action();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : fallback);
+      const target = err instanceof ApiError ? (typeof field === 'function' ? field(err) : field) : undefined;
+      if (err instanceof ApiError && target) {
+        setMsgs({ [target]: err.message });
+        document.getElementById(target === 'code' ? 'login-code' : `login-${target}`)?.focus();
+      } else {
+        setError(err instanceof ApiError ? err.message : fallback);
+      }
     } finally {
       setBusy(false);
     }
@@ -219,7 +229,7 @@ export function LoginDialog({
     return run(async () => {
       const res = await api.post<{ customer: Customer; needsProfile: boolean }>('/customer-auth/signup/verify', { email: email.trim(), code, ticket });
       signedIn(res.customer, res.needsProfile);
-    }, 'Could not verify the code. Please try again.');
+    }, 'Could not verify the code. Please try again.', 'code');
   }
 
   /** Asks for a fresh sign-up code (the details are still in the form). */
@@ -235,7 +245,7 @@ export function LoginDialog({
       setResendIn(res.resendAfterSeconds);
       setCode('');
       setNotice('We sent a new code.');
-    }, 'Could not send the code. Please try again.');
+    }, 'Could not send the code. Please try again.', 'code');
   }
 
   function resendReset() {
@@ -243,7 +253,7 @@ export function LoginDialog({
       await api.post('/customer-auth/forgot-password', { email: email.trim() });
       setResendIn(30);
       setNotice('If an account exists for that email, a new code is on its way.');
-    }, 'Could not send the code. Please try again.');
+    }, 'Could not send the code. Please try again.', 'code');
   }
 
   function resetPassword(e: React.FormEvent) {
@@ -263,7 +273,7 @@ export function LoginDialog({
       setTab('signin');
       go('home');
       setNotice('Your password is set. Sign in with your email and new password.');
-    }, 'Could not set your password. Please try again.');
+    }, 'Could not set your password. Please try again.', (err) => (/code|attempt/i.test(err.message) ? 'code' : undefined));
   }
 
   // --- Profile step (name, and a phone number if there is none) -------------
@@ -305,7 +315,7 @@ export function LoginDialog({
       setResendIn(res.resendAfterSeconds);
       setCode('');
       go('code');
-    }, 'Could not send the code. Please try again.');
+    }, 'Could not send the code. Please try again.', view === 'code' ? 'code' : undefined);
   }
 
   function verifyCode(e: React.FormEvent) {
@@ -316,7 +326,7 @@ export function LoginDialog({
     return run(async () => {
       const res = await api.post<{ customer: Customer; needsProfile: boolean }>('/customer-auth/verify', { phone, code });
       signedIn(res.customer, res.needsProfile);
-    }, 'Could not verify the code. Please try again.');
+    }, 'Could not verify the code. Please try again.', 'code');
   }
 
   const completing = !!customer;

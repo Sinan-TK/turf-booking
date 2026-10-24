@@ -182,8 +182,11 @@ test.describe('customer sign-in', () => {
     await plantEmailCode(email, 'VERIFY', '123456');
     await dialog.getByLabel('6-digit code').fill('000000');
     await dialog.getByRole('button', { name: 'Verify' }).click();
-    await expect(dialog.getByText(/incorrect or has expired/i)).toBeVisible();
+    // The server's answer sits on the code box itself (red border, message under it), not in a banner.
+    await expect(dialog.locator('#verify-email-code-error')).toContainText(/incorrect or has expired/i);
+    await expect(dialog.locator('#verify-email-code')).toHaveAttribute('aria-invalid', 'true');
     await dialog.getByLabel('6-digit code').fill('123456');
+    await expect(dialog.locator('#verify-email-code-error')).toHaveCount(0); // typing clears it
     await dialog.getByRole('button', { name: 'Verify' }).click();
 
     await expect(page.getByRole('status').filter({ hasText: 'Email verified.' })).toBeVisible();
@@ -249,7 +252,8 @@ test.describe('customer sign-in', () => {
     await plantEmailCode(email, 'SIGNUP', CODE);
     await dialog.getByLabel('6-digit code').fill('000000');
     await dialog.getByRole('button', { name: 'Verify and create account' }).click();
-    await expect(dialog.getByText(/incorrect or has expired/i)).toBeVisible();
+    await expect(dialog.locator('#login-code-error')).toContainText(/incorrect or has expired/i); // on the code box
+    await expect(dialog.locator('#login-code')).toHaveAttribute('aria-invalid', 'true');
 
     await dialog.getByLabel('6-digit code').fill(CODE);
     await dialog.getByRole('button', { name: 'Verify and create account' }).click();

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { api, ApiError } from '@/lib/api';
-import { Button, ErrorBanner, FieldError, Icon, Input, Label } from '@/components/ui';
+import { Button, FieldError, Icon, Input, Label } from '@/components/ui';
 import { codeError } from '@/lib/validation';
 
 /**
@@ -13,7 +13,6 @@ import { codeError } from '@/lib/validation';
 export function VerifyEmailDialog({ email, onVerified, onClose }: { email: string; onVerified: () => void; onClose: () => void }) {
   const [code, setCode] = useState('');
   const [codeMsg, setCodeMsg] = useState<string | undefined>();
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [sending, setSending] = useState(true);
   const [resendIn, setResendIn] = useState(0);
@@ -24,7 +23,7 @@ export function VerifyEmailDialog({ email, onVerified, onClose }: { email: strin
 
   async function sendCode() {
     setSending(true);
-    setError(null);
+    setCodeMsg(undefined);
     try {
       const res = await api.post<{ resendAfterSeconds: number }>('/customer-auth/email/send-code');
       setResendIn(res.resendAfterSeconds);
@@ -33,7 +32,7 @@ export function VerifyEmailDialog({ email, onVerified, onClose }: { email: strin
       // is left before another can be sent, so the countdown carries on instead of starting again.
       const left = err instanceof ApiError && err.status === 429 ? (err.details as { retryAfterSeconds?: number } | undefined)?.retryAfterSeconds : undefined;
       if (left) setResendIn(left);
-      else setError(err instanceof ApiError ? err.message : 'Could not send the code. Please try again.');
+      else setCodeMsg(err instanceof ApiError ? err.message : 'Could not send the code. Please try again.');
     } finally {
       setSending(false);
     }
@@ -76,12 +75,11 @@ export function VerifyEmailDialog({ email, onVerified, onClose }: { email: strin
     setCodeMsg(problem);
     if (problem) return void document.getElementById('verify-email-code')?.focus();
     setBusy(true);
-    setError(null);
     try {
       await api.post('/customer-auth/email/verify', { code });
       onVerified();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not verify the code. Please try again.');
+      setCodeMsg(err instanceof ApiError ? err.message : 'Could not verify the code. Please try again.');
     } finally {
       setBusy(false);
     }
@@ -110,18 +108,13 @@ export function VerifyEmailDialog({ email, onVerified, onClose }: { email: strin
               Verify your email
             </h2>
             <p className="mt-0.5 break-words text-sm text-gray-600">
-              {sending ? 'Sending a 6-digit code to ' : 'We sent a 6-digit code to '}
+              {sending ? 'Sending a 6-digit code to ' : 'Enter the 6-digit code emailed to '}
               <span className="font-medium text-gray-900">{email}</span>.
             </p>
           </div>
         </div>
 
         <form onSubmit={onSubmit} noValidate className="mt-4 space-y-3">
-          {error && (
-            <div role="alert">
-              <ErrorBanner message={error} />
-            </div>
-          )}
           <div>
             <Label htmlFor="verify-email-code">6-digit code</Label>
             <Input
