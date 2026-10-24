@@ -7,7 +7,8 @@ export interface MailMessage {
   text: string;
   html: string;
   /** A Resend template to send instead of the html/text (those stay as the log/fallback copy). */
-  template?: { id: string; variables: Record<string, string | number> };
+  /** Resend only accepts string variables. */
+  template?: { id: string; variables: Record<string, string> };
 }
 
 /**

@@ -421,7 +421,7 @@ describe('Customer email + password', () => {
       await signupStart(e);
       const mail = [...sent].reverse().find((m) => m.to === e)!;
       expect(mail.template?.id).toBe('tmpl_test_123');
-      expect(mail.template?.variables).toMatchObject({ CODE: lastCodeFor(e), NAME: 'Pw Person', EXPIRES_IN_MINUTES: 10 });
+      expect(mail.template?.variables).toMatchObject({ CODE: lastCodeFor(e), NAME: 'Pw Person', EXPIRES_IN_MINUTES: '10' });
       expect(String(mail.template?.variables.HEADING)).toMatch(/Verify/);
       expect(mail.text).toMatch(/Your code: \d{6}/);
 

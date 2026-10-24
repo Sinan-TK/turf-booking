@@ -203,7 +203,7 @@ export class CustomerPasswordService {
       text: `Hi ${name},\n\n${intro}\n\nYour code: ${code}\n\nIt works once and expires in ${minutes} minutes. If you did not ask for it, you can ignore this email.`,
       html: `<p>Hi ${escapeHtml(name)},</p><p>${intro}</p><p style="font-size:28px;font-weight:700;letter-spacing:6px">${code}</p><p>It works once and expires in ${minutes} minutes. If you did not ask for it, you can ignore this email.</p>`,
       template: env.RESEND_OTP_TEMPLATE_ID
-        ? { id: env.RESEND_OTP_TEMPLATE_ID, variables: { HEADING: heading, INTRO: intro, CODE: code, NAME: escapeHtml(name), EXPIRES_IN_MINUTES: minutes } }
+        ? { id: env.RESEND_OTP_TEMPLATE_ID, variables: { HEADING: heading, INTRO: intro, CODE: code, NAME: escapeHtml(name), EXPIRES_IN_MINUTES: String(minutes) } }
         : undefined,
     });
   }
