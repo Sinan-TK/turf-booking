@@ -1,3 +1,4 @@
+import { INDIAN_MOBILE_MESSAGE, normalizeIndianMobile } from '../common/phone';
 import {
   BadRequestException,
   ConflictException,
@@ -24,7 +25,6 @@ import { BOOKINGS_REPOSITORY, type AdminBookingFilters, type BookingsRepository 
 import { AuditService } from '../audit/audit.service';
 import { CoinsService } from '../coins/coins.service';
 import { CUSTOMER_MESSENGER, type CustomerMessenger } from '../customer-messaging/customer-messenger.port';
-import { CustomersService } from '../customers/customers.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import type { AuthContext } from '../auth/auth.types';
 import type { CreateOfflineBookingDto } from './dto/booking.dto';
@@ -69,7 +69,6 @@ export class BookingsService {
     private readonly audit: AuditService,
     private readonly coins: CoinsService,
     @Inject(CUSTOMER_MESSENGER) private readonly messenger: CustomerMessenger,
-    private readonly customers: CustomersService,
     private readonly notifications: NotificationsService,
     private readonly policyResolver: PolicyResolverService,
     private readonly schedule: ScheduleService,
@@ -518,15 +517,15 @@ export class BookingsService {
     }
     const lockRange = paddedRange(policy, startTime, endTime);
 
-    const customer = await this.customers.findOrCreateGuestByPhone(dto.customerWhatsappNumber);
-    if (dto.customerName && !customer.name) {
-      await this.customers.updateName(customer.id, dto.customerName);
-    }
+    // A walk-in is for someone without an account: their name and phone are kept on the booking itself and are
+    // never matched with, or added to, the customer accounts (so it never shows under anyone's My bookings).
+    const walkInPhone = normalizeIndianMobile(dto.customerWhatsappNumber);
+    if (!walkInPhone) throw new BadRequestException(INDIAN_MOBILE_MESSAGE);
 
     try {
       const booking = await this.bookings.createOfflineAtomic({
         resourceId: resource.id,
-        customerId: customer.id,
+        walkIn: { name: dto.customerName?.trim() || null, phone: walkInPhone },
         venueId: venue.id,
         startTime,
         endTime,
@@ -549,7 +548,7 @@ export class BookingsService {
         action: 'OFFLINE_BOOKING_CREATED',
         entityType: 'Booking',
         entityId: booking.id,
-        metadata: { orderId: booking.orderId, resourceId: resource.id, customerId: customer.id },
+        metadata: { orderId: booking.orderId, resourceId: resource.id, walkIn: true },
       });
 
       // Excludes the acting owner — they already know, having just
@@ -871,7 +870,7 @@ export class BookingsService {
       orderId: string;
       status: string;
       slotHoldId: string;
-      customerId: string;
+      customerId: string | null;
       venueId: string;
       currency: string;
       resourceId: string | null;
@@ -959,9 +958,11 @@ export class BookingsService {
   }
 
   private async notifyCancellation(
-    customerId: string,
+    customerId: string | null,
     result: { booking: { orderId: string }; refund: { coinAmountCredited: Prisma.Decimal } | null },
   ): Promise<void> {
+    // A walk-in has no account, so there is nobody to message.
+    if (!customerId) return;
     const customer = await this.bookings.findCustomerById(customerId);
     // WhatsApp goes only to a number the customer has verified, never one that was merely typed in.
     if (!customer?.whatsappNumber || !customer.phoneVerified) return;

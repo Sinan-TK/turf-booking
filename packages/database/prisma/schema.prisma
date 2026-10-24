@@ -703,8 +703,9 @@ model SlotHold {
   resourceGroupId  String?  @db.Uuid
   resourceGroup    ResourceGroup? @relation(fields: [resourceGroupId], references: [id], onDelete: Restrict)
   quantity         Int      @default(1)
-  customerId       String   @db.Uuid
-  customer         CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  /// Null for an offline walk-in recorded by venue staff: it has no customer account.
+  customerId       String?  @db.Uuid
+  customer         CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Cascade)
   startTime        DateTime @db.Timestamptz
   endTime          DateTime @db.Timestamptz
   status           SlotHoldStatus @default(HELD)
@@ -821,8 +822,12 @@ model Booking {
   orderId                  String   @unique // "BK" + zero-padded orderSeq, see @venue/shared formatOrderId
   slotHoldId               String   @unique @db.Uuid
   slotHold                 SlotHold @relation(fields: [slotHoldId], references: [id], onDelete: Restrict)
-  customerId               String   @db.Uuid
-  customer                 CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  /// Null for a walk-in (paymentMethod OFFLINE): the customer's name and phone are kept on the booking itself
+  /// (walkInName, walkInPhone) and never linked to, or looked up in, the customer accounts.
+  customerId               String?  @db.Uuid
+  customer                 CustomerProfile? @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  walkInName               String?
+  walkInPhone              String?
   venueId                   String   @db.Uuid
   venue                     Venue     @relation(fields: [venueId], references: [id], onDelete: Restrict)
   // P2: exactly one of resourceId (exclusive) / resourceGroupId (pooled)

@@ -103,6 +103,8 @@ export class CoinsService {
 
     const booking = await this.coins.findBookingById(refund.bookingId);
     if (!booking) throw new NotFoundException('Booking not found');
+    // Refunds exist only for bookings paid online, which always belong to a customer account.
+    if (!booking.customerId) throw new NotFoundException('This booking has no customer account to refund.');
 
     const completed = await this.coins.completeRefundAtomic({
       refundId: refund.id,

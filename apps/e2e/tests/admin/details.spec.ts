@@ -1,5 +1,4 @@
-import { istInstant, nextIstDay, uniquePhone } from '../../support/dates';
-import { unique } from '../../support/env';
+import { createCustomer } from '../../support/customer';
 import { expect, test } from '../../support/fixtures';
 import { field } from '../../support/ui';
 
@@ -46,20 +45,9 @@ test.describe('admin: venue details', () => {
 });
 
 test.describe('admin: customers', () => {
-  test('a customer opens with their details, and can be blocked and unblocked with a confirmation', async ({ page, venue, ownerApi }) => {
-    // A walk-in creates a real customer for this test to act on, so no existing customer is touched.
-    const phone = uniquePhone();
-    const name = `PW Customer ${unique()}`;
-    const res = await ownerApi.post('/owner/bookings', {
-      data: {
-        resourceId: venue.courtId,
-        durationMinutes: 60,
-        customerWhatsappNumber: phone,
-        customerName: name,
-        startTime: istInstant(nextIstDay(2), 10),
-      },
-    });
-    expect(res.ok(), await res.text()).toBeTruthy();
+  test('a customer opens with their details, and can be blocked and unblocked with a confirmation', async ({ page }) => {
+    // A new customer account for this test to act on, so no existing customer is touched.
+    const { name, phone } = await createCustomer('Customer');
 
     await page.goto('/customers');
     await page.getByLabel('Search customers').fill(phone);
@@ -86,13 +74,8 @@ test.describe('admin: customers', () => {
     await expect(page.getByRole('button', { name: 'Block customer' })).toBeVisible();
   });
 
-  test('the wallet adjustment is a Credit/Debit switch with a live preview', async ({ page, venue, ownerApi }) => {
-    const phone = uniquePhone();
-    const name = `PW Wallet ${unique()}`;
-    const res = await ownerApi.post('/owner/bookings', {
-      data: { resourceId: venue.courtId, durationMinutes: 60, customerWhatsappNumber: phone, customerName: name, startTime: istInstant(nextIstDay(2), 12) },
-    });
-    expect(res.ok(), await res.text()).toBeTruthy();
+  test('the wallet adjustment is a Credit/Debit switch with a live preview', async ({ page }) => {
+    const { name, phone } = await createCustomer('Wallet');
 
     await page.goto('/customers');
     await page.getByLabel('Search customers').fill(phone);

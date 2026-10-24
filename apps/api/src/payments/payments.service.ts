@@ -260,7 +260,7 @@ export class PaymentsService {
     // a notification failure must never undo an already-committed
     // payment confirmation, but message order still matters wherever
     // this response feeds into a chat flow.
-    await this.notifyBookingConfirmed(booking.customerId, booking.orderId).catch(() => undefined);
+    if (booking.customerId) await this.notifyBookingConfirmed(booking.customerId, booking.orderId).catch(() => undefined);
 
     // One consolidated notification, not separate PAYMENT_RECEIVED +
     // BOOKING_CONFIRMED rows — this webhook is the single event behind

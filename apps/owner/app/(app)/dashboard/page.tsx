@@ -21,6 +21,8 @@ interface RecentBooking {
   currency: string;
   startTime: string;
   venue: { name: string };
+  /** A walk-in recorded by venue staff: its details are on the booking, not a customer account. */
+  isWalkIn?: boolean;
   customer: { whatsappNumber: string | null; phoneVerified: boolean; email: string | null; name: string | null };
 }
 
@@ -106,7 +108,7 @@ function OwnerAdminDashboard() {
                     >
                       <div className="min-w-0">
                         <p className="truncate text-body-md font-medium text-on-surface">
-                          {b.customer.name || b.customer.whatsappNumber || b.customer.email || 'Customer'}
+                          {b.customer.name || b.customer.whatsappNumber || b.customer.email || 'Customer'}{b.isWalkIn && <span className="ml-1.5 rounded-full bg-surface-container px-1.5 py-0.5 align-middle text-[10px] font-semibold text-on-surface-variant">Walk-in</span>}
                           <span className="font-normal text-on-surface-variant"> · {b.venue.name}</span>
                         </p>
                         <p className="text-xs text-on-surface-variant">

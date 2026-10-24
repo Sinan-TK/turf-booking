@@ -17,6 +17,8 @@ interface Booking {
   currency: string;
   startTime: string;
   venue: { name: string; facilityCode: string };
+  /** A walk-in recorded by venue staff: its details are on the booking, not a customer account. */
+  isWalkIn?: boolean;
   customer: { whatsappNumber: string | null; phoneVerified: boolean; email: string | null; name: string | null };
 }
 
@@ -94,7 +96,7 @@ export default function BookingsPage() {
                 <tr key={b.id} className="border-b border-gray-100 last:border-0 transition-colors hover:bg-brand-50/40">
                   <td className="px-4 py-3 font-mono text-xs">{b.orderId}</td>
                   <td className="px-4 py-3">{b.venue.name}</td>
-                  <td className="px-4 py-3 text-gray-600">{b.customer.name || b.customer.whatsappNumber || b.customer.email || 'Customer'}</td>
+                  <td className="px-4 py-3 text-gray-600">{b.customer.name || b.customer.whatsappNumber || b.customer.email || 'Customer'}{b.isWalkIn && <span className="ml-1.5 rounded-full bg-gray-100 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-gray-600">Walk-in</span>}</td>
                   <td className="px-4 py-3 text-gray-600">{new Date(b.startTime).toLocaleString()}</td>
                   <td className="px-4 py-3">
                     {b.currency} {b.amount}

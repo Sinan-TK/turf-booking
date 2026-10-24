@@ -36,6 +36,8 @@ test.describe('owner portal: bookings', () => {
     await expect(page.getByRole('heading', { name: /^Booking BK/ })).toBeVisible();
     await expect(page.getByText('CONFIRMED').first()).toBeVisible();
     await expect(page.getByText('PW Walk-in Guest')).toBeVisible();
+    await expect(page.getByText('Walk-in', { exact: true })).toBeVisible(); // marked as a walk-in, not a customer account
+    await expect(page.getByText('(number not verified)')).toHaveCount(0);
     await expect(page.getByText(venue.name)).toBeVisible();
     await expect(page.getByText('INR 800').first()).toBeVisible(); // priced by the Mon-Fri price
     await page.getByRole('link', { name: 'All bookings' }).click();

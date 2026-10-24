@@ -28,6 +28,8 @@ interface Booking {
   groundType: string;
   paymentMethod: string | null;
   venue: { name: string; facilityCode: string };
+  /** A walk-in recorded by venue staff: its details are on the booking, not a customer account. */
+  isWalkIn?: boolean;
   customer: { whatsappNumber: string | null; phoneVerified: boolean; email: string | null; name: string | null };
 }
 
@@ -112,7 +114,7 @@ export default function BookingsPage() {
                 <p className="font-medium text-on-surface">{b.venue.name}</p>
                 <p className="text-xs text-on-surface-variant">{b.groundType}</p>
               </td>
-              <td className="px-4 py-3 text-on-surface-variant">{b.customer.name || b.customer.whatsappNumber || b.customer.email || 'Customer'}</td>
+              <td className="px-4 py-3 text-on-surface-variant">{b.customer.name || b.customer.whatsappNumber || b.customer.email || 'Customer'}{b.isWalkIn && <span className="ml-1.5 rounded-full bg-surface-container px-1.5 py-0.5 align-middle text-[10px] font-semibold text-on-surface-variant">Walk-in</span>}</td>
               <td className="whitespace-nowrap px-4 py-3 text-on-surface-variant">
                 {new Date(b.startTime).toLocaleString()}
               </td>

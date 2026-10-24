@@ -13,9 +13,12 @@ import type {
   Venue,
 } from '@venue/database';
 import type { DateRange } from '../common/list-filters';
+import type { presentCustomer } from './booking-customer';
 
-/** Booking with the admin-detail includes (venue/customer/payments/refunds). */
-export type BookingDetail = Prisma.BookingGetPayload<{
+/** Booking with the admin-detail includes (venue/customer/payments/refunds). `customer` is the account, or the walk-in's recorded details. */
+export type BookingDetail = ReturnType<typeof presentCustomer<BookingCustomerRow, RawBookingDetail>>;
+type BookingCustomerRow = { id: string; whatsappNumber: string | null; phoneVerified: boolean; email: string | null; name: string | null };
+type RawBookingDetail = Prisma.BookingGetPayload<{
   include: {
     venue: { select: { id: true; name: true; facilityCode: true; organizationId: true } };
     resourceGroup: { select: { id: true; name: true; allocationMode: true; totalUnits: true } };
@@ -34,8 +37,9 @@ export type BookingCheckoutView = Prisma.BookingGetPayload<{
   };
 }>;
 
-/** Booking with the list-view includes (venue/customer). */
-export type BookingListItem = Prisma.BookingGetPayload<{
+/** Booking with the list-view includes (venue/customer), presented like BookingDetail. */
+export type BookingListItem = ReturnType<typeof presentCustomer<BookingCustomerRow, RawBookingListItem>>;
+type RawBookingListItem = Prisma.BookingGetPayload<{
   include: {
     venue: { select: { id: true; name: true; facilityCode: true; organizationId: true } };
     customer: { select: { id: true; whatsappNumber: true; phoneVerified: true; email: true; name: true } };
@@ -86,7 +90,9 @@ export interface HoldAtomicParams {
   commercialTerms?: Prisma.InputJsonValue;
 }
 
-export interface OfflineAtomicParams extends HoldAtomicParams {
+export interface OfflineAtomicParams extends Omit<HoldAtomicParams, 'customerId'> {
+  /** A walk-in has no customer account: who it is for is kept on the booking itself. */
+  walkIn: { name: string | null; phone: string };
   paymentMethod: PaymentMethod;
   /** What was collected at booking time (the rest is due at the venue). */
   paidAmount: Prisma.Decimal | number | string;

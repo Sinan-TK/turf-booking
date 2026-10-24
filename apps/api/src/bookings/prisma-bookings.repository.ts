@@ -1,3 +1,4 @@
+import { presentCustomer } from './booking-customer';
 import { ConflictException, Injectable } from '@nestjs/common';
 import { formatOrderId, SLOT_HOLD_TRANSITIONS, assertTransition } from '@venue/shared';
 import type { BookingStatus, PaymentMethod, Prisma } from '@venue/database';
@@ -91,8 +92,8 @@ export class PrismaBookingsRepository implements BookingsRepository {
     return this.prisma.client.booking.update({ where: { id }, data: { paidAmount: { increment: delta } } });
   }
 
-  findBookingDetailById(id: string) {
-    return this.prisma.client.booking.findUnique({
+  async findBookingDetailById(id: string) {
+    const booking = await this.prisma.client.booking.findUnique({
       where: { id },
       include: {
         venue: { select: { id: true, name: true, facilityCode: true, organizationId: true } },
@@ -104,6 +105,7 @@ export class PrismaBookingsRepository implements BookingsRepository {
         refunds: true,
       },
     });
+    return booking ? presentCustomer(booking) : null;
   }
 
   findBookingCheckoutViewById(id: string) {
@@ -138,6 +140,8 @@ export class PrismaBookingsRepository implements BookingsRepository {
             { customer: { whatsappNumber: contains(q) } },
             { customer: { name: contains(q) } },
             { customer: { email: contains(q) } },
+            { walkInName: contains(q) },
+            { walkInPhone: contains(q) },
             { venue: { name: contains(q) } },
             { venue: { facilityCode: contains(q) } },
           ]
@@ -149,9 +153,9 @@ export class PrismaBookingsRepository implements BookingsRepository {
     return this.prisma.client.booking.count({ where: this.adminBookingWhere(filters) });
   }
 
-  listForAdmin(filters: AdminBookingFilters & { limit?: number; offset?: number }) {
+  async listForAdmin(filters: AdminBookingFilters & { limit?: number; offset?: number }) {
     const limit = Math.min(filters.limit ?? 50, 200);
-    return this.prisma.client.booking.findMany({
+    const rows = await this.prisma.client.booking.findMany({
       where: this.adminBookingWhere(filters),
       include: {
         venue: { select: { id: true, name: true, facilityCode: true, organizationId: true } },
@@ -161,6 +165,7 @@ export class PrismaBookingsRepository implements BookingsRepository {
       take: limit,
       skip: filters.offset ?? 0,
     });
+    return rows.map((row) => presentCustomer(row));
   }
 
   findCustomerById(id: string) {
@@ -323,7 +328,8 @@ export class PrismaBookingsRepository implements BookingsRepository {
       const slotHold = await tx.slotHold.create({
         data: {
           resourceId: params.resourceId,
-          customerId: params.customerId,
+          // No customer: a walk-in is for someone without an account.
+          customerId: null,
           startTime: params.startTime,
           endTime: params.endTime,
           status: 'CONFIRMED',
@@ -357,7 +363,9 @@ export class PrismaBookingsRepository implements BookingsRepository {
           orderSeq: nextval,
           orderId,
           slotHoldId: slotHold.id,
-          customerId: params.customerId,
+          customerId: null,
+          walkInName: params.walkIn.name,
+          walkInPhone: params.walkIn.phone,
           venueId: params.venueId,
           resourceId: params.resourceId,
           startTime: params.startTime,

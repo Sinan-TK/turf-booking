@@ -70,3 +70,24 @@ export async function plantEmailCode(email: string, purpose: 'SIGNUP' | 'RESET',
     data: { codeHash: createHmac('sha256', secret).update(`email:${purpose}:${address}:${code}`).digest('hex') },
   });
 }
+
+/**
+ * A real customer account for a test to act on, made through the API's test Google sign-in (the stack runs with
+ * GOOGLE_AUTH_MODE=fake) with a phone number saved on it. Walk-ins are not customers, so they cannot stand in.
+ */
+export async function createCustomer(label = 'Customer'): Promise<{ name: string; email: string; phone: string }> {
+  const { request } = await import('@playwright/test');
+  const { URLS } = await import('./env');
+  const tag = Math.random().toString(36).slice(2, 8);
+  const name = `PW ${label} ${tag}`;
+  const email = `pw-${tag}@example.com`;
+  const phone = `+9199${Math.floor(10_000_000 + Math.random() * 89_999_999)}`;
+  // Signed out of every portal: the project's saved staff login would otherwise be sent too, and win.
+  const api = await request.newContext({ baseURL: URLS.api, storageState: { cookies: [], origins: [] } });
+  const signIn = await api.post('/customer-auth/google', { data: { credential: `test:${email}|${name}|sub-${tag}` } });
+  if (!signIn.ok()) throw new Error(`test sign-in failed: ${signIn.status()} ${await signIn.text()}`);
+  const saved = await api.patch('/customer-auth/me', { data: { phone: phone.slice(3) } });
+  if (!saved.ok()) throw new Error(`saving the phone failed: ${saved.status()} ${await saved.text()}`);
+  await api.dispose();
+  return { name, email, phone };
+}

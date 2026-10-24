@@ -18,6 +18,8 @@ export interface DayBooking {
   groundType: string;
   paymentMethod: string | null;
   quantity?: number | null;
+  /** A walk-in recorded by venue staff: its details are on the booking, not a customer account. */
+  isWalkIn?: boolean;
   customer: { whatsappNumber: string | null; phoneVerified: boolean; email: string | null; name: string | null };
 }
 
@@ -129,7 +131,7 @@ export function DayBookings({ venueId, initialDate }: { venueId: string; initial
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-body-md font-medium text-on-surface">
-                    {b.customer.name || b.customer.whatsappNumber || b.customer.email || 'Customer'}
+                    {b.customer.name || b.customer.whatsappNumber || b.customer.email || 'Customer'}{b.isWalkIn && <span className="ml-1.5 rounded-full bg-surface-container px-1.5 py-0.5 align-middle text-[10px] font-semibold text-on-surface-variant">Walk-in</span>}
                   </p>
                   <p className="font-mono text-xs text-on-surface-variant">{b.orderId}</p>
                 </div>

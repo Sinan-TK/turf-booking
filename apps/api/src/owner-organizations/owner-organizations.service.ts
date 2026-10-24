@@ -1,3 +1,4 @@
+import { presentCustomer } from '../bookings/booking-customer';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -90,7 +91,9 @@ export class OwnerOrganizationsService {
           currency: true,
           startTime: true,
           venue: { select: { name: true } },
-          customer: { select: { name: true, whatsappNumber: true, phoneVerified: true, email: true } },
+          customer: { select: { id: true, name: true, whatsappNumber: true, phoneVerified: true, email: true } },
+          walkInName: true,
+          walkInPhone: true,
         },
       }),
     ]);
@@ -122,7 +125,7 @@ export class OwnerOrganizationsService {
         lastBookedAt: last._max.createdAt,
       },
       venues: venueRows,
-      recentBookings,
+      recentBookings: recentBookings.map((b) => presentCustomer(b)),
     };
   }
 

@@ -39,6 +39,8 @@ interface BookingDetail {
   cancellationReasonCode: string | null;
   cancellationNote: string | null;
   venue: { name: string; facilityCode: string };
+  /** A walk-in recorded by venue staff: its details are on the booking, not a customer account. */
+  isWalkIn?: boolean;
   customer: { whatsappNumber: string | null; phoneVerified: boolean; email: string | null; name: string | null };
   payments: Payment[];
   refunds: Refund[];
@@ -115,11 +117,11 @@ export default function BookingDetailPage() {
           <div>
             <dt className="text-on-surface-variant">Customer</dt>
             <dd>
-              {booking.customer.name || booking.customer.whatsappNumber || booking.customer.email || 'Customer'}
+              {booking.customer.name || booking.customer.whatsappNumber || booking.customer.email || 'Customer'}{booking.isWalkIn && <span className="ml-1.5 rounded-full bg-surface-container px-1.5 py-0.5 align-middle text-[10px] font-semibold text-on-surface-variant">Walk-in</span>}
               {booking.customer.name && booking.customer.whatsappNumber && (
                 <span className="block text-xs text-on-surface-variant">
                   {booking.customer.whatsappNumber}
-                  {!booking.customer.phoneVerified && ' (number not verified)'}
+                  {!booking.customer.phoneVerified && !booking.isWalkIn && ' (number not verified)'}
                 </span>
               )}
               {booking.customer.email && <span className="block text-xs text-on-surface-variant">{booking.customer.email}</span>}
