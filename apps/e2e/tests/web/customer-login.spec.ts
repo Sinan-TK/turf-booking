@@ -99,7 +99,7 @@ test.describe('customer sign-in', () => {
     await expect(dialog.getByText('Indian mobile numbers start with 6, 7, 8 or 9.')).toBeVisible();
   });
 
-  test('the account page has a round back button, no Home text, no header menu, and a Log out with confirmation', async ({ page }) => {
+  test('the account page has a curved-box back button, no Home text, no header menu, and a Log out with confirmation', async ({ page }) => {
     await page.goto('/');
     await logIn(page, uniquePhone(), 'PW Account Person');
     // The back button goes back to the page the visitor came from.
@@ -115,11 +115,16 @@ test.describe('customer sign-in', () => {
     const back = page.getByRole('button', { name: 'Go back' });
     await expect(back).toBeVisible();
     const box = (await back.boundingBox())!;
-    expect(Math.round(box.width)).toBe(Math.round(box.height)); // a circle
-    expect(await back.evaluate((el) => getComputedStyle(el).borderRadius)).toMatch(/9999px|50%|\d{3,}px/);
+    expect(Math.round(box.width)).toBe(Math.round(box.height)); // square
+    expect(await back.evaluate((el) => getComputedStyle(el).borderRadius)).toBe('12px'); // a curved box, not a circle
     await expect(page.getByText('Home', { exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Account menu' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Log in' })).toHaveCount(0);
+
+    // Edit stands out: a solid green button, not a plain outline.
+    const editColour = await page.getByRole('button', { name: 'Edit' }).evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(editColour).not.toBe('rgb(255, 255, 255)');
+    expect(editColour).toBe('rgb(4, 120, 87)');
 
     // Log out sits in the top right corner, on the back button's row, where the profile icon used to be.
     const logout = page.getByRole('button', { name: 'Log out' });

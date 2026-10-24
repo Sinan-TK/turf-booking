@@ -16,7 +16,7 @@ export function LogoutButton() {
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="inline-flex h-10 items-center gap-2 rounded-full border border-red-200 bg-white px-4 text-sm font-semibold text-red-600 shadow-sm transition hover:bg-red-50 active:scale-95"
+        className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-200 bg-white px-4 text-sm font-semibold text-red-600 shadow-sm transition hover:bg-red-50 active:scale-95"
       >
         <Icon name="logout" className="text-[16px]" />
         Log out

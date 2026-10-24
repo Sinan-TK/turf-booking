@@ -129,7 +129,7 @@ function Profile() {
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-gray-900">Profile</h2>
         {!editing && (
-          <Button type="button" variant="secondary" className="inline-flex items-center gap-1.5 !px-3 !py-1.5" onClick={startEdit}>
+          <Button type="button" className="inline-flex items-center gap-1.5 !px-3 !py-1.5" onClick={startEdit}>
             <Icon name="edit" className="text-[14px]" />
             Edit
           </Button>
