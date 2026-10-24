@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
 import { LoginGate } from '@/components/login-gate';
@@ -101,7 +102,7 @@ function Profile() {
   }
 
   return (
-    <Card id="profile" className="mb-4 scroll-mt-4">
+    <Card className="mb-4">
       <h2 className="mb-3 text-sm font-semibold text-gray-900">Profile</h2>
       <form onSubmit={onSave} noValidate className="space-y-3">
         {error && (
@@ -304,7 +305,7 @@ function Wallet() {
   }, [refresh]);
 
   return (
-    <Card id="wallet" className="scroll-mt-4">
+    <Card>
       <h2 className="mb-3 text-sm font-semibold text-gray-900">Coins wallet</h2>
       {error && <ErrorBanner message={error} />}
       {!error && !wallet && <LoadingState />}
@@ -338,13 +339,69 @@ function Wallet() {
   );
 }
 
-/** Profile, and a Change password card only for customers who have a password (Google-only customers have none). */
-function ProfileSections() {
+const TABS = [
+  { id: 'profile', label: 'Profile' },
+  { id: 'wallet', label: 'Wallet' },
+  { id: 'security', label: 'Security' },
+] as const;
+type TabId = (typeof TABS)[number]['id'];
+
+/** Security: a password can be changed only by someone who has one; a Google-only customer has none. */
+function Security() {
   const { customer } = useCustomer();
+  if (customer?.hasPassword) return <ChangePassword />;
+  return (
+    <Card>
+      <h2 className="mb-2 text-sm font-semibold text-gray-900">Sign-in method</h2>
+      <p className="text-sm text-gray-600">
+        You sign in with Google, so this account has no password. Your Google account keeps it secure.
+      </p>
+    </Card>
+  );
+}
+
+/** The three sections of the account, switched with tabs. The chosen one is kept in the address (?tab=wallet), so the menu can link straight to it. */
+function AccountTabs() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const wanted = useSearchParams().get('tab');
+  const tab: TabId = TABS.some((t) => t.id === wanted) ? (wanted as TabId) : 'profile';
+  const choose = (id: TabId) => router.replace(`${pathname}?tab=${id}`, { scroll: false });
+
+  function onKeyDown(e: React.KeyboardEvent) {
+    const i = TABS.findIndex((t) => t.id === tab);
+    const next = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : null;
+    if (next === null) return;
+    e.preventDefault();
+    const target = TABS[(next + TABS.length) % TABS.length]!;
+    choose(target.id);
+    document.getElementById(`account-tab-${target.id}`)?.focus();
+  }
+
   return (
     <>
-      <Profile />
-      {customer?.hasPassword && <ChangePassword />}
+      <div role="tablist" aria-label="Account sections" onKeyDown={onKeyDown} className="mb-4 grid grid-cols-3 gap-1 rounded-xl bg-gray-100 p-1 text-sm font-semibold">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            id={`account-tab-${t.id}`}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            aria-controls="account-panel"
+            tabIndex={tab === t.id ? 0 : -1}
+            onClick={() => choose(t.id)}
+            className={`rounded-lg px-3 py-2 transition ${tab === t.id ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <div id="account-panel" role="tabpanel" aria-labelledby={`account-tab-${tab}`}>
+        {tab === 'profile' && <Profile />}
+        {tab === 'wallet' && <Wallet />}
+        {tab === 'security' && <Security />}
+      </div>
     </>
   );
 }
@@ -357,8 +414,9 @@ export default function AccountPage() {
         My account
       </h1>
       <LoginGate message="Log in to see your account.">
-        <ProfileSections />
-        <Wallet />
+        <Suspense fallback={<LoadingState />}>
+          <AccountTabs />
+        </Suspense>
       </LoginGate>
     </Screen>
   );

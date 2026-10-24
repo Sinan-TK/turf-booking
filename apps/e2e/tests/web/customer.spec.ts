@@ -65,8 +65,6 @@ test.describe('customer site: account and support', () => {
 
     await page.goto('/account');
     await expect(page.getByRole('heading', { name: 'My account' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Coins wallet' })).toBeVisible();
-    await expect(page.getByText('No transactions yet.')).toBeVisible();
     const name = page.getByRole('textbox').nth(0);
     const save = page.getByRole('button', { name: 'Save' });
     await expect(name).toHaveValue('PW Original');
@@ -85,6 +83,12 @@ test.describe('customer site: account and support', () => {
     await saved;
     await page.reload();
     await expect(page.getByRole('textbox').nth(0)).toHaveValue(renamed);
+
+    // The wallet is its own tab.
+    await page.getByRole('tab', { name: 'Wallet' }).click();
+    await expect(page).toHaveURL(/\/account\?tab=wallet$/);
+    await expect(page.getByRole('heading', { name: 'Coins wallet' })).toBeVisible();
+    await expect(page.getByText('No transactions yet.')).toBeVisible();
   });
 
   test('a customer can ask support for help and sees the request listed', async ({ page, context, remoteVenue }) => {

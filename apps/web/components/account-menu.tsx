@@ -6,9 +6,9 @@ import { useCustomer } from '@/lib/customer';
 import { ConfirmLogout } from '@/components/confirm-logout';
 
 const ITEMS = [
-  { href: '/account#profile', label: 'Profile' },
+  { href: '/account?tab=profile', label: 'Profile' },
   { href: '/bookings', label: 'My bookings' },
-  { href: '/account#wallet', label: 'Wallet (Coins)' },
+  { href: '/account?tab=wallet', label: 'Wallet (Coins)' },
   { href: '/support', label: 'Support' },
 ];
 

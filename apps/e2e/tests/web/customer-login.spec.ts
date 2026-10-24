@@ -28,7 +28,8 @@ test.describe('customer sign-in', () => {
     const items = await page.getByRole('menuitem').allTextContents();
     expect(items.slice(0, 3)).toEqual(['Profile', 'My bookings', 'Wallet (Coins)']);
     await page.getByRole('menuitem', { name: 'Profile' }).click();
-    await expect(page).toHaveURL(/\/account#profile$/);
+    await expect(page).toHaveURL(/\/account\?tab=profile$/);
+    await expect(page.getByRole('tab', { name: 'Profile' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByRole('heading', { name: 'Profile' })).toBeInViewport();
     await expect(page.getByLabel('Name')).toHaveValue('PW Menu Person');
   });
@@ -64,7 +65,12 @@ test.describe('customer sign-in', () => {
     await expect(page.getByRole('heading', { name: 'My account' })).toBeVisible();
     await expect(page.getByText('Not verified').first()).toBeVisible(); // phone typed, not proven
     await expect(page.getByText('Verified', { exact: true }).first()).toBeVisible(); // email proven by Google
-    await expect(page.getByRole('heading', { name: 'Change password' })).toHaveCount(0); // Google-only: no password
+    // Three tabs; for a Google-only customer the Security tab explains there is no password instead of offering one.
+    await expect(page.getByRole('tab')).toHaveText(['Profile', 'Wallet', 'Security']);
+    await page.getByRole('tab', { name: 'Security' }).click();
+    await expect(page.getByText(/no password/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Change password' })).toHaveCount(0);
+    await expect(page.getByLabel('Current password')).toHaveCount(0);
   });
 
   test('email sign-up needs the emailed code; a wrong code is refused, the right one creates the account', async ({ page }) => {
@@ -95,8 +101,9 @@ test.describe('customer sign-in', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0);
 
     await page.goto('/account');
-    await expect(page.getByRole('heading', { name: 'Change password' })).toBeVisible();
     await expect(page.getByText('Verified', { exact: true }).first()).toBeVisible(); // the emailed code proved the address
+    await page.getByRole('tab', { name: 'Security' }).click();
+    await expect(page.getByRole('heading', { name: 'Change password' })).toBeVisible(); // this account has a password
   });
 
   test('forgot password: a wrong password is refused, then an emailed code sets a new one', async ({ page }) => {
