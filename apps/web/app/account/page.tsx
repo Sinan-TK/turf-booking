@@ -6,7 +6,8 @@ import { api, ApiError } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
 import { LoginGate } from '@/components/login-gate';
 import { Button, Card, ErrorBanner, FieldError, Icon, Input, Label, LoadingState, invalidClass } from '@/components/ui';
-import { emailError, indianPhoneError, nameError, newPasswordError, passwordError } from '@/lib/validation';
+import { emailError, indianPhoneError, nameError, newPasswordError, passwordError, passwordStrength } from '@/lib/validation';
+import { useDebounced } from '@/lib/use-debounced';
 import { PasswordInput } from '@/components/password-input';
 import { PhoneInput, formatPhone, toNationalDigits } from '@/components/phone-input';
 import { useToast } from '@/components/toast';
@@ -249,6 +250,12 @@ function Profile() {
 }
 
 /** Only for customers who have a password. Google-only customers set one through Forgot password on the sign-in screen. */
+type PasswordField = 'current' | 'next' | 'confirm';
+const STRENGTH_BAR = ['bg-red-400', 'bg-amber-400', 'bg-lime-500', 'bg-emerald-600'];
+
+/** Where the API's validation answers belong: the field names it uses, mapped to this form's. */
+const SERVER_FIELD: Record<string, PasswordField> = { currentPassword: 'current', newPassword: 'next' };
+
 function ChangePassword() {
   const { refresh } = useCustomer();
   const toast = useToast();
@@ -256,30 +263,52 @@ function ChangePassword() {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [msgs, setMsgs] = useState<Partial<Record<'current' | 'next' | 'confirm', string>>>({});
+  const [submitted, setSubmitted] = useState(false);
+  // What the API said about a field; cleared as soon as that field is edited.
+  const [serverMsgs, setServerMsgs] = useState<Partial<Record<PasswordField, string>>>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Live checks wait until typing pauses, so a message doesn't flash on every keystroke.
+  const dCurrent = useDebounced(current);
+  const dNext = useDebounced(next);
+  const dConfirm = useDebounced(confirm);
+
+  function check(c: string, n: string, r: string, live: boolean): Partial<Record<PasswordField, string>> {
+    const out: Partial<Record<PasswordField, string>> = {};
+    // While typing only a field that has something in it is judged; after Update, every field is.
+    if (!live || c) out.current = passwordError(c);
+    if (!live || n) out.next = newPasswordError(n) ?? (c && n === c ? 'Choose a password different from your current one.' : undefined);
+    if (!live || r) out.confirm = n !== r ? 'The two passwords are not the same.' : undefined;
+    return out;
+  }
+  const live = check(dCurrent, dNext, dConfirm, true);
+  const msg = (k: PasswordField) => serverMsgs[k] ?? (submitted ? check(current, next, confirm, false)[k] : live[k]);
+  const strength = passwordStrength(next);
 
   function close() {
     setCurrent('');
     setNext('');
     setConfirm('');
-    setMsgs({});
+    setSubmitted(false);
+    setServerMsgs({});
     setError(null);
     setOpen(false);
   }
+  const edit = (k: PasswordField, set: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    set(e.target.value);
+    setServerMsgs((m) => ({ ...m, [k]: undefined }));
+  };
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (saving) return;
-    const found = {
-      current: passwordError(current),
-      next: newPasswordError(next),
-      confirm: next !== confirm ? 'The two passwords are not the same.' : undefined,
-    };
-    setMsgs(found);
+    // 1. The browser's checks, straight away.
+    setSubmitted(true);
+    const found = check(current, next, confirm, false);
     const first = (['current', 'next', 'confirm'] as const).find((k) => found[k]);
     if (first) return void document.getElementById(`password-${first}`)?.focus();
+    // 2. Then the server's, whose answer is placed under the field it is about.
     setSaving(true);
     setError(null);
     try {
@@ -288,11 +317,42 @@ function ChangePassword() {
       toast.show('Password changed. Other devices have been signed out.');
       await refresh();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not change your password.');
+      if (!(err instanceof ApiError)) return void setError('Could not change your password.');
+      const body = (err.details ?? {}) as { code?: string; errors?: Array<{ path?: unknown[]; message?: string }> };
+      const placed: Partial<Record<PasswordField, string>> = {};
+      if (body.code === 'CURRENT_PASSWORD_WRONG') placed.current = err.message;
+      else if (body.code === 'NEW_PASSWORD_SAME') placed.next = err.message;
+      for (const issue of body.errors ?? []) {
+        const field = SERVER_FIELD[String(issue.path?.[0])];
+        if (field && issue.message && !placed[field]) placed[field] = issue.message;
+      }
+      const target = (['current', 'next', 'confirm'] as const).find((k) => placed[k]);
+      if (target) {
+        setServerMsgs(placed);
+        document.getElementById(`password-${target}`)?.focus();
+      } else {
+        setError(err.message);
+      }
     } finally {
       setSaving(false);
     }
   }
+
+  const field = (k: PasswordField, id: string, label: string, value: string, set: (v: string) => void, autoComplete: string, extra?: React.ReactNode) => (
+    <div>
+      <Label htmlFor={id}>{label}</Label>
+      <PasswordInput
+        id={id}
+        autoComplete={autoComplete}
+        value={value}
+        aria-invalid={!!msg(k)}
+        className={msg(k) ? invalidClass : ''}
+        onChange={edit(k, set)}
+      />
+      <FieldError id={`${id}-error`} message={msg(k)} />
+      {extra}
+    </div>
+  );
 
   return (
     <Card className="mb-4">
@@ -306,66 +366,39 @@ function ChangePassword() {
       </div>
       {!open && <p className="mt-1 text-sm text-gray-500">Choose a new password for signing in with your email.</p>}
       {open && (
-      <form onSubmit={onSubmit} noValidate className="mt-3 max-w-md space-y-3">
-        {error && (
-          <div role="alert">
-            <ErrorBanner message={error} />
+        <form onSubmit={onSubmit} noValidate className="mt-3 space-y-3 md:grid md:grid-cols-3 md:gap-4 md:space-y-0">
+          {error && (
+            <div role="alert" className="md:col-span-3">
+              <ErrorBanner message={error} />
+            </div>
+          )}
+          {field('current', 'password-current', 'Current password', current, setCurrent, 'current-password')}
+          {field(
+            'next',
+            'password-next',
+            'New password',
+            next,
+            setNext,
+            'new-password',
+            <div className="mt-1.5" aria-live="polite">
+              <div className="flex gap-1" aria-hidden="true">
+                {[1, 2, 3].map((n) => (
+                  <span key={n} className={`h-1.5 flex-1 rounded-full ${next && strength.level >= n ? STRENGTH_BAR[strength.level] : 'bg-gray-200'}`} />
+                ))}
+              </div>
+              <p className="mt-1 text-xs text-gray-500">{strength.label ? `Strength: ${strength.label}` : 'At least 8 characters.'}</p>
+            </div>,
+          )}
+          {field('confirm', 'password-confirm', 'Repeat the new password', confirm, setConfirm, 'new-password')}
+          <div className="flex gap-2 md:col-span-3">
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Saving…' : 'Update password'}
+            </Button>
+            <Button type="button" variant="secondary" disabled={saving} onClick={close}>
+              Cancel
+            </Button>
           </div>
-        )}
-        <div>
-          <Label htmlFor="password-current">Current password</Label>
-          <PasswordInput
-            id="password-current"
-            autoComplete="current-password"
-            value={current}
-            aria-invalid={!!msgs.current}
-            className={msgs.current ? invalidClass : ''}
-            onChange={(e) => {
-              setCurrent(e.target.value);
-              setMsgs((m) => ({ ...m, current: undefined }));
-            }}
-          />
-          <FieldError id="password-current-error" message={msgs.current} />
-        </div>
-        <div>
-          <Label htmlFor="password-next">New password</Label>
-          <PasswordInput
-            id="password-next"
-            autoComplete="new-password"
-            value={next}
-            aria-invalid={!!msgs.next}
-            className={msgs.next ? invalidClass : ''}
-            onChange={(e) => {
-              setNext(e.target.value);
-              setMsgs((m) => ({ ...m, next: undefined }));
-            }}
-          />
-          <FieldError id="password-next-error" message={msgs.next} />
-        </div>
-        <div>
-          <Label htmlFor="password-confirm">Repeat the new password</Label>
-          <PasswordInput
-            id="password-confirm"
-            autoComplete="new-password"
-            value={confirm}
-            aria-invalid={!!msgs.confirm}
-            className={msgs.confirm ? invalidClass : ''}
-            onChange={(e) => {
-              setConfirm(e.target.value);
-              setMsgs((m) => ({ ...m, confirm: undefined }));
-            }}
-          />
-          <FieldError id="password-confirm-error" message={msgs.confirm} />
-        </div>
-        <div className="flex gap-2">
-          <Button type="submit" disabled={saving}>
-            {saving ? 'Saving…' : 'Update password'}
-          </Button>
-          <Button type="button" variant="secondary" disabled={saving} onClick={close}>
-            Cancel
-          </Button>
-        </div>
-      </form>
+        </form>
       )}
     </Card>
   );

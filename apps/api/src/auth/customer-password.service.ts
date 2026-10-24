@@ -132,7 +132,16 @@ export class CustomerPasswordService {
     if (customer.status !== 'ACTIVE') throw new ForbiddenException('This account has been blocked. Please contact support.');
     if (!customer.passwordHash) throw new BadRequestException(NO_PASSWORD_YET);
     if (!(await verifyPassword(currentPassword, customer.passwordHash))) {
-      throw new BadRequestException('Current password is incorrect');
+      // `code` lets the form show this under the current-password field.
+      throw new BadRequestException({ statusCode: 400, error: 'Bad Request', code: 'CURRENT_PASSWORD_WRONG', message: 'Current password is incorrect' });
+    }
+    if (currentPassword === newPassword) {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'Bad Request',
+        code: 'NEW_PASSWORD_SAME',
+        message: 'Choose a new password that is different from your current one.',
+      });
     }
     const passwordHash = await hashPassword(newPassword);
     await this.prisma.client.$transaction([

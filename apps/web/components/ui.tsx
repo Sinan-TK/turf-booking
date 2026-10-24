@@ -37,6 +37,8 @@ import {
   LifeBuoy,
   Pencil,
   LogOut,
+  Eye,
+  EyeOff,
   type LucideIcon
 } from 'lucide-react';
 
@@ -80,6 +82,8 @@ const ICON_MAP: Record<string, LucideIcon> = {
   support: LifeBuoy,
   edit: Pencil,
   logout: LogOut,
+  visibility: Eye,
+  visibility_off: EyeOff,
 };
 
 export function Icon({ name, className = '' }: { name: string; className?: string; filled?: boolean }) {

@@ -476,7 +476,15 @@ describe('Customer email + password', () => {
       const laptop = agentFor(app);
       expect((await laptop.post('/customer-auth/login').send({ email: e, password: PASSWORD })).status).toBe(200);
 
-      expect((await phoneOne.post('/customer-auth/change-password').send({ currentPassword: 'nope', newPassword: 'brand-new-pw1' })).status).toBe(400);
+      const wrong = await phoneOne.post('/customer-auth/change-password').send({ currentPassword: 'nope', newPassword: 'brand-new-pw1' });
+      expect(wrong.status).toBe(400);
+      expect(wrong.body).toMatchObject({ code: 'CURRENT_PASSWORD_WRONG', message: 'Current password is incorrect' }); // the form places this under the field
+      const same = await phoneOne.post('/customer-auth/change-password').send({ currentPassword: PASSWORD, newPassword: PASSWORD });
+      expect(same.status).toBe(400);
+      expect(same.body).toMatchObject({ code: 'NEW_PASSWORD_SAME' });
+      const tooShort = await phoneOne.post('/customer-auth/change-password').send({ currentPassword: PASSWORD, newPassword: 'short' });
+      expect(tooShort.status).toBe(400);
+      expect(tooShort.body.errors[0].path[0]).toBe('newPassword');
       expect((await phoneOne.post('/customer-auth/change-password').send({ currentPassword: PASSWORD, newPassword: 'short' })).status).toBe(400);
       const ok = await phoneOne.post('/customer-auth/change-password').send({ currentPassword: PASSWORD, newPassword: 'brand-new-pw1' });
       expect(ok.status).toBe(200);

@@ -44,6 +44,19 @@ export function newPasswordError(value: string): string | undefined {
   if (value.length > 128) return 'Use at most 128 characters.';
 }
 
+/** How hard a password is to guess, for the meter shown while typing. Informational: the only rule is 8 to 128 characters. */
+export function passwordStrength(value: string): { level: 0 | 1 | 2 | 3; label: string } {
+  if (value.length < 8) return { level: 0, label: value ? 'Too short' : '' };
+  const points =
+    Number(value.length >= 12) +
+    Number(/[a-z]/.test(value) && /[A-Z]/.test(value)) +
+    Number(/\d/.test(value)) +
+    Number(/[^A-Za-z0-9]/.test(value));
+  if (points <= 1) return { level: 1, label: 'Weak' };
+  if (points === 2) return { level: 2, label: 'Okay' };
+  return { level: 3, label: 'Strong' };
+}
+
 export function passwordError(value: string): string | undefined {
   if (!value) return 'Enter your password.';
 }
