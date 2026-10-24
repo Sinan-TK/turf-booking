@@ -31,7 +31,16 @@ test.describe('customer sign-in', () => {
     await expect(page).toHaveURL(/\/account\?tab=profile$/);
     await expect(page.getByRole('tab', { name: 'Profile' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByRole('heading', { name: 'Profile' })).toBeInViewport();
+    // Shown as text, with an Edit button; Edit opens fields and Cancel closes them again.
+    await expect(page.getByText('PW Menu Person')).toBeVisible();
+    await expect(page.getByRole('textbox')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Edit' }).click();
     await expect(page.getByLabel('Name')).toHaveValue('PW Menu Person');
+    await page.getByLabel('Name').fill('Changed but cancelled');
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('textbox')).toHaveCount(0);
+    await expect(page.getByText('PW Menu Person')).toBeVisible();
+    await expect(page.getByText('Changed but cancelled')).toHaveCount(0);
   });
 
   test('logging out asks for confirmation first', async ({ page }) => {

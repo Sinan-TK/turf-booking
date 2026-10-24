@@ -54,6 +54,8 @@ function Profile() {
   const [name, setName] = useState(customer?.name ?? '');
   const [phone, setPhone] = useState(customer?.phone ?? '');
   const [email, setEmail] = useState(customer?.email ?? '');
+  // The details are shown as plain text; Edit turns them into fields.
+  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +70,22 @@ function Profile() {
     email: !emailLocked && email.trim().toLowerCase() !== (customer?.email ?? ''),
   };
   const dirty = changed.name || changed.phone || changed.email;
+
+  function startEdit() {
+    setName(customer?.name ?? '');
+    setPhone(customer?.phone ?? '');
+    setEmail(customer?.email ?? '');
+    setMsgs({});
+    setError(null);
+    setSaved(false);
+    setEditing(true);
+  }
+
+  function cancelEdit() {
+    setMsgs({});
+    setError(null);
+    setEditing(false);
+  }
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
@@ -91,6 +109,7 @@ function Profile() {
       });
       await refresh();
       setSaved(true);
+      setEditing(false);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Could not save your details.';
       // A number or email that belongs to someone else is shown under its own field.
@@ -103,18 +122,65 @@ function Profile() {
 
   return (
     <Card className="mb-4">
-      <h2 className="mb-3 text-sm font-semibold text-gray-900">Profile</h2>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold text-gray-900">Profile</h2>
+        {!editing && (
+          <Button type="button" variant="secondary" className="!px-3 !py-1.5" onClick={startEdit}>
+            Edit
+          </Button>
+        )}
+      </div>
+      {saved && !editing && (
+        <div className="mb-3">
+          <SuccessBanner message="Saved." />
+        </div>
+      )}
+      {!editing && (
+        <dl className="space-y-3 text-sm">
+          <div>
+            <dt className="text-xs font-medium text-gray-500">Name</dt>
+            <dd className="mt-0.5 text-gray-900">{customer?.name || <span className="text-gray-400">Not added</span>}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium text-gray-500">Email</dt>
+            <dd className="mt-0.5 break-all text-gray-900">
+              {customer?.email ? (
+                <>
+                  {customer.email}
+                  <VerifiedChip verified={emailLocked} what="Email" />
+                </>
+              ) : (
+                <span className="text-gray-400">Not added</span>
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium text-gray-500">Phone number</dt>
+            <dd className="mt-0.5 text-gray-900">
+              {customer?.phone ? (
+                <>
+                  {customer.phone}
+                  <VerifiedChip verified={phoneLocked} what="Phone number" />
+                </>
+              ) : (
+                <span className="text-gray-400">Not added</span>
+              )}
+            </dd>
+          </div>
+        </dl>
+      )}
+      {editing && (
       <form onSubmit={onSave} noValidate className="space-y-3">
         {error && (
           <div role="alert">
             <ErrorBanner message={error} />
           </div>
         )}
-        {saved && <SuccessBanner message="Saved." />}
         <div>
           <Label htmlFor="account-name">Name</Label>
           <Input
             id="account-name"
+            autoFocus
             maxLength={80}
             value={name}
             aria-invalid={!!msgs.name}
@@ -173,10 +239,16 @@ function Profile() {
             <p className="mt-1 text-xs text-gray-500">We don&apos;t check this number yet. Venues use it to reach you about your bookings.</p>
           )}
         </div>
-        <Button type="submit" disabled={saving || !dirty}>
-          {saving ? 'Saving…' : 'Save'}
-        </Button>
+        <div className="flex gap-2">
+          <Button type="submit" disabled={saving || !dirty}>
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+          <Button type="button" variant="secondary" disabled={saving} onClick={cancelEdit}>
+            Cancel
+          </Button>
+        </div>
       </form>
+      )}
     </Card>
   );
 }

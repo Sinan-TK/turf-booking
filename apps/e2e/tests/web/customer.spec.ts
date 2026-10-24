@@ -65,6 +65,10 @@ test.describe('customer site: account and support', () => {
 
     await page.goto('/account');
     await expect(page.getByRole('heading', { name: 'My account' })).toBeVisible();
+    // The details are shown as text; Edit turns them into fields.
+    await expect(page.getByText('PW Original')).toBeVisible();
+    await expect(page.getByRole('textbox')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Edit' }).click();
     const name = page.getByRole('textbox').nth(0);
     const save = page.getByRole('button', { name: 'Save' });
     await expect(name).toHaveValue('PW Original');
@@ -81,8 +85,10 @@ test.describe('customer site: account and support', () => {
     const saved = page.waitForResponse((r) => r.request().method() !== 'GET' && r.url().includes('/me') && r.ok());
     await save.click();
     await saved;
+    await expect(page.getByText('Saved.')).toBeVisible();
+    await expect(page.getByRole('textbox')).toHaveCount(0); // back to the read-only view
     await page.reload();
-    await expect(page.getByRole('textbox').nth(0)).toHaveValue(renamed);
+    await expect(page.getByText(renamed)).toBeVisible();
 
     // The wallet is its own tab.
     await page.getByRole('tab', { name: 'Wallet' }).click();
