@@ -99,6 +99,40 @@ test.describe('customer sign-in', () => {
     await expect(dialog.getByText('Indian mobile numbers start with 6, 7, 8 or 9.')).toBeVisible();
   });
 
+  test('the account page has a round back button, no Home text, no header menu, and a Log out with confirmation', async ({ page }) => {
+    await page.goto('/');
+    await logIn(page, uniquePhone(), 'PW Account Person');
+    // The back button goes back to the page the visitor came from.
+    await page.getByRole('button', { name: 'Account menu' }).click();
+    await page.getByRole('menuitem', { name: 'Profile' }).click();
+    await expect(page.getByRole('heading', { name: 'My account' })).toBeVisible();
+    await page.getByRole('button', { name: 'Go back' }).click();
+    await expect(page).toHaveURL(/localhost:\d+\/$/);
+
+    await page.goto('/account');
+    await expect(page.getByRole('heading', { name: 'My account' })).toBeVisible();
+
+    const back = page.getByRole('button', { name: 'Go back' });
+    await expect(back).toBeVisible();
+    const box = (await back.boundingBox())!;
+    expect(Math.round(box.width)).toBe(Math.round(box.height)); // a circle
+    expect(await back.evaluate((el) => getComputedStyle(el).borderRadius)).toMatch(/9999px|50%|\d{3,}px/);
+    await expect(page.getByText('Home', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Account menu' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Log in' })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Log out' }).click();
+    const confirm = page.getByRole('alertdialog', { name: 'Log out?' });
+    await expect(confirm).toBeVisible();
+    await confirm.getByRole('button', { name: 'Cancel' }).click();
+    await expect(confirm).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible(); // still signed in
+
+    await page.getByRole('button', { name: 'Log out' }).click();
+    await page.getByRole('alertdialog', { name: 'Log out?' }).getByRole('button', { name: 'Log out' }).click();
+    await expect(page.getByText('Log in to see your account.')).toBeVisible();
+  });
+
   test('logging out asks for confirmation first', async ({ page }) => {
     await page.goto('/');
     await logIn(page, uniquePhone(), 'PW Logout Person');
