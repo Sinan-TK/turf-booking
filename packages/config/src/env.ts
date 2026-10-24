@@ -37,6 +37,12 @@ const envSchema = z.object({
   // dev/test only; production should always set it.
   RESEND_API_KEY: optionalString(z.string().min(1)),
   MAIL_FROM: z.string().default('Venue Booking <onboarding@resend.dev>'),
+  // Resend template (its id from the Resend dashboard) for the emailed six-digit codes: sign-up verification and
+  // password reset. Variables: HEADING, INTRO, CODE, NAME, EXPIRES_IN_MINUTES. When unset a built-in plain email is sent.
+  RESEND_OTP_TEMPLATE_ID: optionalString(z.string().min(1)),
+  // How long an emailed code works. Attempts and resend limits reuse OTP_MAX_ATTEMPTS, OTP_RESEND_COOLDOWN_SECONDS
+  // and OTP_MAX_CODES_PER_HOUR.
+  EMAIL_OTP_TTL_MINUTES: z.coerce.number().int().positive().default(10),
 
   // Where blackouts are read from. "rules" = BlockedPeriod (the P3 table).
   // "legacy" = the old BlockedDate table — the rollback switch. Writes always go

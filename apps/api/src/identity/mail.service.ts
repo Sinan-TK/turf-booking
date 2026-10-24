@@ -6,6 +6,8 @@ export interface MailMessage {
   subject: string;
   text: string;
   html: string;
+  /** A Resend template to send instead of the html/text (those stay as the log/fallback copy). */
+  template?: { id: string; variables: Record<string, string | number> };
 }
 
 /**
@@ -18,6 +20,11 @@ export interface MailMessage {
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
+
+  /** Whether mail is really sent (an API key is set); otherwise messages are only logged. */
+  isConfigured(): boolean {
+    return !!loadEnv().RESEND_API_KEY;
+  }
 
   async send(message: MailMessage): Promise<boolean> {
     const env = loadEnv();
@@ -38,8 +45,9 @@ export class MailService {
           from: env.MAIL_FROM,
           to: [message.to],
           subject: message.subject,
-          text: message.text,
-          html: message.html,
+          ...(message.template
+            ? { template: message.template }
+            : { text: message.text, html: message.html }),
         }),
       });
       if (!res.ok) {

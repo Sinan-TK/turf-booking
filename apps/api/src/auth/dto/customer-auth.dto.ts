@@ -33,7 +33,12 @@ export class PasswordLoginDto extends createZodDto(passwordLoginSchema) {}
 export const forgotPasswordSchema = z.object({ email });
 export class ForgotPasswordDto extends createZodDto(forgotPasswordSchema) {}
 
-export const resetPasswordSchema = z.object({ token: z.string().min(20).max(200), password: newPassword });
+const emailCode = z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code.');
+
+export const verifySignUpSchema = z.object({ email, code: emailCode, ticket: z.string().min(20).max(200) });
+export class VerifySignUpDto extends createZodDto(verifySignUpSchema) {}
+
+export const resetPasswordSchema = z.object({ email, code: emailCode, password: newPassword });
 export class ResetPasswordDto extends createZodDto(resetPasswordSchema) {}
 
 export const changePasswordSchema = z.object({ currentPassword: z.string().min(1).max(128), newPassword });

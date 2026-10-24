@@ -8,7 +8,7 @@ import { GoogleButton } from '@/components/google-button';
 import { PasswordInput } from '@/components/password-input';
 import { codeError, emailError, nameError, newPasswordError, passwordError, phoneError } from '@/lib/validation';
 
-type View = 'home' | 'forgot' | 'forgot-sent' | 'profile' | 'phone' | 'code';
+type View = 'home' | 'signup-code' | 'forgot' | 'reset' | 'profile' | 'phone' | 'code';
 type Tab = 'signin' | 'signup';
 
 /**
@@ -22,7 +22,7 @@ const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), a[href], [tabi
 const BAD_LOGIN =
   'Incorrect email or password. Signed up with Google? Use the Google button, or choose Forgot password to set a password first.';
 
-type Msgs = Partial<Record<'name' | 'email' | 'phone' | 'password' | 'code', string>>;
+type Msgs = Partial<Record<'name' | 'email' | 'phone' | 'password' | 'confirm' | 'code', string>>;
 
 export function LoginDialog({
   customer,
@@ -45,6 +45,10 @@ export function LoginDialog({
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  // Handed back when a sign-up starts; only this browser can finish that sign-up.
+  const [ticket, setTicket] = useState('');
+  const [notice, setNotice] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [msgs, setMsgs] = useState<Msgs>({});
@@ -100,6 +104,7 @@ export function LoginDialog({
   const go = (next: View) => {
     setError(null);
     setMsgs({});
+    setNotice(null);
     setView(next);
   };
   const clearMsg = (key: keyof Msgs) => setMsgs((m) => ({ ...m, [key]: undefined }));
@@ -167,13 +172,16 @@ export function LoginDialog({
     }
     return run(async () => {
       try {
-        const res = await api.post<{ customer: Customer; needsProfile: boolean }>('/customer-auth/signup', {
+        const res = await api.post<{ resendAfterSeconds: number; ticket: string }>('/customer-auth/signup', {
           name: name.trim(),
           email: email.trim(),
           phone: phone.trim(),
           password,
         });
-        signedIn(res.customer, res.needsProfile);
+        setTicket(res.ticket);
+        setResendIn(res.resendAfterSeconds);
+        setCode('');
+        go('signup-code');
       } catch (err) {
         // A taken email or number belongs under its own field.
         if (err instanceof ApiError && err.status === 409) {
@@ -193,8 +201,68 @@ export function LoginDialog({
     if (problem) return document.getElementById('login-email')?.focus();
     return run(async () => {
       await api.post('/customer-auth/forgot-password', { email: email.trim() });
-      go('forgot-sent');
-    }, 'Could not send the link. Please try again.');
+      setResendIn(30);
+      setCode('');
+      setPassword('');
+      setConfirm('');
+      go('reset');
+    }, 'Could not send the code. Please try again.');
+  }
+
+  /** The emailed code creates the account (sign-up) and signs the customer in. */
+  function verifySignUp(e: React.FormEvent) {
+    e.preventDefault();
+    const problem = codeError(code);
+    setMsgs({ code: problem });
+    if (problem) return document.getElementById('login-code')?.focus();
+    return run(async () => {
+      const res = await api.post<{ customer: Customer; needsProfile: boolean }>('/customer-auth/signup/verify', { email: email.trim(), code, ticket });
+      signedIn(res.customer, res.needsProfile);
+    }, 'Could not verify the code. Please try again.');
+  }
+
+  /** Asks for a fresh sign-up code (the details are still in the form). */
+  function resendSignUp() {
+    return run(async () => {
+      const res = await api.post<{ resendAfterSeconds: number; ticket: string }>('/customer-auth/signup', {
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        password,
+      });
+      setTicket(res.ticket);
+      setResendIn(res.resendAfterSeconds);
+      setCode('');
+      setNotice('We sent a new code.');
+    }, 'Could not send the code. Please try again.');
+  }
+
+  function resendReset() {
+    return run(async () => {
+      await api.post('/customer-auth/forgot-password', { email: email.trim() });
+      setResendIn(30);
+      setNotice('If an account exists for that email, a new code is on its way.');
+    }, 'Could not send the code. Please try again.');
+  }
+
+  function resetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    const found: Msgs = {
+      code: codeError(code),
+      password: newPasswordError(password),
+      confirm: password !== confirm ? 'The two passwords are not the same.' : undefined,
+    };
+    setMsgs(found);
+    if (Object.values(found).some(Boolean)) return focusFirstInvalid(found, { code: 'login-code', password: 'login-password', confirm: 'login-confirm' });
+    return run(async () => {
+      await api.post('/customer-auth/reset-password', { email: email.trim(), code, password });
+      setPassword('');
+      setConfirm('');
+      setCode('');
+      setTab('signin');
+      go('home');
+      setNotice('Your password is set. Sign in with your email and new password.');
+    }, 'Could not set your password. Please try again.');
   }
 
   // --- Profile step (name, and a phone number if there is none) -------------
@@ -253,8 +321,9 @@ export function LoginDialog({
   const completing = !!customer;
   const titles: Record<View, [string, string]> = {
     home: ['Log in or sign up', HAS.google ? 'Continue with Google, or use your email.' : 'Use your email and password.'],
-    forgot: ['Set or reset your password', 'We will email you a link to choose a new password.'],
-    'forgot-sent': ['Check your email', 'If an account exists for that email, a link is on its way.'],
+    'signup-code': ['Verify your email', `We sent a 6-digit code to ${email.trim()}.`],
+    forgot: ['Set or reset your password', 'We will email you a code to choose a new password.'],
+    reset: ['Enter the code', `If ${email.trim()} has an account, a 6-digit code is on its way.`],
     profile: [
       completing ? 'Add your phone number' : 'Almost done',
       completing ? 'The venue needs a number to reach you about your booking.' : 'Used on your bookings. You can change them later.',
@@ -303,6 +372,7 @@ export function LoginDialog({
 
         {view === 'home' && (
           <div className="space-y-4">
+            {notice && <SuccessBanner message={notice} />}
             {HAS.google && <GoogleButton onCredential={onGoogle} disabled={busy} />}
             {HAS.google && HAS.email && (
               <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
@@ -478,7 +548,7 @@ export function LoginDialog({
               <FieldError id="login-email-error" message={msgs.email} />
             </div>
             <Button type="submit" className="w-full" disabled={busy}>
-              {busy ? 'Sending…' : 'Email me a link'}
+              {busy ? 'Sending…' : 'Email me a code'}
             </Button>
             <button type="button" onClick={() => go('home')} className="block w-full text-center text-sm font-medium text-slate-600 hover:underline">
               Back to sign in
@@ -486,13 +556,117 @@ export function LoginDialog({
           </form>
         )}
 
-        {view === 'forgot-sent' && (
-          <div className="space-y-3">
-            <SuccessBanner message="If an account exists for that email, a link is on its way. It works once and expires in an hour." />
-            <button type="button" onClick={() => go('home')} className="block w-full text-center text-sm font-medium text-emerald-700 hover:underline">
-              Back to sign in
-            </button>
-          </div>
+        {view === 'signup-code' && (
+          <form onSubmit={verifySignUp} noValidate className="space-y-3">
+            {notice && <SuccessBanner message={notice} />}
+            <div>
+              <Label htmlFor="login-code">6-digit code</Label>
+              <Input
+                id="login-code"
+                autoFocus
+                aria-invalid={!!msgs.code}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                placeholder="000000"
+                className={`text-center text-lg tracking-[0.4em] ${msgs.code ? invalidClass : ''}`}
+                value={code}
+                onChange={(e) => {
+                  setCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                  clearMsg('code');
+                }}
+              />
+              <FieldError id="login-code-error" message={msgs.code} />
+            </div>
+            <Button type="submit" className="w-full" disabled={busy}>
+              {busy ? 'Checking…' : 'Verify and create account'}
+            </Button>
+            <div className="flex items-center justify-between text-sm">
+              <button type="button" onClick={() => go('home')} className="font-medium text-slate-600 hover:underline">
+                Change details
+              </button>
+              <button
+                type="button"
+                onClick={() => resendSignUp()}
+                disabled={busy || resendIn > 0}
+                className="font-medium text-emerald-700 hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
+              >
+                {resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend code'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {view === 'reset' && (
+          <form onSubmit={resetPassword} noValidate className="space-y-3">
+            {notice && <SuccessBanner message={notice} />}
+            <div>
+              <Label htmlFor="login-code">6-digit code</Label>
+              <Input
+                id="login-code"
+                autoFocus
+                aria-invalid={!!msgs.code}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                placeholder="000000"
+                className={`text-center text-lg tracking-[0.4em] ${msgs.code ? invalidClass : ''}`}
+                value={code}
+                onChange={(e) => {
+                  setCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                  clearMsg('code');
+                }}
+              />
+              <FieldError id="login-code-error" message={msgs.code} />
+            </div>
+            <div>
+              <Label htmlFor="login-password">New password</Label>
+              <PasswordInput
+                id="login-password"
+                autoComplete="new-password"
+                aria-invalid={!!msgs.password}
+                className={msgs.password ? invalidClass : ''}
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  clearMsg('password');
+                }}
+              />
+              <FieldError id="login-password-error" message={msgs.password} />
+              <p className="mt-1 text-xs text-slate-500">At least 8 characters.</p>
+            </div>
+            <div>
+              <Label htmlFor="login-confirm">Repeat the password</Label>
+              <PasswordInput
+                id="login-confirm"
+                autoComplete="new-password"
+                aria-invalid={!!msgs.confirm}
+                className={msgs.confirm ? invalidClass : ''}
+                value={confirm}
+                onChange={(e) => {
+                  setConfirm(e.target.value);
+                  clearMsg('confirm');
+                }}
+              />
+              <FieldError id="login-confirm-error" message={msgs.confirm} />
+            </div>
+            <Button type="submit" className="w-full" disabled={busy}>
+              {busy ? 'Saving…' : 'Set password'}
+            </Button>
+            <div className="flex items-center justify-between text-sm">
+              <button type="button" onClick={() => go('forgot')} className="font-medium text-slate-600 hover:underline">
+                Change email
+              </button>
+              <button
+                type="button"
+                onClick={() => resendReset()}
+                disabled={busy || resendIn > 0}
+                className="font-medium text-emerald-700 hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
+              >
+                {resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend code'}
+              </button>
+            </div>
+          </form>
         )}
 
         {view === 'profile' && signed && (

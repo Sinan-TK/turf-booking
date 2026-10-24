@@ -62,7 +62,7 @@ describe('Customer phone number rules', () => {
     expect(JSON.stringify(res.body)).toMatch(/already registered to another account/);
     expect((await rowOf(other.id)).whatsappNumber).toBeNull();
 
-    // The same through sign-up.
+    // The same when starting a sign-up.
     const signup = await agentFor(app)
       .post('/customer-auth/signup')
       .send({ name: 'Taker', email: email(), phone: p, password: 'a-long-password' });

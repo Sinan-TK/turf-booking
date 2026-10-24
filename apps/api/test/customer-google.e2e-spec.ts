@@ -1,4 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
+import { hashPassword } from '@venue/database';
 import request from 'supertest';
 import { createTestApp } from './setup/test-app';
 import { agentFor, prisma, uniqueSuffix } from './setup/fixtures';
@@ -77,41 +78,39 @@ describe('Customer sign-in with Google', () => {
     expect(res.headers['set-cookie']).toBeUndefined();
   });
 
-  test('a mailbox already proven (by a reset link) is linked to the Google account, keeping its password', async () => {
+  /** An account with an email and a password whose mailbox was never proven (the email was typed into a profile). */
+  const unprovenPasswordAccount = async (e: string, name: string, password: string) =>
+    prisma.customerProfile.create({
+      data: { name, email: e, whatsappNumber: null, passwordHash: await hashPassword(password), emailVerified: false },
+    });
+
+  test('a mailbox already proven (by a reset code) is linked to the Google account, keeping its password', async () => {
     const e = email();
     const subLinked = `sub-linked-${uniqueSuffix()}`;
-    const signup = await request(app.getHttpServer())
-      .post('/customer-auth/signup')
-      .send({ name: 'Linked Person', email: e, phone: '+919800000001', password: 'a-long-password' });
-    expect(signup.status).toBe(201);
-    await prisma.customerProfile.update({ where: { id: signup.body.customer.id }, data: { emailVerified: true } });
+    const existing = await unprovenPasswordAccount(e, 'Linked Person', 'a-long-password');
+    await prisma.customerProfile.update({ where: { id: existing.id }, data: { emailVerified: true } });
 
     const res = await google(agentFor(app), token(e, 'Linked Person', subLinked));
     expect(res.status).toBe(200);
-    expect(res.body.customer.id).toBe(signup.body.customer.id);
+    expect(res.body.customer.id).toBe(existing.id);
     expect(res.body.customer.hasPassword).toBe(true);
-    expect((await prisma.customerProfile.findUniqueOrThrow({ where: { id: signup.body.customer.id } })).googleSub).toBe(subLinked);
+    expect((await prisma.customerProfile.findUniqueOrThrow({ where: { id: existing.id } })).googleSub).toBe(subLinked);
   });
 
   test('an email someone typed without proving it is taken over by the real owner, who has just proved it', async () => {
     const e = email();
-    const squatter = agentFor(app);
-    const signup = await squatter
-      .post('/customer-auth/signup')
-      .send({ name: 'Not The Owner', email: e, phone: '+919800000002', password: 'squatters-password' });
-    expect(signup.status).toBe(201);
+    const existing = await unprovenPasswordAccount(e, 'Not The Owner', 'squatters-password');
 
     const owner = await google(agentFor(app), token(e, 'The Real Owner'));
     expect(owner.status).toBe(200);
-    expect(owner.body.customer.id).not.toBe(signup.body.customer.id); // a fresh, separate profile
+    expect(owner.body.customer.id).not.toBe(existing.id); // a fresh, separate profile
     expect(owner.body.customer).toMatchObject({ email: e, emailVerified: true, name: 'The Real Owner' });
 
     // The other profile keeps existing but no longer has the email or the password tied to it.
-    const old = await prisma.customerProfile.findUniqueOrThrow({ where: { id: signup.body.customer.id } });
+    const old = await prisma.customerProfile.findUniqueOrThrow({ where: { id: existing.id } });
     expect(old.email).toBeNull();
     expect(old.passwordHash).toBeNull();
     expect(old.name).toBe('Not The Owner');
-    expect((await squatter.get('/customer-auth/me')).status).toBe(200); // their session is untouched
     expect(await prisma.auditLog.count({ where: { action: 'EMAIL_UNVERIFIED_CLEARED', entityId: old.id } })).toBe(1);
 
     // And the squatter's password no longer signs in to anything.

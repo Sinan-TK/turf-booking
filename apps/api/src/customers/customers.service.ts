@@ -190,7 +190,16 @@ export class CustomersService {
     }
   }
 
-  /** Email + password sign-up. Neither the email nor the phone is verified yet. */
+  /** Refuses early (before a code is emailed) a sign-up that could not succeed. */
+  async assertSignUpPossible(email: string, phone: string) {
+    const db = this.prisma.client;
+    if (await db.customerProfile.findUnique({ where: { email }, select: { id: true } })) throw new ConflictException(EMAIL_TAKEN);
+    if (await db.customerProfile.findFirst({ where: { whatsappNumber: phone, phoneVerified: true }, select: { id: true } })) {
+      throw new ConflictException(PHONE_TAKEN);
+    }
+  }
+
+  /** Email + password sign-up, after the emailed code proved the address. The phone is not verified. */
   async signUp(input: { name: string; email: string; phone: string; passwordHash: string }) {
     const email = normalizeEmail(input.email);
     const db = this.prisma.client;
@@ -205,6 +214,7 @@ export class CustomersService {
           email,
           whatsappNumber: input.phone,
           passwordHash: input.passwordHash,
+          emailVerified: true,
         }),
       );
     } catch (error) {
@@ -255,15 +265,6 @@ export class CustomersService {
     }
 
     try {
-      // A reset link proves the mailbox it was sent to, so a link issued before the address changed must not
-      // be able to mark the new address verified.
-      if (data.email) {
-        const [updated] = await db.$transaction([
-          db.customerProfile.update({ where: { id: customerId }, data }),
-          db.customerAuthToken.updateMany({ where: { customerId, usedAt: null }, data: { usedAt: new Date() } }),
-        ]);
-        return updated;
-      }
       return await db.customerProfile.update({ where: { id: customerId }, data });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {

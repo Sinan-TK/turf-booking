@@ -49,19 +49,24 @@ export async function closeDatabase(): Promise<void> {
   if (db) await (await db).$disconnect();
 }
 
-/** Makes a known password-reset link token for the customer with this email (the API stores only its hash). */
-export async function plantResetToken(email: string): Promise<string> {
-  const { createHash, randomBytes } = await import('node:crypto');
+/**
+ * Makes `code` the valid emailed code for this address (the API stores only an HMAC of each code and the email
+ * cannot be read by a test). The row is created by the real sign-up or forgot-password call.
+ */
+export async function plantEmailCode(email: string, purpose: 'SIGNUP' | 'RESET', code = '123456'): Promise<void> {
+  const secret = apiEnv().CUSTOMER_SESSION_SECRET;
+  if (!secret) throw new Error('CUSTOMER_SESSION_SECRET is not set in apps/api/.env');
   const prisma = await database();
-  const customer = await prisma.customerProfile.findFirstOrThrow({ where: { email: email.toLowerCase() } });
-  const raw = randomBytes(32).toString('base64url');
-  await prisma.customerAuthToken.updateMany({ where: { customerId: customer.id, usedAt: null }, data: { usedAt: new Date() } });
-  await prisma.customerAuthToken.create({
-    data: {
-      customerId: customer.id,
-      tokenHash: createHash('sha256').update(raw).digest('hex'),
-      expiresAt: new Date(Date.now() + 3_600_000),
-    },
+  const address = email.toLowerCase();
+  // The browser's request may still be on its way, so give the row a few seconds to appear.
+  let row = null;
+  for (let i = 0; i < 40 && !row; i++) {
+    row = await prisma.customerEmailCode.findFirst({ where: { email: address, purpose, consumedAt: null }, orderBy: { createdAt: 'desc' } });
+    if (!row) await new Promise((r) => setTimeout(r, 250));
+  }
+  if (!row) throw new Error(`No ${purpose} code was issued for ${address}`);
+  await prisma.customerEmailCode.update({
+    where: { id: row.id },
+    data: { codeHash: createHmac('sha256', secret).update(`email:${purpose}:${address}:${code}`).digest('hex') },
   });
-  return raw;
 }

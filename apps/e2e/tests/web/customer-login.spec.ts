@@ -1,10 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
-import { plantResetToken } from '../../support/customer';
+import { plantEmailCode } from '../../support/customer';
 import { logIn } from '../../support/customer-ui';
 import { uniquePhone } from '../../support/dates';
 import { unique } from '../../support/env';
 
 const PASSWORD = 'PwCustomer123!x';
+const CODE = '123456';
 
 async function openDialog(page: Page) {
   await page.goto('/');
@@ -31,7 +32,7 @@ test.describe('customer sign-in', () => {
     await expect(page.getByRole('heading', { name: 'Change password' })).toHaveCount(0); // Google-only: no password
   });
 
-  test('email sign-up with a name, a wrong password is refused, forgot password sets a new one', async ({ page }) => {
+  test('email sign-up needs the emailed code; a wrong code is refused, the right one creates the account', async ({ page }) => {
     const email = `pw-email-${unique()}@example.com`;
     const phone = uniquePhone();
     const dialog = await openDialog(page);
@@ -40,14 +41,46 @@ test.describe('customer sign-in', () => {
     await dialog.getByLabel('Email', { exact: true }).fill(email);
     await dialog.getByLabel('Phone number').fill(phone.slice(3));
     await dialog.getByLabel('Password', { exact: true }).fill(PASSWORD);
-    await dialog.getByRole('button', { name: /Create account/i }).last().click();
+    await dialog.getByRole('button', { name: 'Create account' }).last().click();
+
+    // Nothing is created yet: the dialog now asks for the code that was emailed.
+    await expect(dialog.getByRole('heading', { name: 'Verify your email' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: /Resend in \d+s/ })).toBeDisabled();
+    await dialog.getByLabel('6-digit code').fill('12');
+    await dialog.getByRole('button', { name: 'Verify and create account' }).click();
+    await expect(dialog.getByText('Enter the 6-digit code.').or(dialog.getByText('The code is 6 digits.'))).toBeVisible();
+
+    await plantEmailCode(email, 'SIGNUP', CODE);
+    await dialog.getByLabel('6-digit code').fill('000000');
+    await dialog.getByRole('button', { name: 'Verify and create account' }).click();
+    await expect(dialog.getByText(/incorrect or has expired/i)).toBeVisible();
+
+    await dialog.getByLabel('6-digit code').fill(CODE);
+    await dialog.getByRole('button', { name: 'Verify and create account' }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
 
     await page.goto('/account');
     await expect(page.getByRole('heading', { name: 'Change password' })).toBeVisible();
+    await expect(page.getByText('Verified', { exact: true }).first()).toBeVisible(); // the emailed code proved the address
+  });
 
-    // Sign out, then a wrong password gives the generic message.
-    await page.getByRole('button', { name: /account menu|PW Email Person|P/ }).first().click().catch(() => undefined);
+  test('forgot password: a wrong password is refused, then an emailed code sets a new one', async ({ page }) => {
+    const email = `pw-forgot-${unique()}@example.com`;
+    const phone = uniquePhone();
+    // An account to start from, made the normal way.
+    const dialog = await openDialog(page);
+    await dialog.getByRole('tab', { name: /Create account/i }).click();
+    await dialog.getByLabel('Your name').fill('PW Forgetful');
+    await dialog.getByLabel('Email', { exact: true }).fill(email);
+    await dialog.getByLabel('Phone number').fill(phone.slice(3));
+    await dialog.getByLabel('Password', { exact: true }).fill(PASSWORD);
+    await dialog.getByRole('button', { name: 'Create account' }).last().click();
+    await plantEmailCode(email, 'SIGNUP', CODE);
+    await dialog.getByLabel('6-digit code').fill(CODE);
+    await dialog.getByRole('button', { name: 'Verify and create account' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+
+    // Signed out; a wrong password gives the generic message.
     await page.context().clearCookies();
     const d2 = await openDialog(page);
     await d2.getByLabel('Email', { exact: true }).fill(email);
@@ -55,26 +88,26 @@ test.describe('customer sign-in', () => {
     await d2.getByRole('button', { name: 'Sign in' }).last().click();
     await expect(d2.getByText(/Incorrect email or password/)).toBeVisible();
 
-    // The emailed link, with a planted token, sets a new password.
-    const token = await plantResetToken(email);
-    await page.goto(`/reset-password?token=${token}`);
-    await page.getByLabel('New password').fill('NewPassword456!y');
-    await page.getByLabel('Repeat the password').fill('NewPassword456!y');
-    await page.getByRole('button', { name: 'Set password' }).click();
-    await expect(page.getByText('Your password is set.')).toBeVisible();
-    await page.getByRole('button', { name: 'Sign in' }).click();
-    const d3 = page.getByRole('dialog');
-    await d3.getByLabel('Email', { exact: true }).fill(email);
-    await d3.getByLabel('Password', { exact: true }).fill('NewPassword456!y');
-    await d3.getByRole('button', { name: 'Sign in' }).last().click();
-    await expect(page.getByRole('dialog')).toHaveCount(0);
-  });
+    // Forgot password: the email, then the code with a new password.
+    await d2.getByRole('button', { name: 'Forgot password?' }).click();
+    await d2.getByLabel('Email', { exact: true }).fill(email);
+    await d2.getByRole('button', { name: 'Email me a code' }).click();
+    await expect(d2.getByRole('heading', { name: 'Enter the code' })).toBeVisible();
+    await plantEmailCode(email, 'RESET', CODE);
 
-  test('a reset link works once and a bad one is explained', async ({ page }) => {
-    await page.goto(`/reset-password?token=${'x'.repeat(43)}`);
-    await page.getByLabel('New password').fill('NewPassword456!y');
-    await page.getByLabel('Repeat the password').fill('NewPassword456!y');
-    await page.getByRole('button', { name: 'Set password' }).click();
-    await expect(page.getByText('This link is invalid or has expired.')).toBeVisible();
+    await d2.getByLabel('6-digit code').fill(CODE);
+    await d2.getByLabel('New password').fill('NewPassword456!y');
+    await d2.getByLabel('Repeat the password').fill('Different456!y');
+    await d2.getByRole('button', { name: 'Set password' }).click();
+    await expect(d2.getByText('The two passwords are not the same.')).toBeVisible();
+
+    await d2.getByLabel('Repeat the password').fill('NewPassword456!y');
+    await d2.getByRole('button', { name: 'Set password' }).click();
+    await expect(d2.getByText('Your password is set.')).toBeVisible();
+
+    await d2.getByLabel('Email', { exact: true }).fill(email);
+    await d2.getByLabel('Password', { exact: true }).fill('NewPassword456!y');
+    await d2.getByRole('button', { name: 'Sign in' }).last().click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
   });
 });

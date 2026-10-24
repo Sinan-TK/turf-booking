@@ -55,7 +55,10 @@ then Credentials > OAuth client ID > Web application. Add every app origin (cust
 `http://localhost:3000` / `:3002` for development) under Authorized JavaScript origins; no redirect URI is needed.
 Set the same ID as `GOOGLE_CLIENT_ID` on the API and `NEXT_PUBLIC_GOOGLE_CLIENT_ID` on the customer and owner apps
 (build time). Owner Google sign-in only works for an address already invited as an owner user. Customers can also
-use email + password; reset links need `RESEND_API_KEY` and `MAIL_FROM`. The WhatsApp-code login stays in the API
+use email + password: creating the account and resetting the password both need a 6-digit code emailed to the address,
+so `RESEND_API_KEY` and `MAIL_FROM` are required in production (without them the code is only written to the API log).
+To style these emails, create a Resend template from `docs/email-templates/otp-code.html` (variables `HEADING`, `INTRO`,
+`CODE`, `NAME`, `EXPIRES_IN_MINUTES`), publish it and set its id as `RESEND_OTP_TEMPLATE_ID`; unset sends a plain email. The WhatsApp-code login stays in the API
 but is hidden in the customer app unless `NEXT_PUBLIC_CUSTOMER_LOGIN_METHODS` includes `phone` (default `google,email`).
 
 ## API release order

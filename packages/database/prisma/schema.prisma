@@ -212,24 +212,28 @@ model CustomerProfile {
   coinWallet       CoinWallet?
   coinTransactions CoinTransaction[]
   notifications    Notification[]
-  authTokens       CustomerAuthToken[]
 
   @@index([whatsappNumber])
   @@map("customer_profiles")
 }
 
-/// Single-use password-reset links for customers (only the sha256 of the token is stored).
-model CustomerAuthToken {
-  id         String          @id @default(uuid()) @db.Uuid
-  customerId String          @db.Uuid
-  customer   CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  tokenHash  String          @unique
+/// Six-digit codes emailed to prove a mailbox: one purpose is creating an email + password account (the sign-up
+/// details wait in the payload column until the code is entered, so an unproven address never holds an account), the other
+/// is resetting a password. Only an HMAC of the code is stored.
+model CustomerEmailCode {
+  id         String    @id @default(uuid()) @db.Uuid
+  email      String
+  purpose    String
+  codeHash   String
+  /// Sign-up only: { name, phone, passwordHash }.
+  payload    Json?
+  attempts   Int       @default(0)
   expiresAt  DateTime
-  usedAt     DateTime?
-  createdAt  DateTime        @default(now())
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
 
-  @@index([customerId])
-  @@map("customer_auth_tokens")
+  @@index([email, purpose, createdAt])
+  @@map("customer_email_codes")
 }
 
 enum CustomerSessionSourceLinkType {

@@ -24,6 +24,7 @@ import {
   SignUpDto,
   UpdateProfileDto,
   VerifyCodeDto,
+  VerifySignUpDto,
 } from './dto/customer-auth.dto';
 
 const BLOCKED = 'This account has been blocked. Please contact support.';
@@ -69,10 +70,18 @@ export class CustomerAuthController {
   // --- Email + password -----------------------------------------------------
 
   @Post('signup')
-  @HttpCode(201)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  async signUp(@Body() dto: SignUpDto, @Res({ passthrough: true }) res: Response) {
-    const customer = await this.passwords.signUp(dto);
+  @HttpCode(200)
+  startSignUp(@Body() dto: SignUpDto) {
+    return this.passwords.startSignUp(dto);
+  }
+
+  /** The code emailed by `signup` creates the account and signs the customer in. */
+  @Post('signup/verify')
+  @HttpCode(201)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async verifySignUp(@Body() dto: VerifySignUpDto, @Res({ passthrough: true }) res: Response) {
+    const customer = await this.passwords.verifySignUp(dto.email, dto.code, dto.ticket);
     const view = await this.signIn(res, customer.id);
     return { customer: view, needsProfile: view.needsProfile };
   }
@@ -98,7 +107,7 @@ export class CustomerAuthController {
   @HttpCode(200)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async resetPassword(@Body() dto: ResetPasswordDto) {
-    await this.passwords.resetPassword(dto.token, dto.password);
+    await this.passwords.resetPassword(dto.email, dto.code, dto.password);
     return { ok: true };
   }
 
