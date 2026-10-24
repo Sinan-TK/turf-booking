@@ -29,7 +29,10 @@ export function VerifyEmailDialog({ email, onVerified, onClose }: { email: strin
       const res = await api.post<{ resendAfterSeconds: number }>('/customer-auth/email/send-code');
       setResendIn(res.resendAfterSeconds);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 429) setResendIn(30); // one was sent a moment ago: it still works
+      // A code was sent a moment ago (for example before a page reload): it still works, and the server says how long
+      // is left before another can be sent, so the countdown carries on instead of starting again.
+      const left = err instanceof ApiError && err.status === 429 ? (err.details as { retryAfterSeconds?: number } | undefined)?.retryAfterSeconds : undefined;
+      if (left) setResendIn(left);
       else setError(err instanceof ApiError ? err.message : 'Could not send the code. Please try again.');
     } finally {
       setSending(false);

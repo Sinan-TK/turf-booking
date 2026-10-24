@@ -187,11 +187,20 @@ export class CustomerPasswordService {
       where: { email, purpose, createdAt: { gte: new Date(now.getTime() - 3_600_000) } },
       orderBy: { createdAt: 'desc' },
     });
-    const wait = !!recent[0] && now.getTime() - recent[0].createdAt.getTime() < env.OTP_RESEND_COOLDOWN_SECONDS * 1000;
+    const cooldownMs = env.OTP_RESEND_COOLDOWN_SECONDS * 1000;
+    const sinceLast = recent[0] ? now.getTime() - recent[0].createdAt.getTime() : Infinity;
+    const wait = sinceLast < cooldownMs;
     if (recent.length >= env.OTP_MAX_CODES_PER_HOUR || wait) {
       if (!opts.explicit) return;
+      // The seconds still to wait are sent back, so a page that is reloaded shows the real countdown, not a fresh one.
+      const retryAfterSeconds = Math.max(1, Math.ceil((cooldownMs - sinceLast) / 1000));
       throw new HttpException(
-        wait ? `Please wait ${env.OTP_RESEND_COOLDOWN_SECONDS} seconds before asking for another code.` : 'Too many codes requested. Try again later.',
+        {
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
+          error: 'Too Many Requests',
+          message: wait ? `Please wait ${retryAfterSeconds} seconds before asking for another code.` : 'Too many codes requested. Try again later.',
+          ...(wait ? { retryAfterSeconds } : {}),
+        },
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }

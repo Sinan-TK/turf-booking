@@ -58,9 +58,16 @@ export class CustomerOtpService {
       throw new HttpException('Too many codes requested. Try again later.', HttpStatus.TOO_MANY_REQUESTS);
     }
     const last = recent[0];
-    if (last && now.getTime() - last.createdAt.getTime() < env.OTP_RESEND_COOLDOWN_SECONDS * 1000) {
+    const cooldownMs = env.OTP_RESEND_COOLDOWN_SECONDS * 1000;
+    if (last && now.getTime() - last.createdAt.getTime() < cooldownMs) {
+      const retryAfterSeconds = Math.max(1, Math.ceil((cooldownMs - (now.getTime() - last.createdAt.getTime())) / 1000));
       throw new HttpException(
-        `Please wait ${env.OTP_RESEND_COOLDOWN_SECONDS} seconds before requesting another code`,
+        {
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
+          error: 'Too Many Requests',
+          message: `Please wait ${retryAfterSeconds} seconds before requesting another code`,
+          retryAfterSeconds,
+        },
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }

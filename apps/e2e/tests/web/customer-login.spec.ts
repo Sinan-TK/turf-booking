@@ -168,6 +168,17 @@ test.describe('customer sign-in', () => {
     await expect(dialog.getByText(email)).toBeVisible();
     await expect(dialog.getByRole("button", { name: /Resend in [0-9]+s/ })).toBeDisabled();
     await expect(dialog.getByRole('button', { name: 'Verify' })).toBeDisabled(); // needs all six digits
+
+    // A hard refresh must not restart the resend countdown: the server remembers when the code was sent.
+    await page.waitForTimeout(5000);
+    await page.goto('/account?tab=profile&verify=email'); // a full reload, which opens the dialog again
+    const reopened = page.getByRole('dialog', { name: 'Verify your email' });
+    await expect(reopened).toBeVisible();
+    const resend = reopened.getByRole('button', { name: /Resend in [0-9]+s/ });
+    await expect(resend).toBeVisible();
+    const left = Number(/([0-9]+)s/.exec((await resend.textContent())!)![1]);
+    expect(left).toBeLessThan(28); // about 25 of the 30 seconds were left, not a fresh 30
+    expect(left).toBeGreaterThan(5);
     await plantEmailCode(email, 'VERIFY', '123456');
     await dialog.getByLabel('6-digit code').fill('000000');
     await dialog.getByRole('button', { name: 'Verify' }).click();

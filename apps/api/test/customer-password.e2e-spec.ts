@@ -146,6 +146,13 @@ describe('Customer email + password', () => {
       const soon = await signupStart(e);
       expect(soon.status).toBe(429);
       expect(JSON.stringify(soon.body)).toMatch(/Please wait/);
+      // It says how many seconds are really left, so a reloaded page continues the countdown instead of restarting it.
+      expect(soon.body.retryAfterSeconds).toBeGreaterThan(0);
+      expect(soon.body.retryAfterSeconds).toBeLessThanOrEqual(30);
+      await prisma.customerEmailCode.updateMany({ where: { email: e }, data: { createdAt: new Date(Date.now() - 20_000) } });
+      const later = await signupStart(e);
+      expect(later.status).toBe(429);
+      expect(later.body.retryAfterSeconds).toBeLessThanOrEqual(10); // 20 of the 30 seconds have passed
 
       await ageCodes(e);
       expect((await signupStart(e, { name: 'Second Try' })).status).toBe(200);
