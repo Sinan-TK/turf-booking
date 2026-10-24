@@ -171,7 +171,7 @@ export default function CheckoutPage() {
       }
     }
     setConfirmingPayment(false);
-    setPayError("Payment is still being confirmed. This can take a minute — check 'My Bookings' shortly.");
+    setPayError("Payment is still being confirmed. This can take a minute — check 'Bookings' shortly.");
   }
 
   async function onPayWithRazorpay() {

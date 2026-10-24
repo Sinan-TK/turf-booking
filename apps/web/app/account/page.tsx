@@ -129,13 +129,14 @@ function Profile() {
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-gray-900">Profile</h2>
         {!editing && (
-          <Button type="button" variant="secondary" className="!px-3 !py-1.5" onClick={startEdit}>
+          <Button type="button" variant="secondary" className="inline-flex items-center gap-1.5 !px-3 !py-1.5" onClick={startEdit}>
+            <Icon name="edit" className="text-[14px]" />
             Edit
           </Button>
         )}
       </div>
       {!editing && (
-        <dl className="space-y-3 text-sm">
+        <dl className="grid gap-4 text-sm md:grid-cols-3">
           <div>
             <dt className="text-xs font-medium text-gray-500">Name</dt>
             <dd className="mt-0.5 text-gray-900">{customer?.name || <span className="text-gray-400">Not added</span>}</dd>
@@ -169,9 +170,9 @@ function Profile() {
         </dl>
       )}
       {editing && (
-      <form onSubmit={onSave} noValidate className="space-y-3">
+      <form onSubmit={onSave} noValidate className="space-y-3 md:grid md:grid-cols-3 md:gap-4 md:space-y-0">
         {error && (
-          <div role="alert">
+          <div role="alert" className="md:col-span-3">
             <ErrorBanner message={error} />
           </div>
         )}
@@ -233,7 +234,7 @@ function Profile() {
             <p className="mt-1 text-xs text-gray-500">We don&apos;t check this number yet. Venues use it to reach you about your bookings.</p>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 md:col-span-3">
           <Button type="submit" disabled={saving || !dirty}>
             {saving ? 'Saving…' : 'Save'}
           </Button>
@@ -305,7 +306,7 @@ function ChangePassword() {
       </div>
       {!open && <p className="mt-1 text-sm text-gray-500">Choose a new password for signing in with your email.</p>}
       {open && (
-      <form onSubmit={onSubmit} noValidate className="mt-3 space-y-3">
+      <form onSubmit={onSubmit} noValidate className="mt-3 max-w-md space-y-3">
         {error && (
           <div role="alert">
             <ErrorBanner message={error} />
@@ -427,10 +428,10 @@ function Wallet() {
 }
 
 const TABS = [
-  { id: 'profile', label: 'Profile' },
-  { id: 'wallet', label: 'Wallet' },
-  { id: 'bookings', label: 'My bookings' },
-  { id: 'support', label: 'Support' },
+  { id: 'profile', label: 'Profile', icon: 'person' },
+  { id: 'wallet', label: 'Wallet', icon: 'wallet' },
+  { id: 'bookings', label: 'Bookings', icon: 'bookings' },
+  { id: 'support', label: 'Support', icon: 'support' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
@@ -443,7 +444,8 @@ function ProfileTab() {
     <>
       <Profile />
       {customer?.hasPassword && <ChangePassword />}
-      <Button type="button" variant="secondary" className="w-full !border-red-200 !text-red-600 hover:!bg-red-50" onClick={() => setConfirming(true)}>
+      <Button type="button" variant="secondary" className="inline-flex w-full items-center justify-center gap-2 !border-red-200 !text-red-600 hover:!bg-red-50 lg:w-auto" onClick={() => setConfirming(true)}>
+        <Icon name="logout" className="text-[16px]" />
         Log out
       </Button>
       {confirming && (
@@ -498,8 +500,9 @@ function AccountTabs() {
             aria-controls="account-panel"
             tabIndex={tab === t.id ? 0 : -1}
             onClick={() => choose(t.id)}
-            className={`rounded-lg px-1 py-2 transition sm:px-3 ${tab === t.id ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+            className={`flex flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 transition sm:flex-row sm:gap-2 sm:px-3 sm:py-2.5 ${tab === t.id ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
           >
+            <Icon name={t.icon} className="text-[18px]" />
             {t.label}
           </button>
         ))}
@@ -516,7 +519,7 @@ function AccountTabs() {
 
 export default function AccountPage() {
   return (
-    <Screen showAccountMenu={false}>
+    <Screen showAccountMenu={false} wide>
       <h1 className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold text-gray-900">
         <Icon name="handshake" />
         My account

@@ -26,7 +26,7 @@ test.describe('customer sign-in', () => {
     await logIn(page, uniquePhone(), 'PW Menu Person');
     await page.getByRole('button', { name: 'Account menu' }).click();
     const items = await page.getByRole('menuitem').allTextContents();
-    expect(items.slice(0, 4)).toEqual(['Profile', 'My bookings', 'Wallet (Coins)', 'Support']);
+    expect(items.slice(0, 4)).toEqual(['Profile', 'Bookings', 'Wallet (Coins)', 'Support']);
     await page.getByRole('menuitem', { name: 'Profile' }).click();
     await expect(page).toHaveURL(/\/account\?tab=profile$/);
     await expect(page.getByRole('tab', { name: 'Profile' })).toHaveAttribute('aria-selected', 'true');
@@ -165,7 +165,7 @@ test.describe('customer sign-in', () => {
     await expect(page.getByText('Not verified').first()).toBeVisible(); // phone typed, not proven
     await expect(page.getByText('Verified', { exact: true }).first()).toBeVisible(); // email proven by Google
     // Four tabs. A Google-only customer has no password, so Profile offers no Change password.
-    await expect(page.getByRole('tab')).toHaveText(['Profile', 'Wallet', 'My bookings', 'Support']);
+    await expect(page.getByRole('tab')).toHaveText(['Profile', 'Wallet', 'Bookings', 'Support']);
     await expect(page.getByRole('heading', { name: 'Change password' })).toHaveCount(0);
   });
 

@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useCustomer } from '@/lib/customer';
 import { ConfirmLogout } from '@/components/confirm-logout';
+import { Icon } from '@/components/ui';
 
 const ITEMS = [
-  { href: '/account?tab=profile', label: 'Profile' },
-  { href: '/account?tab=bookings', label: 'My bookings' },
-  { href: '/account?tab=wallet', label: 'Wallet (Coins)' },
-  { href: '/account?tab=support', label: 'Support' },
+  { href: '/account?tab=profile', label: 'Profile', icon: 'person' },
+  { href: '/account?tab=bookings', label: 'Bookings', icon: 'bookings' },
+  { href: '/account?tab=wallet', label: 'Wallet (Coins)', icon: 'wallet' },
+  { href: '/account?tab=support', label: 'Support', icon: 'support' },
 ];
 
 /** Header control: "Log in" when logged out, otherwise an avatar with the
@@ -80,8 +81,9 @@ export function AccountMenu() {
               href={item.href}
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="block px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+              className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
             >
+              <Icon name={item.icon} className="text-[16px] text-slate-400" />
               {item.label}
             </Link>
           ))}
@@ -92,8 +94,9 @@ export function AccountMenu() {
               setOpen(false);
               setConfirmingLogout(true);
             }}
-            className="block w-full border-t border-slate-100 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
+            className="flex w-full items-center gap-2.5 border-t border-slate-100 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
           >
+            <Icon name="logout" className="text-[16px]" />
             Log out
           </button>
         </div>

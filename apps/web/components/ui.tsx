@@ -31,6 +31,12 @@ import {
   LayoutGrid,
   Flower2,
   Volleyball,
+  User,
+  Wallet,
+  CalendarDays,
+  LifeBuoy,
+  Pencil,
+  LogOut,
   type LucideIcon
 } from 'lucide-react';
 
@@ -67,6 +73,13 @@ const ICON_MAP: Record<string, LucideIcon> = {
   arrow_back: ArrowLeft,
   check: Check,
   handshake: Handshake,
+  // The account's main options.
+  person: User,
+  wallet: Wallet,
+  bookings: CalendarDays,
+  support: LifeBuoy,
+  edit: Pencil,
+  logout: LogOut,
 };
 
 export function Icon({ name, className = '' }: { name: string; className?: string; filled?: boolean }) {
