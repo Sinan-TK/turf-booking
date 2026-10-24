@@ -4,9 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
-import { LoginGate } from '@/components/login-gate';
-import { Badge, Card, ErrorBanner, Icon, LoadingState } from '@/components/ui';
-import { Screen } from '@/components/screen';
+import { Badge, Card, ErrorBanner, LoadingState } from '@/components/ui';
 
 interface Booking {
   id: string;
@@ -18,7 +16,8 @@ interface Booking {
   groundType: string;
 }
 
-function BookingList() {
+/** The customer's bookings, newest first. Shown as a tab on the account page. */
+export function BookingsPanel() {
   const { refresh } = useCustomer();
   const [bookings, setBookings] = useState<Booking[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,19 +70,5 @@ function BookingList() {
         </div>
       )}
     </>
-  );
-}
-
-export default function MyBookingsPage() {
-  return (
-    <Screen>
-      <h1 className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold text-gray-900">
-        <Icon name="schedule" />
-        My Bookings
-      </h1>
-      <LoginGate message="Log in to see your bookings.">
-        <BookingList />
-      </LoginGate>
-    </Screen>
   );
 }

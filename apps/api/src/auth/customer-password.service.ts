@@ -15,7 +15,7 @@ import { constantTimeEquals, generateSecureToken, hashToken } from '@venue/share
 import { PrismaService } from '../prisma/prisma.service';
 import { CustomersService, normalizeEmail } from '../customers/customers.service';
 import { MailService } from '../identity/mail.service';
-import { normalizePhone } from '../common/phone';
+import { mobileNumberProblem, normalizePhone } from '../common/phone';
 
 type CodePurpose = 'SIGNUP' | 'RESET';
 interface SignUpPayload {
@@ -61,6 +61,8 @@ export class CustomerPasswordService {
     const env = loadEnv();
     const phone = normalizePhone(input.phone, env.DEFAULT_COUNTRY_CODE);
     if (!phone) throw new BadRequestException('Enter a valid phone number, like +91 98765 43210.');
+    const problem = mobileNumberProblem(phone);
+    if (problem) throw new BadRequestException(problem);
     const email = normalizeEmail(input.email);
     await this.customers.assertSignUpPossible(email, phone);
     const ticket = generateSecureToken();

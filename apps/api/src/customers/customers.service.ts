@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { contains } from '../common/list-filters';
-import { normalizePhone } from '../common/phone';
+import { mobileNumberProblem, normalizePhone } from '../common/phone';
 
 export const PHONE_TAKEN =
   'This number is already registered to another account. Sign in to that account, or use a different number.';
@@ -239,6 +239,9 @@ export class CustomersService {
     if (input.phone !== undefined) {
       const phone = normalizePhone(input.phone, defaultCountryCode);
       if (!phone) throw new BadRequestException('Enter a valid phone number, like +91 98765 43210.');
+      // A number already on the account is left alone (it may predate these rules); a new one must be a real mobile number.
+      const problem = phone === current.whatsappNumber ? null : mobileNumberProblem(phone);
+      if (problem) throw new BadRequestException(problem);
       if (!(current.phoneVerified && current.whatsappNumber === phone)) {
         if (current.phoneVerified) {
           throw new BadRequestException("Your number is verified, so it can't be changed here.");

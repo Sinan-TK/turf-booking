@@ -11,3 +11,17 @@ export function normalizePhone(input: string, defaultCountryCode = '91'): string
   const full = digits.length === 10 ? defaultCountryCode + digits : digits;
   return full.length >= 11 && full.length <= 15 ? `+${full}` : null;
 }
+
+/**
+ * For a customer typing their own number: an Indian (+91) number must be a real mobile number, ten digits starting
+ * with 6, 7, 8 or 9 and not one digit repeated. Numbers from other countries are only checked by normalizePhone.
+ * Returns a message to show, or null when the number is fine.
+ */
+export function mobileNumberProblem(e164: string): string | null {
+  if (!e164.startsWith('+91')) return null;
+  const national = e164.slice(3);
+  if (!/^[6-9]\d{9}$/.test(national) || new Set(national).size === 1) {
+    return 'Enter a valid 10-digit Indian mobile number starting with 6, 7, 8 or 9.';
+  }
+  return null;
+}

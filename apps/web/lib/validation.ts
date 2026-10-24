@@ -4,13 +4,17 @@ export type FieldErrors<K extends string = string> = Partial<Record<K, string>>;
 
 export const hasErrors = (e: object) => Object.values(e).some(Boolean);
 
-export function phoneError(value: string): string | undefined {
-  const v = value.trim();
-  if (!v) return 'Enter your phone number.';
-  if (!/^\+?[\d\s-]+$/.test(v)) return 'Use digits only, with an optional + at the start.';
-  const digits = v.replace(/\D/g, '');
-  if (digits.length < 10) return 'Enter the full 10-digit number.';
-  if (v.length > 30) return 'That number is too long.';
+
+/**
+ * An Indian mobile number as typed in the phone field (the 10 digits after +91): ten digits, starting with 6, 7, 8 or 9,
+ * and not one digit repeated. The server checks the same rules.
+ */
+export function indianPhoneError(digits: string): string | undefined {
+  if (!digits) return 'Enter your phone number.';
+  if (!/^\d+$/.test(digits)) return 'Use digits only.';
+  if (digits.length !== 10) return 'Enter the full 10-digit mobile number.';
+  if (!/^[6-9]/.test(digits)) return 'Indian mobile numbers start with 6, 7, 8 or 9.';
+  if (new Set(digits).size === 1) return 'Enter a real mobile number.'; // one digit repeated
 }
 
 export function codeError(value: string): string | undefined {

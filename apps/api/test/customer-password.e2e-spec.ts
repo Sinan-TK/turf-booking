@@ -174,6 +174,32 @@ describe('Customer email + password', () => {
       expect((await signupStart(email(), { phone: '12' })).status).toBe(400);
     });
 
+    test('an Indian number must be a real mobile number: ten digits, starting 6-9, not one digit repeated', async () => {
+      for (const bad of ['5876543210', '1234567890', '9999999999', '98765 4321', '0 98765 432']) {
+        const res = await signupStart(email(), { phone: bad });
+        expect(res.status).toBe(400);
+      }
+      const message = JSON.stringify((await signupStart(email(), { phone: '5876543210' })).body);
+      expect(message).toMatch(/10-digit Indian mobile number/);
+      // Good spellings of a good number, and a number from another country.
+      for (const good of ['98765 43210', '+91 98765 43210', '09876543210', '+14155550123']) {
+        const e = email();
+        await ageCodes(e);
+        expect((await signupStart(e, { phone: good })).status).toBe(200);
+      }
+    });
+
+    test('a profile edit holds a new number to the same rules, but leaves an existing one alone', async () => {
+      const e = email();
+      const agent = agentFor(app);
+      expect((await signup(e, {}, agent)).status).toBe(201);
+      expect((await agent.patch('/customer-auth/me').send({ phone: '1234567890' })).status).toBe(400);
+      expect((await agent.patch('/customer-auth/me').send({ phone: '8765432109' })).status).toBe(200);
+      // A number that predates the rule keeps working when the same value is saved again.
+      await prisma.customerProfile.update({ where: { email: e }, data: { whatsappNumber: '+915555555555' } });
+      expect((await agent.patch('/customer-auth/me').send({ phone: '+915555555555', name: 'Still Fine' })).status).toBe(200);
+    });
+
     test('an email that is already registered is refused before any code is sent, whatever its case', async () => {
       const e = email();
       expect((await signup(e)).status).toBe(201);

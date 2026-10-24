@@ -47,7 +47,8 @@ test.describe('customer site: booking a slot', () => {
 
     // My bookings lists it as awaiting payment and links back to checkout.
     await page.goto('/bookings');
-    await expect(page.getByRole('heading', { name: /My bookings|Bookings/ }).first()).toBeVisible();
+    await expect(page).toHaveURL(/\/account\?tab=bookings$/); // the old address lands on the tab
+    await expect(page.getByRole('tab', { name: 'My bookings' })).toHaveAttribute('aria-selected', 'true');
     const row = page.getByRole('link').filter({ hasText: /BK\d+/ }); // (the list shows the order, time, type and amount, not the venue)
     await expect(row).toHaveCount(1);
     await expect(row).toContainText('PENDING_PAYMENT');

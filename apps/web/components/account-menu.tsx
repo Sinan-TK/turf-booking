@@ -7,9 +7,9 @@ import { ConfirmLogout } from '@/components/confirm-logout';
 
 const ITEMS = [
   { href: '/account?tab=profile', label: 'Profile' },
-  { href: '/bookings', label: 'My bookings' },
+  { href: '/account?tab=bookings', label: 'My bookings' },
   { href: '/account?tab=wallet', label: 'Wallet (Coins)' },
-  { href: '/support', label: 'Support' },
+  { href: '/account?tab=support', label: 'Support' },
 ];
 
 /** Header control: "Log in" when logged out, otherwise an avatar with the

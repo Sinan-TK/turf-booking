@@ -6,7 +6,8 @@ import type { Customer } from '@/lib/customer';
 import { Button, ErrorBanner, FieldError, Icon, Input, Label, SuccessBanner, invalidClass } from '@/components/ui';
 import { GoogleButton } from '@/components/google-button';
 import { PasswordInput } from '@/components/password-input';
-import { codeError, emailError, nameError, newPasswordError, passwordError, phoneError } from '@/lib/validation';
+import { codeError, emailError, indianPhoneError, nameError, newPasswordError, passwordError } from '@/lib/validation';
+import { PhoneInput } from '@/components/phone-input';
 
 type View = 'home' | 'signup-code' | 'forgot' | 'reset' | 'profile' | 'phone' | 'code';
 type Tab = 'signin' | 'signup';
@@ -163,7 +164,7 @@ export function LoginDialog({
     const found: Msgs = {
       name: nameError(name),
       email: emailError(email),
-      phone: phoneError(phone),
+      phone: indianPhoneError(phone),
       password: newPasswordError(password),
     };
     setMsgs(found);
@@ -175,7 +176,7 @@ export function LoginDialog({
         const res = await api.post<{ resendAfterSeconds: number; ticket: string }>('/customer-auth/signup', {
           name: name.trim(),
           email: email.trim(),
-          phone: phone.trim(),
+          phone,
           password,
         });
         setTicket(res.ticket);
@@ -227,7 +228,7 @@ export function LoginDialog({
       const res = await api.post<{ resendAfterSeconds: number; ticket: string }>('/customer-auth/signup', {
         name: name.trim(),
         email: email.trim(),
-        phone: phone.trim(),
+        phone,
         password,
       });
       setTicket(res.ticket);
@@ -270,14 +271,14 @@ export function LoginDialog({
     e.preventDefault();
     if (!signed) return;
     const needsPhone = !signed.phone;
-    const found: Msgs = { name: nameError(name), phone: needsPhone ? phoneError(phone) : undefined };
+    const found: Msgs = { name: nameError(name), phone: needsPhone ? indianPhoneError(phone) : undefined };
     setMsgs(found);
     if (found.name || found.phone) return focusFirstInvalid(found, { name: 'login-name', phone: 'login-phone' });
     return run(async () => {
       try {
         const updated = await api.patch<Customer>('/customer-auth/me', {
           name: name.trim(),
-          ...(needsPhone ? { phone: phone.trim() } : {}),
+          ...(needsPhone ? { phone } : {}),
         });
         onLoggedIn(updated);
       } catch (err) {
@@ -295,7 +296,7 @@ export function LoginDialog({
   function sendCode(e?: React.FormEvent) {
     e?.preventDefault();
     if (view === 'phone') {
-      const problem = phoneError(phone);
+      const problem = indianPhoneError(phone);
       setMsgs({ phone: problem });
       if (problem) return document.getElementById('login-phone')?.focus();
     }
@@ -329,7 +330,7 @@ export function LoginDialog({
       completing ? 'The venue needs a number to reach you about your booking.' : 'Used on your bookings. You can change them later.',
     ],
     phone: ['Log in with your phone', 'We will send a 6-digit code to your phone.'],
-    code: ['Enter the code', `Sent to ${phone}.`],
+    code: ['Enter the code', `Sent to +91 ${phone}.`],
   };
   const [title, subtitle] = titles[view];
 
@@ -479,17 +480,12 @@ export function LoginDialog({
                     </div>
                     <div>
                       <Label htmlFor="login-phone">Phone number</Label>
-                      <Input
+                      <PhoneInput
                         id="login-phone"
-                        type="tel"
-                        inputMode="tel"
-                        autoComplete="tel"
-                        placeholder="98765 43210"
-                        aria-invalid={!!msgs.phone}
-                        className={msgs.phone ? invalidClass : ''}
+                        invalid={!!msgs.phone}
                         value={phone}
-                        onChange={(e) => {
-                          setPhone(e.target.value);
+                        onValueChange={(digits) => {
+                          setPhone(digits);
                           clearMsg('phone');
                         }}
                       />
@@ -691,18 +687,13 @@ export function LoginDialog({
             {!signed.phone && (
               <div>
                 <Label htmlFor="login-phone">Phone number</Label>
-                <Input
+                <PhoneInput
                   id="login-phone"
                   autoFocus
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel"
-                  placeholder="98765 43210"
-                  aria-invalid={!!msgs.phone}
-                  className={msgs.phone ? invalidClass : ''}
+                  invalid={!!msgs.phone}
                   value={phone}
-                  onChange={(e) => {
-                    setPhone(e.target.value);
+                  onValueChange={(digits) => {
+                    setPhone(digits);
                     clearMsg('phone');
                   }}
                 />
@@ -724,18 +715,13 @@ export function LoginDialog({
           <form onSubmit={sendCode} noValidate className="space-y-3">
             <div>
               <Label htmlFor="login-phone">Phone number</Label>
-              <Input
+              <PhoneInput
                 id="login-phone"
                 autoFocus
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                placeholder="98765 43210"
-                aria-invalid={!!msgs.phone}
-                className={msgs.phone ? invalidClass : ''}
+                invalid={!!msgs.phone}
                 value={phone}
-                onChange={(e) => {
-                  setPhone(e.target.value);
+                onValueChange={(digits) => {
+                  setPhone(digits);
                   clearMsg('phone');
                 }}
               />

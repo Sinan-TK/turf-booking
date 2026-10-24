@@ -26,7 +26,7 @@ test.describe('customer sign-in', () => {
     await logIn(page, uniquePhone(), 'PW Menu Person');
     await page.getByRole('button', { name: 'Account menu' }).click();
     const items = await page.getByRole('menuitem').allTextContents();
-    expect(items.slice(0, 3)).toEqual(['Profile', 'My bookings', 'Wallet (Coins)']);
+    expect(items.slice(0, 4)).toEqual(['Profile', 'My bookings', 'Wallet (Coins)', 'Support']);
     await page.getByRole('menuitem', { name: 'Profile' }).click();
     await expect(page).toHaveURL(/\/account\?tab=profile$/);
     await expect(page.getByRole('tab', { name: 'Profile' })).toHaveAttribute('aria-selected', 'true');
@@ -41,6 +41,62 @@ test.describe('customer sign-in', () => {
     await expect(page.getByRole('textbox')).toHaveCount(0);
     await expect(page.getByText('PW Menu Person')).toBeVisible();
     await expect(page.getByText('Changed but cancelled')).toHaveCount(0);
+  });
+
+  test('the phone field shows the flag and +91 outside the box and holds only the ten digits, with Indian number rules', async ({ page }) => {
+    const phone = uniquePhone();
+    await page.goto('/');
+    await logIn(page, phone, 'PW Phone Person');
+    await page.goto('/account?tab=profile');
+    await expect(page.getByText(`+91 ${phone.slice(3, 8)} ${phone.slice(8)}`)).toBeVisible();
+    await page.getByRole('button', { name: 'Edit' }).click();
+
+    const field = page.locator('#account-phone');
+    await expect(field).toHaveValue(phone.slice(3)); // no +91 inside the box
+    await expect(page.getByLabel('India, country code 91')).toHaveText('+91');
+    await field.fill('');
+    await field.fill('+91 98765 43210abc'); // as if pasted
+    await expect(field).toHaveValue('9876543210'); // digits only, country code dropped
+    await field.fill('');
+    await field.pressSequentially('98765432109999');
+    await expect(field).toHaveValue('9876543210'); // never more than ten
+
+    const save = page.getByRole('button', { name: 'Save' });
+    await field.fill('98765');
+    await save.click();
+    await expect(page.getByText('Enter the full 10-digit mobile number.')).toBeVisible();
+    await field.fill('5876543210');
+    await save.click();
+    await expect(page.getByText('Indian mobile numbers start with 6, 7, 8 or 9.')).toBeVisible();
+    await field.fill('9999999999');
+    await save.click();
+    await expect(page.getByText('Enter a real mobile number.')).toBeVisible();
+
+    const fresh = '9' + String(Math.floor(100_000_000 + Math.random() * 899_999_999));
+    await field.fill(fresh);
+    await save.click();
+    const toast = page.getByRole('status').filter({ hasText: 'Profile saved.' });
+    await expect(toast).toBeVisible(); // a toast at the bottom middle, not a banner that stays
+    const box = (await toast.boundingBox())!;
+    const view = page.viewportSize()!;
+    expect(Math.abs(box.x + box.width / 2 - view.width / 2)).toBeLessThan(8);
+    expect(box.y).toBeGreaterThan(view.height * 0.7);
+    await expect(page.getByText(`+91 ${fresh.slice(0, 5)} ${fresh.slice(5)}`)).toBeVisible();
+    await expect(toast).toHaveCount(0, { timeout: 8000 });
+  });
+
+  test('the sign-up form takes the phone the same way', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Log in' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('tab', { name: /Create account/i }).click();
+    await expect(dialog.getByLabel('India, country code 91')).toHaveText('+91');
+    await dialog.getByLabel('Phone number').fill('1234567890');
+    await dialog.getByLabel('Your name').fill('PW Rules');
+    await dialog.getByLabel('Email', { exact: true }).fill(`pw-rules-${unique()}@example.com`);
+    await dialog.getByLabel('Password', { exact: true }).fill(PASSWORD);
+    await dialog.getByRole('button', { name: 'Create account' }).last().click();
+    await expect(dialog.getByText('Indian mobile numbers start with 6, 7, 8 or 9.')).toBeVisible();
   });
 
   test('logging out asks for confirmation first', async ({ page }) => {
@@ -74,12 +130,9 @@ test.describe('customer sign-in', () => {
     await expect(page.getByRole('heading', { name: 'My account' })).toBeVisible();
     await expect(page.getByText('Not verified').first()).toBeVisible(); // phone typed, not proven
     await expect(page.getByText('Verified', { exact: true }).first()).toBeVisible(); // email proven by Google
-    // Three tabs; for a Google-only customer the Security tab explains there is no password instead of offering one.
-    await expect(page.getByRole('tab')).toHaveText(['Profile', 'Wallet', 'Security']);
-    await page.getByRole('tab', { name: 'Security' }).click();
-    await expect(page.getByText(/no password/i)).toBeVisible();
+    // Four tabs. A Google-only customer has no password, so Profile offers no Change password.
+    await expect(page.getByRole('tab')).toHaveText(['Profile', 'Wallet', 'My bookings', 'Support']);
     await expect(page.getByRole('heading', { name: 'Change password' })).toHaveCount(0);
-    await expect(page.getByLabel('Current password')).toHaveCount(0);
   });
 
   test('email sign-up needs the emailed code; a wrong code is refused, the right one creates the account', async ({ page }) => {
@@ -111,8 +164,17 @@ test.describe('customer sign-in', () => {
 
     await page.goto('/account');
     await expect(page.getByText('Verified', { exact: true }).first()).toBeVisible(); // the emailed code proved the address
-    await page.getByRole('tab', { name: 'Security' }).click();
-    await expect(page.getByRole('heading', { name: 'Change password' })).toBeVisible(); // this account has a password
+    await expect(page.getByRole('heading', { name: 'Change password' })).toBeVisible(); // in Profile, for an account with a password
+    await expect(page.getByLabel('Current password')).toHaveCount(0); // closed until Change is pressed
+    await page.getByRole('button', { name: 'Change', exact: true }).click();
+    await page.getByLabel('Current password').fill(PASSWORD);
+    await page.getByLabel('New password', { exact: true }).fill('BrandNew456!y');
+    await page.getByLabel('Repeat the new password').fill('BrandNew456!y');
+    await page.getByRole('button', { name: 'Update password' }).click();
+    const done = page.getByRole('status').filter({ hasText: 'Password changed' });
+    await expect(done).toBeVisible();
+    await expect(page.getByLabel('Current password')).toHaveCount(0);
+    await expect(done).toHaveCount(0, { timeout: 8000 }); // the message fades away by itself
   });
 
   test('forgot password: a wrong password is refused, then an emailed code sets a new one', async ({ page }) => {

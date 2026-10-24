@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Akshar } from 'next/font/google';
 import './globals.css';
 import { CustomerProvider } from '@/lib/customer';
+import { ToastProvider } from '@/components/toast';
 
 const akshar = Akshar({
   subsets: ['latin'],
@@ -22,7 +23,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
       </head>
       <body className="font-sans antialiased text-slate-800 selection:bg-brand-500 selection:text-white">
-        <CustomerProvider>{children}</CustomerProvider>
+        <ToastProvider>
+          <CustomerProvider>{children}</CustomerProvider>
+        </ToastProvider>
       </body>
     </html>
   );

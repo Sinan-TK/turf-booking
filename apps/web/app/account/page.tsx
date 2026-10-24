@@ -5,9 +5,13 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
 import { LoginGate } from '@/components/login-gate';
-import { Button, Card, ErrorBanner, FieldError, Icon, Input, Label, LoadingState, SuccessBanner, invalidClass } from '@/components/ui';
-import { emailError, nameError, newPasswordError, passwordError, phoneError } from '@/lib/validation';
+import { Button, Card, ErrorBanner, FieldError, Icon, Input, Label, LoadingState, invalidClass } from '@/components/ui';
+import { emailError, indianPhoneError, nameError, newPasswordError, passwordError } from '@/lib/validation';
 import { PasswordInput } from '@/components/password-input';
+import { PhoneInput, formatPhone, toNationalDigits } from '@/components/phone-input';
+import { useToast } from '@/components/toast';
+import { BookingsPanel } from '@/components/bookings-panel';
+import { SupportPanel } from '@/components/support-panel';
 import { Screen } from '@/components/screen';
 
 interface CoinWallet {
@@ -51,33 +55,35 @@ function VerifiedChip({ verified, what }: { verified: boolean; what: string }) {
 
 function Profile() {
   const { customer, refresh } = useCustomer();
+  const toast = useToast();
   const [name, setName] = useState(customer?.name ?? '');
-  const [phone, setPhone] = useState(customer?.phone ?? '');
+  // The 10 digits after +91; the flag and +91 are shown in front of the field.
+  const [phone, setPhone] = useState(toNationalDigits(customer?.phone));
   const [email, setEmail] = useState(customer?.email ?? '');
   // The details are shown as plain text; Edit turns them into fields.
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [msgs, setMsgs] = useState<Partial<Record<'name' | 'phone' | 'email', string>>>({});
 
   // A verified phone or email is the customer's identity: shown, not editable.
   const phoneLocked = !!customer?.phoneVerified;
   const emailLocked = !!customer?.emailVerified;
+  // A number from another country (from before the site was India-only) can be seen but not edited here.
+  const foreignPhone = !!customer?.phone && !customer.phone.startsWith('+91');
   const changed = {
     name: name.trim() !== (customer?.name ?? ''),
-    phone: !phoneLocked && phone.trim() !== (customer?.phone ?? ''),
+    phone: !phoneLocked && !foreignPhone && phone !== toNationalDigits(customer?.phone),
     email: !emailLocked && email.trim().toLowerCase() !== (customer?.email ?? ''),
   };
   const dirty = changed.name || changed.phone || changed.email;
 
   function startEdit() {
     setName(customer?.name ?? '');
-    setPhone(customer?.phone ?? '');
+    setPhone(toNationalDigits(customer?.phone));
     setEmail(customer?.email ?? '');
     setMsgs({});
     setError(null);
-    setSaved(false);
     setEditing(true);
   }
 
@@ -92,7 +98,7 @@ function Profile() {
     if (saving) return;
     const found = {
       name: changed.name ? nameError(name) : undefined,
-      phone: changed.phone ? phoneError(phone) : undefined,
+      phone: changed.phone ? indianPhoneError(phone) : undefined,
       email: changed.email ? emailError(email) : undefined,
     };
     setMsgs(found);
@@ -100,16 +106,15 @@ function Profile() {
     if (first) return void document.getElementById(`account-${first}`)?.focus();
     setSaving(true);
     setError(null);
-    setSaved(false);
     try {
       await api.patch('/customer-auth/me', {
         ...(changed.name ? { name: name.trim() } : {}),
-        ...(changed.phone ? { phone: phone.trim() } : {}),
+        ...(changed.phone ? { phone } : {}),
         ...(changed.email ? { email: email.trim() } : {}),
       });
       await refresh();
-      setSaved(true);
       setEditing(false);
+      toast.show('Profile saved.');
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Could not save your details.';
       // A number or email that belongs to someone else is shown under its own field.
@@ -130,11 +135,6 @@ function Profile() {
           </Button>
         )}
       </div>
-      {saved && !editing && (
-        <div className="mb-3">
-          <SuccessBanner message="Saved." />
-        </div>
-      )}
       {!editing && (
         <dl className="space-y-3 text-sm">
           <div>
@@ -159,7 +159,7 @@ function Profile() {
             <dd className="mt-0.5 text-gray-900">
               {customer?.phone ? (
                 <>
-                  {customer.phone}
+                  {formatPhone(customer.phone)}
                   <VerifiedChip verified={phoneLocked} what="Phone number" />
                 </>
               ) : (
@@ -219,23 +219,18 @@ function Profile() {
             Phone number
             {customer?.phone && <VerifiedChip verified={phoneLocked} what="Phone number" />}
           </Label>
-          <Input
+          <PhoneInput
             id="account-phone"
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            readOnly={phoneLocked}
-            value={phone}
-            placeholder="98765 43210"
-            aria-invalid={!!msgs.phone}
-            className={`${phoneLocked ? 'bg-gray-50 text-gray-500' : ''} ${msgs.phone ? invalidClass : ''}`}
-            onChange={(e) => {
-              setPhone(e.target.value);
+            value={foreignPhone ? (customer?.phone ?? '') : phone}
+            readOnly={phoneLocked || foreignPhone}
+            invalid={!!msgs.phone}
+            onValueChange={(digits) => {
+              setPhone(digits);
               setMsgs((m) => ({ ...m, phone: undefined }));
             }}
           />
           <FieldError id="account-phone-error" message={msgs.phone} />
-          {customer?.phone && !phoneLocked && (
+          {customer?.phone && !phoneLocked && !foreignPhone && (
             <p className="mt-1 text-xs text-gray-500">We don&apos;t check this number yet. Venues use it to reach you about your bookings.</p>
           )}
         </div>
@@ -256,13 +251,23 @@ function Profile() {
 /** Only for customers who have a password. Google-only customers set one through Forgot password on the sign-in screen. */
 function ChangePassword() {
   const { refresh } = useCustomer();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
   const [msgs, setMsgs] = useState<Partial<Record<'current' | 'next' | 'confirm', string>>>({});
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  function close() {
+    setCurrent('');
+    setNext('');
+    setConfirm('');
+    setMsgs({});
+    setError(null);
+    setOpen(false);
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -277,13 +282,10 @@ function ChangePassword() {
     if (first) return void document.getElementById(`password-${first}`)?.focus();
     setSaving(true);
     setError(null);
-    setSaved(false);
     try {
       await api.post('/customer-auth/change-password', { currentPassword: current, newPassword: next });
-      setCurrent('');
-      setNext('');
-      setConfirm('');
-      setSaved(true);
+      close();
+      toast.show('Password changed. Other devices have been signed out.');
       await refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not change your password.');
@@ -294,14 +296,22 @@ function ChangePassword() {
 
   return (
     <Card className="mb-4">
-      <h2 className="mb-3 text-sm font-semibold text-gray-900">Change password</h2>
-      <form onSubmit={onSubmit} noValidate className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold text-gray-900">Change password</h2>
+        {!open && (
+          <Button type="button" variant="secondary" className="!px-3 !py-1.5" onClick={() => setOpen(true)}>
+            Change
+          </Button>
+        )}
+      </div>
+      {!open && <p className="mt-1 text-sm text-gray-500">Choose a new password for signing in with your email.</p>}
+      {open && (
+      <form onSubmit={onSubmit} noValidate className="mt-3 space-y-3">
         {error && (
           <div role="alert">
             <ErrorBanner message={error} />
           </div>
         )}
-        {saved && <SuccessBanner message="Password changed. Other devices have been signed out." />}
         <div>
           <Label htmlFor="password-current">Current password</Label>
           <PasswordInput
@@ -347,10 +357,16 @@ function ChangePassword() {
           />
           <FieldError id="password-confirm-error" message={msgs.confirm} />
         </div>
-        <Button type="submit" disabled={saving}>
-          {saving ? 'Saving…' : 'Change password'}
-        </Button>
+        <div className="flex gap-2">
+          <Button type="submit" disabled={saving}>
+            {saving ? 'Saving…' : 'Update password'}
+          </Button>
+          <Button type="button" variant="secondary" disabled={saving} onClick={close}>
+            Cancel
+          </Button>
+        </div>
       </form>
+      )}
     </Card>
   );
 }
@@ -414,25 +430,23 @@ function Wallet() {
 const TABS = [
   { id: 'profile', label: 'Profile' },
   { id: 'wallet', label: 'Wallet' },
-  { id: 'security', label: 'Security' },
+  { id: 'bookings', label: 'My bookings' },
+  { id: 'support', label: 'Support' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
-/** Security: a password can be changed only by someone who has one; a Google-only customer has none. */
-function Security() {
+/** Details, and a Change password card for customers who have a password (Google-only customers have none). */
+function ProfileTab() {
   const { customer } = useCustomer();
-  if (customer?.hasPassword) return <ChangePassword />;
   return (
-    <Card>
-      <h2 className="mb-2 text-sm font-semibold text-gray-900">Sign-in method</h2>
-      <p className="text-sm text-gray-600">
-        You sign in with Google, so this account has no password. Your Google account keeps it secure.
-      </p>
-    </Card>
+    <>
+      <Profile />
+      {customer?.hasPassword && <ChangePassword />}
+    </>
   );
 }
 
-/** The three sections of the account, switched with tabs. The chosen one is kept in the address (?tab=wallet), so the menu can link straight to it. */
+/** The sections of the account, switched with tabs. The chosen one is kept in the address (?tab=wallet), so the menu can link straight to it. */
 function AccountTabs() {
   const router = useRouter();
   const pathname = usePathname();
@@ -452,7 +466,7 @@ function AccountTabs() {
 
   return (
     <>
-      <div role="tablist" aria-label="Account sections" onKeyDown={onKeyDown} className="mb-4 grid grid-cols-3 gap-1 rounded-xl bg-gray-100 p-1 text-sm font-semibold">
+      <div role="tablist" aria-label="Account sections" onKeyDown={onKeyDown} className="mb-4 grid grid-cols-4 gap-1 rounded-xl bg-gray-100 p-1 text-xs font-semibold sm:text-sm">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -463,16 +477,17 @@ function AccountTabs() {
             aria-controls="account-panel"
             tabIndex={tab === t.id ? 0 : -1}
             onClick={() => choose(t.id)}
-            className={`rounded-lg px-3 py-2 transition ${tab === t.id ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+            className={`rounded-lg px-1 py-2 transition sm:px-3 ${tab === t.id ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
           >
             {t.label}
           </button>
         ))}
       </div>
       <div id="account-panel" role="tabpanel" aria-labelledby={`account-tab-${tab}`}>
-        {tab === 'profile' && <Profile />}
+        {tab === 'profile' && <ProfileTab />}
         {tab === 'wallet' && <Wallet />}
-        {tab === 'security' && <Security />}
+        {tab === 'bookings' && <BookingsPanel />}
+        {tab === 'support' && <SupportPanel />}
       </div>
     </>
   );

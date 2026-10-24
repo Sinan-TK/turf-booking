@@ -3,23 +3,20 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
-import { LoginGate } from '@/components/login-gate';
+import { useToast } from '@/components/toast';
 import {
   Badge,
   Button,
   Card,
   ErrorBanner,
   FieldError,
-  Icon,
   Input,
   Label,
   LoadingState,
   Select,
-  SuccessBanner,
   invalidClass,
 } from '@/components/ui';
 import { hasErrors, type FieldErrors } from '@/lib/validation';
-import { Screen } from '@/components/screen';
 
 interface Ticket {
   id: string;
@@ -41,13 +38,14 @@ function categoryLabel(value: string): string {
   return CATEGORIES.find((c) => c.value === value)?.label ?? value;
 }
 
-function Tickets() {
+/** Contact form and the customer's earlier requests. Shown as a tab on the account page. */
+export function SupportPanel() {
   const { refresh } = useCustomer();
+  const toast = useToast();
   const [tickets, setTickets] = useState<Ticket[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [form, setForm] = useState({ category: 'BOOKING_ISSUE', subject: '', description: '' });
   const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldErrors<'subject' | 'description'>>({});
 
@@ -77,7 +75,6 @@ function Tickets() {
     }
     setSending(true);
     setFormError(null);
-    setSent(false);
     try {
       await api.post('/me/support-tickets', {
         category: form.category,
@@ -86,7 +83,7 @@ function Tickets() {
       });
       setForm({ category: 'BOOKING_ISSUE', subject: '', description: '' });
       setErrors({});
-      setSent(true);
+      toast.show('Thanks, we have your request and will reply soon.');
       load();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : 'Could not send your request.');
@@ -105,7 +102,6 @@ function Tickets() {
               <ErrorBanner message={formError} />
             </div>
           )}
-          {sent && <SuccessBanner message="Thanks — we have your request and will reply on WhatsApp." />}
           <div>
             <Label>What is it about?</Label>
             <Select
@@ -181,19 +177,5 @@ function Tickets() {
         )}
       </Card>
     </>
-  );
-}
-
-export default function SupportPage() {
-  return (
-    <Screen>
-      <h1 className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold text-gray-900">
-        <Icon name="handshake" />
-        Support
-      </h1>
-      <LoginGate message="Log in to contact support.">
-        <Tickets />
-      </LoginGate>
-    </Screen>
   );
 }
