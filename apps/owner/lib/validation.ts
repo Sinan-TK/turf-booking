@@ -42,11 +42,10 @@ export function numberError(value: string, label: string, min: number, max: numb
   if (n < min || n > max) return `${label} must be between ${min} and ${max}.`;
 }
 
-/** A WhatsApp number: 6-20 characters of digits, with an optional leading + and spaces or dashes. */
-export function phoneError(value: string): string | undefined {
-  const v = value.trim();
-  if (!v) return 'Enter the customer’s WhatsApp number.';
-  if (!/^\+?[\d\s-]+$/.test(v)) return 'Use digits only, with an optional + at the start.';
-  const compact = v.replace(/[\s-]/g, '');
-  if (compact.length < 6 || compact.length > 20) return 'Enter a full phone number, like +91 98765 43210.';
+/** The customer's Indian mobile number as typed in the phone field (the 10 digits after +91). The server checks the same rules. */
+export function indianPhoneError(digits: string): string | undefined {
+  if (!digits) return 'Enter the customer’s phone number.';
+  if (digits.length !== 10) return 'Enter the full 10-digit mobile number.';
+  if (!/^[6-9]/.test(digits)) return 'Indian mobile numbers start with 6, 7, 8 or 9.';
+  if (new Set(digits).size === 1) return 'Enter a real mobile number.';
 }

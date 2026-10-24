@@ -61,7 +61,6 @@ const envSchema = z.object({
   OTP_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
   OTP_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().nonnegative().default(30),
   OTP_MAX_CODES_PER_HOUR: z.coerce.number().int().positive().default(5),
-  DEFAULT_COUNTRY_CODE: z.string().regex(/^\d{1,3}$/).default('91'),
   // Approved WhatsApp authentication template carrying the code; when unset
   // the code is sent as a plain text message.
   WHATSAPP_OTP_TEMPLATE: optionalString(z.string().min(1)),

@@ -69,11 +69,9 @@ function Profile() {
   // A verified phone or email is the customer's identity: shown, not editable.
   const phoneLocked = !!customer?.phoneVerified;
   const emailLocked = !!customer?.emailVerified;
-  // A number from another country (from before the site was India-only) can be seen but not edited here.
-  const foreignPhone = !!customer?.phone && !customer.phone.startsWith('+91');
   const changed = {
     name: name.trim() !== (customer?.name ?? ''),
-    phone: !phoneLocked && !foreignPhone && phone !== toNationalDigits(customer?.phone),
+    phone: !phoneLocked && phone !== toNationalDigits(customer?.phone),
     email: !emailLocked && email.trim().toLowerCase() !== (customer?.email ?? ''),
   };
   const dirty = changed.name || changed.phone || changed.email;
@@ -221,8 +219,8 @@ function Profile() {
           </Label>
           <PhoneInput
             id="account-phone"
-            value={foreignPhone ? (customer?.phone ?? '') : phone}
-            readOnly={phoneLocked || foreignPhone}
+            value={phone}
+            readOnly={phoneLocked}
             invalid={!!msgs.phone}
             onValueChange={(digits) => {
               setPhone(digits);
@@ -230,7 +228,7 @@ function Profile() {
             }}
           />
           <FieldError id="account-phone-error" message={msgs.phone} />
-          {customer?.phone && !phoneLocked && !foreignPhone && (
+          {customer?.phone && !phoneLocked && (
             <p className="mt-1 text-xs text-gray-500">We don&apos;t check this number yet. Venues use it to reach you about your bookings.</p>
           )}
         </div>

@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { durationLabel, type VenueCategory } from '@/lib/categories';
 import { Button, Card, ErrorBanner, FieldError, Input, Label, Select, SuccessBanner, invalidClass } from '@/components/ui';
-import { hasErrors, numberError, phoneError, type FieldErrors } from '@/lib/validation';
+import { hasErrors, indianPhoneError, numberError, type FieldErrors } from '@/lib/validation';
+import { PhoneInput } from '@/components/phone-input';
 
 export interface WalkInResource {
   id: string;
@@ -77,7 +78,7 @@ export function WalkInForm({
       resourceId: form.resourceId ? undefined : 'Select a unit.',
       date: form.date ? undefined : 'Choose the date.',
       time: form.time ? undefined : 'Choose the start time.',
-      customerWhatsappNumber: phoneError(form.customerWhatsappNumber),
+      customerWhatsappNumber: indianPhoneError(form.customerWhatsappNumber),
       customerName: form.customerName.length > 100 ? 'Keep the name to 100 characters.' : undefined,
       amount: form.amount.trim() === '' ? undefined : numberError(form.amount, 'Amount', 0, 1_000_000),
       amountPaid:
@@ -205,15 +206,12 @@ export function WalkInForm({
           <FieldError id="walkin-time-error" message={errors.time} />
         </div>
         <div>
-          <Label htmlFor="walkin-phone">Customer WhatsApp Number</Label>
-          <Input
+          <Label htmlFor="walkin-phone">Customer phone number</Label>
+          <PhoneInput
             id="walkin-phone"
-            type="tel"
-            placeholder="+91…"
-            aria-invalid={!!errors.customerWhatsappNumber}
-            className={errors.customerWhatsappNumber ? invalidClass : ''}
+            invalid={!!errors.customerWhatsappNumber}
             value={form.customerWhatsappNumber}
-            onChange={(e) => update('customerWhatsappNumber', e.target.value)}
+            onValueChange={(digits) => update('customerWhatsappNumber', digits)}
           />
           <FieldError id="walkin-phone-error" message={errors.customerWhatsappNumber} />
         </div>

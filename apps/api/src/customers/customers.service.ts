@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { contains } from '../common/list-filters';
-import { mobileNumberProblem, normalizePhone } from '../common/phone';
+import { INDIAN_MOBILE_MESSAGE, normalizeIndianMobile } from '../common/phone';
 
 export const PHONE_TAKEN =
   'This number is already registered to another account. Sign in to that account, or use a different number.';
@@ -95,7 +95,9 @@ export class CustomersService {
    * number, otherwise a credential-less, UNVERIFIED profile. Nothing proves the number belongs to them, so it
    * is never marked verified here (it becomes verified when they log in with the code).
    */
-  async findOrCreateGuestByPhone(phone: string) {
+  async findOrCreateGuestByPhone(rawPhone: string) {
+    const phone = normalizeIndianMobile(rawPhone);
+    if (!phone) throw new BadRequestException(INDIAN_MOBILE_MESSAGE);
     const db = this.prisma.client;
     const verified = await db.customerProfile.findFirst({ where: { whatsappNumber: phone, phoneVerified: true } });
     if (verified) return verified;
@@ -228,7 +230,7 @@ export class CustomersService {
    * here; an unverified one can, and stays unverified. A number another account holds verified, or an email
    * any other account holds, is refused.
    */
-  async updateProfile(customerId: string, input: { name?: string; phone?: string; email?: string }, defaultCountryCode: string) {
+  async updateProfile(customerId: string, input: { name?: string; phone?: string; email?: string }) {
     const db = this.prisma.client;
     const current = await db.customerProfile.findUnique({ where: { id: customerId } });
     if (!current) throw new NotFoundException('Customer not found');
@@ -237,11 +239,9 @@ export class CustomersService {
     if (input.name !== undefined) data.name = input.name.trim();
 
     if (input.phone !== undefined) {
-      const phone = normalizePhone(input.phone, defaultCountryCode);
-      if (!phone) throw new BadRequestException('Enter a valid phone number, like +91 98765 43210.');
-      // A number already on the account is left alone (it may predate these rules); a new one must be a real mobile number.
-      const problem = phone === current.whatsappNumber ? null : mobileNumberProblem(phone);
-      if (problem) throw new BadRequestException(problem);
+      // Saving the number already on the account again is fine (it may predate the Indian-mobile rule); a new one must pass it.
+      const phone = input.phone.trim() === current.whatsappNumber ? current.whatsappNumber : normalizeIndianMobile(input.phone);
+      if (!phone) throw new BadRequestException(INDIAN_MOBILE_MESSAGE);
       if (!(current.phoneVerified && current.whatsappNumber === phone)) {
         if (current.phoneVerified) {
           throw new BadRequestException("Your number is verified, so it can't be changed here.");

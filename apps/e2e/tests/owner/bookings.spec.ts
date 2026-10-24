@@ -24,7 +24,7 @@ test.describe('owner portal: bookings', () => {
     await field(form, 'Resource').selectOption({ index: 0 }); // Turf A
     await field(form, 'Date').fill(nextIstDay(3)); // a Wednesday, inside the 6am-10pm weekday price
     await field(form, 'Start Time').fill('11:00');
-    await field(form, 'Customer WhatsApp Number').fill(phone);
+    await form.locator('#walkin-phone').fill(phone); // the +91 sits outside the box; a pasted +91 number is trimmed to the ten digits
     await field(form, 'Customer Name (optional)').fill('PW Walk-in Guest');
     await form.getByRole('button', { name: 'Book This Slot' }).click();
 

@@ -196,10 +196,10 @@ test.describe('owner portal: pricing', () => {
     await page.getByRole('button', { name: 'Book This Slot' }).click();
     await expect(page.getByText('Choose the date.')).toBeVisible();
     await expect(page.getByText('Choose the start time.')).toBeVisible();
-    await expect(page.getByText('Enter the customer’s WhatsApp number.')).toBeVisible();
-    await field(page, 'Customer WhatsApp Number').fill('abc');
+    await expect(page.getByText('Enter the customer’s phone number.')).toBeVisible();
+    await page.locator('#walkin-phone').fill('5876543210');
     await page.getByRole('button', { name: 'Book This Slot' }).click();
-    await expect(page.getByText('Use digits only, with an optional + at the start.')).toBeVisible();
+    await expect(page.getByText('Indian mobile numbers start with 6, 7, 8 or 9.')).toBeVisible();
   });
 
   test('the Closed days and Walk-in booking tabs open', async ({ page, makeVenue }) => {

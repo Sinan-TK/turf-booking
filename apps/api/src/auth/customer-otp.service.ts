@@ -15,7 +15,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CustomersService, customerView } from '../customers/customers.service';
 import { CustomerSessionService } from './customer-session.service';
 import { CUSTOMER_MESSENGER, type CustomerMessenger } from '../customer-messaging/customer-messenger.port';
-import { normalizePhone } from '../common/phone';
+import { INDIAN_MOBILE_MESSAGE, normalizeIndianMobile } from '../common/phone';
 
 const INVALID = 'Invalid or expired code';
 
@@ -40,8 +40,8 @@ export class CustomerOtpService {
   }
 
   private phoneOrThrow(raw: string): string {
-    const phone = normalizePhone(raw, loadEnv().DEFAULT_COUNTRY_CODE);
-    if (!phone) throw new BadRequestException('Enter a valid phone number');
+    const phone = normalizeIndianMobile(raw);
+    if (!phone) throw new BadRequestException(INDIAN_MOBILE_MESSAGE);
     return phone;
   }
 

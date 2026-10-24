@@ -166,7 +166,7 @@ export class CustomerAuthController {
   @Roles(Role.CUSTOMER)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async updateMe(@CurrentUser() actor: AuthContext, @Body() dto: UpdateProfileDto) {
-    await this.customers.updateProfile(actor.id, dto, loadEnv().DEFAULT_COUNTRY_CODE);
+    await this.customers.updateProfile(actor.id, dto);
     return this.customers.getOwnView(actor.id);
   }
 }
