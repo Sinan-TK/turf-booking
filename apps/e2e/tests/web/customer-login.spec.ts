@@ -21,6 +21,18 @@ test.describe('customer sign-in', () => {
     await expect(dialog.getByText('Send code')).toHaveCount(0);
   });
 
+  test('the account menu has a Profile option that opens the profile', async ({ page }) => {
+    await page.goto('/');
+    await logIn(page, uniquePhone(), 'PW Menu Person');
+    await page.getByRole('button', { name: 'Account menu' }).click();
+    const items = await page.getByRole('menuitem').allTextContents();
+    expect(items.slice(0, 3)).toEqual(['Profile', 'My bookings', 'Wallet (Coins)']);
+    await page.getByRole('menuitem', { name: 'Profile' }).click();
+    await expect(page).toHaveURL(/\/account#profile$/);
+    await expect(page.getByRole('heading', { name: 'Profile' })).toBeInViewport();
+    await expect(page.getByLabel('Name')).toHaveValue('PW Menu Person');
+  });
+
   test('logging out asks for confirmation first', async ({ page }) => {
     await page.goto('/');
     await logIn(page, uniquePhone(), 'PW Logout Person');

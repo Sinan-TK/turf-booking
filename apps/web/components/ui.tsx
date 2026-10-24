@@ -73,9 +73,9 @@ export function Icon({ name, className = '' }: { name: string; className?: strin
   const LucideIconComponent = ICON_MAP[name] || Activity;
   return <LucideIconComponent size="1em" className={`shrink-0 ${className}`} />;
 }
-export function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+export function Card({ children, className = '', id }: { children: React.ReactNode; className?: string; id?: string }) {
   return (
-    <div className={`rounded-lg border border-gray-200 bg-white p-5 shadow-sm ${className}`}>
+    <div id={id} className={`rounded-lg border border-gray-200 bg-white p-5 shadow-sm ${className}`}>
       {children}
     </div>
   );

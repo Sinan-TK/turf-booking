@@ -101,7 +101,7 @@ function Profile() {
   }
 
   return (
-    <Card className="mb-4">
+    <Card id="profile" className="mb-4 scroll-mt-4">
       <h2 className="mb-3 text-sm font-semibold text-gray-900">Profile</h2>
       <form onSubmit={onSave} noValidate className="space-y-3">
         {error && (
@@ -304,7 +304,7 @@ function Wallet() {
   }, [refresh]);
 
   return (
-    <Card>
+    <Card id="wallet" className="scroll-mt-4">
       <h2 className="mb-3 text-sm font-semibold text-gray-900">Coins wallet</h2>
       {error && <ErrorBanner message={error} />}
       {!error && !wallet && <LoadingState />}
