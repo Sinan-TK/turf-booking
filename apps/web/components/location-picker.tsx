@@ -5,6 +5,7 @@ import { nearestTown } from '@venue/shared/dist/location';
 import { api } from '@/lib/api';
 import { getPosition, type LocationChoice, type Town } from '@/lib/location';
 import { Icon, Select } from '@/components/ui';
+import { Skeleton } from '@/components/skeleton';
 
 interface Option {
   id: string;
@@ -207,7 +208,14 @@ export function LocationPicker({
             </button>
           )}
 
-          {towns === null && <p className="px-3.5 py-3 text-sm text-slate-400">Loading towns…</p>}
+          {towns === null && (
+            <div role="status" aria-busy="true" className="space-y-1 px-3.5 py-2">
+              <span className="sr-only">Loading towns…</span>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-9 w-full rounded-lg" />
+              ))}
+            </div>
+          )}
           {townsError && <p className="px-3.5 py-3 text-sm text-red-600">Couldn&apos;t load the towns. Choose All of {districtName || 'the district'}.</p>}
           {towns !== null && !townsError && towns.length === 0 && (
             <p className="px-3.5 py-3 text-sm text-slate-500">No towns are listed for {districtName || 'this district'} yet.</p>

@@ -9,6 +9,7 @@ import { useCustomer } from '@/lib/customer';
 import { formatCountdown, formatDay, formatTimeRange, useCountdown } from '@/lib/checkout';
 import type { RazorpayCheckoutOptions } from '@/lib/razorpay';
 import { Badge, Button, Card, ErrorBanner, Icon, LoadingState, SuccessBanner } from '@/components/ui';
+import { DetailSkeleton } from '@/components/skeleton';
 import { Screen } from '@/components/screen';
 import { CancellationTerms, useCancellationPreview } from '@/components/cancellation-terms';
 
@@ -226,7 +227,7 @@ export default function CheckoutPage() {
         Checkout
       </h1>
 
-      {(view === 'loading' || customerLoading) && <LoadingState message="Loading your booking…" />}
+      {(view === 'loading' || customerLoading) && <DetailSkeleton rows={7} />}
 
       {!customerLoading && view === 'login' && (
         <Card>

@@ -2,7 +2,8 @@
 
 import { useEffect } from 'react';
 import { useCustomer } from '@/lib/customer';
-import { Button, Card, LoadingState } from '@/components/ui';
+import { Button, Card } from '@/components/ui';
+import { AccountSkeleton } from '@/components/skeleton';
 
 /**
  * Renders its children only for a logged-in customer. Logged out, it opens
@@ -17,7 +18,7 @@ export function LoginGate({ children, message = 'Log in to continue.' }: { child
     if (!loading && !customer) requireLogin().catch(() => undefined);
   }, [loading, customer, requireLogin]);
 
-  if (loading) return <LoadingState />;
+  if (loading) return <AccountSkeleton />;
   if (!customer) {
     return (
       <Card>

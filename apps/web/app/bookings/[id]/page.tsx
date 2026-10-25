@@ -5,7 +5,8 @@ import { useParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
 import { LoginGate } from '@/components/login-gate';
-import { Badge, Button, Card, ErrorBanner, LoadingState, SuccessBanner } from '@/components/ui';
+import { Badge, Button, Card, ErrorBanner, SuccessBanner } from '@/components/ui';
+import { DetailSkeleton } from '@/components/skeleton';
 import { Screen } from '@/components/screen';
 import { CancellationTerms, useCancellationPreview } from '@/components/cancellation-terms';
 
@@ -75,7 +76,7 @@ function BookingDetail() {
   return (
     <>
       {error && <ErrorBanner message={error} />}
-      {!error && !booking && <LoadingState />}
+      {!error && !booking && <DetailSkeleton />}
       {booking && (
         <Card>
           {cancelResultMessage && (

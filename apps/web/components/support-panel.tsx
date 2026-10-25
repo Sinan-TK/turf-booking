@@ -12,11 +12,11 @@ import {
   FieldError,
   Input,
   Label,
-  LoadingState,
   Select,
   invalidClass,
 } from '@/components/ui';
 import { hasErrors, type FieldErrors } from '@/lib/validation';
+import { RowsSkeleton } from '@/components/skeleton';
 
 interface Ticket {
   id: string;
@@ -160,7 +160,7 @@ export function SupportPanel() {
       <Card>
         <h2 className="mb-3 text-sm font-semibold text-gray-900">Your requests</h2>
         {listError && <ErrorBanner message={listError} />}
-        {!listError && !tickets && <LoadingState />}
+        {!listError && !tickets && <RowsSkeleton label="Loading your requests…" />}
         {tickets && tickets.length === 0 && <p className="text-sm text-gray-500">No requests yet.</p>}
         {tickets && tickets.length > 0 && (
           <ul className="divide-y divide-gray-100 text-sm">

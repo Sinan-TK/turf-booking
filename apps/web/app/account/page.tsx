@@ -5,7 +5,8 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
 import { LoginGate } from '@/components/login-gate';
-import { Button, Card, ErrorBanner, FieldError, Icon, Input, Label, LoadingState, invalidClass } from '@/components/ui';
+import { Button, Card, ErrorBanner, FieldError, Icon, Input, Label, invalidClass } from '@/components/ui';
+import { AccountSkeleton, WalletSkeleton } from '@/components/skeleton';
 import { emailError, indianPhoneError, nameError, newPasswordError, newPasswordProblem, passwordError, passwordRules, passwordStrength } from '@/lib/validation';
 import { useDebounced } from '@/lib/use-debounced';
 import { PasswordInput } from '@/components/password-input';
@@ -488,7 +489,7 @@ function Wallet() {
     <Card>
       <h2 className="mb-3 text-sm font-semibold text-gray-900">Coins wallet</h2>
       {error && <ErrorBanner message={error} />}
-      {!error && !wallet && <LoadingState />}
+      {!error && !wallet && <WalletSkeleton />}
       {wallet && (
         <>
           <p className="text-3xl font-semibold text-gray-900">{wallet.cachedBalance}</p>
@@ -594,7 +595,7 @@ export default function AccountPage() {
         My account
       </h1>
       <LoginGate message="Log in to see your account.">
-        <Suspense fallback={<LoadingState />}>
+        <Suspense fallback={<AccountSkeleton />}>
           <AccountTabs />
         </Suspense>
       </LoginGate>

@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
-import { Badge, Card, ErrorBanner, LoadingState } from '@/components/ui';
+import { Badge, Card, ErrorBanner } from '@/components/ui';
+import { BookingRowsSkeleton } from '@/components/skeleton';
 
 interface Booking {
   id: string;
@@ -36,7 +37,7 @@ export function BookingsPanel() {
   return (
     <>
       {error && <ErrorBanner message={error} />}
-      {!error && !bookings && <LoadingState />}
+      {!error && !bookings && <BookingRowsSkeleton />}
       {!error && bookings && bookings.length === 0 && (
         <Card>
           <p className="mb-4 text-center text-sm text-gray-500">No bookings yet.</p>

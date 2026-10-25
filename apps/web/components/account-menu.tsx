@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useCustomer } from '@/lib/customer';
 import { ConfirmLogout } from '@/components/confirm-logout';
 import { Icon } from '@/components/ui';
+import { Skeleton } from '@/components/skeleton';
 
 const ITEMS = [
   { href: '/account?tab=profile', label: 'Profile', icon: 'person' },
@@ -38,7 +39,7 @@ export function AccountMenu() {
     };
   }, [open]);
 
-  if (loading) return <div className="h-9 w-9" aria-hidden="true" />;
+  if (loading) return <Skeleton className="h-10 w-10 rounded-xl" />;
 
   if (!customer) {
     return (

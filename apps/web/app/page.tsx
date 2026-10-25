@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { DISMISSED, useCustomer } from '@/lib/customer';
-import { ErrorBanner, Icon, LoadingState } from '@/components/ui';
+import { ErrorBanner, Icon } from '@/components/ui';
+import { SearchingBar, Skeleton, VenueCardsSkeleton } from '@/components/skeleton';
 import { AccountMenu } from '@/components/account-menu';
 import { useToast } from '@/components/toast';
 import { LocationPicker } from '@/components/location-picker';
@@ -248,6 +249,7 @@ export default function HomePage() {
 
   // Active venue types (Super-Admin managed) drive the filter chips.
   const [categories, setCategories] = useState<VenueCategory[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -257,7 +259,8 @@ export default function HomePage() {
     api
       .get<VenueCategory[]>('/categories?available=true')
       .then(setCategories)
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setCategoriesLoading(false));
   }, []);
 
   // Searches can overlap (the default place, then a chosen place, then another day) and finish in any order: only the
@@ -378,6 +381,12 @@ export default function HomePage() {
               </button>
             );
           })}
+          {categoriesLoading &&
+            [0, 1, 2, 3].map((i) => (
+              <div key={i} aria-hidden="true" className="flex-shrink-0 px-4 py-2.5">
+                <Skeleton className="h-4 w-24" />
+              </div>
+            ))}
         </div>
         {activeCategory && activeCategory.unitTypes.length > 0 && (
           <div className="flex items-center gap-2 overflow-x-auto py-2 scrollbar-hide">
@@ -421,7 +430,8 @@ export default function HomePage() {
 
       <main className="mx-auto w-full max-w-screen-xl flex-1 px-4 pb-24 sm:px-6 lg:px-8">
         {errorMessage && <div className="mb-4"><ErrorBanner message={errorMessage} /></div>}
-        {searching && <LoadingState message="Checking live availability…" />}
+        {/* The first search shows the shape of the results; a re-search keeps the old results and shows a slim bar. */}
+        {searching && (results.length === 0 ? <VenueCardsSkeleton /> : <SearchingBar />)}
         {!searching && searched && visibleResults.length === 0 && (
           <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-sm">
             {choice && choice.mode !== 'district' ? (
