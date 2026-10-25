@@ -10,6 +10,8 @@ export interface BookingTimeCheck {
   now?: Date;
   /** Owner walk-ins may be logged after the fact / far ahead. */
   skipLeadAndAdvance?: boolean;
+  /** The venue's own "book up to n days ahead" setting (today counts as the first day). */
+  advanceDays?: number;
 }
 
 /** Minutes between local midnight and `startTime` in the venue's zone, or
@@ -37,6 +39,15 @@ export function isStartAligned(policy: BookingPolicyValues, startTime: Date, tim
 }
 
 /**
+ * The last instant a booking may start when customers can book `days` days ahead: the end of the venue's local
+ * day number `days` counting today as the first (7 days = today and the next six). Counted on the venue's own
+ * calendar, not the server's, and not as "24 hours times n from now", so the last day is bookable all day long.
+ */
+export function lastBookableInstantMs(now: Date, timezone: string, days: number): number {
+  return DateTime.fromJSDate(now, { zone: timezone }).startOf('day').plus({ days }).toMillis() - 1;
+}
+
+/**
  * Backend enforcement of a resolved BookingPolicy. Used by both the
  * customer hold path and the owner walk-in path (search applies the same
  * predicates when generating slots, so the two can never disagree). Throws
@@ -61,6 +72,13 @@ export function assertPolicyAllowsBooking(policy: BookingPolicyValues, check: Bo
       policy.minLeadMinutes > 0
         ? `Bookings must be made at least ${policy.minLeadMinutes} minutes ahead`
         : 'startTime must be a valid future timestamp',
+    );
+  }
+  if (check.advanceDays !== undefined && check.startTime.getTime() > lastBookableInstantMs(now, check.timezone, check.advanceDays)) {
+    throw new BadRequestException(
+      check.advanceDays === 1
+        ? 'This venue can only be booked for today.'
+        : `This venue can be booked up to ${check.advanceDays} days ahead (today and the next ${check.advanceDays - 1} days).`,
     );
   }
   if (check.startTime.getTime() > now.getTime() + policy.maxAdvanceDays * 86_400_000) {

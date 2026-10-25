@@ -175,9 +175,12 @@ function googleMapsLink(venue: { googleMapsUrl?: string | null; lat?: number; ln
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${venue.name}, ${venue.address}`)}`;
 }
 
-/** Next 7 calendar days (today first), for the 1-tap date strip. */
-function next7Days(): Array<{ iso: string; weekday: string; day: string; month: string; isToday: boolean }> {
-  return Array.from({ length: 7 }, (_, i) => {
+const DEFAULT_DAY_COUNT = 7;
+const MOST_DAYS = 14;
+
+/** The next `count` calendar days (today first), for the 1-tap date strip. */
+function nextDays(count: number): Array<{ iso: string; weekday: string; day: string; month: string; isToday: boolean }> {
+  return Array.from({ length: count }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() + i);
     return {
@@ -257,6 +260,8 @@ export default function HomePage() {
   const [results, setResults] = useState<SearchResult[]>([]);
   // Cards come ten at a time: where the next ten start (null = that was all), and the state of fetching them.
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  // How many days to offer: the most any venue here allows booking ahead (7 until the first search says otherwise).
+  const [dayCount, setDayCount] = useState(DEFAULT_DAY_COUNT);
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -312,6 +317,12 @@ export default function HomePage() {
       setResults(page.data);
       setNextCursor(page.nextCursor);
       setSearched(true);
+      if (page.advanceDays) {
+        const count = Math.min(MOST_DAYS, Math.max(1, page.advanceDays));
+        setDayCount(count);
+        // A chosen day that is no longer on offer (a new place allows fewer days) falls back to today.
+        setForm((f) => (nextDays(count).some((d) => d.iso === f.date) ? f : { ...f, date: todayIso() }));
+      }
     } catch (err) {
       if (mine !== latestSearch.current) return;
       setErrorMessage(err instanceof ApiError ? err.message : 'Search failed.');
@@ -379,7 +390,7 @@ export default function HomePage() {
     }));
   }
 
-  const days = useMemo(() => next7Days(), []);
+  const days = useMemo(() => nextDays(dayCount), [dayCount]);
 
   const { title: locationTitle, subtitle: locationSubtitle } = headerLines(choice);
 

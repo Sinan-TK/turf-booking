@@ -40,6 +40,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export interface Page<T> {
   data: T;
   nextCursor: string | null;
+  /** For search: how many days the day picker should offer (the venues' "book up to n days ahead"). */
+  advanceDays: number | null;
 }
 
 async function requestPage<T>(path: string): Promise<Page<T>> {
@@ -50,7 +52,8 @@ async function requestPage<T>(path: string): Promise<Page<T>> {
     const message = said || res.statusText;
     throw new ApiError(res.status, message, body);
   }
-  return { data: body as T, nextCursor: res.headers.get('X-Next-Cursor') };
+  const advance = Number(res.headers.get('X-Advance-Days'));
+  return { data: body as T, nextCursor: res.headers.get('X-Next-Cursor'), advanceDays: Number.isInteger(advance) && advance > 0 ? advance : null };
 }
 
 export const api = {

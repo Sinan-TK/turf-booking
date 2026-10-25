@@ -9,6 +9,7 @@ import type { VenueCategory, VenueCategorySummary } from '@/lib/categories';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SvgIcon } from '@/components/svg-icons';
 import { VenueMapLink } from '@/components/venue-map-link';
+import { VenueAdvanceBooking } from '@/components/venue-advance-booking';
 import {
   Badge,
   Button,
@@ -30,6 +31,7 @@ interface Venue {
   description: string | null;
   address: string;
   googleMapsUrl: string | null;
+  advanceBookingDays: number;
   status: string;
   timezone: string;
   defaultSlotGranularityMinutes: number;
@@ -191,6 +193,8 @@ export default function VenueDetailPage() {
       </section>
 
       <VenueMapLink venueId={venue.id} link={venue.googleMapsUrl} onSaved={() => refetch()} />
+
+      <VenueAdvanceBooking venueId={venue.id} days={venue.advanceBookingDays} onSaved={() => refetch()} />
 
       <div className="grid grid-cols-2 gap-card-gap lg:grid-cols-4">
         <Stat label="Facilities" value={venue.facilities.length} />

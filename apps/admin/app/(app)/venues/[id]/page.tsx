@@ -22,6 +22,7 @@ import {
 import { hasErrors, textError, type FieldErrors } from '@/lib/validation';
 import { VenueTermsSection } from '@/components/venue-terms-section';
 import { VenueMapLink } from '@/components/venue-map-link';
+import { VenueAdvanceBooking } from '@/components/venue-advance-booking';
 
 interface Venue {
   id: string;
@@ -30,6 +31,7 @@ interface Venue {
   description: string | null;
   address: string;
   googleMapsUrl: string | null;
+  advanceBookingDays: number;
   status: string;
   timezone: string;
   organizationId: string;
@@ -473,6 +475,12 @@ export default function VenueDetailPage() {
       </Card>
 
       <VenueMapLink venueId={venue.id} link={venue.googleMapsUrl} onSaved={(googleMapsUrl) => mutate((v) => (v ? { ...v, googleMapsUrl } : v))} />
+
+      <VenueAdvanceBooking
+        venueId={venue.id}
+        days={venue.advanceBookingDays}
+        onSaved={(advanceBookingDays) => mutate((v) => (v ? { ...v, advanceBookingDays } : v))}
+      />
 
       <VenueTermsSection venueId={id} />
     </div>

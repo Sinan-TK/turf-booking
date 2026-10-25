@@ -431,6 +431,8 @@ model Venue {
   cancellationPolicyId      String?  @unique @db.Uuid
   cancellationPolicy        CancellationPolicy? @relation(fields: [cancellationPolicyId], references: [id])
   defaultSlotGranularityMinutes Int  @default(60)
+  /// How many days customers can book ahead: today and the next (n - 1) days. The owner sets it, 1 to 14.
+  advanceBookingDays        Int      @default(7)
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
   deletedAt                 DateTime?

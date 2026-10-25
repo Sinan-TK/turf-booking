@@ -170,6 +170,7 @@ export class BookingsService {
       startTime,
       durationMinutes: dto.durationMinutes,
       timezone: venue.timezone,
+      advanceDays: venue.advanceBookingDays,
     });
     if (
       !(await this.schedule.isWithinOpeningHours(
@@ -311,6 +312,7 @@ export class BookingsService {
       startTime,
       durationMinutes: dto.durationMinutes,
       timezone: venue.timezone,
+      advanceDays: venue.advanceBookingDays,
     });
     if (
       !(await this.schedule.isWithinOpeningHours(

@@ -8,15 +8,18 @@ import { CommercialTermsService } from '../commercial/commercial-terms.service';
 import { ResourcesService } from '../resources/resources.service';
 import { PolicyResolverService, type ResolvedPolicy } from '../scheduling/policy-resolver.service';
 import { ScheduleService, type OpenWindow } from '../scheduling/schedule.service';
-import { isDurationAllowed } from '../scheduling/policy-validation';
+import { isDurationAllowed, lastBookableInstantMs } from '../scheduling/policy-validation';
 import { allowedDurations } from '../common/booking-policy.defaults';
 import { pLimit } from '../common/concurrency';
 import { AVAILABILITY_REPOSITORY, type AvailabilityRepository } from './availability.repository';
 
 /** The response header that carries the cursor for the next page of search results. */
 export const NEXT_CURSOR_HEADER = 'X-Next-Cursor';
+/** How many days the day picker should offer: the largest "book up to n days ahead" of the venues in the search. */
+export const ADVANCE_DAYS_HEADER = 'X-Advance-Days';
 
 /** Venues worked on side by side, and the most database reads in flight at once for one search. */
+const DEFAULT_ADVANCE_DAYS = 7;
 const VENUE_CHUNK = 3;
 const LOAD_CONCURRENCY = 8;
 
@@ -131,14 +134,16 @@ export class AvailabilityService {
    * overlap or skip. The slow part is the database: each card needs a handful of reads, so those run side by
    * side (a few venues at a time, at most LOAD_CONCURRENCY reads in flight) instead of one after another.
    */
-  async searchPage(params: SearchParams): Promise<{ results: SearchResult[]; nextCursor: string | null }> {
+  async searchPage(params: SearchParams): Promise<{ results: SearchResult[]; nextCursor: string | null; advanceDays: number }> {
     let categoryId = params.categoryId;
     if (!categoryId && params.categorySlug) {
       categoryId = (await this.availability.findCategoryIdBySlug(params.categorySlug)) ?? undefined;
-      if (!categoryId) return { results: [], nextCursor: null };
+      if (!categoryId) return { results: [], nextCursor: null, advanceDays: DEFAULT_ADVANCE_DAYS };
     }
 
     const candidates = await this.resolveCandidateVenues(params);
+    // The day picker offers as many days as the venue that takes bookings furthest ahead (the text filter does not shrink it).
+    const advanceDays = candidates.reduce((most, v) => Math.max(most, v.advanceBookingDays), 0) || DEFAULT_ADVANCE_DAYS;
     const needle = params.q?.trim().toLowerCase();
     // The text filter keeps venues whose name or address contains it, and venues with a unit of that sub-type
     // (the units themselves are narrowed again in resultsForVenue). Done here so a page never wades through
@@ -148,7 +153,7 @@ export class AvailabilityService {
       const withSubType = new Set(await this.availability.findVenueIdsByGroundType(needle));
       venues = candidates.filter((v) => v.name.toLowerCase().includes(needle) || v.address.toLowerCase().includes(needle) || withSubType.has(v.id));
     }
-    if (venues.length === 0) return { results: [], nextCursor: null };
+    if (venues.length === 0) return { results: [], nextCursor: null, advanceDays };
 
     const [startVenue, startUnit] = params.cursor ? params.cursor.split('.').map(Number) : [0, 0];
     const now = new Date();
@@ -181,7 +186,7 @@ export class AvailabilityService {
       firstUnit = 0;
     }
     if (!next && v < venues.length) next = { venue: v, unit: 0 };
-    return { results, nextCursor: next ? `${next.venue}.${next.unit}` : null };
+    return { results, nextCursor: next ? `${next.venue}.${next.unit}` : null, advanceDays };
   }
 
   /** The cards one venue contributes, each tagged with its position among the venue's units (for the cursor). */
@@ -253,6 +258,7 @@ export class AvailabilityService {
         openWindows,
         timezone: venue.timezone,
         now,
+        advanceDays: venue.advanceBookingDays,
       }),
     );
     if (startTimes.length === 0) return null;
@@ -401,6 +407,8 @@ export class AvailabilityService {
     openWindows: OpenWindow[] | null;
     timezone: string;
     now: Date;
+    /** The venue's own "book up to n days ahead", counted on its calendar (today is day one). */
+    advanceDays: number;
   }): Promise<Date[]> {
     const { policy, durationMinutes, windowStart, windowEnd, openWindows, timezone, now } = args;
     const durationMs = durationMinutes * MINUTE_MS;
@@ -424,7 +432,8 @@ export class AvailabilityService {
     if (bounds.length === 0) return [];
 
     const earliestStart = now.getTime() + policy.minLeadMinutes * MINUTE_MS;
-    const latestStart = now.getTime() + policy.maxAdvanceDays * 86_400_000;
+    // The nearer of the facility's general limit and the venue's own "book up to n days ahead".
+    const latestStart = Math.min(now.getTime() + policy.maxAdvanceDays * 86_400_000, lastBookableInstantMs(now, timezone, args.advanceDays));
 
     const rangeStart = new Date(Math.min(...bounds.map((b) => b.from.getTime())));
     const rangeEnd = new Date(Math.max(...bounds.map((b) => b.to.getTime())));
