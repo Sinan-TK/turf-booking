@@ -40,12 +40,16 @@ test.describe('customer site: finding a venue', () => {
     await expect(card.getByRole('heading', { name: remoteVenue.name })).toHaveCount(1);
     await expect(card.getByRole('link', { name: 'Directions' })).toHaveCount(1);
     await expect(card).toContainText('2 options');
-    await expect(card.getByRole('region')).toHaveCount(2);
+    // One unit is shown at a time; the others are a tab away.
+    await expect(card.getByRole('tab')).toHaveCount(2);
+    await expect(card.getByRole('region')).toHaveCount(1);
     await expect(turf).toHaveCount(1);
-    await expect(court).toHaveCount(1);
+    await expect(court).toHaveCount(0);
     await expect(turf).toContainText('5S');
-    await expect(court).not.toContainText('5S'); // a unit with no sub-type shows none
     await expect(card.getByRole('link', { name: 'Directions' })).toBeVisible();
+    // Only the next few open times show at first; "All N slots" lists every one.
+    await expect(turf.getByRole('button', { name: /^[0-9]+:[0-9]{2} (AM|PM) ₹/ })).toHaveCount(3);
+    await turf.getByRole('button', { name: /^All [0-9]+ slots$/ }).click();
 
     // The turf is priced 6 AM-10 PM (Mon-Fri 800, Sat-Sun 1000); the court is priced all day at 300.
     const turfPrice = weekend ? '₹1000' : '₹800';
@@ -53,6 +57,12 @@ test.describe('customer site: finding a venue', () => {
     await expect(turf.getByRole('button', { name: new RegExp(`^9:00 PM ${turfPrice}`) })).toBeVisible();
     await expect(turf.getByRole('button', { name: /^5:00 AM/ })).toHaveCount(0); // before the first priced hour
     await expect(turf.getByRole('button', { name: /^10:00 PM/ })).toHaveCount(0); // a 1-hour slot would end after 10 PM
+
+    await card.getByRole('tab', { name: /^Court 1/ }).click();
+    await expect(turf).toHaveCount(0);
+    await expect(court).toHaveCount(1);
+    await expect(court).not.toContainText('5S'); // a unit with no sub-type shows none
+    await court.getByRole('button', { name: /^All [0-9]+ slots$/ }).click();
     await expect(court.getByRole('button', { name: /^12:00 AM ₹300/ })).toBeVisible();
     await expect(court.getByRole('button', { name: /^11:00 PM ₹300/ })).toBeVisible();
   });
@@ -83,7 +93,7 @@ test.describe('customer site: finding a venue', () => {
     await chips.getByRole('button', { name: 'All', exact: true }).click();
     await settled(page);
     await expect(turf).toHaveCount(1);
-    await expect(court).toHaveCount(1);
+    await expect(page.getByRole('tab', { name: /^Court 1/ })).toHaveCount(1);
   });
 
   test('the search box narrows by venue name', async ({ page, context, remoteVenue }) => {

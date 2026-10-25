@@ -11,7 +11,7 @@ import { AccountMenu } from '@/components/account-menu';
 import { useToast } from '@/components/toast';
 import { LocationPicker } from '@/components/location-picker';
 import { headerLines, locationParams, useLocationChoice } from '@/lib/location';
-import { durationLabel, shortDuration, type VenueCategory } from '@/lib/categories';
+import { durationLabel, type VenueCategory } from '@/lib/categories';
 
 interface SearchResult {
   venue: { id: string; name: string; facilityCode: string; address: string; photoUrl: string | null; lat: number; lng: number; googleMapsUrl?: string | null };
@@ -519,7 +519,7 @@ export default function HomePage() {
             )}
           </div>
         )}
-        <div className="flex flex-col gap-3 sm:gap-5">
+        <div className="grid grid-cols-1 items-start gap-3 sm:gap-5 xl:grid-cols-2">
           {groupByVenue(visibleResults).map((group) => (
             <VenueGroupCard
               key={group.venue.id}
@@ -850,8 +850,8 @@ function groupByVenue(results: SearchResult[]): Array<{ venue: SearchResult['ven
 }
 
 /**
- * One card per venue, with each of its units (two turfs, a turf and a court...) listed inside it, each with its
- * own price, timeline and slots. The venue's name, address and Directions are shown once, at the top.
+ * One compact card per venue. The venue's name, address and Directions are shown once at the top; below them one
+ * unit (turf, court...) is shown at a time, picked from a row of tabs that swipes sideways when there are many.
  */
 function VenueGroupCard({
   venue,
@@ -863,6 +863,10 @@ function VenueGroupCard({
   units: SearchResult[];
   liveFor: (r: SearchResult) => SearchResult;
 } & Omit<UnitCardProps, 'result' | 'liveResult'>) {
+  const [pickedId, setPickedId] = useState(units[0]!.resource.id);
+  // A re-search can drop the picked unit (a filter, a new day): fall back to the first one.
+  const unit = units.find((u) => u.resource.id === pickedId) ?? units[0]!;
+
   // The icon is the facility's when the venue offers one kind of unit, a generic one when it mixes them.
   const iconKeys = new Set(units.map((u) => u.category?.iconKey ?? 'category'));
   const icon = iconKeys.size === 1 ? [...iconKeys][0]! : 'category';
@@ -873,53 +877,65 @@ function VenueGroupCard({
       aria-label={venue.name}
       className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-card transition-all duration-300 hover:border-emerald-500/40 sm:shadow-sm sm:hover:shadow-lg"
     >
-      <header className="flex items-start justify-between gap-3 border-b border-slate-100 bg-white p-4 sm:p-5">
-        <div className="flex min-w-0 items-start gap-3.5">
-          <div className="relative shrink-0">
-            <div className="flex h-14 w-14 items-center justify-center rounded-xl border-2 border-emerald-500/30 bg-slate-50 text-emerald-600 shadow-sm">
-              <Icon name={icon} className="text-[1.75rem]" />
-            </div>
-            <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-white bg-emerald-500">
-              <svg className="h-2 w-2 text-white" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-            </span>
+      <header className="flex items-start gap-3 p-4">
+        <div className="relative shrink-0">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl border-2 border-emerald-500/30 bg-slate-50 text-emerald-600 shadow-sm">
+            <Icon name={icon} className="text-[1.5rem]" />
           </div>
-          <div className="min-w-0">
-            <h2 className="truncate text-base font-black leading-snug tracking-tight text-slate-900 sm:text-xl sm:font-bold">{venue.name}</h2>
-            <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
-              <Icon name="location_on" className="shrink-0 text-[0.875rem] text-brand-600" />
-              <span className="truncate">{venue.address}</span>
-            </p>
-            <div className="mt-1.5 flex flex-wrap items-center gap-2">
-              <a
-                href={googleMapsLink(venue)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-50 px-2.5 py-1 text-[0.6875rem] font-bold text-emerald-700 transition hover:bg-emerald-100 active:scale-95"
-              >
-                <Icon name="location_on" className="text-[0.875rem]" />
-                Directions
-              </a>
-              <span className="text-[0.6875rem] font-semibold text-slate-400">
-                {units.length} {units.length === 1 ? 'option' : 'options'} · {openSlots} slot{openSlots === 1 ? '' : 's'} open
-              </span>
-            </div>
+          <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-white bg-emerald-500">
+            <svg className="h-2 w-2 text-white" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+          </span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <h2 className="truncate text-base font-black leading-snug tracking-tight text-slate-900 sm:text-lg sm:font-bold">{venue.name}</h2>
+            <a
+              href={googleMapsLink(venue)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-50 px-2.5 py-1 text-[0.6875rem] font-bold text-emerald-700 transition hover:bg-emerald-100 active:scale-95"
+            >
+              <Icon name="location_on" className="text-[0.875rem]" />
+              Directions
+            </a>
           </div>
+          <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+            <Icon name="location_on" className="shrink-0 text-[0.875rem] text-brand-600" />
+            <span className="truncate">{venue.address}</span>
+          </p>
+          <p className="mt-1 text-[0.6875rem] font-semibold text-slate-400">
+            {units.length} {units.length === 1 ? 'option' : 'options'} · {openSlots} slot{openSlots === 1 ? '' : 's'} open
+          </p>
         </div>
       </header>
 
-      <div className="divide-y divide-slate-100">
-        {units.map((unit) => {
-          const props = { ...unitProps, result: unit, liveResult: liveFor(unit) };
-          return (
-            <section key={unit.resource.id} aria-label={`${venue.name}, ${unit.resource.name}`}>
-              <MobileUnit {...props} />
-              <DesktopUnit {...props} />
-            </section>
-          );
-        })}
-      </div>
+      {units.length > 1 && (
+        <div role="tablist" aria-label={`${venue.name} options`} className="scrollbar-hide flex gap-2 overflow-x-auto px-4 pb-3">
+          {units.map((u) => {
+            const on = u.resource.id === unit.resource.id;
+            return (
+              <button
+                key={u.resource.id}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                onClick={() => setPickedId(u.resource.id)}
+                className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition active:scale-95 ${on ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-emerald-400'}`}
+              >
+                <Icon name={u.category?.iconKey ?? 'category'} className="text-[0.9375rem]" />
+                {u.resource.name}
+                {u.price && <span className={on ? 'text-emerald-100' : 'text-emerald-700'}>{formatPrice(u.price)}</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <section aria-label={`${venue.name}, ${unit.resource.name}`} className="border-t border-slate-100">
+        <UnitPanel {...unitProps} key={unit.resource.id} result={unit} liveResult={liveFor(unit)} />
+      </section>
     </article>
   );
 }
@@ -933,232 +949,125 @@ function UnitIcon({ r, className = '' }: { r: SearchResult; className?: string }
   );
 }
 
-/** Phone layout of one unit inside its venue's card: name and price, then the day timeline and Book. */
-function MobileUnit({ result: r, liveResult, durationMinutes, dateIso, reloading, onDurationChange }: UnitCardProps) {
-  const hasSlots = r.availableStartTimes.length > 0;
-  const [slotModalOpen, setSlotModalOpen] = useState(false);
-  const timeline = useMemo(() => buildTimeline(r), [r]);
+/** How many open times show straight away; the rest are behind "All slots". */
+const NEXT_SLOTS = 3;
 
-  return (
-    <>
-      <div className="flex flex-col gap-3 px-4 pt-4 sm:hidden">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <UnitIcon r={r} className="h-10 w-10" />
-            <div className="min-w-0">
-              <h3 className="truncate text-sm font-extrabold text-slate-900">{r.resource.name}</h3>
-              {r.resource.groundType && (
-                <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[0.625rem] font-bold uppercase tracking-wider text-emerald-800">
-                  {r.resource.groundType}
-                </span>
-              )}
-            </div>
-          </div>
-          {r.price && (
-            <div className="shrink-0 rounded-xl border border-emerald-500/20 bg-emerald-50 px-2.5 py-1 text-right">
-              <span className="block text-[0.5625rem] font-bold uppercase leading-none text-emerald-700">From</span>
-              <div className="mt-0.5 flex items-baseline justify-end leading-tight text-venue-primary">
-                {r.price.normalAmount && (
-                  <s className="mr-1 text-[0.6875rem] font-medium text-slate-400">{formatPrice({ amount: r.price.normalAmount, currency: r.price.currency })}</s>
-                )}
-                <span className="text-base font-black tracking-tight">{formatPrice(r.price)}</span>
-                <span className="ml-0.5 text-[0.625rem] font-medium text-slate-500">/{shortDuration(durationMinutes)}</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="-mx-4 border-t border-emerald-500/20">
-          <div className="flex flex-col gap-2 bg-emerald-50/50 p-4">
-            <div className="flex items-center justify-between text-[0.625rem]">
-              <span className="text-[0.625rem] font-extrabold uppercase tracking-wider text-slate-800">DAY TIMELINE OCCUPANCY</span>
-              <div className="flex flex-wrap items-center gap-2 text-[0.5625rem] font-medium text-slate-500">
-                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-emerald-500" /> Available</span>
-                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-slate-300" /> Booked</span>
-              </div>
-            </div>
-            <div className="flex w-full items-center gap-1">
-              {timeline.hours.map((h) =>
-                timeline.available.has(h) ? (
-                  <div key={h} title={`${hourLabel(h)} - Available`} className="h-2 flex-1 rounded-sm bg-emerald-500 shadow-sm" />
-                ) : (
-                  <div key={h} title={`${hourLabel(h)} - Booked`} className="h-2 flex-1 rounded-sm bg-slate-200" />
-                ),
-              )}
-            </div>
-            <div className="flex items-center justify-between px-0.5 text-[0.5625rem] font-bold text-slate-400">
-              <span>{timeline.labels[0]}</span>
-              <span>{timeline.labels[1]}</span>
-              <span>{timeline.labels[2]}</span>
-            </div>
-            <div className="mt-1 flex items-center justify-between gap-2 border-t border-emerald-500/20 pt-2">
-              <button
-                type="button"
-                onClick={() => hasSlots && setSlotModalOpen(true)}
-                disabled={!hasSlots}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-extrabold text-white shadow-sm transition active:scale-95 ${hasSlots ? 'bg-emerald-600 hover:bg-emerald-700' : 'cursor-not-allowed bg-slate-400'}`}
-              >
-                <Icon name="bolt" className="text-[0.875rem]" />
-                <span>{hasSlots ? `Book Now · ${r.availableStartTimes.length} slots` : 'No Slots Today'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-      {slotModalOpen && (
-        <SlotBookingModal
-          result={liveResult}
-          durationMinutes={durationMinutes}
-          dateIso={dateIso}
-          reloading={reloading}
-          onDurationChange={onDurationChange}
-          onClose={() => setSlotModalOpen(false)}
-        />
-      )}
-    </>
-  );
-}
-
-/** Desktop layout of one unit inside its venue's card: name, price and Book Now on the left; timeline and slots on the right. */
-function DesktopUnit({ result: r, liveResult, durationMinutes, dateIso, reloading, onDurationChange }: UnitCardProps) {
-  const hasSlots = r.availableStartTimes.length > 0;
-  const [slotModalOpen, setSlotModalOpen] = useState(false);
+/**
+ * One unit inside its venue's card: its name, sub-type and price, a thin day timeline, the next few open times
+ * (one tap books), and a button that lists every slot. "Book Now" opens the full booking window (duration etc.).
+ */
+function UnitPanel({ result: r, liveResult, durationMinutes, dateIso, reloading, onDurationChange }: UnitCardProps) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const { bookSlot, busyStart, error: bookError } = useBookSlot(r.resource.id, durationMinutes);
+  const timeline = useMemo(() => buildTimeline(r), [r]);
+  const times = r.availableStartTimes;
+  const shown = showAll ? times : times.slice(0, NEXT_SLOTS);
 
   return (
-    <>
-      <div className="hidden grid-cols-1 sm:grid lg:grid-cols-12 lg:divide-x lg:divide-slate-100">
-        {/* Left: the unit */}
-        <div className="flex flex-col justify-between p-5 sm:p-6 lg:col-span-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3.5">
-              <UnitIcon r={r} className="h-12 w-12" />
-              <div className="min-w-0">
-                <h3 className="text-lg font-bold leading-snug text-slate-900">{r.resource.name}</h3>
-                {r.resource.groundType && (
-                  <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[0.625rem] font-bold text-slate-600">
-                    {r.resource.groundType}
-                  </span>
-                )}
-              </div>
-            </div>
-            {r.price && (
-              <div className="flex shrink-0 flex-col items-end">
-                <span className="text-[0.6875rem] font-semibold text-slate-400">{durationLabel(durationMinutes)} rate</span>
-                {r.price.normalAmount && (
-                  <s className="text-xs font-medium text-slate-400">{formatPrice({ amount: r.price.normalAmount, currency: r.price.currency })}</s>
-                )}
-                <span className="text-2xl font-black text-emerald-700">{formatPrice(r.price)}</span>
-                {payNowLabel(r.price) && <span className="text-[0.6875rem] font-semibold text-emerald-700">{payNowLabel(r.price)}</span>}
-              </div>
+    <div className="flex flex-col gap-3 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <UnitIcon r={r} className="h-10 w-10" />
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-extrabold text-slate-900 sm:text-base">{r.resource.name}</h3>
+            {r.resource.groundType && (
+              <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[0.625rem] font-bold uppercase tracking-wider text-emerald-800">
+                {r.resource.groundType}
+              </span>
             )}
           </div>
-
-          {hasSlots && (
-            <div className="mt-5 border-t border-slate-100 pt-3.5">
-              <button
-                type="button"
-                onClick={() => setSlotModalOpen(true)}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-2.5 text-xs font-bold text-white shadow-md transition-all hover:-translate-y-0.5 hover:from-emerald-500 hover:to-emerald-600 active:scale-95"
-              >
-                <Icon name="bolt" className="text-[1.125rem]" />
-                Book Now · {r.availableStartTimes.length} slot{r.availableStartTimes.length === 1 ? '' : 's'} open
-              </button>
-            </div>
-          )}
         </div>
-
-        {/* Right: timeline + slot grid */}
-        <div className="flex flex-col justify-between bg-slate-50/60 p-5 sm:p-6 lg:col-span-7">
-          <div>
-            <DayTimeline result={r} />
-
-            <div className="mb-2 mt-3.5 flex items-center justify-between">
-              <span className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-700">
-                <Icon name="schedule" className="text-[1rem]" />
-                Tap Slot to Instant Book
-              </span>
-              <span className="text-[0.6875rem] font-semibold text-emerald-700">
-                {r.availableStartTimes.length} slot{r.availableStartTimes.length === 1 ? '' : 's'} open
-              </span>
-            </div>
-
-            {r.availableStartTimes.length === 0 ? (
-              <p className="rounded-xl border border-slate-200 bg-white p-3 text-center text-xs text-slate-500">
-                No open slots for this duration on this day.
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
-                {r.availableStartTimes.map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    disabled={busyStart !== null}
-                    onClick={() => bookSlot(t)}
-                    className="group flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/60 p-2.5 shadow-sm transition-all hover:border-emerald-600 hover:bg-emerald-600 hover:text-white disabled:cursor-wait disabled:opacity-60"
-                  >
-                    <span className="flex flex-col text-left">
-                      <span className="text-xs font-extrabold text-slate-900 group-hover:text-white">{formatStart(t, r.timezone)}</span>
-                      {priceAt(r, t) && (
-                        <span className="text-[0.625rem] font-bold text-emerald-700 group-hover:text-emerald-100">{formatPrice(priceAt(r, t)!)}</span>
-                      )}
-                    </span>
-                    <span className="flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 text-[0.625rem] font-extrabold uppercase text-white group-hover:bg-white group-hover:text-emerald-900">
-                      {busyStart === t ? 'Holding…' : 'Book'}
-                    </span>
-                  </button>
-                ))}
-              </div>
+        {r.price && (
+          <div className="shrink-0 text-right leading-tight">
+            <span className="block text-[0.5625rem] font-bold uppercase text-slate-400">{durationLabel(durationMinutes)} rate</span>
+            {r.price.normalAmount && (
+              <s className="mr-1 text-[0.6875rem] font-medium text-slate-400">{formatPrice({ amount: r.price.normalAmount, currency: r.price.currency })}</s>
             )}
-            {bookError && (
-              <div role="alert" className="mt-2">
-                <ErrorBanner message={bookError} />
-              </div>
-            )}
+            <span className="text-lg font-black text-emerald-700">{formatPrice(r.price)}</span>
+            {payNowLabel(r.price) && <span className="block text-[0.625rem] font-semibold text-emerald-700">{payNowLabel(r.price)}</span>}
           </div>
+        )}
+      </div>
+
+      <div>
+        <div className="flex w-full items-center gap-0.5" aria-hidden="true">
+          {timeline.hours.map((h) => (
+            <div
+              key={h}
+              title={`${hourLabel(h)} - ${timeline.available.has(h) ? 'Available' : 'Booked'}`}
+              className={`h-1.5 flex-1 rounded-sm ${timeline.available.has(h) ? 'bg-emerald-500' : 'bg-slate-200'}`}
+            />
+          ))}
+        </div>
+        <div className="flex justify-between pt-1 text-[0.5625rem] font-bold text-slate-400" aria-hidden="true">
+          <span>{timeline.labels[0]}</span>
+          <span>{timeline.labels[1]}</span>
+          <span>{timeline.labels[2]}</span>
         </div>
       </div>
-      {slotModalOpen && (
+
+      {times.length === 0 ? (
+        <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center text-xs text-slate-500">No open slots for this duration on this day.</p>
+      ) : (
+        <>
+          <div className="flex items-center justify-between text-[0.6875rem] font-bold uppercase tracking-wider text-slate-600">
+            <span>{showAll ? 'All open times' : 'Next open'}</span>
+            <span className="normal-case tracking-normal text-emerald-700">
+              {times.length} slot{times.length === 1 ? '' : 's'} open
+            </span>
+          </div>
+          <div className={showAll ? 'grid grid-cols-3 gap-2 sm:grid-cols-4' : 'grid grid-cols-3 gap-2'}>
+            {shown.map((t) => (
+              <button
+                key={t}
+                type="button"
+                disabled={busyStart !== null}
+                onClick={() => bookSlot(t)}
+                className="group flex flex-col items-center rounded-xl border border-emerald-200 bg-emerald-50/60 px-2 py-2 text-center shadow-sm transition hover:border-emerald-600 hover:bg-emerald-600 hover:text-white active:scale-95 disabled:cursor-wait disabled:opacity-60"
+              >
+                <span className="text-xs font-extrabold">{busyStart === t ? 'Holding…' : formatStart(t, r.timezone)}</span>
+                {priceAt(r, t) && <span className="text-[0.625rem] font-bold text-emerald-700 group-hover:text-emerald-100">{formatPrice(priceAt(r, t)!)}</span>}
+              </button>
+            ))}
+          </div>
+          {bookError && (
+            <div role="alert">
+              <ErrorBanner message={bookError} />
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            {times.length > NEXT_SLOTS && (
+              <button
+                type="button"
+                aria-expanded={showAll}
+                onClick={() => setShowAll((v) => !v)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-emerald-400 active:scale-95"
+              >
+                {showAll ? 'Show fewer' : `All ${times.length} slots`}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-extrabold text-white shadow-sm transition hover:bg-emerald-700 active:scale-95"
+            >
+              <Icon name="bolt" className="text-[0.875rem]" />
+              Book Now
+            </button>
+          </div>
+        </>
+      )}
+      {modalOpen && (
         <SlotBookingModal
           result={liveResult}
           durationMinutes={durationMinutes}
           dateIso={dateIso}
           reloading={reloading}
           onDurationChange={onDurationChange}
-          onClose={() => setSlotModalOpen(false)}
+          onClose={() => setModalOpen(false)}
         />
       )}
-    </>
-  );
-}
-
-function DayTimeline({ result: r }: { result: SearchResult }) {
-  const timeline = useMemo(() => buildTimeline(r), [r]);
-
-  return (
-    <div className="mb-3.5 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="mb-1.5 flex items-center gap-1.5">
-        <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-        </span>
-        <span className="text-[0.6875rem] font-bold uppercase tracking-wide text-slate-800">Day Timeline</span>
-      </div>
-      <div className="flex h-4 gap-0.5 overflow-hidden rounded-lg border border-slate-200 bg-slate-100 p-0.5">
-        {timeline.hours.map((h) => {
-          const t = timeline.available.has(h);
-          return t ? (
-            <span key={h} className="flex-1 rounded-sm bg-emerald-500" title={`${hourLabel(h)} — available`} />
-          ) : (
-            <span key={h} className="flex-1 rounded-sm bg-slate-300" title={`${hourLabel(h)} — unavailable`} />
-          );
-        })}
-      </div>
-      <div className="flex justify-between pt-1 text-[0.5625rem] font-semibold text-slate-400">
-        <span>{timeline.labels[0]}</span>
-            <span>{timeline.labels[1]}</span>
-            <span>{timeline.labels[2]}</span>
-      </div>
     </div>
   );
 }

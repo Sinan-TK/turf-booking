@@ -27,7 +27,7 @@ test.describe('customer site: results load ten at a time', () => {
 
     const cards = page.getByRole('heading', { name: /^PW Venue / });
     await expect(cards).toHaveCount(10); // the first page: ten venue cards, not all twelve
-    await expect(page.getByRole('region')).toHaveCount(20); // each with its two units inside
+    await expect(page.getByRole('region')).toHaveCount(10); // each showing one of its two units (the other is one tab away)
     await expect(page.getByText('That is every venue for this search.')).toHaveCount(0);
 
     // Scrolling to the end brings the next ones, behind a loading animation.
@@ -65,6 +65,6 @@ test.describe('customer site: results load ten at a time', () => {
     await page.getByPlaceholder('Search venues, names or areas...').fill(last.name);
     await expect(page.getByRole('heading', { name: last.name })).toBeVisible(); // found although it was not among the first ten
     await expect(page.getByRole('heading', { name: /^PW Venue / })).toHaveCount(1); // one card for it
-    await expect(page.getByRole('region')).toHaveCount(2); // with its two units inside
+    await expect(page.getByRole('region')).toHaveCount(1); // showing one of its two units
   });
 });
