@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
+import { useDebounced } from '@/lib/use-debounced';
 import { DISMISSED, useCustomer } from '@/lib/customer';
 import { ErrorBanner, Icon } from '@/components/ui';
 import { SearchingBar, Skeleton, VenueCardsSkeleton } from '@/components/skeleton';
@@ -245,7 +246,8 @@ export default function HomePage() {
   });
 
   const [nameFilter, setNameFilter] = useState('');
-  const [sortBy] = useState<'price' | 'distance'>('price');
+  // The text filter is applied by the server (so it covers venues not loaded yet), once typing pauses.
+  const searchText = useDebounced(nameFilter.trim(), 350);
 
   // Active venue types (Super-Admin managed) drive the filter chips.
   const [categories, setCategories] = useState<VenueCategory[]>([]);
@@ -253,6 +255,10 @@ export default function HomePage() {
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
+  // Cards come ten at a time: where the next ten start (null = that was all), and the state of fetching them.
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreError, setMoreError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -266,26 +272,45 @@ export default function HomePage() {
   // Searches can overlap (the default place, then a chosen place, then another day) and finish in any order: only the
   // newest one may put its answer on the page, so a slow old search can never overwrite a newer one.
   const latestSearch = useRef(0);
+  const PAGE_SIZE = 10;
+  // Changing a card's duration re-searches; the cards already loaded stay (so the open card doesn't vanish).
+  const keepLoaded = useRef(false);
+  const loadedCount = useRef(0);
+  loadedCount.current = results.length;
 
-  const runSearch = useCallback(async () => {
-    if (!choice) return;
-    const mine = ++latestSearch.current;
-    setSearching(true);
-    setErrorMessage(null);
-    try {
+  const searchPath = useCallback(
+    (cursor?: string) => {
       const params = new URLSearchParams({
         date: form.date,
         timeWindow: form.timeWindow,
         durationMinutes: String(form.durationMinutes),
-        ...locationParams(choice),
+        limit: String(!cursor && keepLoaded.current ? Math.min(50, Math.max(PAGE_SIZE, loadedCount.current)) : PAGE_SIZE),
+        ...locationParams(choice!),
       });
-      // Both filters are optional: no category = every venue type, no
-      // sub-type = every kind of unit. The API owns the filtering.
+      // Both filters are optional: no category = every venue type, no sub-type = every kind of unit. The API owns the filtering.
       if (form.categorySlug) params.set('categorySlug', form.categorySlug);
       if (form.groundType) params.set('groundType', form.groundType);
-      const data = await api.get<SearchResult[]>(`/search?${params.toString()}`);
+      if (searchText) params.set('q', searchText);
+      if (cursor) params.set('cursor', cursor);
+      return `/search?${params.toString()}`;
+    },
+    [choice, form.categorySlug, form.groundType, form.date, form.timeWindow, form.durationMinutes, searchText],
+  );
+
+  /** A new search: the first ten cards. Anything still loading from an earlier search is ignored from now on. */
+  const runSearch = useCallback(async () => {
+    if (!choice) return;
+    const mine = ++latestSearch.current;
+    setSearching(true);
+    setLoadingMore(false);
+    setMoreError(null);
+    setErrorMessage(null);
+    try {
+      const page = await api.getPage<SearchResult[]>(searchPath());
+      keepLoaded.current = false;
       if (mine !== latestSearch.current) return;
-      setResults(data);
+      setResults(page.data);
+      setNextCursor(page.nextCursor);
       setSearched(true);
     } catch (err) {
       if (mine !== latestSearch.current) return;
@@ -293,28 +318,53 @@ export default function HomePage() {
     } finally {
       if (mine === latestSearch.current) setSearching(false);
     }
-  }, [choice, form.categorySlug, form.groundType, form.date, form.timeWindow, form.durationMinutes]);
+  }, [choice, searchPath]);
 
-  // Re-search automatically whenever the place or a filter changes: no
-  // separate submit button to hunt for.
+  /** The next ten, added below the ones already shown. */
+  const loadMore = useCallback(async () => {
+    if (!choice || !nextCursor || loadingMore || searching) return;
+    const mine = latestSearch.current; // a new search while this loads makes the answer stale
+    setLoadingMore(true);
+    setMoreError(null);
+    try {
+      const page = await api.getPage<SearchResult[]>(searchPath(nextCursor));
+      if (mine !== latestSearch.current) return;
+      setResults((current) => {
+        const seen = new Set(current.map((r) => `${r.venue.id}/${r.resource.id}`));
+        return [...current, ...page.data.filter((r) => !seen.has(`${r.venue.id}/${r.resource.id}`))];
+      });
+      setNextCursor(page.nextCursor);
+    } catch (err) {
+      if (mine !== latestSearch.current) return;
+      setMoreError(err instanceof ApiError ? err.message : 'Could not load more venues.');
+    } finally {
+      if (mine === latestSearch.current) setLoadingMore(false);
+    }
+  }, [choice, nextCursor, loadingMore, searching, searchPath]);
+
+  // Re-search automatically whenever the place or a filter changes: no separate submit button to hunt for.
   useEffect(() => {
     if (ready && choice) runSearch();
   }, [ready, runSearch]);
 
-  const visibleResults = useMemo(() => {
-    const q = nameFilter.trim().toLowerCase();
-    const filtered = q
-      ? results.filter(
-          (r) => r.venue.name.toLowerCase().includes(q) || r.venue.address.toLowerCase().includes(q) || r.resource.groundType.toLowerCase().includes(q),
-        )
-      : results;
-    return [...filtered].sort((a, b) => {
-      if (sortBy === 'distance') {
-        return (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity);
-      }
-      return Number(a.price?.amount ?? Infinity) - Number(b.price?.amount ?? Infinity);
-    });
-  }, [results, nameFilter, sortBy]);
+  // Scrolling near the end of the list loads the next ten. The watcher is set up again after every load, so it
+  // also fires straight away if the list is still too short to fill the screen.
+  const endOfList = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = endOfList.current;
+    if (!el || !nextCursor || loadingMore || searching || moreError) return;
+    const watcher = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) void loadMore();
+      },
+      { rootMargin: '500px 0px' },
+    );
+    watcher.observe(el);
+    return () => watcher.disconnect();
+  }, [nextCursor, loadingMore, searching, moreError, results.length, loadMore]);
+
+  // Shown in the order the server gave: nearest first for a location search, otherwise by venue name.
+  const visibleResults = results;
 
   const activeCategory = categories.find((c) => c.slug === form.categorySlug);
 
@@ -471,7 +521,10 @@ export default function HomePage() {
               durationMinutes: form.durationMinutes,
               dateIso: form.date,
               reloading: searching,
-              onDurationChange: (m: number) => setForm((f) => ({ ...f, durationMinutes: m })),
+              onDurationChange: (m: number) => {
+                keepLoaded.current = true;
+                setForm((f) => ({ ...f, durationMinutes: m }));
+              },
             };
             return (
               <div key={`${r.venue.id}-${r.resource.id}`}>
@@ -481,6 +534,33 @@ export default function HomePage() {
             );
           })}
         </div>
+
+        {visibleResults.length > 0 && (
+          <>
+            {loadingMore && (
+              <div className="mt-3 sm:mt-5">
+                <div role="status" className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-slate-500">
+                  <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-200 border-t-emerald-600 motion-reduce:animate-none" />
+                  Loading more venues…
+                </div>
+                <VenueCardsSkeleton count={2} label="Loading the next venues" />
+              </div>
+            )}
+            {moreError && (
+              <div className="mt-4 flex flex-col items-center gap-2">
+                <ErrorBanner message={moreError} />
+                <button type="button" onClick={() => void loadMore()} className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700">
+                  Try again
+                </button>
+              </div>
+            )}
+            {/* Scrolling this line into view (a little early) fetches the next ten. */}
+            <div ref={endOfList} aria-hidden="true" className="h-px" />
+            {!nextCursor && !searching && !loadingMore && (
+              <p className="py-8 text-center text-xs font-medium text-slate-400">That is every venue for this search.</p>
+            )}
+          </>
+        )}
       </main>
 
       {pickerOpen && (

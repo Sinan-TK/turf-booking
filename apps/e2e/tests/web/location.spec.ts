@@ -8,6 +8,11 @@ import { expect, NILAMBUR_MAPS_LINK, test } from '../../support/fixtures';
  */
 const header = (page: Page, now: string | RegExp) => page.getByRole('button', { name: new RegExp(`^Change location, now ${typeof now === 'string' ? now : now.source}`) });
 const picker = (page: Page) => page.getByRole('dialog', { name: 'Choose your location' });
+/** The results come ten at a time, so a test venue among hundreds is found by typing its name (the server filters the whole list). */
+const find = async (page: Page, name: string) => {
+  await page.getByPlaceholder('Search venues, names or areas...').fill(name);
+  await expect(page.getByRole('heading', { name }).first()).toBeVisible({ timeout: 30_000 });
+};
 const venueCard = (page: Page, name: string) => page.locator('article').filter({ hasText: name }).filter({ visible: true }).first();
 
 test.describe('customer site: location', () => {
@@ -16,7 +21,7 @@ test.describe('customer site: location', () => {
     await expect(header(page, 'Malappuram')).toBeVisible();
     await expect(page.getByText('Tap to choose')).toHaveCount(0);
     await settled(page);
-    await expect(page.getByRole('heading', { name: manjeriVenue.name }).first()).toBeVisible({ timeout: 30_000 });
+    await find(page, manjeriVenue.name);
   });
 
   test('the picker lists Malappuram\'s towns, filters them as you type, and closes with Escape', async ({ page }) => {
@@ -64,20 +69,21 @@ test.describe('customer site: location', () => {
   test('choosing a town searches around it, and the choice survives a reload', async ({ page, manjeriVenue, nilamburVenue }) => {
     await page.goto('/');
     await settled(page);
-    await expect(page.getByRole('heading', { name: nilamburVenue.name }).first()).toBeVisible({ timeout: 30_000 });
+    await find(page, nilamburVenue.name);
 
     await header(page, 'Malappuram').click();
     await picker(page).getByRole('button', { name: 'Manjeri', exact: true }).click();
     await expect(picker(page)).toHaveCount(0);
     await expect(header(page, 'Manjeri')).toBeVisible();
     await settled(page);
-    await expect(page.getByRole('heading', { name: manjeriVenue.name }).first()).toBeVisible({ timeout: 30_000 });
+    await find(page, manjeriVenue.name);
+    await page.getByPlaceholder('Search venues, names or areas...').fill(nilamburVenue.name);
     await expect(page.getByRole('heading', { name: nilamburVenue.name })).toHaveCount(0); // about 20 km away
 
     await page.reload();
     await expect(header(page, 'Manjeri')).toBeVisible();
     await settled(page);
-    await expect(page.getByRole('heading', { name: manjeriVenue.name }).first()).toBeVisible({ timeout: 30_000 });
+    await find(page, manjeriVenue.name);
 
     // The whole district again.
     await header(page, 'Manjeri').click();
@@ -85,7 +91,7 @@ test.describe('customer site: location', () => {
     await picker(page).getByRole('button', { name: 'All of Malappuram' }).click();
     await expect(header(page, 'Malappuram')).toBeVisible();
     await settled(page);
-    await expect(page.getByRole('heading', { name: nilamburVenue.name }).first()).toBeVisible({ timeout: 30_000 });
+    await find(page, nilamburVenue.name);
   });
 
   test('a location chosen before the default has loaded is not replaced by the default', async ({ page, context, remoteVenue }) => {
@@ -126,7 +132,7 @@ test.describe('customer site: location', () => {
     await expect(header(page, 'Near Manjeri')).toBeVisible();
     await expect(page.getByText('Using your current location')).toBeVisible();
     await settled(page);
-    await expect(page.getByRole('heading', { name: manjeriVenue.name }).first()).toBeVisible({ timeout: 30_000 });
+    await find(page, manjeriVenue.name);
   });
 
   test('current location: a blocked permission says so and how to fix it; the picker stays open', async ({ page }) => {
@@ -159,13 +165,14 @@ test.describe('customer site: venue cards and Directions', () => {
   test('no "km away" on a card; Directions uses the venue\'s Google Maps link, else a route to its pin', async ({ page, manjeriVenue, nilamburVenue }) => {
     await page.goto('/');
     await settled(page);
-    await expect(page.getByRole('heading', { name: nilamburVenue.name }).first()).toBeVisible({ timeout: 30_000 });
+    await find(page, nilamburVenue.name);
     await expect(page.getByText(/km away/)).toHaveCount(0);
 
     const withLink = venueCard(page, nilamburVenue.name).getByRole('link', { name: 'Directions' });
     await expect(withLink).toHaveAttribute('href', NILAMBUR_MAPS_LINK);
     await expect(withLink).toHaveAttribute('target', '_blank');
 
+    await find(page, manjeriVenue.name);
     const pinOnly = venueCard(page, manjeriVenue.name).getByRole('link', { name: 'Directions' });
     await expect(pinOnly).toHaveAttribute('href', `https://www.google.com/maps/dir/?api=1&destination=${manjeriVenue.lat},${manjeriVenue.lng}`);
   });
@@ -176,7 +183,7 @@ test.describe('customer site: venue cards and Directions', () => {
     await header(page, 'Malappuram').click();
     await picker(page).getByRole('button', { name: 'Use my current location' }).click();
     await settled(page);
-    await expect(page.getByRole('heading', { name: manjeriVenue.name }).first()).toBeVisible({ timeout: 30_000 });
+    await find(page, manjeriVenue.name);
     await expect(page.getByText(/km away/)).toHaveCount(0);
   });
 });

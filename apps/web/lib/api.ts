@@ -36,7 +36,25 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return body as T;
 }
 
+/** A page of a list: the rows, and where the next page starts (null when this was the last). */
+export interface Page<T> {
+  data: T;
+  nextCursor: string | null;
+}
+
+async function requestPage<T>(path: string): Promise<Page<T>> {
+  const res = await fetch(`${API_URL}${path}`, { credentials: 'include', headers: { 'Content-Type': 'application/json' } });
+  const body = (await res.json().catch(() => undefined)) as unknown;
+  if (!res.ok) {
+    const said = body && typeof body === 'object' && 'message' in body ? String((body as { message: unknown }).message) : '';
+    const message = said || res.statusText;
+    throw new ApiError(res.status, message, body);
+  }
+  return { data: body as T, nextCursor: res.headers.get('X-Next-Cursor') };
+}
+
 export const api = {
+  getPage: <T>(path: string) => requestPage<T>(path),
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, data?: unknown) =>
     request<T>(path, { method: 'POST', body: data !== undefined ? JSON.stringify(data) : undefined }),

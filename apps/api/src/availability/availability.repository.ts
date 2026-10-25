@@ -41,6 +41,8 @@ export interface AvailabilityRepository {
   }): Promise<VenueWithPhoto[]>;
   findCategoryIdBySlug(slug: string): Promise<string | null>;
   /** groundType omitted = every sub-type; categoryId omitted = every facility. */
+  /** Ids of venues that have a bookable unit whose sub-type (e.g. "7S") contains the text, for the search box. */
+  findVenueIdsByGroundType(text: string): Promise<string[]>;
   findBookableResources(venueId: string, groundType?: string, categoryId?: string): Promise<BookableResource[]>;
   /** Every rule for the unit and duration already in effect at `at`. */
   findPricingRules(resourceId: string, durationMinutes: number, at: Date): Promise<PricingRule[]>;

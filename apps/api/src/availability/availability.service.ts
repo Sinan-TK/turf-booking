@@ -10,7 +10,15 @@ import { PolicyResolverService, type ResolvedPolicy } from '../scheduling/policy
 import { ScheduleService, type OpenWindow } from '../scheduling/schedule.service';
 import { isDurationAllowed } from '../scheduling/policy-validation';
 import { allowedDurations } from '../common/booking-policy.defaults';
+import { pLimit } from '../common/concurrency';
 import { AVAILABILITY_REPOSITORY, type AvailabilityRepository } from './availability.repository';
+
+/** The response header that carries the cursor for the next page of search results. */
+export const NEXT_CURSOR_HEADER = 'X-Next-Cursor';
+
+/** Venues worked on side by side, and the most database reads in flight at once for one search. */
+const VENUE_CHUNK = 3;
+const LOAD_CONCURRENCY = 8;
 
 const EARTH_RADIUS_KM = 6371;
 const MINUTE_MS = 60_000;
@@ -39,6 +47,43 @@ interface SearchParams {
   lat?: number;
   lng?: number;
   radiusKm: number;
+  limit?: number;
+  cursor?: string;
+  q?: string;
+}
+
+type CandidateVenue = Awaited<ReturnType<AvailabilityRepository['findActiveVenuesByDistrict']>>[number];
+type BookableResource = Awaited<ReturnType<AvailabilityRepository['findBookableResources']>>[number];
+/** One search card, exactly as the API returns it. */
+export interface SearchResult {
+  venue: {
+    id: string;
+    name: string;
+    facilityCode: string;
+    address: string;
+    photoUrl: string | null;
+    lat: number;
+    lng: number;
+    googleMapsUrl: string | null;
+  };
+  category: BookableResource['category'];
+  resource: { id: string; name: string; groundType: string };
+  distanceKm: number | undefined;
+  availableStartTimes: string[];
+  policy: {
+    slotIntervalMin: number;
+    minDurationMin: number;
+    maxDurationMin: number;
+    durationIncrementMin: number;
+    durations: number[];
+  };
+  openWindows: OpenWindow[] | null;
+  timezone: string;
+  price: { amount: string; currency: string; normalAmount: string | null; bookingAmount: string } | null;
+  priceVaries: boolean;
+  startPrices: Array<string | null>;
+  startNormalPrices: Array<string | null>;
+  startBookingPrices: Array<string | null>;
 }
 
 @Injectable()
@@ -74,131 +119,207 @@ export class AvailabilityService {
    * (interval, durations, buffers, lead time, advance window) — the same
    * rules BookingsService enforces on holds.
    */
+  /** Every result in one go (no paging): what a caller that wants the whole list uses. */
   async search(params: SearchParams) {
+    return (await this.searchPage({ ...params, limit: undefined, cursor: undefined })).results;
+  }
+
+  /**
+   * One page of results. With a `limit`, only enough venues are worked through to fill it, and `nextCursor` says
+   * where the next page starts (venue number, then unit number inside that venue), or is null when nothing is
+   * left. The order is fixed (nearest first for a location search, otherwise by venue name), so pages never
+   * overlap or skip. The slow part is the database: each card needs a handful of reads, so those run side by
+   * side (a few venues at a time, at most LOAD_CONCURRENCY reads in flight) instead of one after another.
+   */
+  async searchPage(params: SearchParams): Promise<{ results: SearchResult[]; nextCursor: string | null }> {
     let categoryId = params.categoryId;
     if (!categoryId && params.categorySlug) {
       categoryId = (await this.availability.findCategoryIdBySlug(params.categorySlug)) ?? undefined;
-      if (!categoryId) return [];
+      if (!categoryId) return { results: [], nextCursor: null };
     }
 
-    const candidateVenues = await this.resolveCandidateVenues(params);
-    if (candidateVenues.length === 0) return [];
+    const candidates = await this.resolveCandidateVenues(params);
+    const needle = params.q?.trim().toLowerCase();
+    // The text filter keeps venues whose name or address contains it, and venues with a unit of that sub-type
+    // (the units themselves are narrowed again in resultsForVenue). Done here so a page never wades through
+    // hundreds of venues that cannot match.
+    let venues = candidates;
+    if (needle) {
+      const withSubType = new Set(await this.availability.findVenueIdsByGroundType(needle));
+      venues = candidates.filter((v) => v.name.toLowerCase().includes(needle) || v.address.toLowerCase().includes(needle) || withSubType.has(v.id));
+    }
+    if (venues.length === 0) return { results: [], nextCursor: null };
 
+    const [startVenue, startUnit] = params.cursor ? params.cursor.split('.').map(Number) : [0, 0];
     const now = new Date();
-    const results = [];
     const termsCache = new Map<string, CommercialTerms>();
-    for (const venue of candidateVenues) {
-      const resources = await this.availability.findBookableResources(venue.id, params.groundType, categoryId);
-      if (resources.length === 0) continue;
-      const policySet = await this.policies.forVenue(venue, now);
+    const limitReads = pLimit(LOAD_CONCURRENCY);
+    const wanted = params.limit ?? Infinity;
 
-      // Resolved per-venue, in that venue's own timezone — candidate venues
-      // from a geo/district search can legitimately span timezones on a
-      // global platform, and "today"/weekday must mean the venue's local
-      // calendar day, not the server's (engineering rule #11).
-      const {
-        start: windowStart,
-        end: windowEnd,
-        localDay,
-      } = this.resolveWindow(params.date, params.timeWindow, venue.timezone);
-
-      for (const resource of resources) {
-        const policy = policySet.resolve({ resourceId: resource.id });
-        // A resource whose policy doesn't offer this duration simply has
-        // nothing to show for it (e.g. a 30-min request vs a 60-min venue).
-        if (!isDurationAllowed(policy, params.durationMinutes)) continue;
-
-        const openWindows = await this.schedule.openWindows(
-          { resourceId: resource.id },
-          localDay,
-          params.durationMinutes,
-        );
-        const startTimes = await this.candidateStartTimes({
-          venueId: venue.id,
-          resourceId: resource.id,
-          policy,
-          durationMinutes: params.durationMinutes,
-          windowStart,
-          windowEnd,
-          openWindows,
-          timezone: venue.timezone,
-          now,
-        });
-        if (startTimes.length === 0) continue;
-
-        // The price depends on the day AND the time a slot starts, so each
-        // start time is priced on its own; `price` is the lowest of them.
-        const latestStart = startTimes.reduce((a, b) => (a > b ? a : b));
-        const pricingRules = await this.availability.findPricingRules(
-          resource.id,
-          params.durationMinutes,
-          latestStart,
-        );
-        const startPrices = startTimes.map((t) => pickPricingRule(pricingRules, t, venue.timezone));
-        const priced = startPrices.filter((r): r is NonNullable<typeof r> => r !== null);
-        const pricingRule = priced.reduce<(typeof priced)[number] | null>(
-          (low, r) => (low === null || effectivePrice(r) < effectivePrice(low) ? r : low),
-          null,
-        );
-        const priceVaries = new Set(startPrices.map((r) => (r ? effectivePrice(r) : null))).size > 1;
-        // The advance shown is what a hold will charge: never below the facility's minimum.
-        const terms = await this.termsFor(venue.id, resource.categoryId, termsCache);
-        const advanceOf = (r: NonNullable<(typeof startPrices)[number]>) =>
-          atLeastMinAdvance(r.bookingPrice, new Prisma.Decimal(effectivePrice(r)), terms).toString();
-
-        results.push({
-          venue: {
-            id: venue.id,
-            name: venue.name,
-            facilityCode: venue.facilityCode,
-            address: venue.address,
-            photoUrl: venue.photos[0]?.url ?? null,
-            lat: Number(venue.lat),
-            lng: Number(venue.lng),
-            googleMapsUrl: venue.googleMapsUrl,
-          },
-          category: resource.category,
-          resource: { id: resource.id, name: resource.name, groundType: resource.groundType },
-          distanceKm:
-            params.lat !== undefined && params.lng !== undefined
-              ? Number(
-                  haversineKm(params.lat, params.lng, Number(venue.lat), Number(venue.lng)).toFixed(
-                    2,
-                  ),
-                )
-              : undefined,
-          availableStartTimes: startTimes.map((t) => t.toISOString()),
-          // What the UI needs to render durations and the slot grid
-          // without hardcoding anything per venue type.
-          policy: {
-            slotIntervalMin: policy.slotIntervalMin,
-            minDurationMin: policy.minDurationMin,
-            maxDurationMin: policy.maxDurationMin,
-            durationIncrementMin: policy.durationIncrementMin,
-            durations: allowedDurations(policy),
-          },
-          openWindows: openWindows ?? null,
-          timezone: venue.timezone,
-          // `amount` is the full price (the offer when there is one). `normalAmount` is the struck-through
-          // normal price (only when an offer applies) and `bookingAmount` is the advance paid online.
-          price: pricingRule
-            ? {
-                amount: String(effectivePrice(pricingRule)),
-                currency: pricingRule.currency,
-                normalAmount: pricingRule.offerPrice != null ? pricingRule.normalPrice.toString() : null,
-                bookingAmount: advanceOf(pricingRule),
-              }
-            : null,
-          // True when different start times cost different amounts, so the UI can say "from".
-          priceVaries,
-          // Aligned with availableStartTimes; null where no price rule covers that time.
-          startPrices: startPrices.map((r) => (r ? String(effectivePrice(r)) : null)),
-          startNormalPrices: startPrices.map((r) => (r && r.offerPrice != null ? r.normalPrice.toString() : null)),
-          startBookingPrices: startPrices.map((r) => (r ? advanceOf(r) : null)),
-        });
+    const results: SearchResult[] = [];
+    let next: { venue: number; unit: number } | null = null;
+    let v = startVenue!;
+    let firstUnit = startUnit!;
+    while (v < venues.length && results.length < wanted) {
+      const chunk = venues.slice(v, v + VENUE_CHUNK);
+      const perVenue = await Promise.all(
+        chunk.map((venue, i) => this.resultsForVenue(venue, params, categoryId, needle, now, termsCache, limitReads, i === 0 ? firstUnit : 0)),
+      );
+      let full = false;
+      for (let i = 0; i < perVenue.length && !full; i++) {
+        for (const item of perVenue[i]!) {
+          if (results.length >= wanted) {
+            next = { venue: v + i, unit: item.unitIndex };
+            full = true;
+            break;
+          }
+          results.push(item.result);
+        }
       }
+      if (full) break;
+      v += chunk.length;
+      firstUnit = 0;
     }
-    return results;
+    if (!next && v < venues.length) next = { venue: v, unit: 0 };
+    return { results, nextCursor: next ? `${next.venue}.${next.unit}` : null };
+  }
+
+  /** The cards one venue contributes, each tagged with its position among the venue's units (for the cursor). */
+  private async resultsForVenue(
+    venue: CandidateVenue,
+    params: SearchParams,
+    categoryId: string | undefined,
+    needle: string | undefined,
+    now: Date,
+    termsCache: Map<string, CommercialTerms>,
+    limitReads: ReturnType<typeof pLimit>,
+    fromUnit: number,
+  ): Promise<Array<{ unitIndex: number; result: SearchResult }>> {
+    const allResources = await limitReads(() => this.availability.findBookableResources(venue.id, params.groundType, categoryId));
+    // A text filter keeps a venue's units when the venue's name or address matches, else only units whose sub-type does.
+    const venueMatches = !needle || venue.name.toLowerCase().includes(needle) || venue.address.toLowerCase().includes(needle);
+    const resources = venueMatches ? allResources : allResources.filter((r) => r.groundType.toLowerCase().includes(needle!));
+    if (resources.length === 0 || fromUnit >= resources.length) return [];
+    const policySet = await limitReads(() => this.policies.forVenue(venue, now));
+
+    // Resolved per-venue, in that venue's own timezone — candidate venues from a geo/district search can
+    // legitimately span timezones on a global platform, and "today"/weekday must mean the venue's local
+    // calendar day, not the server's (engineering rule #11).
+    const { start: windowStart, end: windowEnd, localDay } = this.resolveWindow(params.date, params.timeWindow, venue.timezone);
+
+    const built = await Promise.all(
+      resources.map(async (resource, unitIndex) => {
+        if (unitIndex < fromUnit) return null;
+        const result = await this.resultForResource(
+          venue,
+          resource,
+          policySet.resolve({ resourceId: resource.id }),
+          params,
+          { windowStart, windowEnd, localDay },
+          now,
+          termsCache,
+          limitReads,
+        );
+        return result ? { unitIndex, result } : null;
+      }),
+    );
+    return built.filter((b): b is { unitIndex: number; result: SearchResult } => b !== null);
+  }
+
+  /** One card: the open start times for a unit on the day, priced, or null when it has nothing to show. */
+  private async resultForResource(
+    venue: CandidateVenue,
+    resource: BookableResource,
+    policy: ResolvedPolicy,
+    params: SearchParams,
+    day: { windowStart: Date; windowEnd: Date; localDay: DateTime },
+    now: Date,
+    termsCache: Map<string, CommercialTerms>,
+    limitReads: ReturnType<typeof pLimit>,
+  ): Promise<SearchResult | null> {
+    // A resource whose policy doesn't offer this duration simply has nothing to show for it (e.g. a 30-min
+    // request vs a 60-min venue).
+    if (!isDurationAllowed(policy, params.durationMinutes)) return null;
+
+    const openWindows = await limitReads(() => this.schedule.openWindows({ resourceId: resource.id }, day.localDay, params.durationMinutes));
+    const startTimes = await limitReads(() =>
+      this.candidateStartTimes({
+        venueId: venue.id,
+        resourceId: resource.id,
+        policy,
+        durationMinutes: params.durationMinutes,
+        windowStart: day.windowStart,
+        windowEnd: day.windowEnd,
+        openWindows,
+        timezone: venue.timezone,
+        now,
+      }),
+    );
+    if (startTimes.length === 0) return null;
+
+    // The price depends on the day AND the time a slot starts, so each start time is priced on its own; `price`
+    // is the lowest of them.
+    const latestStart = startTimes.reduce((a, b) => (a > b ? a : b));
+    const [pricingRules, terms] = await Promise.all([
+      limitReads(() => this.availability.findPricingRules(resource.id, params.durationMinutes, latestStart)),
+      limitReads(() => this.termsFor(venue.id, resource.categoryId, termsCache)),
+    ]);
+    const startPrices = startTimes.map((t) => pickPricingRule(pricingRules, t, venue.timezone));
+    const priced = startPrices.filter((r): r is NonNullable<typeof r> => r !== null);
+    const pricingRule = priced.reduce<(typeof priced)[number] | null>(
+      (low, r) => (low === null || effectivePrice(r) < effectivePrice(low) ? r : low),
+      null,
+    );
+    const priceVaries = new Set(startPrices.map((r) => (r ? effectivePrice(r) : null))).size > 1;
+    // The advance shown is what a hold will charge: never below the facility's minimum.
+    const advanceOf = (r: NonNullable<(typeof startPrices)[number]>) =>
+      atLeastMinAdvance(r.bookingPrice, new Prisma.Decimal(effectivePrice(r)), terms).toString();
+
+    return {
+      venue: {
+        id: venue.id,
+        name: venue.name,
+        facilityCode: venue.facilityCode,
+        address: venue.address,
+        photoUrl: venue.photos[0]?.url ?? null,
+        lat: Number(venue.lat),
+        lng: Number(venue.lng),
+        googleMapsUrl: venue.googleMapsUrl,
+      },
+      category: resource.category,
+      resource: { id: resource.id, name: resource.name, groundType: resource.groundType },
+      distanceKm:
+        params.lat !== undefined && params.lng !== undefined
+          ? Number(haversineKm(params.lat, params.lng, Number(venue.lat), Number(venue.lng)).toFixed(2))
+          : undefined,
+      availableStartTimes: startTimes.map((t) => t.toISOString()),
+      // What the UI needs to render durations and the slot grid without hardcoding anything per venue type.
+      policy: {
+        slotIntervalMin: policy.slotIntervalMin,
+        minDurationMin: policy.minDurationMin,
+        maxDurationMin: policy.maxDurationMin,
+        durationIncrementMin: policy.durationIncrementMin,
+        durations: allowedDurations(policy),
+      },
+      openWindows: openWindows ?? null,
+      timezone: venue.timezone,
+      // `amount` is the full price (the offer when there is one). `normalAmount` is the struck-through normal price
+      // (only when an offer applies) and `bookingAmount` is the advance paid online.
+      price: pricingRule
+        ? {
+            amount: String(effectivePrice(pricingRule)),
+            currency: pricingRule.currency,
+            normalAmount: pricingRule.offerPrice != null ? pricingRule.normalPrice.toString() : null,
+            bookingAmount: advanceOf(pricingRule),
+          }
+        : null,
+      // True when different start times cost different amounts, so the UI can say "from".
+      priceVaries,
+      // Aligned with availableStartTimes; null where no price rule covers that time.
+      startPrices: startPrices.map((r) => (r ? String(effectivePrice(r)) : null)),
+      startNormalPrices: startPrices.map((r) => (r && r.offerPrice != null ? r.normalPrice.toString() : null)),
+      startBookingPrices: startPrices.map((r) => (r ? advanceOf(r) : null)),
+    };
   }
 
   private async resolveCandidateVenues(params: SearchParams) {
@@ -223,9 +344,12 @@ export class AvailabilityService {
       minLng: params.lng! - lngDelta,
       maxLng: params.lng! + lngDelta,
     });
-    return nearby.filter(
-      (t) => haversineKm(params.lat!, params.lng!, Number(t.lat), Number(t.lng)) <= params.radiusKm,
-    );
+    return nearby
+      .map((t) => ({ t, km: haversineKm(params.lat!, params.lng!, Number(t.lat), Number(t.lng)) }))
+      .filter(({ km }) => km <= params.radiusKm)
+      // Nearest first, with the id as a tiebreak so the order never changes between two requests.
+      .sort((x, y) => x.km - y.km || x.t.id.localeCompare(y.t.id))
+      .map(({ t }) => t);
   }
 
   /**

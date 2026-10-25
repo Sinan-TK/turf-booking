@@ -36,6 +36,8 @@ export class PrismaAvailabilityRepository implements AvailabilityRepository {
     return this.prisma.client.venue.findMany({
       where: { districtId, status: 'ACTIVE' },
       include: VENUE_SEARCH_INCLUDE,
+      // A fixed order, so "the next 10" always continues where the last page stopped.
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
     });
   }
 
@@ -58,6 +60,15 @@ export class PrismaAvailabilityRepository implements AvailabilityRepository {
     return category?.id ?? null;
   }
 
+  async findVenueIdsByGroundType(text: string) {
+    const rows = await this.prisma.client.resource.findMany({
+      where: { groundType: { contains: text, mode: 'insensitive' }, isBookable: true, status: 'ACTIVE' },
+      select: { venueId: true },
+      distinct: ['venueId'],
+    });
+    return rows.map((r) => r.venueId);
+  }
+
   findBookableResources(venueId: string, groundType?: string, categoryId?: string) {
     return this.prisma.client.resource.findMany({
       include: { category: { select: UNIT_CATEGORY_SELECT } },
@@ -68,6 +79,7 @@ export class PrismaAvailabilityRepository implements AvailabilityRepository {
         isBookable: true,
         status: 'ACTIVE',
       },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }, { id: 'asc' }],
     });
   }
 

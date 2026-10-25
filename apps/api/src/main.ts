@@ -69,7 +69,7 @@ async function bootstrap() {
   app.enableCors({
     origin: [env.WEB_APP_URL, env.ADMIN_APP_URL, env.OWNER_APP_URL],
     credentials: true,
-    exposedHeaders: ['X-Total-Count'],
+    exposedHeaders: ['X-Total-Count', 'X-Next-Cursor'],
   });
 
   await app.listen(env.PORT);
