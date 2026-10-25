@@ -6,6 +6,7 @@ import { useCustomer } from '@/lib/customer';
 import { ConfirmLogout } from '@/components/confirm-logout';
 import { Icon } from '@/components/ui';
 import { Skeleton } from '@/components/skeleton';
+import { CoinBalance } from '@/components/coin-balance';
 
 const ITEMS = [
   { href: '/account?tab=profile', label: 'Profile', icon: 'person' },
@@ -56,7 +57,9 @@ export function AccountMenu() {
   const initial = (customer.name?.trim() || customer.email || customer.phone?.replace(/\D/g, '') || '?').charAt(0).toUpperCase();
 
   return (
-    <div ref={root} className="relative">
+    <div className="flex items-center gap-2">
+      <CoinBalance />
+      <div ref={root} className="relative">
       <button
         type="button"
         aria-label="Account menu"
@@ -119,6 +122,7 @@ export function AccountMenu() {
           }}
         />
       )}
+      </div>
     </div>
   );
 }

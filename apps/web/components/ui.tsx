@@ -41,6 +41,7 @@ import {
   EyeOff,
   KeyRound,
   ShieldCheck,
+  Coins,
   type LucideIcon
 } from 'lucide-react';
 
@@ -88,6 +89,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   visibility_off: EyeOff,
   lock: KeyRound,
   verified: ShieldCheck,
+  coins: Coins,
 };
 
 export function Icon({ name, className = '' }: { name: string; className?: string; filled?: boolean }) {
