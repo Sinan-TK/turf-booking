@@ -3,6 +3,7 @@ import request from 'supertest';
 import { DateTime } from 'luxon';
 import { createTestApp } from './setup/test-app';
 import {
+  bookableFarAhead,
   createCustomerFixture,
   createOwnerFixture,
   createVenueFixture,
@@ -84,6 +85,7 @@ describe('Venue policy engine', () => {
       lng: 76,
     });
     expect(venue.status).toBe(201);
+    await bookableFarAhead(venue.body.id);
     expect((await adminAgent.patch(`/venues/${venue.body.id}`).send({ status: 'ACTIVE' })).status).toBe(200);
 
     const resource = await ownerAgent

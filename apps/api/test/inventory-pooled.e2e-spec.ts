@@ -7,6 +7,7 @@ import {
   futureStart,
   loginAsSuperAdmin,
   prisma,
+  bookableFarAhead,
   uniqueSuffix,
   type TestAgent,
 } from './setup/fixtures';
@@ -89,6 +90,7 @@ describe('Pooled inventory (kayak fleets)', () => {
       throw new Error(`Venue creation failed: ${venueRes.status} ${JSON.stringify(venueRes.body)}`);
     }
     venueId = venueRes.body.id as string;
+    await bookableFarAhead(venueId);
     const activateRes = await adminAgent.patch(`/venues/${venueId}`).send({ status: 'ACTIVE' });
     if (activateRes.status !== 200) {
       throw new Error(

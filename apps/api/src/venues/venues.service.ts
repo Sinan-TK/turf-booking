@@ -93,6 +93,7 @@ export class VenuesService {
         lat: dto.lat,
         lng: dto.lng,
         googleMapsUrl: dto.googleMapsUrl,
+        advanceBookingDays: dto.advanceBookingDays,
         timezone: district.timezone,
         // defaultSlotGranularityMinutes is not settable — always the
         // platform-fixed 60-minute default from the Prisma schema.

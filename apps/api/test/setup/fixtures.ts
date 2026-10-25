@@ -29,6 +29,14 @@ export function uniqueSuffix(): string {
  * (now enforced per venue by BookingPolicy, see scheduling/policy-validation.ts),
  * and Asia/Kolkata's UTC+5:30 offset means a UTC-aligned hour lands on the
  * half-hour locally. */
+/**
+ * Real venues let customers book at most 14 days ahead (7 unless the owner changes it), but these tests book weeks
+ * ahead on purpose, to keep clear of each other's slots, so their venues are opened up directly in the database.
+ */
+export async function bookableFarAhead(venueId: string) {
+  await prisma.venue.update({ where: { id: venueId }, data: { advanceBookingDays: 120 } });
+}
+
 export function futureStart(daysFromNow: number, hour: number): Date {
   return DateTime.now()
     .setZone('Asia/Kolkata')
@@ -221,6 +229,7 @@ export async function createVenueFixture(
     throw new Error(`Venue creation failed: ${venueRes.status} ${JSON.stringify(venueRes.body)}`);
   }
   const venueId = venueRes.body.id as string;
+  await bookableFarAhead(venueId);
 
   const activateRes = await adminAgent.patch(`/venues/${venueId}`).send({ status: 'ACTIVE' });
   if (activateRes.status !== 200) {
