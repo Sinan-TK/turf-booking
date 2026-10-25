@@ -33,31 +33,32 @@ describe('search results come in pages', () => {
     expect(res.headers['x-next-cursor']).toBeUndefined();
   });
 
-  it('pages of five add up to exactly the full list, in the same order, with no overlap', async () => {
+  it('a page is whole venues: pages of three venues add up to exactly the full list, in order, with no overlap', async () => {
     const full = keys((await search().expect(200)).body);
     const seen: string[] = [];
     let cursor: string | undefined;
     const sizes: number[] = [];
     for (let guard = 0; guard < 10; guard++) {
-      const res = await search({ limit: 5, ...(cursor ? { cursor } : {}) }).expect(200);
+      const res = await search({ limit: 3, ...(cursor ? { cursor } : {}) }).expect(200);
       sizes.push(res.body.length);
-      expect(res.body.length).toBeLessThanOrEqual(5);
+      expect(new Set(res.body.map((r: { venue: { id: string } }) => r.venue.id)).size).toBeLessThanOrEqual(3);
       seen.push(...keys(res.body));
       cursor = res.headers['x-next-cursor'];
       if (!cursor) break;
     }
-    expect(sizes).toEqual([5, 5, 2]);
+    expect(sizes).toEqual([9, 3]); // three venues of three units, then the last venue
     expect(seen).toEqual(full);
     expect(new Set(seen).size).toBe(seen.length);
   });
 
-  it('a page can end in the middle of a venue and the next one carries on from the next unit', async () => {
-    const full = keys((await search().expect(200)).body);
-    const first = await search({ limit: 4 }).expect(200); // venue 1 has three units, so this stops after one unit of venue 2
-    expect(keys(first.body)).toEqual(full.slice(0, 4));
-    expect(first.headers['x-next-cursor']).toMatch(/^1\.1$/);
-    const second = await search({ limit: 4, cursor: first.headers['x-next-cursor'] }).expect(200);
-    expect(keys(second.body)).toEqual(full.slice(4, 8));
+  it('a venue is never split across pages: its units arrive together', async () => {
+    const first = await search({ limit: 1 }).expect(200);
+    expect(first.body).toHaveLength(3);
+    expect(new Set(first.body.map((r: { venue: { id: string } }) => r.venue.id)).size).toBe(1);
+    expect(first.headers['x-next-cursor']).toBe('1.0');
+    const second = await search({ limit: 1, cursor: first.headers['x-next-cursor'] }).expect(200);
+    expect(second.body).toHaveLength(3);
+    expect(second.body[0].venue.id).not.toBe(first.body[0].venue.id);
   });
 
   it('is also fast: the whole page is computed with the reads overlapping', async () => {
@@ -67,13 +68,10 @@ describe('search results come in pages', () => {
   });
 
   it('the text filter narrows to the matching venue, and the paging follows the filtered list', async () => {
-    const res = await search({ q: `${TEXT} V2`, limit: 2 }).expect(200);
-    expect(res.body).toHaveLength(2);
+    const res = await search({ q: `${TEXT} V2`, limit: 1 }).expect(200);
+    expect(res.body).toHaveLength(3);
     expect(res.body.every((r: { venue: { name: string } }) => r.venue.name === `${TEXT} V2`)).toBe(true);
-    expect(res.headers['x-next-cursor']).toBe('0.2'); // the third unit of the one matching venue
-    const rest = await search({ q: `${TEXT} V2`, limit: 2, cursor: '0.2' }).expect(200);
-    expect(rest.body).toHaveLength(1);
-    expect(rest.headers['x-next-cursor']).toBeUndefined();
+    expect(res.headers['x-next-cursor']).toBeUndefined(); // the only venue that matches
     expect((await search({ q: 'no-such-venue-zzz' }).expect(200)).body).toEqual([]);
   });
 

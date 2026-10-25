@@ -128,9 +128,9 @@ export class AvailabilityService {
   }
 
   /**
-   * One page of results. With a `limit`, only enough venues are worked through to fill it, and `nextCursor` says
-   * where the next page starts (venue number, then unit number inside that venue), or is null when nothing is
-   * left. The order is fixed (nearest first for a location search, otherwise by venue name), so pages never
+   * One page of results. With a `limit` of n, the page is n venues, each with all of its units that have open slots
+   * (the answer is the flat list of those units), and `nextCursor` says which venue the next page starts at, or is
+   * null when nothing is left. The order is fixed (nearest first for a location search, otherwise by venue name), so pages never
    * overlap or skip. The slow part is the database: each card needs a handful of reads, so those run side by
    * side (a few venues at a time, at most LOAD_CONCURRENCY reads in flight) instead of one after another.
    */
@@ -162,24 +162,27 @@ export class AvailabilityService {
     const wanted = params.limit ?? Infinity;
 
     const results: SearchResult[] = [];
+    let venuesShown = 0;
     let next: { venue: number; unit: number } | null = null;
     let v = startVenue!;
     let firstUnit = startUnit!;
-    while (v < venues.length && results.length < wanted) {
+    while (v < venues.length && venuesShown < wanted) {
       const chunk = venues.slice(v, v + VENUE_CHUNK);
       const perVenue = await Promise.all(
         chunk.map((venue, i) => this.resultsForVenue(venue, params, categoryId, needle, now, termsCache, limitReads, i === 0 ? firstUnit : 0)),
       );
       let full = false;
-      for (let i = 0; i < perVenue.length && !full; i++) {
-        for (const item of perVenue[i]!) {
-          if (results.length >= wanted) {
-            next = { venue: v + i, unit: item.unitIndex };
-            full = true;
-            break;
-          }
-          results.push(item.result);
+      for (let i = 0; i < perVenue.length; i++) {
+        const items = perVenue[i]!;
+        if (items.length === 0) continue; // nothing open here: not a card
+        if (venuesShown >= wanted) {
+          // A page is whole venues, each with all its units, so the next page starts at the next venue.
+          next = { venue: v + i, unit: 0 };
+          full = true;
+          break;
         }
+        for (const item of items) results.push(item.result);
+        venuesShown++;
       }
       if (full) break;
       v += chunk.length;

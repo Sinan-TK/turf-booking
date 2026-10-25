@@ -19,7 +19,7 @@ export const searchSchema = z
     lat: z.coerce.number().min(-90).max(90).optional(),
     lng: z.coerce.number().min(-180).max(180).optional(),
     radiusKm: z.coerce.number().positive().max(100).default(10),
-    // Paging: at most `limit` cards per request, and `cursor` (from the previous answer's X-Next-Cursor header) to
+    // Paging: at most `limit` venues per request (each with all its units), and `cursor` (from the previous answer's X-Next-Cursor header) to
     // continue. Without a limit every result is returned in one go.
     limit: z.coerce.number().int().min(1).max(50).optional(),
     cursor: z.string().regex(/^\d+\.\d+$/, 'cursor is not valid').optional(),

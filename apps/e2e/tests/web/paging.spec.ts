@@ -10,13 +10,13 @@ const slow = (ms: number) => async (route: Route) => {
 };
 
 test.describe('customer site: results load ten at a time', () => {
-  test('ten cards first, the next ones when scrolling, with a loading animation, until the end', async ({ page, context, ownerApi, adminApi }) => {
+  test('ten venues first, the next ones when scrolling, with a loading animation, until the end', async ({ page, context, ownerApi, adminApi }) => {
     test.setTimeout(240_000);
-    // Seven venues of two units each at their own spot: fourteen cards, so there are two pages.
+    // Twelve venues of two units each at their own spot: a card per venue, so there are two pages (ten, then two).
     const lat = 8 + Math.random() * 10;
     const lng = 60 + Math.random() * 10;
     const names: string[] = [];
-    for (let i = 0; i < 7; i++) names.push((await createVenue(ownerApi, adminApi, { lat, lng })).name);
+    for (let i = 0; i < 12; i++) names.push((await createVenue(ownerApi, adminApi, { lat, lng })).name);
 
     await shareLocation(context, lat, lng);
     await page.goto('/');
@@ -26,7 +26,8 @@ test.describe('customer site: results load ten at a time', () => {
     await page.getByRole('button', { name: /[0-9]+ [A-Za-z]{3}$/ }).nth(2).click();
 
     const cards = page.getByRole('heading', { name: /^PW Venue / });
-    await expect(cards).toHaveCount(10); // the first page, not all fourteen
+    await expect(cards).toHaveCount(10); // the first page: ten venue cards, not all twelve
+    await expect(page.getByRole('region')).toHaveCount(20); // each with its two units inside
     await expect(page.getByText('That is every venue for this search.')).toHaveCount(0);
 
     // Scrolling to the end brings the next ones, behind a loading animation.
@@ -36,13 +37,13 @@ test.describe('customer site: results load ten at a time', () => {
     await expect(loadingMore).toBeVisible();
     await expect(loadingMore.locator('.animate-spin')).toBeVisible();
     await expect(page.getByRole('status').filter({ hasText: 'Loading the next venues' }).locator('.animate-pulse').first()).toBeVisible();
-    await expect(cards).toHaveCount(14, { timeout: 30_000 });
+    await expect(cards).toHaveCount(12, { timeout: 30_000 });
     await expect(loadingMore).toHaveCount(0);
     await expect(page.getByText('That is every venue for this search.')).toBeVisible();
 
     // Every card appears once, and the venues named in this test are all there.
     const shown = await cards.allTextContents();
-    expect(new Set(shown.map((t) => t.trim())).size).toBe(7);
+    expect(new Set(shown.map((t) => t.trim())).size).toBe(12);
     for (const name of names) expect(shown.map((t) => t.trim())).toContain(name);
   });
 
@@ -51,8 +52,8 @@ test.describe('customer site: results load ten at a time', () => {
     const lat = 8 + Math.random() * 10;
     const lng = 60 + Math.random() * 10;
     const venues = [];
-    for (let i = 0; i < 7; i++) venues.push(await createVenue(ownerApi, adminApi, { lat, lng }));
-    const last = venues[venues.length - 1]!; // far down the list, past the first ten cards
+    for (let i = 0; i < 12; i++) venues.push(await createVenue(ownerApi, adminApi, { lat, lng }));
+    const last = venues[venues.length - 1]!; // far down the list, past the first ten venues
 
     await shareLocation(context, lat, lng);
     await page.goto('/');
@@ -62,7 +63,8 @@ test.describe('customer site: results load ten at a time', () => {
     await expect(page.getByRole('heading', { name: /^PW Venue / })).toHaveCount(10);
 
     await page.getByPlaceholder('Search venues, names or areas...').fill(last.name);
-    await expect(page.getByRole('heading', { name: last.name }).first()).toBeVisible(); // found although it was not among the first ten
-    await expect(page.getByRole('heading', { name: /^PW Venue / })).toHaveCount(2); // its two units
+    await expect(page.getByRole('heading', { name: last.name })).toBeVisible(); // found although it was not among the first ten
+    await expect(page.getByRole('heading', { name: /^PW Venue / })).toHaveCount(1); // one card for it
+    await expect(page.getByRole('region')).toHaveCount(2); // with its two units inside
   });
 });

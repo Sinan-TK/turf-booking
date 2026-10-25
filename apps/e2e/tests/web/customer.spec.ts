@@ -17,7 +17,7 @@ test.describe('customer site: booking a slot', () => {
     const price = isoWeekday(day) >= 6 ? 1000 : 800;
     await page.getByRole('button', { name: /\d+ [A-Za-z]{3}$/ }).nth(2).click();
     await settled(page);
-    const turf = page.locator('article').filter({ hasText: remoteVenue.name }).filter({ hasText: 'Turf A' });
+    const turf = page.getByRole('region', { name: `${remoteVenue.name}, Turf A` });
     await turf.getByRole('button', { name: new RegExp('^10:00 AM ₹' + price) }).click();
 
     // Checkout: the held slot, its price and a running hold timer. Nothing is paid.
@@ -76,7 +76,7 @@ test.describe('customer site: booking needs a verified email or phone', () => {
     const price = isoWeekday(day) >= 6 ? 1000 : 800;
     await page.getByRole("button", { name: /[0-9]+ [A-Za-z]{3}$/ }).nth(2).click();
     await settled(page);
-    const turf = page.locator('article').filter({ hasText: remoteVenue.name }).filter({ hasText: 'Turf A' });
+    const turf = page.getByRole('region', { name: `${remoteVenue.name}, Turf A` });
     await turf.getByRole('button', { name: new RegExp('^11:00 AM ₹' + price) }).click();
 
     // No hold, no checkout: the profile opens with the verification dialog.

@@ -32,13 +32,20 @@ test.describe('customer site: finding a venue', () => {
     const chip = (await page.getByRole('button', { name: DAY_BUTTON }).nth(3).innerText()).trim();
     const weekend = /^(Sat|Sun)/.test(chip);
 
-    const turf = page.locator('article').filter({ hasText: remoteVenue.name }).filter({ hasText: 'Turf A' });
-    const court = page.locator('article').filter({ hasText: remoteVenue.name }).filter({ hasText: 'Court 1' });
+    const turf = page.getByRole('region', { name: `${remoteVenue.name}, Turf A` });
+    const court = page.getByRole('region', { name: `${remoteVenue.name}, Court 1` });
+    // One card for the venue, with both of its units inside it: its name, address and Directions are shown once.
+    const card = page.locator('article').filter({ hasText: remoteVenue.name });
+    await expect(card).toHaveCount(1);
+    await expect(card.getByRole('heading', { name: remoteVenue.name })).toHaveCount(1);
+    await expect(card.getByRole('link', { name: 'Directions' })).toHaveCount(1);
+    await expect(card).toContainText('2 options');
+    await expect(card.getByRole('region')).toHaveCount(2);
     await expect(turf).toHaveCount(1);
     await expect(court).toHaveCount(1);
     await expect(turf).toContainText('5S');
-    await expect(court).not.toContainText('Court 1 ·'); // a unit with no type has no dangling separator
-    await expect(turf.getByRole('link', { name: 'Directions' })).toBeVisible();
+    await expect(court).not.toContainText('5S'); // a unit with no sub-type shows none
+    await expect(card.getByRole('link', { name: 'Directions' })).toBeVisible();
 
     // The turf is priced 6 AM-10 PM (Mon-Fri 800, Sat-Sun 1000); the court is priced all day at 300.
     const turfPrice = weekend ? '₹1000' : '₹800';
@@ -53,8 +60,8 @@ test.describe('customer site: finding a venue', () => {
   test('the facility chips narrow the results to that facility', async ({ page, context, remoteVenue }) => {
     await shareLocation(context, remoteVenue.lat, remoteVenue.lng);
     await searchNear(page, remoteVenue.name);
-    const turf = page.locator('article').filter({ hasText: remoteVenue.name }).filter({ hasText: 'Turf A' });
-    const court = page.locator('article').filter({ hasText: remoteVenue.name }).filter({ hasText: 'Court 1' });
+    const turf = page.getByRole('region', { name: `${remoteVenue.name}, Turf A` });
+    const court = page.getByRole('region', { name: `${remoteVenue.name}, Court 1` });
     const chips = page.getByRole('banner');
 
     // Two days ahead, so the result never depends on what time of day the suite runs (late today has no slots left).
