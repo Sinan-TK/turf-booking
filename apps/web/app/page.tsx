@@ -875,11 +875,11 @@ function VenueGroupCard({
   return (
     <article
       aria-label={venue.name}
-      className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-card transition-all duration-300 hover:border-emerald-500/40 sm:shadow-sm sm:hover:shadow-lg"
+      className="overflow-hidden rounded-[1.75rem] border border-slate-200/90 bg-white p-3 shadow-card transition-all duration-300 hover:border-emerald-500/40 sm:shadow-sm sm:hover:shadow-lg"
     >
-      <header className="flex items-start gap-3 p-4">
+      <header className="flex items-start gap-3 rounded-3xl bg-gradient-to-br from-emerald-50 via-emerald-50/50 to-white p-3.5 ring-1 ring-emerald-100">
         <div className="relative shrink-0">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl border-2 border-emerald-500/30 bg-slate-50 text-emerald-600 shadow-sm">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-emerald-600 shadow-md ring-1 ring-emerald-100">
             <Icon name={icon} className="text-[1.5rem]" />
           </div>
           <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-white bg-emerald-500">
@@ -895,7 +895,7 @@ function VenueGroupCard({
               href={googleMapsLink(venue)}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-50 px-2.5 py-1 text-[0.6875rem] font-bold text-emerald-700 transition hover:bg-emerald-100 active:scale-95"
+              className="inline-flex shrink-0 items-center gap-1 rounded-2xl bg-white px-3 py-1.5 text-[0.6875rem] font-bold text-emerald-700 shadow-sm ring-1 ring-emerald-200 transition hover:bg-emerald-600 hover:text-white active:scale-95"
             >
               <Icon name="location_on" className="text-[0.875rem]" />
               Directions
@@ -912,7 +912,7 @@ function VenueGroupCard({
       </header>
 
       {units.length > 1 && (
-        <div role="tablist" aria-label={`${venue.name} options`} className="scrollbar-hide flex gap-2 overflow-x-auto px-4 pb-3">
+        <div role="tablist" aria-label={`${venue.name} options`} className="scrollbar-hide mt-3 flex gap-1.5 overflow-x-auto rounded-2xl bg-slate-100 p-1.5">
           {units.map((u) => {
             const on = u.resource.id === unit.resource.id;
             return (
@@ -922,7 +922,7 @@ function VenueGroupCard({
                 role="tab"
                 aria-selected={on}
                 onClick={() => setPickedId(u.resource.id)}
-                className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition active:scale-95 ${on ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-emerald-400'}`}
+                className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition active:scale-95 ${on ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-600 hover:bg-white'}`}
               >
                 <Icon name={u.category?.iconKey ?? 'category'} className="text-[0.9375rem]" />
                 {u.resource.name}
@@ -933,7 +933,7 @@ function VenueGroupCard({
         </div>
       )}
 
-      <section aria-label={`${venue.name}, ${unit.resource.name}`} className="border-t border-slate-100">
+      <section aria-label={`${venue.name}, ${unit.resource.name}`} className="mt-3 rounded-3xl bg-slate-50 ring-1 ring-slate-100">
         <UnitPanel {...unitProps} key={unit.resource.id} result={unit} liveResult={liveFor(unit)} />
       </section>
     </article>
@@ -943,7 +943,7 @@ function VenueGroupCard({
 /** A small curved box with the unit's facility icon. */
 function UnitIcon({ r, className = '' }: { r: SearchResult; className?: string }) {
   return (
-    <div className={`flex shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 ${className}`}>
+    <div className={`flex shrink-0 items-center justify-center rounded-2xl bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-100 ${className}`}>
       <Icon name={r.category?.iconKey ?? 'category'} className="text-[1.25rem]" />
     </div>
   );
@@ -965,10 +965,10 @@ function UnitPanel({ result: r, liveResult, durationMinutes, dateIso, reloading,
   const shown = showAll ? times : times.slice(0, NEXT_SLOTS);
 
   return (
-    <div className="flex flex-col gap-3 p-4">
+    <div className="flex flex-col gap-3.5 p-3.5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
-          <UnitIcon r={r} className="h-10 w-10" />
+          <UnitIcon r={r} className="h-11 w-11" />
           <div className="min-w-0">
             <h3 className="truncate text-sm font-extrabold text-slate-900 sm:text-base">{r.resource.name}</h3>
             {r.resource.groundType && (
@@ -979,7 +979,7 @@ function UnitPanel({ result: r, liveResult, durationMinutes, dateIso, reloading,
           </div>
         </div>
         {r.price && (
-          <div className="shrink-0 text-right leading-tight">
+          <div className="shrink-0 rounded-2xl bg-white px-3 py-1.5 text-right leading-tight shadow-sm ring-1 ring-emerald-100">
             <span className="block text-[0.5625rem] font-bold uppercase text-slate-400">{durationLabel(durationMinutes)} rate</span>
             {r.price.normalAmount && (
               <s className="mr-1 text-[0.6875rem] font-medium text-slate-400">{formatPrice({ amount: r.price.normalAmount, currency: r.price.currency })}</s>
@@ -990,13 +990,13 @@ function UnitPanel({ result: r, liveResult, durationMinutes, dateIso, reloading,
         )}
       </div>
 
-      <div>
+      <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
         <div className="flex w-full items-center gap-0.5" aria-hidden="true">
           {timeline.hours.map((h) => (
             <div
               key={h}
               title={`${hourLabel(h)} - ${timeline.available.has(h) ? 'Available' : 'Booked'}`}
-              className={`h-1.5 flex-1 rounded-sm ${timeline.available.has(h) ? 'bg-emerald-500' : 'bg-slate-200'}`}
+              className={`h-2 flex-1 rounded-full ${timeline.available.has(h) ? 'bg-emerald-500' : 'bg-slate-200'}`}
             />
           ))}
         </div>
@@ -1008,7 +1008,7 @@ function UnitPanel({ result: r, liveResult, durationMinutes, dateIso, reloading,
       </div>
 
       {times.length === 0 ? (
-        <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center text-xs text-slate-500">No open slots for this duration on this day.</p>
+        <p className="rounded-2xl bg-white p-3.5 text-center text-xs text-slate-500 ring-1 ring-slate-100">No open slots for this duration on this day.</p>
       ) : (
         <>
           <div className="flex items-center justify-between text-[0.6875rem] font-bold uppercase tracking-wider text-slate-600">
@@ -1024,7 +1024,7 @@ function UnitPanel({ result: r, liveResult, durationMinutes, dateIso, reloading,
                 type="button"
                 disabled={busyStart !== null}
                 onClick={() => bookSlot(t)}
-                className="group flex flex-col items-center rounded-xl border border-emerald-200 bg-emerald-50/60 px-2 py-2 text-center shadow-sm transition hover:border-emerald-600 hover:bg-emerald-600 hover:text-white active:scale-95 disabled:cursor-wait disabled:opacity-60"
+                className="group flex flex-col items-center rounded-2xl bg-white px-2 py-2.5 text-center shadow-sm ring-1 ring-emerald-200 transition hover:bg-emerald-600 hover:text-white hover:ring-emerald-600 active:scale-95 disabled:cursor-wait disabled:opacity-60"
               >
                 <span className="text-xs font-extrabold">{busyStart === t ? 'Holding…' : formatStart(t, r.timezone)}</span>
                 {priceAt(r, t) && <span className="text-[0.625rem] font-bold text-emerald-700 group-hover:text-emerald-100">{formatPrice(priceAt(r, t)!)}</span>}
@@ -1042,7 +1042,7 @@ function UnitPanel({ result: r, liveResult, durationMinutes, dateIso, reloading,
                 type="button"
                 aria-expanded={showAll}
                 onClick={() => setShowAll((v) => !v)}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-emerald-400 active:scale-95"
+                className="rounded-2xl bg-white px-4 py-3 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:ring-emerald-400 active:scale-95"
               >
                 {showAll ? 'Show fewer' : `All ${times.length} slots`}
               </button>
@@ -1050,7 +1050,7 @@ function UnitPanel({ result: r, liveResult, durationMinutes, dateIso, reloading,
             <button
               type="button"
               onClick={() => setModalOpen(true)}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-extrabold text-white shadow-sm transition hover:bg-emerald-700 active:scale-95"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-emerald-600 px-3 py-3 text-xs font-extrabold text-white shadow-md transition hover:bg-emerald-700 active:scale-95"
             >
               <Icon name="bolt" className="text-[0.875rem]" />
               Book Now
