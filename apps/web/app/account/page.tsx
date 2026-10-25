@@ -47,7 +47,7 @@ function labelFor(type: string): string {
 function VerifiedChip({ verified, what }: { verified: boolean; what: string }) {
   return (
     <span
-      className={`ml-2 rounded-full px-2 py-0.5 align-middle text-[11px] font-semibold ${
+      className={`ml-2 rounded-full px-2 py-0.5 align-middle text-[0.6875rem] font-semibold ${
         verified ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'
       }`}
       aria-label={`${what} ${verified ? 'verified' : 'not verified'}`}
@@ -139,7 +139,7 @@ function Profile() {
         <h2 className="text-sm font-semibold text-gray-900">Profile</h2>
         {!editing && (
           <Button type="button" className="inline-flex items-center gap-1.5 !px-3 !py-1.5" onClick={startEdit}>
-            <Icon name="edit" className="text-[14px]" />
+            <Icon name="edit" className="text-[0.875rem]" />
             Edit
           </Button>
         )}
@@ -163,7 +163,7 @@ function Profile() {
                       onClick={() => setVerifying(true)}
                       className="ml-2 inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-2.5 py-1 align-middle text-xs font-semibold text-white transition hover:bg-emerald-600"
                     >
-                      <Icon name="verified" className="text-[13px]" />
+                      <Icon name="verified" className="text-[0.8125rem]" />
                       Verify
                     </button>
                   )}
@@ -398,7 +398,7 @@ function ChangePassword() {
         <h2 className="text-sm font-semibold text-gray-900">Change password</h2>
         {!open && (
           <Button type="button" className="inline-flex items-center gap-1.5 !px-3 !py-1.5" onClick={() => setOpen(true)}>
-            <Icon name="lock" className="text-[14px]" />
+            <Icon name="lock" className="text-[0.875rem]" />
             Change
           </Button>
         )}
@@ -429,7 +429,7 @@ function ChangePassword() {
               <ul className="mt-2 space-y-1 text-xs" aria-label="Password rules">
                 {rules.map((r) => (
                   <li key={r.id} className={`flex items-center gap-1.5 ${r.ok ? 'text-emerald-700' : dNext ? 'text-red-600' : 'text-gray-500'}`}>
-                    {r.ok ? <Icon name="check" className="text-[14px]" /> : dNext ? <Icon name="close" className="text-[14px]" /> : <span aria-hidden="true" className="inline-block h-3 w-3 shrink-0 rounded-full border border-gray-300" />}
+                    {r.ok ? <Icon name="check" className="text-[0.875rem]" /> : dNext ? <Icon name="close" className="text-[0.875rem]" /> : <span aria-hidden="true" className="inline-block h-3 w-3 shrink-0 rounded-full border border-gray-300" />}
                     <span>{r.label}</span>
                   </li>
                 ))}
@@ -445,7 +445,7 @@ function ChangePassword() {
             'new-password',
             confirmMatches && !msg('confirm') ? (
               <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-emerald-700">
-                <Icon name="check" className="text-[14px]" />
+                <Icon name="check" className="text-[0.875rem]" />
                 Passwords match
               </p>
             ) : undefined,
@@ -572,7 +572,7 @@ function AccountTabs() {
             onClick={() => choose(t.id)}
             className={`flex flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 transition sm:flex-row sm:gap-2 sm:px-3 sm:py-2.5 ${tab === t.id ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
           >
-            <Icon name={t.icon} className="text-[18px]" />
+            <Icon name={t.icon} className="text-[1.125rem]" />
             {t.label}
           </button>
         ))}

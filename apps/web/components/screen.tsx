@@ -16,9 +16,10 @@ export function Screen({
   wide?: boolean;
 }) {
   // Narrow, centred columns suit a phone; a wide page uses the whole laptop screen.
-  const width = wide ? 'max-w-lg md:max-w-2xl lg:max-w-screen-xl' : 'max-w-lg md:max-w-2xl';
+  // A wide page (the account) fills the screen; a form-like page (checkout, one booking) is a wide, centred column.
+  const width = wide ? 'max-w-lg md:max-w-2xl lg:max-w-none' : 'max-w-lg md:max-w-3xl lg:max-w-4xl';
   return (
-    <main className="min-h-screen bg-gray-50 px-4 pb-8 sm:px-6 sm:pb-12 lg:px-8">
+    <main className="min-h-screen bg-gray-50 px-4 pb-8 sm:px-6 sm:pb-12 lg:px-10 2xl:px-14">
       <div className={`mx-auto flex w-full items-center justify-between py-4 ${width}`}>
         <BackButton />
         {topRight ?? (showAccountMenu ? <AccountMenu /> : null)}

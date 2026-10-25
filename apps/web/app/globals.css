@@ -2,6 +2,70 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Size. Everything is sized in rem, so changing the root size scales the whole site: text, buttons, cards and
+ * spacing grow together on big screens (and stay as they are on phones and small laptops).
+ */
+html {
+  font-size: 16px;
+}
+@media (min-width: 1280px) {
+  html {
+    font-size: 17px;
+  }
+}
+@media (min-width: 1536px) {
+  html {
+    font-size: 18.5px;
+  }
+}
+@media (min-width: 1920px) {
+  html {
+    font-size: 20px;
+  }
+}
+@media (min-width: 2560px) {
+  html {
+    font-size: 24px;
+  }
+}
+
+/*
+ * Scrollbars: thin, rounded and quiet instead of the thick grey default. The thumb is slate, turns green when
+ * pointed at, and the track is invisible. Firefox gets the same through scrollbar-width / scrollbar-color.
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #34d399;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+/* Rows that scroll sideways by swiping or by wheel (chips, day pickers) show no bar at all. */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* LocationSidebar (apps/web/app/page.tsx) animates via Tailwind
  * translate/opacity transitions driven by its own `shown` state — no
  * keyframes needed. The drawer slides in from the left on open and back

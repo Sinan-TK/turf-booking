@@ -84,7 +84,7 @@ export function AccountMenu() {
               onClick={() => setOpen(false)}
               className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
             >
-              <Icon name={item.icon} className="text-[16px] text-slate-400" />
+              <Icon name={item.icon} className="text-[1rem] text-slate-400" />
               {item.label}
             </Link>
           ))}
@@ -97,7 +97,7 @@ export function AccountMenu() {
             }}
             className="flex w-full items-center gap-2.5 border-t border-slate-100 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
           >
-            <Icon name="logout" className="text-[16px]" />
+            <Icon name="logout" className="text-[1rem]" />
             Log out
           </button>
         </div>

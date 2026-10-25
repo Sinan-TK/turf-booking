@@ -101,7 +101,7 @@ export function VerifyEmailDialog({ email, onVerified, onClose }: { email: strin
       >
         <div className="flex items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-            <Icon name="verified" className="text-[20px]" />
+            <Icon name="verified" className="text-[1.25rem]" />
           </span>
           <div className="min-w-0">
             <h2 id="verify-email-title" className="text-lg font-semibold text-gray-900">

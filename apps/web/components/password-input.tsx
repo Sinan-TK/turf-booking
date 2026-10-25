@@ -17,7 +17,7 @@ export function PasswordInput({ className = '', ...props }: Omit<InputHTMLAttrib
         aria-label={shown ? 'Hide password' : 'Show password'}
         className="absolute inset-y-0 right-1.5 my-auto flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
       >
-        <Icon name={shown ? 'visibility_off' : 'visibility'} className="text-[18px]" />
+        <Icon name={shown ? 'visibility_off' : 'visibility'} className="text-[1.125rem]" />
       </button>
     </div>
   );

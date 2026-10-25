@@ -338,7 +338,7 @@ export default function CheckoutPage() {
                   disabled={!holdActive || paying || confirmingPayment}
                   onClick={() => guarded(onPayWithRazorpay)}
                 >
-                  <Icon name="bolt" className="text-[20px]" />
+                  <Icon name="bolt" className="text-[1.25rem]" />
                   {paying ? 'Please wait…' : 'Pay online'}
                 </Button>
                 <Button
@@ -362,7 +362,7 @@ export default function CheckoutPage() {
                 <SuccessBanner
                   message={
                     <span className="flex items-center gap-1.5">
-                      <Icon name="bolt" className="text-[18px]" />
+                      <Icon name="bolt" className="text-[1.125rem]" />
                       Booking confirmed! We have sent the details to your WhatsApp.
                     </span>
                   }

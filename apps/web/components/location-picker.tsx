@@ -156,7 +156,7 @@ export function LocationPicker({
             aria-label="Back"
             className="rounded-full p-2 text-slate-600 hover:bg-slate-100 sm:hidden"
           >
-            <Icon name="arrow_back" className="text-[20px]" />
+            <Icon name="arrow_back" className="text-[1.25rem]" />
           </button>
           <h2 id="location-picker-title" className="flex-1 text-base font-extrabold text-slate-900">
             Choose your location
@@ -167,13 +167,13 @@ export function LocationPicker({
             aria-label="Close"
             className="hidden rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 sm:block"
           >
-            <Icon name="close" className="text-[18px]" />
+            <Icon name="close" className="text-[1.125rem]" />
           </button>
         </header>
 
         <div className="px-3 pt-3 sm:px-5">
           <div className="relative">
-            <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[16px] text-slate-400" />
+            <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[1rem] text-slate-400" />
             <input
               ref={searchBox}
               type="search"
@@ -188,9 +188,9 @@ export function LocationPicker({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4 pt-2 sm:px-3">
           <button type="button" onClick={useMyLocation} disabled={locating} className={row(current?.mode === 'geo')}>
-            <Icon name="my_location" className="text-[18px] text-emerald-700" />
+            <Icon name="my_location" className="text-[1.125rem] text-emerald-700" />
             <span className="flex-1">{locating ? 'Finding your location…' : 'Use my current location'}</span>
-            {current?.mode === 'geo' && <Icon name="check" className="text-[16px]" />}
+            {current?.mode === 'geo' && <Icon name="check" className="text-[1rem]" />}
           </button>
           {geoError && (
             <p role="alert" className="mx-3.5 mb-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -202,9 +202,9 @@ export function LocationPicker({
 
           {districtName && (
             <button type="button" onClick={chooseDistrict} className={row(isDistrictCurrent)}>
-              <Icon name="location_on" className={`text-[18px] ${isDistrictCurrent ? 'text-emerald-700' : 'text-slate-500'}`} />
+              <Icon name="location_on" className={`text-[1.125rem] ${isDistrictCurrent ? 'text-emerald-700' : 'text-slate-500'}`} />
               <span className="flex-1">All of {districtName}</span>
-              {isDistrictCurrent && <Icon name="check" className="text-[16px]" />}
+              {isDistrictCurrent && <Icon name="check" className="text-[1rem]" />}
             </button>
           )}
 
@@ -227,9 +227,9 @@ export function LocationPicker({
             const selected = current?.mode === 'town' && current.areaId === t.id;
             return (
               <button key={t.id} type="button" onClick={() => chooseTown(t)} className={row(selected)}>
-                <Icon name="location_on" className={`text-[18px] ${selected ? 'text-emerald-700' : 'text-slate-400'}`} />
+                <Icon name="location_on" className={`text-[1.125rem] ${selected ? 'text-emerald-700' : 'text-slate-400'}`} />
                 <span className="flex-1">{t.name}</span>
-                {selected && <Icon name="check" className="text-[16px]" />}
+                {selected && <Icon name="check" className="text-[1rem]" />}
               </button>
             );
           })}
@@ -242,7 +242,7 @@ export function LocationPicker({
               className="flex w-full items-center justify-between text-xs font-bold uppercase tracking-wide text-slate-500"
             >
               Other district
-              <Icon name="expand_more" className={`text-[16px] transition ${showOther ? 'rotate-180' : ''}`} />
+              <Icon name="expand_more" className={`text-[1rem] transition ${showOther ? 'rotate-180' : ''}`} />
             </button>
             {showOther && (
               <div className="mt-3 space-y-3">

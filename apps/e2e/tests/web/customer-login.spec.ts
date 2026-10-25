@@ -119,7 +119,10 @@ test.describe('customer sign-in', () => {
     await expect(back).toBeVisible();
     const box = (await back.boundingBox())!;
     expect(Math.round(box.width)).toBe(Math.round(box.height)); // square
-    expect(await back.evaluate((el) => getComputedStyle(el).borderRadius)).toBe('12px'); // a curved box, not a circle
+    // A curved box, not a circle: the corners are rounded, but far less than half the width.
+    const radius = parseFloat(await back.evaluate((el) => getComputedStyle(el).borderTopLeftRadius));
+    expect(radius).toBeGreaterThan(8);
+    expect(radius).toBeLessThan(box.width / 2 - 4);
     await expect(page.getByText('Home', { exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Account menu' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Log in' })).toHaveCount(0);

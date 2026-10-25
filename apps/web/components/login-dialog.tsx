@@ -371,7 +371,7 @@ export function LoginDialog({
             aria-label="Close"
             className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
           >
-            <Icon name="close" className="text-[20px]" />
+            <Icon name="close" className="text-[1.25rem]" />
           </button>
         </div>
 
@@ -386,7 +386,7 @@ export function LoginDialog({
             {notice && <SuccessBanner message={notice} />}
             {HAS.google && <GoogleButton onCredential={onGoogle} disabled={busy} />}
             {HAS.google && HAS.email && (
-              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              <div className="flex items-center gap-2 text-[0.6875rem] font-semibold uppercase tracking-wide text-slate-400">
                 <span className="h-px flex-1 bg-slate-200" /> or <span className="h-px flex-1 bg-slate-200" />
               </div>
             )}

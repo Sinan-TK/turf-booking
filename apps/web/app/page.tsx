@@ -387,14 +387,14 @@ export default function HomePage() {
     <>
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-emerald-900/10 pt-3 pb-0">
-        <div className="mx-auto w-full max-w-screen-xl px-4 sm:px-6 lg:px-8">
+        <div className="w-full px-4 sm:px-6 lg:px-10 2xl:px-14">
         {/* Top row: location · (search, inline from md up) · account. Below md the search box wraps to its own full-width row. */}
         <div className="flex flex-wrap items-center justify-between gap-x-3 md:flex-nowrap md:gap-x-6">
           <button onClick={() => setPickerOpen(true)} aria-label={`Change location, now ${locationTitle}`} aria-haspopup="dialog" className="flex items-center gap-2 text-slate-700 hover:text-slate-900 transition py-1 text-left group md:order-1" type="button">
             <svg className="w-6 h-6 text-brand-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"></path></svg>
             <div className="flex flex-col items-start text-left">
               <span className="font-black text-slate-900 text-sm tracking-tight leading-tight">{locationTitle}</span>
-              <span className="text-[10px] font-medium text-slate-500 leading-tight">
+              <span className="text-[0.625rem] font-medium text-slate-500 leading-tight">
                 {locationSubtitle}
               </span>
             </div>
@@ -426,7 +426,7 @@ export default function HomePage() {
                 onClick={() => selectCategory(c.slug)}
                 className={`flex-shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs transition ${isActive ? 'text-emerald-700 border-b-2 border-emerald-600 font-bold' : 'font-semibold text-slate-600 hover:text-slate-900 border-b-2 border-transparent border-r border-slate-100'}`}
               >
-                <Icon name={c.iconKey} className={`text-[16px] ${isActive ? 'text-emerald-600' : 'text-slate-400'}`} />
+                <Icon name={c.iconKey} className={`text-[1rem] ${isActive ? 'text-emerald-600' : 'text-slate-400'}`} />
                 <span>{c.name}</span>
               </button>
             );
@@ -448,7 +448,7 @@ export default function HomePage() {
                   type="button"
                   onClick={() => setForm((f) => ({ ...f, groundType: t.value }))}
                   aria-pressed={isActive}
-                  className={`flex-shrink-0 rounded-full border px-3 py-1 text-[11px] font-bold transition ${isActive ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-400'}`}
+                  className={`flex-shrink-0 rounded-full border px-3 py-1 text-[0.6875rem] font-bold transition ${isActive ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-400'}`}
                 >
                   {t.label}
                 </button>
@@ -460,7 +460,7 @@ export default function HomePage() {
       </header>
 
       <section className="pb-3 pt-4">
-        <div className="mx-auto flex w-full max-w-screen-xl items-center space-x-2 overflow-x-auto px-4 scrollbar-hide scroll-smooth sm:space-x-3 sm:px-6 lg:px-8">
+        <div className="flex w-full items-center space-x-2 overflow-x-auto px-4 scrollbar-hide scroll-smooth sm:space-x-3 sm:px-6 lg:px-10 2xl:px-14">
           {days.map((d) => {
             const isActive = form.date === d.iso;
             return (
@@ -469,16 +469,16 @@ export default function HomePage() {
                 onClick={() => setForm((f) => ({ ...f, date: d.iso }))}
                 className={`flex-shrink-0 flex flex-col items-center justify-center py-2.5 px-3.5 rounded-2xl min-w-[64px] sm:min-w-[84px] sm:py-3 transition-all active:scale-95 ${isActive ? 'bg-gradient-to-br from-brand-500 to-brand-600 text-white shadow-brand-500/40 shadow-lg border border-brand-400' : 'bg-white border border-slate-200 text-slate-800 hover:border-slate-300 shadow-sm'}`}
               >
-                <span className={`text-[9px] uppercase leading-none ${isActive ? 'font-extrabold tracking-wider text-brand-100' : 'font-bold text-slate-400'}`}>{d.weekday}</span>
+                <span className={`text-[0.5625rem] uppercase leading-none ${isActive ? 'font-extrabold tracking-wider text-brand-100' : 'font-bold text-slate-400'}`}>{d.weekday}</span>
                 <span className={`text-lg font-black my-0.5 leading-tight ${isActive ? '' : 'text-slate-900'}`}>{d.day}</span>
-                <span className={`text-[10px] leading-none ${isActive ? 'font-semibold text-brand-50' : 'font-medium text-slate-400'}`}>{d.month}</span>
+                <span className={`text-[0.625rem] leading-none ${isActive ? 'font-semibold text-brand-50' : 'font-medium text-slate-400'}`}>{d.month}</span>
               </button>
             );
           })}
         </div>
       </section>
 
-      <main className="mx-auto w-full max-w-screen-xl flex-1 px-4 pb-24 sm:px-6 lg:px-8">
+      <main className="w-full flex-1 px-4 pb-24 sm:px-6 lg:px-10 2xl:px-14">
         {errorMessage && <div className="mb-4"><ErrorBanner message={errorMessage} /></div>}
         {/* The first search shows the shape of the results; a re-search keeps the old results and shows a slim bar. */}
         {searching && (results.length === 0 ? <VenueCardsSkeleton /> : <SearchingBar />)}
@@ -692,11 +692,11 @@ function SlotBookingModal({
               />
             ) : (
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
-                <Icon name={r.category?.iconKey ?? 'category'} className="text-[24px]" />
+                <Icon name={r.category?.iconKey ?? 'category'} className="text-[1.5rem]" />
               </div>
             )}
             <div className="min-w-0">
-              <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700">Book your slot</p>
+              <p className="text-[0.625rem] font-extrabold uppercase tracking-wider text-emerald-700">Book your slot</p>
               <h3 className="mt-0.5 truncate text-lg font-black tracking-tight text-slate-900">{r.venue.name}</h3>
               <p className="mt-0.5 truncate text-xs text-slate-500">
                 {r.venue.address}
@@ -706,16 +706,16 @@ function SlotBookingModal({
                   href={googleMapsLink(r.venue)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 transition hover:bg-emerald-100 active:scale-95"
+                  className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-50 px-2.5 py-1 text-[0.6875rem] font-bold text-emerald-700 transition hover:bg-emerald-100 active:scale-95"
                 >
-                  <Icon name="location_on" className="text-[14px]" />
+                  <Icon name="location_on" className="text-[0.875rem]" />
                   Directions
                 </a>
               </div>
             </div>
           </div>
           <button type="button" onClick={beginClose} aria-label="Close" className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-            <Icon name="close" className="text-[20px]" />
+            <Icon name="close" className="text-[1.25rem]" />
           </button>
         </div>
 
@@ -776,7 +776,7 @@ function SlotBookingModal({
                     {formatStart(t, r.timezone)}
                   </span>
                   {slotPrice && (
-                    <span className={`shrink-0 text-[11px] font-black ${active ? 'text-emerald-100' : 'text-emerald-700'}`}>
+                    <span className={`shrink-0 text-[0.6875rem] font-black ${active ? 'text-emerald-100' : 'text-emerald-700'}`}>
                       {formatPrice(slotPrice)}
                     </span>
                   )}
@@ -852,7 +852,7 @@ function MobileVenueCard({
           <div className="relative flex-shrink-0">
             {/* Using a placeholder since we don't have venue image from the api right now, using stadium icon as fallback */}
             <div className="w-14 h-14 rounded-xl border-2 border-emerald-500/30 shadow-sm flex items-center justify-center bg-slate-50 text-emerald-600">
-              <Icon name={r.category?.iconKey ?? 'category'} className="text-[28px]" />
+              <Icon name={r.category?.iconKey ?? 'category'} className="text-[1.75rem]" />
             </div>
             <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full flex items-center justify-center">
               <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path></svg>
@@ -861,7 +861,7 @@ function MobileVenueCard({
           <div className="flex-1 min-w-0 flex flex-col">
             <h2 className="text-base font-black text-slate-900 tracking-tight leading-snug mb-1 truncate">{r.venue.name}</h2>
             <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.625rem] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800">
                 <svg className="w-3 h-3 text-emerald-600 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polygon points="12 6 15 11 10 14 14 17 8 18"></polygon></svg>
                 {r.resource.groundType}
               </span>
@@ -872,14 +872,14 @@ function MobileVenueCard({
                 {r.venue.address.split(',')[0] || r.venue.address}
               </span>
               <span className="text-slate-300">•</span>
-              <span className="text-[11px] text-slate-400">{r.resource.name}</span>
+              <span className="text-[0.6875rem] text-slate-400">{r.resource.name}</span>
             </div>
             <div className="mt-1.5 flex items-center gap-2">
               <a
                 href={googleMapsLink(r.venue)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 transition hover:bg-emerald-100 active:scale-95"
+                className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-50 px-2.5 py-1 text-[0.6875rem] font-bold text-emerald-700 transition hover:bg-emerald-100 active:scale-95"
               >
                 <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" strokeLinecap="round" strokeLinejoin="round"></path></svg>
                 Directions
@@ -889,13 +889,13 @@ function MobileVenueCard({
         </div>
         {r.price && (
           <div className="bg-emerald-50 border border-emerald-500/20 px-2.5 py-1 rounded-xl text-right shrink-0">
-            <span className="text-[9px] uppercase font-bold text-emerald-700 block leading-none">From</span>
+            <span className="text-[0.5625rem] uppercase font-bold text-emerald-700 block leading-none">From</span>
             <div className="flex items-baseline justify-end text-venue-primary leading-tight mt-0.5">
               {r.price.normalAmount && (
-                <s className="mr-1 text-[11px] font-medium text-slate-400">{formatPrice({ amount: r.price.normalAmount, currency: r.price.currency })}</s>
+                <s className="mr-1 text-[0.6875rem] font-medium text-slate-400">{formatPrice({ amount: r.price.normalAmount, currency: r.price.currency })}</s>
               )}
               <span className="text-base font-black tracking-tight">{formatPrice(r.price)}</span>
-              <span className="text-[10px] font-medium text-slate-500 ml-0.5">/{shortDuration(durationMinutes)}</span>
+              <span className="text-[0.625rem] font-medium text-slate-500 ml-0.5">/{shortDuration(durationMinutes)}</span>
             </div>
           </div>
         )}
@@ -903,9 +903,9 @@ function MobileVenueCard({
 
       <div className="border-t border-emerald-500/20 -mx-4">
         <div className="flex flex-col gap-2 bg-emerald-50/50 p-4 rounded-b-2xl">
-          <div className="flex items-center justify-between text-[10px]">
-            <span className="font-extrabold uppercase tracking-wider text-slate-800 text-[10px]">DAY TIMELINE OCCUPANCY</span>
-            <div className="flex items-center gap-2 text-slate-500 font-medium text-[9px] flex-wrap">
+          <div className="flex items-center justify-between text-[0.625rem]">
+            <span className="font-extrabold uppercase tracking-wider text-slate-800 text-[0.625rem]">DAY TIMELINE OCCUPANCY</span>
+            <div className="flex items-center gap-2 text-slate-500 font-medium text-[0.5625rem] flex-wrap">
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-500"></span> Available</span>
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-slate-300"></span> Booked</span>
             </div>
@@ -922,7 +922,7 @@ function MobileVenueCard({
             })}
           </div>
           
-          <div className="flex items-center justify-between text-[9px] font-bold text-slate-400 px-0.5">
+          <div className="flex items-center justify-between text-[0.5625rem] font-bold text-slate-400 px-0.5">
             <span>{timeline.labels[0]}</span>
             <span>{timeline.labels[1]}</span>
             <span>{timeline.labels[2]}</span>
@@ -985,15 +985,15 @@ function DesktopVenueCard({
             <div className="mb-2.5 flex items-start justify-between gap-3">
               <div className="flex items-center gap-3.5">
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700">
-                  <Icon name={r.category?.iconKey ?? 'category'} className="text-[28px]" />
+                  <Icon name={r.category?.iconKey ?? 'category'} className="text-[1.75rem]" />
                 </div>
                 <div>
-                  <span className="mb-1 inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                  <span className="mb-1 inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[0.625rem] font-bold text-slate-600">
                     {r.resource.groundType ? `${r.resource.name} · ${r.resource.groundType}` : r.resource.name}
                   </span>
                   <h3 className="text-xl font-bold leading-snug text-slate-900">{r.venue.name}</h3>
                   <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
-                    <Icon name="location_on" className="text-[14px]" />
+                    <Icon name="location_on" className="text-[0.875rem]" />
                     {r.venue.address}
                   </p>
                   <div className="mt-1.5 flex items-center gap-2">
@@ -1001,9 +1001,9 @@ function DesktopVenueCard({
                       href={googleMapsLink(r.venue)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 transition hover:bg-emerald-100 active:scale-95"
+                      className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-50 px-2.5 py-1 text-[0.6875rem] font-bold text-emerald-700 transition hover:bg-emerald-100 active:scale-95"
                     >
-                      <Icon name="location_on" className="text-[14px]" />
+                      <Icon name="location_on" className="text-[0.875rem]" />
                       Directions
                     </a>
                   </div>
@@ -1011,7 +1011,7 @@ function DesktopVenueCard({
               </div>
               {r.price && (
                 <div className="flex shrink-0 flex-col items-end">
-                  <span className="text-[11px] font-semibold text-slate-400">
+                  <span className="text-[0.6875rem] font-semibold text-slate-400">
                     {durationLabel(durationMinutes)} rate
                   </span>
                   {r.price.normalAmount && (
@@ -1023,7 +1023,7 @@ function DesktopVenueCard({
                     {formatPrice(r.price)}
                   </span>
                   {payNowLabel(r.price) && (
-                    <span className="text-[11px] font-semibold text-emerald-700">{payNowLabel(r.price)}</span>
+                    <span className="text-[0.6875rem] font-semibold text-emerald-700">{payNowLabel(r.price)}</span>
                   )}
                 </div>
               )}
@@ -1037,7 +1037,7 @@ function DesktopVenueCard({
                 onClick={() => setSlotModalOpen(true)}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-2.5 text-xs font-bold text-white shadow-md transition-all hover:-translate-y-0.5 hover:from-emerald-500 hover:to-emerald-600 active:scale-95"
               >
-                <Icon name="bolt" className="text-[18px]" />
+                <Icon name="bolt" className="text-[1.125rem]" />
                 Book Now · {r.availableStartTimes.length} slot{r.availableStartTimes.length === 1 ? '' : 's'} open
               </button>
             </div>
@@ -1051,10 +1051,10 @@ function DesktopVenueCard({
 
             <div className="mb-2 mt-3.5 flex items-center justify-between">
               <span className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-700">
-                <Icon name="schedule" className="text-[16px]" />
+                <Icon name="schedule" className="text-[1rem]" />
                 Tap Slot to Instant Book
               </span>
-              <span className="text-[11px] font-semibold text-emerald-700">
+              <span className="text-[0.6875rem] font-semibold text-emerald-700">
                 {r.availableStartTimes.length} slot{r.availableStartTimes.length === 1 ? '' : 's'} open
               </span>
             </div>
@@ -1077,12 +1077,12 @@ function DesktopVenueCard({
                       <span className="flex flex-col text-left">
                         <span className="text-xs font-extrabold text-slate-900 group-hover:text-white">{formatStart(t, r.timezone)}</span>
                         {priceAt(r, t) && (
-                          <span className="text-[10px] font-bold text-emerald-700 group-hover:text-emerald-100">
+                          <span className="text-[0.625rem] font-bold text-emerald-700 group-hover:text-emerald-100">
                             {formatPrice(priceAt(r, t)!)}
                           </span>
                         )}
                       </span>
-                      <span className="flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 text-[10px] font-extrabold uppercase text-white group-hover:bg-white group-hover:text-emerald-900">
+                      <span className="flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 text-[0.625rem] font-extrabold uppercase text-white group-hover:bg-white group-hover:text-emerald-900">
                         {busyStart === t ? 'Holding…' : 'Book'}
                       </span>
                     </button>
@@ -1123,7 +1123,7 @@ function DayTimeline({ result: r }: { result: SearchResult }) {
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
         </span>
-        <span className="text-[11px] font-bold uppercase tracking-wide text-slate-800">Day Timeline</span>
+        <span className="text-[0.6875rem] font-bold uppercase tracking-wide text-slate-800">Day Timeline</span>
       </div>
       <div className="flex h-4 gap-0.5 overflow-hidden rounded-lg border border-slate-200 bg-slate-100 p-0.5">
         {timeline.hours.map((h) => {
@@ -1135,7 +1135,7 @@ function DayTimeline({ result: r }: { result: SearchResult }) {
           );
         })}
       </div>
-      <div className="flex justify-between pt-1 text-[9px] font-semibold text-slate-400">
+      <div className="flex justify-between pt-1 text-[0.5625rem] font-semibold text-slate-400">
         <span>{timeline.labels[0]}</span>
             <span>{timeline.labels[1]}</span>
             <span>{timeline.labels[2]}</span>
