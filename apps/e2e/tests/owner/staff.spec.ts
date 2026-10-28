@@ -107,9 +107,9 @@ test.describe('owner portal: venue-based staff', () => {
       await expect(nav.getByRole('link', { name: new RegExp(label + '$') })).toHaveCount(0);
     }
 
-    // A page staff may not open sends them back to the dashboard.
+    // A page staff may not open sends them back to the dashboard, which says why.
     await page.goto('/payments');
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(/\/dashboard\?restricted=1$/);
 
     // Bookings list: scoped to the chosen venue, no venue filter.
     await page.getByRole('navigation').getByRole('link', { name: /Bookings$/ }).click();

@@ -21,6 +21,7 @@ import {
 } from '@/components/ui';
 import { emailError, hasErrors, indianPhoneError, textError, type FieldErrors } from '@/lib/validation';
 import { PhoneInput } from '@/components/phone-input';
+import { AccessCard } from '@/components/access-card';
 
 interface Staff {
   id: string;
@@ -253,6 +254,14 @@ function VenuesModal({
   );
 }
 
+const MAX_VENUE_CHIPS = 3;
+
+/** "Asha Menon" -> "AM". */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? '?') + (parts.length > 1 ? parts[parts.length - 1]![0]! : '')).toUpperCase();
+}
+
 export default function StaffPage() {
   const { user } = useAuth();
   const f = useListFilters({ search: '', status: '' });
@@ -295,6 +304,7 @@ export default function StaffPage() {
           <SuccessBanner message={notice} />
         </div>
       )}
+      {!f.active && <div className="mb-6"><AccessCard audience="owner" /></div>}
       <ListToolbar
         active={f.active}
         total={total}
@@ -323,7 +333,7 @@ export default function StaffPage() {
       {error && <ErrorBanner message={error} />}
       {!error && (
         <DataTable
-          columns={['Name', 'Venues', 'Status', { label: '', className: 'w-56' }]}
+          columns={['Staff member', 'Works in', 'Sign-in', { label: '', className: 'w-56' }]}
           loading={loading}
           rowCount={staff.length}
           empty={f.active ? 'No staff match your search or filters.' : 'No staff yet. Invite someone to let them take bookings at a venue.'}
@@ -332,40 +342,85 @@ export default function StaffPage() {
           {staff.map((s) => (
             <tr key={s.id} className={ROW}>
               <td className="px-4 py-3">
-                <p className="font-medium text-on-surface">{s.name}</p>
-                <p className="text-xs text-on-surface-variant">{s.email}</p>
-              </td>
-              <td className="px-4 py-3">
-                <div className="flex flex-wrap gap-1.5">
-                  {s.venues.length === 0 && <span className="text-xs text-on-surface-variant">None</span>}
-                  {s.venues.map((v) => (
-                    <span key={v.id} className="rounded-full bg-surface-container px-2.5 py-0.5 text-xs text-on-surface">
-                      {v.name}
-                    </span>
-                  ))}
+                <div className="flex items-center gap-3">
+                  <span
+                    aria-hidden="true"
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+                      s.status === 'ACTIVE' ? 'bg-primary/10 text-primary' : 'bg-surface-container-high text-on-surface-variant'
+                    }`}
+                  >
+                    {initials(s.name)}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-on-surface">{s.name}</p>
+                    <p className="truncate text-xs text-on-surface-variant">{s.email}</p>
+                    {s.phone && <p className="text-xs text-on-surface-variant">{s.phone}</p>}
+                  </div>
                 </div>
               </td>
               <td className="px-4 py-3">
-                <Badge value={s.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE'} />
+                {s.venues.length === 0 ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-500/30">
+                    No venue yet: can&apos;t take bookings
+                  </span>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {s.venues.slice(0, MAX_VENUE_CHIPS).map((v) => (
+                      <span key={v.id} className="rounded-full bg-surface-container px-2.5 py-0.5 text-xs text-on-surface">
+                        {v.name}
+                      </span>
+                    ))}
+                    {s.venues.length > MAX_VENUE_CHIPS && (
+                      <span
+                        className="text-xs font-medium text-on-surface-variant"
+                        title={s.venues.slice(MAX_VENUE_CHIPS).map((v) => v.name).join(', ')}
+                      >
+                        +{s.venues.length - MAX_VENUE_CHIPS} more
+                      </span>
+                    )}
+                  </div>
+                )}
               </td>
-              <td className="px-4 py-3 text-right">
-                <button
-                  type="button"
-                  className="mr-4 text-sm font-medium text-primary hover:underline"
-                  onClick={() => setEditing(s)}
-                >
-                  Edit venues
-                </button>
-                <button
-                  type="button"
-                  className={`text-sm font-medium hover:underline ${s.status === 'ACTIVE' ? 'text-error' : 'text-primary'}`}
-                  onClick={() => {
-                    setToggleError(null);
-                    setToggling(s);
-                  }}
-                >
-                  {s.status === 'ACTIVE' ? 'Disable' : 'Enable'}
-                </button>
+              <td className="px-4 py-3">
+                {s.status === 'ACTIVE' ? (
+                  <span className="inline-flex items-center gap-2 text-sm text-on-surface">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
+                    Active
+                  </span>
+                ) : (
+                  <span className="block text-sm text-on-surface-variant">
+                    <span className="inline-flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-outline" aria-hidden="true" />
+                      Disabled
+                    </span>
+                    <span className="block text-xs">Cannot sign in</span>
+                  </span>
+                )}
+              </td>
+              <td className="px-4 py-3">
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="rounded-lg px-3 py-1.5 text-sm font-medium text-on-surface ring-1 ring-inset ring-outline-variant/50 transition-colors hover:bg-surface-container-low"
+                    onClick={() => setEditing(s)}
+                  >
+                    Edit venues
+                  </button>
+                  <button
+                    type="button"
+                    className={`rounded-lg px-3 py-1.5 text-sm font-medium ring-1 ring-inset transition-colors ${
+                      s.status === 'ACTIVE'
+                        ? 'text-error ring-error/30 hover:bg-error/5'
+                        : 'text-primary ring-primary/30 hover:bg-primary/5'
+                    }`}
+                    onClick={() => {
+                      setToggleError(null);
+                      setToggling(s);
+                    }}
+                  >
+                    {s.status === 'ACTIVE' ? 'Disable' : 'Enable'}
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

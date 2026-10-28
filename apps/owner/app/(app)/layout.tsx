@@ -6,17 +6,18 @@ import { useAuth } from '@/lib/auth-context';
 import { Sidebar } from '@/components/sidebar';
 import { NotificationBell } from '@/components/notification-bell';
 import { Icon, LoadingState } from '@/components/ui';
-import { canOpen } from '@/lib/access';
-
-const OWNER_ROLE_LABEL: Record<string, string> = {
-  OWNER_ADMIN: 'Owner Admin',
-  OWNER_STAFF: 'Owner Staff',
-};
+import { ROLE_LABEL, canOpen } from '@/lib/access';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, isStaff, selectedVenueId, selectVenue } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  // Set when a staff member was sent here from a page that is only for the owner admin (read from the address, which
+  // keeps this layout free of the Suspense boundary useSearchParams would need).
+  const [restricted, setRestricted] = useState(false);
+  useEffect(() => {
+    setRestricted(new URLSearchParams(window.location.search).get('restricted') === '1');
+  }, [pathname]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -29,7 +30,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading || !user) return;
     if (needsVenue) router.replace('/choose-venue');
-    else if (blocked) router.replace('/dashboard');
+    else if (blocked) router.replace('/dashboard?restricted=1'); // says why, instead of silently moving them
   }, [loading, user, needsVenue, blocked, router]);
 
   // Close the mobile drawer automatically on navigation — otherwise it
@@ -63,8 +64,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-3">
             {isStaff && user.venues.length > 0 && (
               <label className="flex items-center gap-2">
-                <span className="sr-only">Venue</span>
-                <Icon name="storefront" className="hidden text-on-surface-variant sm:inline" />
+                <span className="hidden text-label-md font-label-md text-on-surface-variant lg:inline">Working in</span>
+                <span className="sr-only lg:hidden">Venue</span>
+                <Icon name="storefront" className="hidden text-on-surface-variant sm:inline lg:hidden" />
                 {user.venues.length > 1 ? (
                   <select
                     value={selectedVenueId ?? ''}
@@ -87,9 +89,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             )}
             <NotificationBell />
             <div className="hidden text-right sm:block">
-              <p className="text-body-md font-semibold text-on-surface">{user.name ?? OWNER_ROLE_LABEL[user.ownerRole]}</p>
+              <p className="text-body-md font-semibold text-on-surface">{user.name ?? ROLE_LABEL[user.ownerRole]}</p>
               <p className="font-label-md text-label-md text-on-surface-variant">
-                {OWNER_ROLE_LABEL[user.ownerRole] ?? user.ownerRole}
+                {ROLE_LABEL[user.ownerRole] ?? user.ownerRole}
               </p>
             </div>
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary">
@@ -97,7 +99,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </header>
-        <main className="min-h-screen p-container-padding pt-24">{children}</main>
+        <main className="min-h-screen p-container-padding pt-24">
+          {restricted && (
+            <div role="status" className="mb-6 flex items-start justify-between gap-3 rounded-xl bg-surface-container px-4 py-3 text-sm text-on-surface">
+              <p>
+                That page is for the owner admin. As staff you work with bookings, walk-ins and alerts; earnings, venues and staff are looked after by
+                your owner admin.
+              </p>
+              <button
+                type="button"
+                aria-label="Dismiss"
+                className="shrink-0 rounded-md px-2 py-0.5 text-on-surface-variant hover:bg-surface-container-high"
+                onClick={() => {
+                  setRestricted(false);
+                  router.replace(pathname ?? '/dashboard');
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+          {children}
+        </main>
       </div>
     </div>
   );

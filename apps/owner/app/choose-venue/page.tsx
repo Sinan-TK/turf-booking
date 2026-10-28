@@ -75,6 +75,11 @@ export default function ChooseVenuePage() {
           ))}
         </ul>
       )}
+      {user.venues.length > 0 && (
+        <p className="mt-4 text-xs text-on-surface-variant">
+          You can switch venue at any time from the Working in menu at the top of every page.
+        </p>
+      )}
       <div className="mt-6">
         <Button
           type="button"

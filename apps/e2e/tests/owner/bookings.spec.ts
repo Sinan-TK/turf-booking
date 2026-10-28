@@ -169,6 +169,7 @@ test.describe('owner portal: payments, refunds, notifications, settings', () => 
     await expect(page.getByRole('heading', { name: 'Account' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Change Password' })).toBeVisible();
     await expect(page.getByText('Role', { exact: true })).toBeVisible();
-    await expect(page.getByText('OWNER_ADMIN')).toBeVisible();
+    await expect(page.getByText('Owner admin', { exact: true }).first()).toBeVisible(); // the role in words, not the raw value
+    await expect(page.getByText(/You manage every venue/)).toBeVisible();
   });
 });

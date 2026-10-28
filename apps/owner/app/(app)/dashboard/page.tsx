@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useFetch } from '@/lib/use-fetch';
 import { useAuth } from '@/lib/auth-context';
 import { DayBookings } from '@/components/day-bookings';
+import { AccessCard } from '@/components/access-card';
 import { Badge, Card, EmptyState, ErrorBanner, Icon, PageHeader } from '@/components/ui';
 
 interface Summary {
@@ -51,6 +52,14 @@ const QUICK_LINKS = [
   { href: '/payments', icon: 'payments', label: 'Payments', hint: 'Money received at your venues' },
   { href: '/notifications', icon: 'notifications', label: 'Notifications', hint: 'Alerts and platform messages' },
 ];
+
+/** "5 Nov, 1:00 pm": the day and hour of a booking, without seconds or the browser's US date order. */
+function slotTime(iso: string): string {
+  const d = new Date(iso);
+  const day = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  const time = d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+  return `${day}, ${time}`;
+}
 
 function OwnerAdminDashboard() {
   const { data, error, loading } = useFetch<Summary>('/owner/dashboard/summary');
@@ -112,7 +121,7 @@ function OwnerAdminDashboard() {
                           <span className="font-normal text-on-surface-variant"> · {b.venue.name}</span>
                         </p>
                         <p className="text-xs text-on-surface-variant">
-                          {new Date(b.startTime).toLocaleString()} · <span className="font-mono">{b.orderId}</span>
+                          {slotTime(b.startTime)} · <span className="font-mono">{b.orderId}</span>
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-3">
@@ -154,7 +163,7 @@ function OwnerAdminDashboard() {
 
 /** Staff see today at their venue instead of organization-wide totals and revenue. */
 function StaffDashboard() {
-  const { selectedVenue } = useAuth();
+  const { user, selectedVenue } = useAuth();
   if (!selectedVenue) return null;
   return (
     <div className="space-y-6">
@@ -177,6 +186,7 @@ function StaffDashboard() {
           </Link>
         ))}
       </div>
+      <AccessCard audience="staff" venues={user?.venues} />
     </div>
   );
 }

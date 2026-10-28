@@ -69,7 +69,7 @@ export default function VenuesPage() {
     <div>
       <PageHeader
         title="My Venues"
-        subtitle="The places you run. Open one to manage its facilities, units, pricing and hours."
+        subtitle="The places you run. Open one to manage its units and prices."
         action={
           <Link href="/venues/new">
             <Button>+ New venue</Button>
@@ -120,7 +120,7 @@ export default function VenuesPage() {
             'Facilities',
             'Address',
             'Status',
-            { label: '', className: 'w-24' },
+            { label: '', className: 'w-28' },
           ]}
           loading={loading}
           rowCount={paged.rows.length}
@@ -141,7 +141,11 @@ export default function VenuesPage() {
           {paged.rows.map((venue) => (
             <tr key={venue.id} className={ROW}>
               <td className="px-4 py-3 font-mono text-xs">{venue.facilityCode}</td>
-              <td className="px-4 py-3 font-medium text-on-surface">{venue.name}</td>
+              <td className="px-4 py-3 font-medium text-on-surface">
+                <Link href={`/venues/${venue.id}`} className="hover:text-primary hover:underline">
+                  {venue.name}
+                </Link>
+              </td>
               <td className="px-4 py-3">
                 {venue.facilities?.length ? (
                   <div className="flex flex-wrap gap-1.5">
@@ -165,7 +169,7 @@ export default function VenuesPage() {
               <td className="px-4 py-3 text-right">
                 <Link
                   href={`/venues/${venue.id}`}
-                  className="text-sm font-medium text-primary hover:underline"
+                  className="whitespace-nowrap text-sm font-medium text-primary hover:underline"
                 >
                   Manage →
                 </Link>
