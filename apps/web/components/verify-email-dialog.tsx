@@ -100,7 +100,7 @@ export function VerifyEmailDialog({ email, onVerified, onClose }: { email: strin
         className="w-full max-w-sm rounded-t-2xl bg-white p-6 shadow-xl ring-1 ring-black/5 sm:rounded-2xl"
       >
         <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
             <Icon name="verified" className="text-[1.25rem]" />
           </span>
           <div className="min-w-0">
@@ -139,7 +139,7 @@ export function VerifyEmailDialog({ email, onVerified, onClose }: { email: strin
               type="button"
               onClick={() => void sendCode()}
               disabled={sending || resendIn > 0}
-              className="text-sm font-medium text-emerald-700 hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
+              className="text-sm font-medium text-brand-700 hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
             >
               {resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend code'}
             </button>

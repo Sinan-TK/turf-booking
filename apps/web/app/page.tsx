@@ -6,18 +6,22 @@ import { api, ApiError } from '@/lib/api';
 import { useDebounced } from '@/lib/use-debounced';
 import { DISMISSED, useCustomer } from '@/lib/customer';
 import { ErrorBanner, Icon } from '@/components/ui';
-import { SearchingBar, Skeleton, VenueCardsSkeleton } from '@/components/skeleton';
+import { LoadingNote, SearchingBar, Skeleton, VenueCardSkeleton, VenueCardsSkeleton } from '@/components/skeleton';
 import { AccountMenu } from '@/components/account-menu';
 import { useToast } from '@/components/toast';
 import { LocationPicker } from '@/components/location-picker';
-import { headerLines, locationParams, useLocationChoice } from '@/lib/location';
+import { VenueTypePicker } from '@/components/venue-type-picker';
+import { locationParams, useLocationChoice, type LocationChoice } from '@/lib/location';
 import { durationLabel, type VenueCategory } from '@/lib/categories';
 
 interface SearchResult {
   venue: { id: string; name: string; facilityCode: string; address: string; photoUrl: string | null; lat: number; lng: number; googleMapsUrl?: string | null };
-  resource: { id: string; name: string; groundType: string };
+  /** photoUrls: the unit's photos (up to three, main one first); empty when the owner has added none. */
+  resource: { id: string; name: string; groundType: string; photoUrls?: string[] };
   category?: { slug: string; name: string; iconKey: string; unitLabel: string; venueLabel: string };
   distanceKm?: number;
+  /** The length (minutes) the start times and prices are for: the one asked for where this unit offers it, else its shortest. */
+  durationMinutes?: number;
   availableStartTimes: string[];
   /** The venue's resolved booking rules — what durations/starts it offers. */
   policy?: {
@@ -52,11 +56,14 @@ export interface SlotPrice {
   bookingAmount?: string | null;
 }
 
-// Shown when the search result carries no bookable windows to size the timeline from.
-const DEFAULT_TIMELINE = { first: 6, last: 23 };
+/** A date as YYYY-MM-DD in the customer's own calendar (toISOString would give the UTC day, a day behind in India until 5:30 AM). */
+function localIso(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localIso(new Date());
 }
 
 /** "6:00 AM – 7:00 AM" — the end time customers actually need to know
@@ -71,52 +78,6 @@ function formatTimeRange(startIso: string, durationMinutes: number, timeZone?: s
 /** Start times are shown in the VENUE's timezone, not the browser's. */
 function formatStart(startIso: string, timeZone?: string): string {
   return new Date(startIso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone });
-}
-
-/** Hour of day (0–23) of an instant in the venue's own timezone. */
-function hourInZone(iso: string, timeZone: string): number {
-  const h = Number(
-    new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', timeZone }).format(new Date(iso)),
-  );
-  return Number.isFinite(h) ? h % 24 : new Date(iso).getHours();
-}
-
-/**
- * The day-timeline bars for one result: one per hour the venue is open
- * (derived from its opening windows, 06:00–23:00 when none are set), lit
- * when at least one bookable start falls inside that hour. Works for any
- * slot interval, including 30-minute starts.
- */
-function buildTimeline(r: SearchResult) {
-  let first = DEFAULT_TIMELINE.first;
-  let last = DEFAULT_TIMELINE.last;
-  if (r.openWindows && r.openWindows.length > 0) {
-    const opens = r.openWindows.map((w) => Number(w.openTime.slice(0, 2)));
-    const closes = r.openWindows.map((w) => {
-      const [h, m] = w.closeTime.split(':').map(Number);
-      return (m ?? 0) > 0 ? (h ?? 0) + 1 : (h ?? 0);
-    });
-    first = Math.min(...opens);
-    last = Math.max(...closes) - 1;
-  }
-  if (!(last >= first)) {
-    first = DEFAULT_TIMELINE.first;
-    last = DEFAULT_TIMELINE.last;
-  }
-  const hours = Array.from({ length: last - first + 1 }, (_, i) => first + i);
-  const available = new Set(r.availableStartTimes.map((t) => hourInZone(t, r.timezone)));
-  const mid = first + Math.floor((last + 1 - first) / 2);
-  return {
-    hours,
-    available,
-    labels: [hourLabel(first), hourLabel(mid), hourLabel((last + 1) % 24)] as const,
-  };
-}
-
-function hourLabel(hour: number): string {
-  const d = new Date();
-  d.setHours(hour, 0, 0, 0);
-  return d.toLocaleTimeString([], { hour: 'numeric' }).replace(' ', '');
 }
 
 /** "₹550" — symbol + compact value, falling back to "CODE 550" for
@@ -157,7 +118,7 @@ function payNowLabel(price: SlotPrice): string {
 
 function formatPrice(price: { amount: string; currency: string }): string {
   const n = Number(price.amount);
-  const value = Number.isFinite(n) ? String(n) : price.amount;
+  const value = Number.isFinite(n) ? n.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : price.amount;
   const symbol = CURRENCY_SYMBOLS[price.currency?.toUpperCase()];
   return symbol ? `${symbol}${value}` : `${price.currency} ${value}`;
 }
@@ -175,7 +136,15 @@ function googleMapsLink(venue: { googleMapsUrl?: string | null; lat?: number; ln
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${venue.name}, ${venue.address}`)}`;
 }
 
-const DEFAULT_DAY_COUNT = 7;
+/** The header's place name on one line: "Malappuram, Kerala", "Kottakkal, Malappuram" or "Near Tirur". */
+function placeLabel(choice: LocationChoice | null): string {
+  if (!choice) return 'Select location';
+  if (choice.mode === 'town') return `${choice.townName ?? choice.districtName}, ${choice.districtName}`;
+  if (choice.mode === 'geo') return choice.nearTown ? `Near ${choice.nearTown}` : 'Your location';
+  return choice.stateName ? `${choice.districtName}, ${choice.stateName}` : choice.districtName;
+}
+
+const DEFAULT_DAY_COUNT = 14;
 const MOST_DAYS = 14;
 
 /** The next `count` calendar days (today first), for the 1-tap date strip. */
@@ -184,9 +153,9 @@ function nextDays(count: number): Array<{ iso: string; weekday: string; day: str
     const d = new Date();
     d.setDate(d.getDate() + i);
     return {
-      iso: d.toISOString().slice(0, 10),
+      iso: localIso(d),
       weekday: i === 0 ? 'Today' : d.toLocaleDateString([], { weekday: 'short' }),
-      day: String(d.getDate()).padStart(2, '0'),
+      day: String(d.getDate()),
       month: d.toLocaleDateString([], { month: 'short' }),
       isToday: i === 0,
     };
@@ -239,16 +208,82 @@ export default function HomePage() {
   // Where to search: the saved choice, otherwise Malappuram. Nothing is searched until that is known.
   const { choice, setChoice, ready } = useLocationChoice();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [typePickerOpen, setTypePickerOpen] = useState(false);
+
+  // The header gains a soft shadow once the page has scrolled a little.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // "/" jumps to the search box, unless the person is already typing somewhere.
+  const searchBox = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
+      e.preventDefault();
+      searchBox.current?.focus();
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
+  // The customer's saved venues, for the save buttons on the cards. Saving needs an account: logged out, a tap opens the login.
+  const { customer, requireLogin } = useCustomer();
+  const toast = useToast();
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!customer) return setSavedIds(new Set());
+    api
+      .get<Array<{ venueId?: string; venue?: { id: string } }>>('/me/saved-venues')
+      .then((rows) => setSavedIds(new Set(rows.map((r) => r.venue?.id ?? r.venueId ?? '').filter(Boolean))))
+      .catch(() => undefined);
+  }, [customer]);
+  async function toggleSaved(venueId: string) {
+    try {
+      await requireLogin();
+    } catch {
+      return; // the login was dismissed
+    }
+    const wasSaved = savedIds.has(venueId);
+    const flip = (on: boolean) =>
+      setSavedIds((ids) => {
+        const next = new Set(ids);
+        if (on) next.add(venueId);
+        else next.delete(venueId);
+        return next;
+      });
+    flip(!wasSaved);
+    try {
+      if (wasSaved) await api.delete(`/me/saved-venues/${venueId}`);
+      else await api.post('/me/saved-venues', { venueId });
+    } catch {
+      flip(wasSaved);
+      toast.show(wasSaved ? 'Could not remove it from your saved venues.' : 'Could not save that venue. Please try again.');
+    }
+  }
 
   const [form, setForm] = useState({
-    categorySlug: '',
+    // The venue types searched; empty = every type. The chips pick one, the venue-type modal (wide screens) several.
+    categorySlugs: [] as string[],
     groundType: '',
     date: todayIso(),
     timeWindow: 'ALL',
-    durationMinutes: 60,
+    // null = every unit at its own shortest booking; a length picked inside a booking window applies to the units that offer it.
+    durationMinutes: null as number | null,
   });
 
   const [nameFilter, setNameFilter] = useState('');
+  // A link such as /?q=Venue+name (the "View slots" button of a saved venue) starts with that search typed in.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get('q');
+    if (q) setNameFilter(q);
+  }, []);
   // The text filter is applied by the server (so it covers venues not loaded yet), once typing pauses.
   const searchText = useDebounced(nameFilter.trim(), 350);
 
@@ -258,6 +293,8 @@ export default function HomePage() {
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
+  // The day the shown results are for. While another day loads, the cards keep drawing their own day, not the new one.
+  const [resultsDate, setResultsDate] = useState(todayIso());
   // Cards come ten at a time: where the next ten start (null = that was all), and the state of fetching them.
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   // How many days to offer: the most any venue here allows booking ahead (7 until the first search says otherwise).
@@ -288,24 +325,31 @@ export default function HomePage() {
       const params = new URLSearchParams({
         date: form.date,
         timeWindow: form.timeWindow,
-        durationMinutes: String(form.durationMinutes),
+        ...(form.durationMinutes !== null ? { durationMinutes: String(form.durationMinutes) } : {}),
         limit: String(!cursor && keepLoaded.current ? Math.min(50, Math.max(PAGE_SIZE, loadedCount.current)) : PAGE_SIZE),
         ...locationParams(choice!),
       });
       // Both filters are optional: no category = every venue type, no sub-type = every kind of unit. The API owns the filtering.
-      if (form.categorySlug) params.set('categorySlug', form.categorySlug);
+      if (form.categorySlugs.length > 0) params.set('categorySlugs', form.categorySlugs.join(','));
       if (form.groundType) params.set('groundType', form.groundType);
       if (searchText) params.set('q', searchText);
       if (cursor) params.set('cursor', cursor);
       return `/search?${params.toString()}`;
     },
-    [choice, form.categorySlug, form.groundType, form.date, form.timeWindow, form.durationMinutes, searchText],
+    [choice, form.categorySlugs, form.groundType, form.date, form.timeWindow, form.durationMinutes, searchText],
   );
 
   /** A new search: the first ten cards. Anything still loading from an earlier search is ignored from now on. */
   const runSearch = useCallback(async () => {
     if (!choice) return;
     const mine = ++latestSearch.current;
+    const date = form.date;
+    // A new day, place, type or text: the old cards go at once and the skeleton shows until the new ones arrive.
+    // A duration change made inside an open booking window keeps the cards, so that window stays open.
+    if (!keepLoaded.current) {
+      setResults([]);
+      setNextCursor(null);
+    }
     setSearching(true);
     setLoadingMore(false);
     setMoreError(null);
@@ -315,6 +359,7 @@ export default function HomePage() {
       keepLoaded.current = false;
       if (mine !== latestSearch.current) return;
       setResults(page.data);
+      setResultsDate(date);
       setNextCursor(page.nextCursor);
       setSearched(true);
       if (page.advanceDays) {
@@ -329,7 +374,7 @@ export default function HomePage() {
     } finally {
       if (mine === latestSearch.current) setSearching(false);
     }
-  }, [choice, searchPath]);
+  }, [choice, searchPath, form.date]);
 
   /** The next ten, added below the ones already shown. */
   const loadMore = useCallback(async () => {
@@ -376,123 +421,165 @@ export default function HomePage() {
 
   // Shown in the order the server gave: nearest first for a location search, otherwise by venue name.
   const visibleResults = results;
+  const venueGroups = useMemo(() => groupByVenue(visibleResults), [visibleResults]);
 
-  const activeCategory = categories.find((c) => c.slug === form.categorySlug);
+  // Sub-types (and a type's own shortest booking) only make sense when exactly one type is picked.
+  const activeCategory = form.categorySlugs.length === 1 ? categories.find((c) => c.slug === form.categorySlugs[0]) : undefined;
 
-  function selectCategory(slug: string) {
-    const category = categories.find((c) => c.slug === slug);
-    setForm((f) => ({
+  function selectCategories(slugs: string[]) {
+      setForm((f) => ({
       ...f,
-      categorySlug: slug,
+      categorySlugs: slugs,
       groundType: '',
-      // Start from the type's shortest booking; "All" keeps the usual hour.
-      durationMinutes: category ? category.policy.minDurationMin : 60,
+      // A new type starts every unit at its own shortest booking again.
+      durationMinutes: null,
     }));
   }
 
+  // The days depend on today's date, which the server cannot know: the page is built ahead of time (and the server may
+  // be in another timezone), so server-made dates would be stale and never match what the browser makes. The day row is
+  // therefore drawn only once the page is in the browser, with same-sized grey boxes until then.
+  const [inBrowser, setInBrowser] = useState(false);
+  useEffect(() => setInBrowser(true), []);
   const days = useMemo(() => nextDays(dayCount), [dayCount]);
 
-  const { title: locationTitle, subtitle: locationSubtitle } = headerLines(choice);
+  const locationLabel = placeLabel(choice);
+
 
   return (
     <>
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-emerald-900/10 pt-3 pb-0">
-        <div className="w-full px-4 sm:px-6 lg:px-10 2xl:px-14">
-        {/* Top row: location · (search, inline from md up) · account. Below md the search box wraps to its own full-width row. */}
-        <div className="flex flex-wrap items-center justify-between gap-x-3 md:flex-nowrap md:gap-x-6">
-          <button onClick={() => setPickerOpen(true)} aria-label={`Change location, now ${locationTitle}`} aria-haspopup="dialog" className="flex items-center gap-2 text-slate-700 hover:text-slate-900 transition py-1 text-left group md:order-1" type="button">
-            <svg className="w-6 h-6 text-brand-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"></path></svg>
-            <div className="flex flex-col items-start text-left">
-              <span className="font-black text-slate-900 text-sm tracking-tight leading-tight">{locationTitle}</span>
-              <span className="text-[0.625rem] font-medium text-slate-500 leading-tight">
-                {locationSubtitle}
-              </span>
-            </div>
+      {/* Header: a plain white bar. Logo · location · search · venue types, with the account on the right; below md the
+          search wraps to its own row. It gains a soft shadow once the page scrolls. */}
+      <header
+        className={`sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur-md transition-shadow duration-300 ${scrolled ? 'shadow-[0_8px_24px_-16px_rgba(15,23,42,0.35)]' : ''}`}
+      >
+        <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2.5 px-4 py-3 sm:px-6 md:flex-nowrap md:gap-x-4 lg:px-10 2xl:px-14">
+          <span className="mr-2 hidden select-none whitespace-nowrap text-[1.75rem] font-black italic leading-none tracking-tight text-slate-900 lg:block">
+            Turf<span className="text-brand-600">X</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            aria-label={`Change location, now ${locationLabel}`}
+            aria-haspopup="dialog"
+            className="group flex h-11 min-w-0 max-w-[65%] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-left transition hover:border-brand-400 active:scale-[0.98] md:h-12 md:w-56 md:max-w-none xl:w-64"
+          >
+            <Icon name="location_on" className="text-[1.125rem] text-brand-600" />
+            <span className="min-w-0 flex-1 truncate text-sm font-bold text-slate-900">{locationLabel}</span>
+            <Icon name="expand_more" className="text-[1rem] text-slate-400 transition group-hover:text-brand-600" />
           </button>
-          <div className="md:order-3">
+          <div className="ml-auto md:order-last">
             <AccountMenu />
           </div>
-        <div className="relative order-last mt-2.5 w-full md:order-2 md:mt-0 md:w-auto md:max-w-xl md:flex-1">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
+          <div className="nav-search order-last flex h-11 w-full items-center rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 transition-[box-shadow,border-color,background-color] hover:border-slate-300 focus-within:border-brand-500 focus-within:bg-white md:order-none md:h-12 md:w-auto md:max-w-2xl md:flex-1">
+            <Icon name="search" className="text-[1.125rem] text-slate-500" />
+            <input
+              ref={searchBox}
+              value={nameFilter}
+              onChange={(e) => setNameFilter(e.target.value)}
+              aria-label="Search venues"
+              className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none"
+              placeholder="Search venues, turfs, pools, badminton, activities..."
+              type="text"
+            />
+            {nameFilter && (
+              <button
+                type="button"
+                onClick={() => {
+                  setNameFilter('');
+                  searchBox.current?.focus();
+                }}
+                aria-label="Clear search"
+                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-200/70 hover:text-slate-700"
+              >
+                <Icon name="close" className="text-[0.9375rem]" />
+              </button>
+            )}
           </div>
-          <input 
-            value={nameFilter}
-            onChange={(e) => setNameFilter(e.target.value)}
-            className="w-full pl-9 pr-9 py-2 text-xs font-medium bg-[#F4F6F5] rounded-xl border border-slate-200/90 shadow-subtle placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all text-slate-800" 
-            placeholder="Search venues, names or areas..." type="text" />
-          <button onClick={() => setNameFilter('')} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
+          {/* Wide screens: pick several venue types at once. */}
+          <button
+            type="button"
+            onClick={() => setTypePickerOpen(true)}
+            aria-haspopup="dialog"
+            className={`hidden h-12 flex-shrink-0 items-center gap-2 rounded-xl border px-4 text-sm font-bold transition md:inline-flex ${form.categorySlugs.length > 0 ? 'border-brand-600 bg-brand-50 text-brand-800' : 'border-slate-200 bg-white text-slate-800 hover:border-brand-400'}`}
+          >
+            <Icon name="category" className="text-[1.125rem] text-brand-600" />
+            Venue types
+            {form.categorySlugs.length > 0 && (
+              <span className="rounded-full bg-brand-700 px-1.5 text-[0.6875rem] leading-[1.125rem] text-white">{form.categorySlugs.length}</span>
+            )}
+            <Icon name="expand_more" className="text-[1rem] text-slate-400" />
           </button>
         </div>
+      </header>
+
+      {/* Every bookable day in one row (it swipes sideways when it does not fit). */}
+      <section className="flex w-full flex-col gap-3 px-4 pb-4 pt-4 sm:px-6 lg:px-10 2xl:px-14">
+        <div className="flex min-w-0 items-center gap-2 overflow-x-auto scroll-smooth scrollbar-hide sm:gap-2.5">
+          {!inBrowser &&
+            Array.from({ length: DEFAULT_DAY_COUNT }, (_, i) => (
+              <Skeleton key={i} className="h-[4.5rem] w-[4.25rem] flex-shrink-0 rounded-xl sm:h-[4.75rem] sm:w-[5.25rem] lg:w-auto lg:min-w-[3.75rem] lg:max-w-[5.25rem] lg:flex-1" />
+            ))}
+          {inBrowser && days.map((d) => {
+            const isActive = form.date === d.iso;
+            return (
+              <button
+                key={d.iso}
+                type="button"
+                aria-pressed={isActive}
+                onClick={() => setForm((f) => ({ ...f, date: d.iso }))}
+                className={`flex h-[4.5rem] w-[4.25rem] flex-shrink-0 flex-col items-center justify-center rounded-xl border transition active:scale-95 sm:h-[4.75rem] sm:w-[5.25rem] lg:w-auto lg:min-w-[3.75rem] lg:max-w-[5.25rem] lg:flex-1 ${isActive ? 'border-brand-700 bg-brand-700 text-white shadow-glow' : 'border-slate-200 bg-white text-slate-900 hover:border-brand-400'}`}
+              >
+                <span className={`text-xs ${isActive ? 'font-bold text-white' : 'font-medium text-slate-500'}`}>{d.weekday}</span>
+                <span className="text-xl font-extrabold leading-tight">{d.day}</span>
+                <span className={`text-xs ${isActive ? 'font-semibold text-brand-100' : 'font-medium text-slate-500'}`}>{d.month}</span>
+              </button>
+            );
+          })}
         </div>
-        <div className="flex items-center overflow-x-auto scrollbar-hide scroll-smooth pt-2.5 -mx-4 sm:-mx-6 lg:-mx-8">
+        {/* Phones have no Venue types button in the header, so the types are chips here. */}
+        <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto scrollbar-hide md:hidden">
           {[{ slug: '', name: 'All', iconKey: 'apps' }, ...categories].map((c) => {
-            const isActive = form.categorySlug === c.slug;
+            const isActive = c.slug ? form.categorySlugs.includes(c.slug) : form.categorySlugs.length === 0;
             return (
               <button
                 key={c.slug || 'all'}
                 type="button"
-                onClick={() => selectCategory(c.slug)}
-                className={`flex-shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs transition ${isActive ? 'text-emerald-700 border-b-2 border-emerald-600 font-bold' : 'font-semibold text-slate-600 hover:text-slate-900 border-b-2 border-transparent border-r border-slate-100'}`}
+                aria-pressed={isActive}
+                onClick={() => selectCategories(c.slug ? [c.slug] : [])}
+                className={`inline-flex h-10 flex-shrink-0 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition active:scale-95 ${isActive ? 'border-brand-700 bg-brand-700 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-brand-400'}`}
               >
-                <Icon name={c.iconKey} className={`text-[1rem] ${isActive ? 'text-emerald-600' : 'text-slate-400'}`} />
+                {c.slug && <Icon name={c.iconKey} className={`text-[1rem] ${isActive ? 'text-white' : 'text-slate-600'}`} />}
                 <span>{c.name}</span>
               </button>
             );
           })}
-          {categoriesLoading &&
-            [0, 1, 2, 3].map((i) => (
-              <div key={i} aria-hidden="true" className="flex-shrink-0 px-4 py-2.5">
-                <Skeleton className="h-4 w-24" />
-              </div>
-            ))}
+          {categoriesLoading && [0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-24 flex-shrink-0 rounded-xl" />)}
         </div>
-        {activeCategory && activeCategory.unitTypes.length > 0 && (
-          <div className="flex items-center gap-2 overflow-x-auto py-2 scrollbar-hide">
-            {[{ value: '', label: `Any ${activeCategory.unitLabel.toLowerCase()}` }, ...activeCategory.unitTypes.map((t) => ({ value: t, label: t }))].map((t) => {
-              const isActive = form.groundType === t.value;
-              return (
-                <button
-                  key={t.value || 'any'}
-                  type="button"
-                  onClick={() => setForm((f) => ({ ...f, groundType: t.value }))}
-                  aria-pressed={isActive}
-                  className={`flex-shrink-0 rounded-full border px-3 py-1 text-[0.6875rem] font-bold transition ${isActive ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-400'}`}
-                >
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
-        )}
-        </div>
-      </header>
-
-      <section className="pb-3 pt-4">
-        <div className="flex w-full items-center space-x-2 overflow-x-auto px-4 scrollbar-hide scroll-smooth sm:space-x-3 sm:px-6 lg:px-10 2xl:px-14">
-          {days.map((d) => {
-            const isActive = form.date === d.iso;
+      </section>
+      {activeCategory && activeCategory.unitTypes.length > 0 && (
+        <div className="-mt-1 flex w-full items-center gap-2 overflow-x-auto px-4 pb-4 scrollbar-hide sm:px-6 lg:px-10 2xl:px-14">
+          {[{ value: '', label: `Any ${activeCategory.unitLabel.toLowerCase()}` }, ...activeCategory.unitTypes.map((t) => ({ value: t, label: t }))].map((t) => {
+            const isActive = form.groundType === t.value;
             return (
-              <button 
-                key={d.iso} 
-                onClick={() => setForm((f) => ({ ...f, date: d.iso }))}
-                className={`flex-shrink-0 flex flex-col items-center justify-center py-2.5 px-3.5 rounded-2xl min-w-[64px] sm:min-w-[84px] sm:py-3 transition-all active:scale-95 ${isActive ? 'bg-gradient-to-br from-brand-500 to-brand-600 text-white shadow-brand-500/40 shadow-lg border border-brand-400' : 'bg-white border border-slate-200 text-slate-800 hover:border-slate-300 shadow-sm'}`}
+              <button
+                key={t.value || 'any'}
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, groundType: t.value }))}
+                aria-pressed={isActive}
+                className={`flex-shrink-0 rounded-full border px-3 py-1 text-[0.6875rem] font-bold transition ${isActive ? 'border-brand-700 bg-brand-700 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-brand-400'}`}
               >
-                <span className={`text-[0.5625rem] uppercase leading-none ${isActive ? 'font-extrabold tracking-wider text-brand-100' : 'font-bold text-slate-400'}`}>{d.weekday}</span>
-                <span className={`text-lg font-black my-0.5 leading-tight ${isActive ? '' : 'text-slate-900'}`}>{d.day}</span>
-                <span className={`text-[0.625rem] leading-none ${isActive ? 'font-semibold text-brand-50' : 'font-medium text-slate-400'}`}>{d.month}</span>
+                {t.label}
               </button>
             );
           })}
         </div>
-      </section>
+      )}
 
       <main className="w-full flex-1 px-4 pb-24 sm:px-6 lg:px-10 2xl:px-14">
         {errorMessage && <div className="mb-4"><ErrorBanner message={errorMessage} /></div>}
-        {/* The first search shows the shape of the results; a re-search keeps the old results and shows a slim bar. */}
-        {searching && (results.length === 0 ? <VenueCardsSkeleton /> : <SearchingBar />)}
+        {/* Every new search shows the skeleton in place of the cards; only a duration change from an open booking window keeps the cards and shows a slim bar. */}
+        {searching && (results.length === 0 ? <VenueCardsSkeleton count={6} /> : <SearchingBar />)}
         {!searching && searched && visibleResults.length === 0 && (
           <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-sm">
             {choice && choice.mode !== 'district' ? (
@@ -509,7 +596,7 @@ export default function HomePage() {
                       districtName: choice.districtName,
                     })
                   }
-                  className="mt-4 rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+                  className="mt-4 rounded-full bg-brand-600 px-4 py-2 text-xs font-bold text-white hover:bg-brand-700"
                 >
                   Browse all of {choice.districtName}
                 </button>
@@ -519,8 +606,8 @@ export default function HomePage() {
             )}
           </div>
         )}
-        <div className="grid grid-cols-1 items-start gap-3 sm:gap-5 xl:grid-cols-2">
-          {groupByVenue(visibleResults).map((group) => (
+        <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2 xl:grid-cols-3">
+          {venueGroups.map((group) => (
             <VenueGroupCard
               key={group.venue.id}
               venue={group.venue}
@@ -528,8 +615,10 @@ export default function HomePage() {
               // The modals edit the duration, which re-searches: look each unit up in the live results so an open
               // modal refreshes its slots and prices instead of going stale.
               liveFor={(r) => results.find((x) => x.venue.id === r.venue.id && x.resource.id === r.resource.id) ?? r}
+              saved={savedIds.has(group.venue.id)}
+              onToggleSave={() => void toggleSaved(group.venue.id)}
               durationMinutes={form.durationMinutes}
-              dateIso={form.date}
+              dateIso={resultsDate}
               reloading={searching}
               onDurationChange={(m: number) => {
                 keepLoaded.current = true;
@@ -537,23 +626,23 @@ export default function HomePage() {
               }}
             />
           ))}
+          {/* The next venues load into the same grid: skeletons fill the rest of the last row first. */}
+          {loadingMore && (
+            <>
+              <LoadingNote label="Loading the next venues" />
+              {Array.from({ length: skeletonsToFillRow(venueGroups.length) }, (_, i) => (
+                <VenueCardSkeleton key={`more-${i}`} />
+              ))}
+            </>
+          )}
         </div>
 
         {visibleResults.length > 0 && (
           <>
-            {loadingMore && (
-              <div className="mt-3 sm:mt-5">
-                <div role="status" className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-slate-500">
-                  <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-200 border-t-emerald-600 motion-reduce:animate-none" />
-                  Loading more venues…
-                </div>
-                <VenueCardsSkeleton count={2} label="Loading the next venues" />
-              </div>
-            )}
             {moreError && (
               <div className="mt-4 flex flex-col items-center gap-2">
                 <ErrorBanner message={moreError} />
-                <button type="button" onClick={() => void loadMore()} className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700">
+                <button type="button" onClick={() => void loadMore()} className="rounded-full bg-brand-600 px-4 py-2 text-xs font-bold text-white hover:bg-brand-700">
                   Try again
                 </button>
               </div>
@@ -575,6 +664,17 @@ export default function HomePage() {
             setPickerOpen(false);
           }}
           onClose={() => setPickerOpen(false)}
+        />
+      )}
+      {typePickerOpen && (
+        <VenueTypePicker
+          categories={categories}
+          selected={form.categorySlugs}
+          onApply={(slugs) => {
+            selectCategories(slugs);
+            setTypePickerOpen(false);
+          }}
+          onClose={() => setTypePickerOpen(false)}
         />
       )}
     </>
@@ -695,12 +795,12 @@ function SlotBookingModal({
                 className="h-12 w-12 shrink-0 rounded-xl border border-slate-200 object-cover"
               />
             ) : (
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-brand-100">
                 <Icon name={r.category?.iconKey ?? 'category'} className="text-[1.5rem]" />
               </div>
             )}
             <div className="min-w-0">
-              <p className="text-[0.625rem] font-extrabold uppercase tracking-wider text-emerald-700">Book your slot</p>
+              <p className="text-[0.625rem] font-extrabold uppercase tracking-wider text-brand-700">Book your slot</p>
               <h3 className="mt-0.5 truncate text-lg font-black tracking-tight text-slate-900">{r.venue.name}</h3>
               <p className="mt-0.5 truncate text-xs text-slate-500">
                 {r.venue.address}
@@ -710,7 +810,7 @@ function SlotBookingModal({
                   href={googleMapsLink(r.venue)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-50 px-2.5 py-1 text-[0.6875rem] font-bold text-emerald-700 transition hover:bg-emerald-100 active:scale-95"
+                  className="inline-flex items-center gap-1 rounded-full border border-brand-500/30 bg-brand-50 px-2.5 py-1 text-[0.6875rem] font-bold text-brand-700 transition hover:bg-brand-100 active:scale-95"
                 >
                   <Icon name="location_on" className="text-[0.875rem]" />
                   Directions
@@ -772,15 +872,15 @@ function SlotBookingModal({
                   aria-pressed={active}
                   className={`flex items-center justify-between gap-2 rounded-xl border-2 px-3 py-2.5 text-left transition-all active:scale-95 ${
                     active
-                      ? 'border-emerald-600 bg-emerald-600 text-white shadow-md'
-                      : 'border-slate-200 bg-white text-slate-800 hover:border-emerald-400 hover:bg-emerald-50/50'
+                      ? 'border-brand-600 bg-brand-600 text-white shadow-md'
+                      : 'border-slate-200 bg-white text-slate-800 hover:border-brand-400 hover:bg-brand-50/50'
                   }`}
                 >
                   <span className={`text-sm font-extrabold ${active ? 'text-white' : 'text-slate-900'}`}>
                     {formatStart(t, r.timezone)}
                   </span>
                   {slotPrice && (
-                    <span className={`shrink-0 text-[0.6875rem] font-black ${active ? 'text-emerald-100' : 'text-emerald-700'}`}>
+                    <span className={`shrink-0 text-[0.6875rem] font-black ${active ? 'text-brand-100' : 'text-brand-700'}`}>
                       {formatPrice(slotPrice)}
                     </span>
                   )}
@@ -798,7 +898,7 @@ function SlotBookingModal({
                 <s className="ml-1 font-medium text-slate-400">{formatPrice({ amount: priceAt(r, selected)!.normalAmount!, currency: r.price!.currency })}</s>
               )}
               {displayPrice && priceAt(r, selected) && payNowLabel(priceAt(r, selected)!) && (
-                <span className="block text-emerald-700">{payNowLabel(priceAt(r, selected)!)}, the rest at the venue</span>
+                <span className="block text-brand-700">{payNowLabel(priceAt(r, selected)!)}, the rest at the venue</span>
               )}
             </p>
           )}
@@ -811,7 +911,7 @@ function SlotBookingModal({
             type="button"
             disabled={!selected || booking || reloading}
             onClick={() => selected && bookSlot(selected)}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-extrabold text-white shadow-md transition hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:active:scale-100"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-700 px-5 py-3 text-sm font-extrabold text-white shadow-glow transition hover:bg-brand-800 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none disabled:active:scale-100"
           >
             {booking && (
               <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -832,10 +932,19 @@ function SlotBookingModal({
 interface UnitCardProps {
   result: SearchResult;
   liveResult: SearchResult;
-  durationMinutes: number;
+  /** The length asked for, or null when each unit is shown at its own shortest. A unit's result says what it used. */
+  durationMinutes: number | null;
   dateIso: string;
   reloading: boolean;
   onDurationChange: (minutes: number) => void;
+}
+
+/**
+ * How many skeleton cards to add while the next venues load, so they finish the last row in every layout (one, two or
+ * three columns: 6 is a multiple of each). When the last row is already full, one more row's worth.
+ */
+function skeletonsToFillRow(cards: number): number {
+  return (6 - (cards % 6)) % 6 || 3;
 }
 
 /** The venues in the order the server gave them, each with its units (turfs, courts...) together. */
@@ -850,69 +959,68 @@ function groupByVenue(results: SearchResult[]): Array<{ venue: SearchResult['ven
 }
 
 /**
- * One compact card per venue. The venue's name, address and Directions are shown once at the top; below them one
- * unit (turf, court...) is shown at a time, picked from a row of tabs that swipes sideways when there are many.
+ * One card per venue: a photo banner (the picked unit's photos, else the venue's, else a drawn placeholder), the
+ * venue's name, address and Directions, a row of unit tiles (turf, court…) to pick from, and the picked unit's next
+ * open times and Book Now.
  */
 function VenueGroupCard({
   venue,
   units,
   liveFor,
+  saved,
+  onToggleSave,
   ...unitProps
 }: {
   venue: SearchResult['venue'];
   units: SearchResult[];
   liveFor: (r: SearchResult) => SearchResult;
+  saved: boolean;
+  onToggleSave: () => void;
 } & Omit<UnitCardProps, 'result' | 'liveResult'>) {
   const [pickedId, setPickedId] = useState(units[0]!.resource.id);
   // A re-search can drop the picked unit (a filter, a new day): fall back to the first one.
   const unit = units.find((u) => u.resource.id === pickedId) ?? units[0]!;
-
-  // The icon is the facility's when the venue offers one kind of unit, a generic one when it mixes them.
-  const iconKeys = new Set(units.map((u) => u.category?.iconKey ?? 'category'));
-  const icon = iconKeys.size === 1 ? [...iconKeys][0]! : 'category';
   const openSlots = units.reduce((n, u) => n + u.availableStartTimes.length, 0);
+  const unitPhotos = unit.resource.photoUrls ?? [];
+  const photos = unitPhotos.length > 0 ? unitPhotos : venue.photoUrl ? [venue.photoUrl] : [];
 
   return (
     <article
       aria-label={venue.name}
-      className="overflow-hidden rounded-[1.75rem] border border-slate-200/90 bg-white p-3 shadow-card transition-all duration-300 hover:border-emerald-500/40 sm:shadow-sm sm:hover:shadow-lg"
+      className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm transition-shadow duration-300 hover:shadow-lg"
     >
-      <header className="flex items-start gap-3 rounded-3xl bg-gradient-to-br from-emerald-50 via-emerald-50/50 to-white p-3.5 ring-1 ring-emerald-100">
-        <div className="relative shrink-0">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-emerald-600 shadow-md ring-1 ring-emerald-100">
-            <Icon name={icon} className="text-[1.5rem]" />
-          </div>
-          <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-white bg-emerald-500">
-            <svg className="h-2 w-2 text-white" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
-          </span>
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <h2 className="truncate text-base font-black leading-snug tracking-tight text-slate-900 sm:text-lg sm:font-bold">{venue.name}</h2>
-            <a
-              href={googleMapsLink(venue)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex shrink-0 items-center gap-1 rounded-2xl bg-white px-3 py-1.5 text-[0.6875rem] font-bold text-emerald-700 shadow-sm ring-1 ring-emerald-200 transition hover:bg-emerald-600 hover:text-white active:scale-95"
-            >
-              <Icon name="location_on" className="text-[0.875rem]" />
-              Directions
-            </a>
-          </div>
-          <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
-            <Icon name="location_on" className="shrink-0 text-[0.875rem] text-brand-600" />
-            <span className="truncate">{venue.address}</span>
-          </p>
-          <p className="mt-1 text-[0.6875rem] font-semibold text-slate-400">
-            {units.length} {units.length === 1 ? 'option' : 'options'} · {openSlots} slot{openSlots === 1 ? '' : 's'} open
-          </p>
-        </div>
-      </header>
+      <CardGallery
+        key={unit.resource.id}
+        photos={photos}
+        iconKey={unit.category?.iconKey ?? 'category'}
+        alt={`${venue.name}, ${unit.resource.name}`}
+        badge={`${openSlots} slot${openSlots === 1 ? '' : 's'} open`}
+        saved={saved}
+        onToggleSave={onToggleSave}
+        venueName={venue.name}
+      />
 
-      {units.length > 1 && (
-        <div role="tablist" aria-label={`${venue.name} options`} className="scrollbar-hide mt-3 flex gap-1.5 overflow-x-auto rounded-2xl bg-slate-100 p-1.5">
+      <div className="flex flex-1 flex-col gap-3.5 px-3.5 pb-3.5 pt-3 sm:px-4 sm:pb-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="truncate text-lg font-extrabold leading-snug tracking-tight text-slate-900">{venue.name}</h2>
+            <p className="mt-0.5 flex items-center gap-1.5 text-[0.8125rem] text-slate-500">
+              <Icon name="location_on" className="text-[0.9375rem] text-slate-400" />
+              <span className="truncate">{venue.address}</span>
+            </p>
+          </div>
+          <a
+            href={googleMapsLink(venue)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-brand-50 px-3 py-2 text-xs font-bold text-brand-700 transition hover:bg-brand-100 active:scale-95"
+          >
+            <Icon name="navigation" className="text-[0.875rem]" />
+            Directions
+          </a>
+        </div>
+
+        <div role="tablist" aria-label={`${venue.name} options`} className="scrollbar-hide -m-0.5 flex gap-2 overflow-x-auto p-0.5">
           {units.map((u) => {
             const on = u.resource.id === unit.resource.id;
             return (
@@ -922,142 +1030,339 @@ function VenueGroupCard({
                 role="tab"
                 aria-selected={on}
                 onClick={() => setPickedId(u.resource.id)}
-                className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition active:scale-95 ${on ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-600 hover:bg-white'}`}
+                className={`flex w-[8.5rem] shrink-0 items-center sm:w-[calc((100%-1rem)/3)] gap-2 rounded-xl border px-2 py-2.5 text-left transition active:scale-[0.98] ${on ? 'border-brand-700 bg-brand-700 text-white shadow-glow' : 'border-slate-200 bg-white text-slate-800 hover:border-brand-400'}`}
               >
-                <Icon name={u.category?.iconKey ?? 'category'} className="text-[0.9375rem]" />
-                {u.resource.name}
-                {u.price && <span className={on ? 'text-emerald-100' : 'text-emerald-700'}>{formatPrice(u.price)}</span>}
+                <Icon name={u.category?.iconKey ?? 'category'} className={`text-[1.125rem] ${on ? 'text-white' : 'text-slate-500'}`} />
+                <span className="min-w-0">
+                  <span className="block truncate text-xs font-bold leading-tight">{u.resource.name}</span>
+                  {u.price && (
+                    <span className={`block text-xs font-semibold ${on ? 'text-brand-100' : 'text-brand-700'}`}>{formatPrice(u.price)}</span>
+                  )}
+                </span>
               </button>
             );
           })}
         </div>
-      )}
 
-      <section aria-label={`${venue.name}, ${unit.resource.name}`} className="mt-3 rounded-3xl bg-slate-50 ring-1 ring-slate-100">
         <UnitPanel {...unitProps} key={unit.resource.id} result={unit} liveResult={liveFor(unit)} />
-      </section>
+      </div>
     </article>
   );
 }
 
-/** A small curved box with the unit's facility icon. */
-function UnitIcon({ r, className = '' }: { r: SearchResult; className?: string }) {
+/** "6:00 AM – 12:00 AM": the unit's opening hours on the searched day, or null when none are set. */
+function openHoursLabel(r: SearchResult): string | null {
+  const windows = r.openWindows;
+  if (!windows || windows.length === 0) return null;
+  const toMinutes = (hhmm: string) => {
+    const [h, m] = hhmm.split(':').map(Number);
+    return (h ?? 0) * 60 + (m ?? 0);
+  };
+  const open = Math.min(...windows.map((w) => toMinutes(w.openTime)));
+  const close = Math.max(...windows.map((w) => toMinutes(w.closeTime) || 24 * 60));
+  const fmt = (minutes: number) => {
+    const d = new Date(2000, 0, 1, Math.floor(minutes / 60) % 24, minutes % 60);
+    return d.toLocaleTimeString('en-US', d.getMinutes() ? { hour: 'numeric', minute: '2-digit' } : { hour: 'numeric' });
+  };
+  return `${fmt(open)} – ${fmt(close)}`;
+}
+
+/** How long each photo stays before the banner moves to the next on its own. */
+const AUTO_PHOTO_MS = 2000;
+
+/**
+ * The card's banner: up to three photos that fade from one to the next, on their own and by hand (arrows on hover,
+ * swipe on phones, dots to show where you are), a save button, and how many slots are open. Without photos it draws a calm green field with
+ * the unit's icon, so a venue that has not added pictures yet still looks finished.
+ */
+function CardGallery({
+  photos,
+  iconKey,
+  alt,
+  badge,
+  saved,
+  onToggleSave,
+  venueName,
+}: {
+  photos: string[];
+  iconKey: string;
+  alt: string;
+  badge: string;
+  saved: boolean;
+  onToggleSave: () => void;
+  venueName: string;
+}) {
+  const [index, setIndex] = useState(0);
+  const touchX = useRef<number | null>(null);
+  const many = photos.length > 1;
+  const go = (step: number) => setIndex((i) => (i + step + photos.length) % photos.length);
+
+  // Photos change on their own every few seconds, but only while someone could be watching: not while the card is
+  // pointed at or focused (they are looking or reaching for a button), off screen, in a background tab, or for people
+  // who ask for less motion. Each card starts a little later than the last, so a page of cards never flips at once,
+  // and a tap on an arrow, a dot or a swipe restarts the wait.
+  const banner = useRef<HTMLDivElement>(null);
+  const [held, setHeld] = useState(false);
+  const [watched, setWatched] = useState(false);
+  const firstWait = useRef<number | null>(null);
+  if (firstWait.current === null) firstWait.current = AUTO_PHOTO_MS + Math.round(Math.random() * 1500);
+  useEffect(() => {
+    const el = banner.current;
+    if (!many || !el) return;
+    let onScreen = false;
+    const update = () => setWatched(onScreen && document.visibilityState === 'visible');
+    const watcher = new IntersectionObserver(([entry]) => {
+      onScreen = !!entry?.isIntersecting;
+      update();
+    }, { threshold: 0.5 });
+    watcher.observe(el);
+    document.addEventListener('visibilitychange', update);
+    return () => {
+      watcher.disconnect();
+      document.removeEventListener('visibilitychange', update);
+    };
+  }, [many]);
+  useEffect(() => {
+    if (!many || held || !watched || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const wait = firstWait.current ?? AUTO_PHOTO_MS;
+    const timer = setTimeout(() => {
+      firstWait.current = AUTO_PHOTO_MS;
+      setIndex((i) => (i + 1) % photos.length);
+    }, wait);
+    return () => clearTimeout(timer);
+  }, [index, many, held, watched, photos.length]);
+
   return (
-    <div className={`flex shrink-0 items-center justify-center rounded-2xl bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-100 ${className}`}>
-      <Icon name={r.category?.iconKey ?? 'category'} className="text-[1.25rem]" />
+    <div
+      ref={banner}
+      className="group relative aspect-[16/7] overflow-hidden bg-brand-800"
+      onMouseEnter={() => setHeld(true)}
+      onMouseLeave={() => setHeld(false)}
+      onFocus={() => setHeld(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHeld(false);
+      }}
+      onTouchStart={(e) => (touchX.current = e.touches[0]?.clientX ?? null)}
+      onTouchEnd={(e) => {
+        const start = touchX.current;
+        const end = e.changedTouches[0]?.clientX;
+        touchX.current = null;
+        if (!many || start === null || end === undefined || Math.abs(end - start) < 40) return;
+        go(end < start ? 1 : -1);
+      }}
+    >
+      {photos.length > 0 ? (
+        photos.map((src, i) => (
+          <img
+            key={src}
+            src={src}
+            alt={i === index ? alt : ''}
+            aria-hidden={i !== index}
+            loading="lazy"
+            decoding="async"
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${i === index ? 'opacity-100' : 'opacity-0'}`}
+          />
+        ))
+      ) : (
+        <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900">
+          {/* Faint pitch markings: a halfway line and centre circle. */}
+          <div className="absolute inset-y-0 left-1/2 w-px bg-white/10" />
+          <div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Icon name={iconKey} className="text-[3.25rem] text-white/35" />
+          </div>
+        </div>
+      )}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/35 to-transparent" />
+
+      <button
+        type="button"
+        onClick={onToggleSave}
+        aria-pressed={saved}
+        aria-label={saved ? `Remove ${venueName} from saved venues` : `Save ${venueName}`}
+        className="absolute right-2.5 top-2.5 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur transition hover:scale-105 active:scale-95"
+      >
+        <Icon name="bookmark" className={`text-[1.125rem] ${saved ? 'fill-brand-700 text-brand-700' : 'text-slate-700'}`} />
+      </button>
+
+      {many && (
+        <>
+          <button
+            type="button"
+            onClick={() => go(-1)}
+            aria-label="Previous photo"
+            className="absolute left-2.5 top-1/2 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-800 opacity-0 shadow-sm transition group-hover:opacity-100 focus-visible:opacity-100 sm:flex"
+          >
+            <Icon name="chevron_left" className="text-[1rem]" />
+          </button>
+          <button
+            type="button"
+            onClick={() => go(1)}
+            aria-label="Next photo"
+            className="absolute right-2.5 top-1/2 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-800 opacity-0 shadow-sm transition group-hover:opacity-100 focus-visible:opacity-100 sm:flex"
+          >
+            <Icon name="chevron_right" className="text-[1rem]" />
+          </button>
+          <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
+            {photos.map((src, i) => (
+              <button
+                key={src}
+                type="button"
+                onClick={() => setIndex(i)}
+                aria-label={`Photo ${i + 1} of ${photos.length}`}
+                aria-current={i === index}
+                className={`h-1.5 rounded-full transition-all ${i === index ? 'w-4 bg-white' : 'w-1.5 bg-white/60 hover:bg-white/90'}`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      <span className="absolute bottom-2.5 right-2.5 rounded-full bg-white px-2.5 py-1 text-[0.6875rem] font-bold text-brand-700 shadow-sm">{badge}</span>
     </div>
   );
 }
 
-/** How many open times show straight away; the rest are behind "All slots". */
-const NEXT_SLOTS = 3;
+/** One hour of a unit's day on its card. */
+interface HourCell {
+  /** Hour from the start of the venue's day; 24 and above are the small hours after midnight. */
+  hour: number;
+  state: 'available' | 'booked' | 'unavailable';
+  /** The first bookable start inside this hour (what a tap on it books). */
+  start: string | null;
+}
+
+/** "6 AM", "12 PM", "12 AM" for an hour of the day (24 and above wrap past midnight). */
+function shortHour(hour: number): string {
+  const h = ((hour % 24) + 24) % 24;
+  return `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? 'AM' : 'PM'}`;
+}
 
 /**
- * One unit inside its venue's card: its name, sub-type and price, a thin day timeline, the next few open times
- * (one tap books), and a button that lists every slot. "Book Now" opens the full booking window (duration etc.).
+ * The unit's day as hourly blocks for its card, in the venue's own timezone: available where a booking of the chosen
+ * length can start, booked where the venue is open but nothing can start (taken or blocked), unavailable where it is
+ * closed or the hour has already gone. The axis runs 6 AM to midnight, widened when the venue opens earlier or later.
  */
-function UnitPanel({ result: r, liveResult, durationMinutes, dateIso, reloading, onDurationChange }: UnitCardProps) {
+function buildDayTimeline(r: SearchResult, dateIso: string): { cells: HourCell[]; first: number; last: number } {
+  const toMinutes = (hhmm: string) => {
+    const [h, m] = hhmm.split(':').map(Number);
+    return (h ?? 0) * 60 + (m ?? 0);
+  };
+  const windows = (r.openWindows && r.openWindows.length > 0 ? r.openWindows : [{ openTime: '06:00', closeTime: '00:00' }]).map((w) => {
+    const open = toMinutes(w.openTime);
+    let close = toMinutes(w.closeTime);
+    if (close <= open) close += 24 * 60; // closes at or after midnight
+    return { open, close };
+  });
+  const first = Math.min(6, ...windows.map((w) => Math.floor(w.open / 60)));
+  const last = Math.min(30, Math.max(24, ...windows.map((w) => Math.ceil(w.close / 60))));
+
+  const zone = r.timezone;
+  const parts = (iso: string | Date) => {
+    const f = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+    const p = Object.fromEntries(f.formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
+    return { day: `${p.year}-${p.month}-${p.day}`, minutes: Number(p.hour) * 60 + Number(p.minute) };
+  };
+  // Starts after midnight belong to the end of this day's axis.
+  const startsByHour = new Map<number, string>();
+  for (const t of r.availableStartTimes) {
+    const p = parts(t);
+    const hour = Math.floor(p.minutes / 60) + (p.day > dateIso ? 24 : 0);
+    if (!startsByHour.has(hour)) startsByHour.set(hour, t);
+  }
+  const now = parts(new Date());
+  const nowOnAxis = now.day === dateIso ? now.minutes : now.day > dateIso ? Infinity : -Infinity;
+
+  const cells: HourCell[] = [];
+  for (let hour = first; hour < last; hour++) {
+    const start = startsByHour.get(hour) ?? null;
+    const open = windows.some((w) => hour * 60 < w.close && (hour + 1) * 60 > w.open);
+    // An hour that has already begun can only still offer a later start inside it (shown green when it does).
+    const past = hour * 60 <= nowOnAxis;
+    cells.push({ hour, start, state: start ? 'available' : open && !past ? 'booked' : 'unavailable' });
+  }
+  return { cells, first, last };
+}
+
+const CELL_COLOURS: Record<HourCell['state'], string> = {
+  available: 'bg-green-600',
+  booked: 'bg-rose-500',
+  unavailable: 'bg-slate-200',
+};
+
+/**
+ * The picked unit's day: the date and opening hours, an hour-by-hour bar (tap a green hour to book it at the chosen
+ * length) with its legend, and Book Now for the full booking window (duration, every start time).
+ */
+function UnitPanel({ result: r, liveResult, durationMinutes: requestedDuration, dateIso, reloading, onDurationChange }: UnitCardProps) {
   const [modalOpen, setModalOpen] = useState(false);
-  const [showAll, setShowAll] = useState(false);
+  // What this unit's slots and prices are for (its own shortest unless a length it offers was asked for).
+  const durationMinutes = liveResult.durationMinutes ?? r.durationMinutes ?? requestedDuration ?? r.policy?.minDurationMin ?? 60;
   const { bookSlot, busyStart, error: bookError } = useBookSlot(r.resource.id, durationMinutes);
-  const timeline = useMemo(() => buildTimeline(r), [r]);
-  const times = r.availableStartTimes;
-  const shown = showAll ? times : times.slice(0, NEXT_SLOTS);
+  const { cells, first, last } = useMemo(() => buildDayTimeline(r, dateIso), [r, dateIso]);
+  const hours = openHoursLabel(r);
+  const span = last - first;
+  const labels = Array.from({ length: Math.floor(span / 3) + 1 }, (_, i) => first + i * 3).filter((h) => h <= last);
 
   return (
-    <div className="flex flex-col gap-3.5 p-3.5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <UnitIcon r={r} className="h-11 w-11" />
-          <div className="min-w-0">
-            <h3 className="truncate text-sm font-extrabold text-slate-900 sm:text-base">{r.resource.name}</h3>
-            {r.resource.groundType && (
-              <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[0.625rem] font-bold uppercase tracking-wider text-emerald-800">
-                {r.resource.groundType}
-              </span>
-            )}
-          </div>
-        </div>
-        {r.price && (
-          <div className="shrink-0 rounded-2xl bg-white px-3 py-1.5 text-right leading-tight shadow-sm ring-1 ring-emerald-100">
-            <span className="block text-[0.5625rem] font-bold uppercase text-slate-400">{durationLabel(durationMinutes)} rate</span>
-            {r.price.normalAmount && (
-              <s className="mr-1 text-[0.6875rem] font-medium text-slate-400">{formatPrice({ amount: r.price.normalAmount, currency: r.price.currency })}</s>
-            )}
-            <span className="text-lg font-black text-emerald-700">{formatPrice(r.price)}</span>
-            {payNowLabel(r.price) && <span className="block text-[0.625rem] font-semibold text-emerald-700">{payNowLabel(r.price)}</span>}
-          </div>
-        )}
+    <div className="mt-auto flex flex-col gap-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-[0.9375rem] font-bold text-slate-900">{dayHeading(dateIso)}</span>
+        {hours && <span className="text-sm text-slate-500">{hours}</span>}
       </div>
 
-      <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
-        <div className="flex w-full items-center gap-0.5" aria-hidden="true">
-          {timeline.hours.map((h) => (
-            <div
+      <div>
+        <div aria-hidden="true" className="relative mb-1.5 h-3.5 text-[0.625rem] font-medium text-slate-500">
+          {labels.map((h, i) => (
+            <span
               key={h}
-              title={`${hourLabel(h)} - ${timeline.available.has(h) ? 'Available' : 'Booked'}`}
-              className={`h-2 flex-1 rounded-full ${timeline.available.has(h) ? 'bg-emerald-500' : 'bg-slate-200'}`}
-            />
+              className="absolute top-0 whitespace-nowrap"
+              style={{ left: `${((h - first) / span) * 100}%`, transform: i === 0 ? 'none' : h === last ? 'translateX(-100%)' : 'translateX(-50%)' }}
+            >
+              {shortHour(h)}
+            </span>
           ))}
         </div>
-        <div className="flex justify-between pt-1 text-[0.5625rem] font-bold text-slate-400" aria-hidden="true">
-          <span>{timeline.labels[0]}</span>
-          <span>{timeline.labels[1]}</span>
-          <span>{timeline.labels[2]}</span>
+        <div className="flex gap-[3px]" role="group" aria-label={`${r.resource.name}, ${dayHeading(dateIso)}`}>
+          {cells.map((c) =>
+            c.state === 'available' && c.start ? (
+              <button
+                key={c.hour}
+                type="button"
+                disabled={busyStart !== null}
+                onClick={() => bookSlot(c.start!)}
+                title={`${shortHour(c.hour)} · available, tap to book ${durationLabel(durationMinutes).toLowerCase()}`}
+                aria-label={`Book ${formatStart(c.start, r.timezone)}`}
+                className={`h-6 flex-1 rounded-[4px] ${CELL_COLOURS.available} transition hover:brightness-110 active:scale-95 disabled:cursor-wait ${busyStart === c.start ? 'animate-pulse' : ''}`}
+              />
+            ) : (
+              <span key={c.hour} title={`${shortHour(c.hour)} · ${c.state}`} className={`h-6 flex-1 rounded-[4px] ${CELL_COLOURS[c.state]}`} />
+            ),
+          )}
+        </div>
+        <div className="mt-2.5 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-slate-500">
+          {(['available', 'booked', 'unavailable'] as const).map((s) => (
+            <span key={s} className="inline-flex items-center gap-1.5 capitalize">
+              <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${CELL_COLOURS[s]}`} />
+              {s}
+            </span>
+          ))}
         </div>
       </div>
 
-      {times.length === 0 ? (
-        <p className="rounded-2xl bg-white p-3.5 text-center text-xs text-slate-500 ring-1 ring-slate-100">No open slots for this duration on this day.</p>
-      ) : (
-        <>
-          <div className="flex items-center justify-between text-[0.6875rem] font-bold uppercase tracking-wider text-slate-600">
-            <span>{showAll ? 'All open times' : 'Next open'}</span>
-            <span className="normal-case tracking-normal text-emerald-700">
-              {times.length} slot{times.length === 1 ? '' : 's'} open
-            </span>
-          </div>
-          <div className={showAll ? 'grid grid-cols-3 gap-2 sm:grid-cols-4' : 'grid grid-cols-3 gap-2'}>
-            {shown.map((t) => (
-              <button
-                key={t}
-                type="button"
-                disabled={busyStart !== null}
-                onClick={() => bookSlot(t)}
-                className="group flex flex-col items-center rounded-2xl bg-white px-2 py-2.5 text-center shadow-sm ring-1 ring-emerald-200 transition hover:bg-emerald-600 hover:text-white hover:ring-emerald-600 active:scale-95 disabled:cursor-wait disabled:opacity-60"
-              >
-                <span className="text-xs font-extrabold">{busyStart === t ? 'Holding…' : formatStart(t, r.timezone)}</span>
-                {priceAt(r, t) && <span className="text-[0.625rem] font-bold text-emerald-700 group-hover:text-emerald-100">{formatPrice(priceAt(r, t)!)}</span>}
-              </button>
-            ))}
-          </div>
-          {bookError && (
-            <div role="alert">
-              <ErrorBanner message={bookError} />
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            {times.length > NEXT_SLOTS && (
-              <button
-                type="button"
-                aria-expanded={showAll}
-                onClick={() => setShowAll((v) => !v)}
-                className="rounded-2xl bg-white px-4 py-3 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:ring-emerald-400 active:scale-95"
-              >
-                {showAll ? 'Show fewer' : `All ${times.length} slots`}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setModalOpen(true)}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-emerald-600 px-3 py-3 text-xs font-extrabold text-white shadow-md transition hover:bg-emerald-700 active:scale-95"
-            >
-              <Icon name="bolt" className="text-[0.875rem]" />
-              Book Now
-            </button>
-          </div>
-        </>
+      {bookError && (
+        <div role="alert">
+          <ErrorBanner message={bookError} />
+        </div>
       )}
+      <button
+        type="button"
+        onClick={() => setModalOpen(true)}
+        className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-700 text-sm font-bold text-white shadow-glow transition hover:bg-brand-800 active:scale-[0.99]"
+      >
+        <Icon name="book" className="text-[1.125rem]" />
+        Book Now
+      </button>
       {modalOpen && (
         <SlotBookingModal
           result={liveResult}
@@ -1072,3 +1377,9 @@ function UnitPanel({ result: r, liveResult, durationMinutes, dateIso, reloading,
   );
 }
 
+/** "Today, 25 Oct" or "Mon, 27 Oct" for the searched day. */
+function dayHeading(dateIso: string): string {
+  const d = new Date(`${dateIso}T00:00:00`);
+  const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return dateIso === todayIso() ? `Today, ${date}` : `${d.toLocaleDateString('en-GB', { weekday: 'short' })}, ${date}`;
+}

@@ -7,9 +7,8 @@ const nextConfig = {
     // Old WhatsApp booking links land on the home search instead of a 404.
     return [
       { source: '/book/:token', destination: '/', permanent: false },
-      // My bookings and Support are tabs of the account page now.
+      // My bookings is a tab of the account page. (Support has a page of its own at /support.)
       { source: '/bookings', destination: '/account?tab=bookings', permanent: false },
-      { source: '/support', destination: '/account?tab=support', permanent: false },
     ];
   },
 };

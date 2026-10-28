@@ -58,7 +58,7 @@ export function PhoneInput({
 }) {
   return (
     <div
-      className={`flex w-full items-stretch overflow-hidden rounded-md border bg-white focus-within:border-emerald-600 ${
+      className={`flex w-full items-stretch overflow-hidden rounded-md border bg-white focus-within:border-brand-600 ${
         invalid ? 'border-red-500' : 'border-gray-300'
       }`}
     >

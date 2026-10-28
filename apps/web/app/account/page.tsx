@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
@@ -15,7 +16,7 @@ import { useToast } from '@/components/toast';
 import { BookingsPanel } from '@/components/bookings-panel';
 import { LogoutButton } from '@/components/logout-button';
 import { VerifyEmailDialog } from '@/components/verify-email-dialog';
-import { SupportPanel } from '@/components/support-panel';
+import { SavedVenuesPanel } from '@/components/saved-venues-panel';
 import { Screen } from '@/components/screen';
 
 interface CoinWallet {
@@ -48,7 +49,7 @@ function VerifiedChip({ verified, what }: { verified: boolean; what: string }) {
   return (
     <span
       className={`ml-2 rounded-full px-2 py-0.5 align-middle text-[0.6875rem] font-semibold ${
-        verified ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'
+        verified ? 'bg-brand-50 text-brand-700' : 'bg-amber-50 text-amber-800'
       }`}
       aria-label={`${what} ${verified ? 'verified' : 'not verified'}`}
     >
@@ -161,7 +162,7 @@ function Profile() {
                     <button
                       type="button"
                       onClick={() => setVerifying(true)}
-                      className="ml-2 inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-2.5 py-1 align-middle text-xs font-semibold text-white transition hover:bg-emerald-600"
+                      className="ml-2 inline-flex items-center gap-1 rounded-lg bg-brand-700 px-2.5 py-1 align-middle text-xs font-semibold text-white transition hover:bg-brand-600"
                     >
                       <Icon name="verified" className="text-[0.8125rem]" />
                       Verify
@@ -280,7 +281,7 @@ function Profile() {
 
 /** Only for customers who have a password. Google-only customers set one through Forgot password on the sign-in screen. */
 type PasswordField = 'current' | 'next' | 'confirm';
-const STRENGTH_BAR = ['bg-red-400', 'bg-amber-400', 'bg-lime-500', 'bg-emerald-600'];
+const STRENGTH_BAR = ['bg-red-400', 'bg-amber-400', 'bg-lime-500', 'bg-brand-600'];
 
 /** Where the API's validation answers belong: the field names it uses, mapped to this form's. */
 const SERVER_FIELD: Record<string, PasswordField> = { currentPassword: 'current', newPassword: 'next' };
@@ -428,7 +429,7 @@ function ChangePassword() {
               {strength.label && <p className="mt-1 text-xs text-gray-500">Strength: {strength.label}</p>}
               <ul className="mt-2 space-y-1 text-xs" aria-label="Password rules">
                 {rules.map((r) => (
-                  <li key={r.id} className={`flex items-center gap-1.5 ${r.ok ? 'text-emerald-700' : dNext ? 'text-red-600' : 'text-gray-500'}`}>
+                  <li key={r.id} className={`flex items-center gap-1.5 ${r.ok ? 'text-brand-700' : dNext ? 'text-red-600' : 'text-gray-500'}`}>
                     {r.ok ? <Icon name="check" className="text-[0.875rem]" /> : dNext ? <Icon name="close" className="text-[0.875rem]" /> : <span aria-hidden="true" className="inline-block h-3 w-3 shrink-0 rounded-full border border-gray-300" />}
                     <span>{r.label}</span>
                   </li>
@@ -444,7 +445,7 @@ function ChangePassword() {
             setConfirm,
             'new-password',
             confirmMatches && !msg('confirm') ? (
-              <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+              <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-brand-700">
                 <Icon name="check" className="text-[0.875rem]" />
                 Passwords match
               </p>
@@ -505,7 +506,7 @@ function Wallet() {
                       <p className="truncate text-gray-900">{labelFor(t.type)}</p>
                       <p className="text-xs text-gray-500">{new Date(t.createdAt).toLocaleString()}</p>
                     </div>
-                    <p className={`shrink-0 font-medium ${credit ? 'text-emerald-700' : 'text-gray-900'}`}>
+                    <p className={`shrink-0 font-medium ${credit ? 'text-brand-700' : 'text-gray-900'}`}>
                       {credit ? '+' : ''}
                       {t.amount}
                     </p>
@@ -524,7 +525,7 @@ const TABS = [
   { id: 'profile', label: 'Profile', icon: 'person' },
   { id: 'wallet', label: 'Wallet', icon: 'wallet' },
   { id: 'bookings', label: 'Bookings', icon: 'bookings' },
-  { id: 'support', label: 'Support', icon: 'support' },
+  { id: 'saved', label: 'Saved', icon: 'bookmark' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
@@ -535,6 +536,19 @@ function ProfileTab() {
     <>
       <Profile />
       {customer?.hasPassword && <ChangePassword />}
+      {/* Support is a page of its own: this card, at the bottom of Profile, is the way to it. */}
+      <Link href="/support" className="mt-4 block rounded-lg outline-none focus-visible:ring-4 focus-visible:ring-brand-600/20">
+        <Card className="flex items-center gap-3 transition hover:border-brand-400">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+            <Icon name="support" className="text-[1.25rem]" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-gray-900">Support</span>
+            <span className="block text-xs text-gray-500">Ask for help and see your earlier requests</span>
+          </span>
+          <Icon name="chevron_right" className="shrink-0 text-[1.25rem] text-gray-400" />
+        </Card>
+      </Link>
     </>
   );
 }
@@ -545,6 +559,10 @@ function AccountTabs() {
   const pathname = usePathname();
   const wanted = useSearchParams().get('tab');
   const tab: TabId = TABS.some((t) => t.id === wanted) ? (wanted as TabId) : 'profile';
+  // Support used to be a tab here: old links to ?tab=support land on its own page.
+  useEffect(() => {
+    if (wanted === 'support') router.replace('/support');
+  }, [wanted, router]);
   const choose = (id: TabId) => router.replace(`${pathname}?tab=${id}`, { scroll: false });
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -570,7 +588,7 @@ function AccountTabs() {
             aria-controls="account-panel"
             tabIndex={tab === t.id ? 0 : -1}
             onClick={() => choose(t.id)}
-            className={`flex flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 transition sm:flex-row sm:gap-2 sm:px-3 sm:py-2.5 ${tab === t.id ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+            className={`flex flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 transition sm:flex-row sm:gap-2 sm:px-3 sm:py-2.5 ${tab === t.id ? 'bg-white text-brand-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
           >
             <Icon name={t.icon} className="text-[1.125rem]" />
             {t.label}
@@ -581,7 +599,7 @@ function AccountTabs() {
         {tab === 'profile' && <ProfileTab />}
         {tab === 'wallet' && <Wallet />}
         {tab === 'bookings' && <BookingsPanel />}
-        {tab === 'support' && <SupportPanel />}
+        {tab === 'saved' && <SavedVenuesPanel />}
       </div>
     </>
   );

@@ -449,7 +449,7 @@ export function LoginDialog({
                     <Button type="submit" className="w-full" disabled={busy}>
                       {busy ? 'Signing in…' : 'Sign in'}
                     </Button>
-                    <button type="button" onClick={() => go('forgot')} className="block w-full text-center text-sm font-medium text-emerald-700 hover:underline">
+                    <button type="button" onClick={() => go('forgot')} className="block w-full text-center text-sm font-medium text-brand-700 hover:underline">
                       Forgot password?
                     </button>
                   </form>
@@ -595,7 +595,7 @@ export function LoginDialog({
                 type="button"
                 onClick={() => resendSignUp()}
                 disabled={busy || resendIn > 0}
-                className="font-medium text-emerald-700 hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
+                className="font-medium text-brand-700 hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
               >
                 {resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend code'}
               </button>
@@ -667,7 +667,7 @@ export function LoginDialog({
                 type="button"
                 onClick={() => resendReset()}
                 disabled={busy || resendIn > 0}
-                className="font-medium text-emerald-700 hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
+                className="font-medium text-brand-700 hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
               >
                 {resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend code'}
               </button>
@@ -778,7 +778,7 @@ export function LoginDialog({
                 type="button"
                 onClick={() => sendCode()}
                 disabled={busy || resendIn > 0}
-                className="font-medium text-emerald-700 hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
+                className="font-medium text-brand-700 hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
               >
                 {resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend code'}
               </button>

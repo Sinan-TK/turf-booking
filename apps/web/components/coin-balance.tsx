@@ -58,10 +58,13 @@ export function CoinBalance() {
       href="/account?tab=wallet"
       title="Coins wallet"
       aria-label={`${formatCoins(balance)} coins. Open your wallet`}
-      className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 text-sm font-bold text-amber-800 shadow-sm transition hover:bg-amber-100 active:scale-95"
+      className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-amber-50 px-3 text-sm font-bold text-amber-900 transition hover:bg-amber-100 active:scale-95 md:h-11 md:px-3.5"
     >
       <Icon name="coins" className="text-[1.125rem] text-amber-500" />
-      <span>{formatCoins(balance)}</span>
+      <span>
+        {formatCoins(balance)}
+        <span className="hidden md:inline"> Coins</span>
+      </span>
     </Link>
   );
 }

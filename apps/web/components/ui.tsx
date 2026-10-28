@@ -37,11 +37,19 @@ import {
   LifeBuoy,
   Pencil,
   LogOut,
+  LogIn,
   Eye,
   EyeOff,
   KeyRound,
   ShieldCheck,
   Coins,
+  ChevronLeft,
+  ChevronRight,
+  Bookmark,
+  Plus,
+  Navigation,
+  Layers,
+  CalendarCheck,
   type LucideIcon
 } from 'lucide-react';
 
@@ -67,6 +75,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   bedroom_parent: BedDouble,
   celebration: PartyPopper,
   category: LayoutGrid,
+  apps: LayoutGrid,
   location_on: MapPin,
   expand_more: ChevronDown,
   search: Search,
@@ -85,11 +94,21 @@ const ICON_MAP: Record<string, LucideIcon> = {
   support: LifeBuoy,
   edit: Pencil,
   logout: LogOut,
+  login: LogIn,
   visibility: Eye,
   visibility_off: EyeOff,
   lock: KeyRound,
   verified: ShieldCheck,
   coins: Coins,
+  // The venue cards.
+  chevron_left: ChevronLeft,
+  chevron_right: ChevronRight,
+  bookmark: Bookmark,
+  plus: Plus,
+  navigation: Navigation,
+  layers: Layers,
+  calendar: CalendarDays,
+  book: CalendarCheck,
 };
 
 export function Icon({ name, className = '' }: { name: string; className?: string; filled?: boolean }) {
@@ -110,7 +129,7 @@ export function Button({
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' }) {
   const variants = {
-    primary: 'bg-emerald-700 text-white hover:bg-emerald-600 disabled:bg-emerald-300',
+    primary: 'bg-brand-700 text-white hover:bg-brand-600 disabled:bg-brand-300',
     secondary: 'bg-white text-gray-900 border border-gray-300 hover:bg-gray-50',
     danger: 'bg-red-600 text-white hover:bg-red-700 disabled:bg-red-300',
   };
@@ -125,7 +144,7 @@ export function Button({
 export function Input({ className = '', ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className={`w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-600 focus:outline-none ${className}`}
+      className={`w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm focus:border-brand-600 focus:outline-none ${className}`}
       {...props}
     />
   );
@@ -134,7 +153,7 @@ export function Input({ className = '', ...props }: InputHTMLAttributes<HTMLInpu
 export function Select({ className = '', style, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
-      className={`appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-9 text-sm text-slate-700 shadow-sm transition-all hover:border-emerald-400 focus:border-emerald-600 focus:outline-none focus:ring-4 focus:ring-emerald-600/10 ${className}`}
+      className={`appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-9 text-sm text-slate-700 shadow-sm transition-all hover:border-brand-400 focus:border-brand-600 focus:outline-none focus:ring-4 focus:ring-brand-600/10 ${className}`}
       style={{
         backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3e%3c/svg%3e")`,
         backgroundPosition: 'right 0.75rem center',

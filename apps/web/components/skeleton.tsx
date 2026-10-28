@@ -19,32 +19,53 @@ function Region({ label, className = '', children }: { label: string; className?
   );
 }
 
-/** Search results on the home page: venue cards with their slot grid. */
+/** One venue card's shape (photo, name, unit tiles, day timeline, Book Now). A grid item, so it can sit among real cards. */
+export function VenueCardSkeleton() {
+  return (
+    <div aria-hidden="true" className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm">
+      <Skeleton className="aspect-[16/7] w-full rounded-none" />
+      <div className="flex flex-col gap-3.5 px-3.5 pb-3.5 pt-3 sm:px-4 sm:pb-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-5 w-2/3" />
+            <Skeleton className="h-3 w-1/2" />
+          </div>
+          <Skeleton className="h-8 w-24 rounded-xl" />
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {Array.from({ length: 3 }, (_, j) => (
+            <Skeleton key={j} className="h-14 rounded-xl" />
+          ))}
+        </div>
+        <div className="flex justify-between">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-4 w-20" />
+        </div>
+        <Skeleton className="h-6 w-full rounded-md" />
+        <Skeleton className="mx-auto h-3 w-1/2" />
+        <Skeleton className="h-12 w-full rounded-xl" />
+      </div>
+    </div>
+  );
+}
+
+/** Search results on the home page while they load: venue card shapes in the same grid as the real cards. */
 export function VenueCardsSkeleton({ count = 3, label = 'Checking live availability…' }: { count?: number; label?: string }) {
   return (
-    <Region label={label} className="flex flex-col gap-3 sm:gap-5">
+    <Region label={label} className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2 xl:grid-cols-3">
       {Array.from({ length: count }, (_, i) => (
-        <div key={i} className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-card sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
-          <div className="flex flex-col gap-3 p-4 sm:p-5">
-            <div className="flex items-start gap-3">
-              <Skeleton className="h-14 w-14 shrink-0 rounded-xl" />
-              <div className="flex-1 space-y-2 pt-1">
-                <Skeleton className="h-4 w-2/3" />
-                <Skeleton className="h-3 w-1/2" />
-                <Skeleton className="h-3 w-1/3" />
-              </div>
-              <Skeleton className="h-6 w-14" />
-            </div>
-            <Skeleton className="mt-1 hidden h-10 w-full rounded-xl sm:block" />
-          </div>
-          <div className="grid grid-cols-3 gap-2 border-t border-slate-100 p-4 sm:grid-cols-4 sm:border-l sm:border-t-0 sm:p-5">
-            {Array.from({ length: 8 }, (_, j) => (
-              <Skeleton key={j} className="h-12 rounded-xl" />
-            ))}
-          </div>
-        </div>
+        <VenueCardSkeleton key={i} />
       ))}
     </Region>
+  );
+}
+
+/** The screen-reader message for skeleton cards placed straight into a grid of real ones (no wrapper of its own). */
+export function LoadingNote({ label }: { label: string }) {
+  return (
+    <span role="status" aria-busy="true" className="sr-only">
+      {label}
+    </span>
   );
 }
 

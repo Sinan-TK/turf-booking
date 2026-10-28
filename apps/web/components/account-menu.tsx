@@ -12,7 +12,7 @@ const ITEMS = [
   { href: '/account?tab=profile', label: 'Profile', icon: 'person' },
   { href: '/account?tab=bookings', label: 'Bookings', icon: 'bookings' },
   { href: '/account?tab=wallet', label: 'Wallet (Coins)', icon: 'wallet' },
-  { href: '/account?tab=support', label: 'Support', icon: 'support' },
+  { href: '/support', label: 'Support', icon: 'support' },
 ];
 
 /** Header control: "Log in" when logged out, otherwise an avatar with the
@@ -47,17 +47,16 @@ export function AccountMenu() {
       <button
         type="button"
         onClick={() => requireLogin().catch(() => undefined)}
-        className="h-9 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 active:scale-95"
+        className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white pl-3 pr-4 text-sm font-bold text-slate-800 transition hover:border-brand-400 active:scale-95 md:h-12 md:pl-3.5 md:pr-5"
       >
+        <Icon name="login" className="text-[1.125rem] text-brand-600" />
         Log in
       </button>
     );
   }
 
-  const initial = (customer.name?.trim() || customer.email || customer.phone?.replace(/\D/g, '') || '?').charAt(0).toUpperCase();
-
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 md:gap-3">
       <CoinBalance />
       <div ref={root} className="relative">
       <button
@@ -66,9 +65,10 @@ export function AccountMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-95"
+        title={customer.name ?? 'Your account'}
+        className="flex h-10 w-10 items-center justify-center rounded-full border border-brand-100 bg-brand-50 text-brand-700 transition hover:border-brand-300 hover:bg-brand-100 active:scale-95 md:h-11 md:w-11"
       >
-        {initial}
+        <Icon name="person" className="text-[1.25rem] md:text-[1.375rem]" />
       </button>
       {open && (
         <div

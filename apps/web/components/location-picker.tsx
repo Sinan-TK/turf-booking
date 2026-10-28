@@ -134,7 +134,7 @@ export function LocationPicker({
   const isDistrictCurrent = current?.mode === 'district' && current.districtId === districtId;
   const row = (selected: boolean) =>
     `flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm transition ${
-      selected ? 'bg-emerald-50 font-bold text-emerald-800' : 'font-medium text-slate-800 hover:bg-slate-50'
+      selected ? 'bg-brand-50 font-bold text-brand-800' : 'font-medium text-slate-800 hover:bg-slate-50'
     }`;
 
   return (
@@ -181,14 +181,14 @@ export function LocationPicker({
               onChange={(e) => setQuery(e.target.value)}
               placeholder={`Search a town in ${districtName || 'this district'}…`}
               aria-label="Search towns"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-800 placeholder-slate-400 focus:border-emerald-600 focus:outline-none focus:ring-4 focus:ring-emerald-600/10"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-800 placeholder-slate-400 focus:border-brand-600 focus:outline-none focus:ring-4 focus:ring-brand-600/10"
             />
           </div>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4 pt-2 sm:px-3">
           <button type="button" onClick={useMyLocation} disabled={locating} className={row(current?.mode === 'geo')}>
-            <Icon name="my_location" className="text-[1.125rem] text-emerald-700" />
+            <Icon name="my_location" className="text-[1.125rem] text-brand-700" />
             <span className="flex-1">{locating ? 'Finding your location…' : 'Use my current location'}</span>
             {current?.mode === 'geo' && <Icon name="check" className="text-[1rem]" />}
           </button>
@@ -202,7 +202,7 @@ export function LocationPicker({
 
           {districtName && (
             <button type="button" onClick={chooseDistrict} className={row(isDistrictCurrent)}>
-              <Icon name="location_on" className={`text-[1.125rem] ${isDistrictCurrent ? 'text-emerald-700' : 'text-slate-500'}`} />
+              <Icon name="location_on" className={`text-[1.125rem] ${isDistrictCurrent ? 'text-brand-700' : 'text-slate-500'}`} />
               <span className="flex-1">All of {districtName}</span>
               {isDistrictCurrent && <Icon name="check" className="text-[1rem]" />}
             </button>
@@ -227,7 +227,7 @@ export function LocationPicker({
             const selected = current?.mode === 'town' && current.areaId === t.id;
             return (
               <button key={t.id} type="button" onClick={() => chooseTown(t)} className={row(selected)}>
-                <Icon name="location_on" className={`text-[1.125rem] ${selected ? 'text-emerald-700' : 'text-slate-400'}`} />
+                <Icon name="location_on" className={`text-[1.125rem] ${selected ? 'text-brand-700' : 'text-slate-400'}`} />
                 <span className="flex-1">{t.name}</span>
                 {selected && <Icon name="check" className="text-[1rem]" />}
               </button>

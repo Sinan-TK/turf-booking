@@ -10,6 +10,7 @@ import {
   Card,
   ErrorBanner,
   FieldError,
+  Icon,
   Input,
   Label,
   Select,
@@ -17,6 +18,7 @@ import {
 } from '@/components/ui';
 import { hasErrors, type FieldErrors } from '@/lib/validation';
 import { RowsSkeleton } from '@/components/skeleton';
+import { Modal } from '@/components/modal';
 
 interface Ticket {
   id: string;
@@ -38,10 +40,14 @@ function categoryLabel(value: string): string {
   return CATEGORIES.find((c) => c.value === value)?.label ?? value;
 }
 
-/** Contact form and the customer's earlier requests. Shown as a tab on the account page. */
+/**
+ * The customer's earlier requests, with a "New request" button that opens the contact form in a modal.
+ * Shown on the Support page.
+ */
 export function SupportPanel() {
   const { refresh } = useCustomer();
   const toast = useToast();
+  const [open, setOpen] = useState(false);
   const [tickets, setTickets] = useState<Ticket[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [form, setForm] = useState({ category: 'BOOKING_ISSUE', subject: '', description: '' });
@@ -83,6 +89,7 @@ export function SupportPanel() {
       });
       setForm({ category: 'BOOKING_ISSUE', subject: '', description: '' });
       setErrors({});
+      setOpen(false);
       toast.show('Thanks, we have your request and will reply soon.');
       load();
     } catch (err) {
@@ -94,71 +101,14 @@ export function SupportPanel() {
 
   return (
     <>
-      <Card className="mb-4">
-        <h2 className="mb-3 text-sm font-semibold text-gray-900">Contact support</h2>
-        <form onSubmit={onSubmit} noValidate className="space-y-3">
-          {formError && (
-            <div role="alert">
-              <ErrorBanner message={formError} />
-            </div>
-          )}
-          <div>
-            <Label>What is it about?</Label>
-            <Select
-              className="w-full"
-              value={form.category}
-              onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="support-subject">Subject</Label>
-            <Input
-              id="support-subject"
-              maxLength={150}
-              value={form.subject}
-              aria-invalid={!!errors.subject}
-              aria-describedby={errors.subject ? 'support-subject-error' : undefined}
-              className={errors.subject ? invalidClass : ''}
-              onChange={(e) => {
-                setForm((f) => ({ ...f, subject: e.target.value }));
-                setErrors((p) => ({ ...p, subject: undefined }));
-              }}
-            />
-            <FieldError id="support-subject-error" message={errors.subject} />
-          </div>
-          <div>
-            <Label htmlFor="support-description">Details</Label>
-            <textarea
-              id="support-description"
-              maxLength={2000}
-              rows={4}
-              value={form.description}
-              aria-invalid={!!errors.description}
-              aria-describedby={errors.description ? 'support-description-error' : undefined}
-              onChange={(e) => {
-                setForm((f) => ({ ...f, description: e.target.value }));
-                setErrors((p) => ({ ...p, description: undefined }));
-              }}
-              className={`w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-600 focus:outline-none ${errors.description ? invalidClass : ''}`}
-            />
-            <FieldError id="support-description-error" message={errors.description} />
-          </div>
-          <div className="flex justify-end">
-            <Button type="submit" disabled={sending}>
-              {sending ? 'Sending…' : 'Send request'}
-            </Button>
-          </div>
-        </form>
-      </Card>
-
       <Card>
-        <h2 className="mb-3 text-sm font-semibold text-gray-900">Your requests</h2>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-gray-900">Your requests</h2>
+          <Button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5">
+            <Icon name="plus" className="text-[1rem]" />
+            New request
+          </Button>
+        </div>
         {listError && <ErrorBanner message={listError} />}
         {!listError && !tickets && <RowsSkeleton label="Loading your requests…" />}
         {tickets && tickets.length === 0 && <p className="text-sm text-gray-500">No requests yet.</p>}
@@ -178,6 +128,70 @@ export function SupportPanel() {
           </ul>
         )}
       </Card>
+
+      {open && (
+        <Modal title="Contact support" onClose={() => setOpen(false)} busy={sending}>
+          <form onSubmit={onSubmit} noValidate className="space-y-3">
+            {formError && (
+              <div role="alert">
+                <ErrorBanner message={formError} />
+              </div>
+            )}
+            <div>
+              <Label>What is it about?</Label>
+              <Select
+                className="w-full"
+                value={form.category}
+                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+              >
+                {CATEGORIES.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="support-subject">Subject</Label>
+              <Input
+                id="support-subject"
+                maxLength={150}
+                value={form.subject}
+                aria-invalid={!!errors.subject}
+                aria-describedby={errors.subject ? 'support-subject-error' : undefined}
+                className={errors.subject ? invalidClass : ''}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, subject: e.target.value }));
+                  setErrors((p) => ({ ...p, subject: undefined }));
+                }}
+              />
+              <FieldError id="support-subject-error" message={errors.subject} />
+            </div>
+            <div>
+              <Label htmlFor="support-description">Details</Label>
+              <textarea
+                id="support-description"
+                maxLength={2000}
+                rows={4}
+                value={form.description}
+                aria-invalid={!!errors.description}
+                aria-describedby={errors.description ? 'support-description-error' : undefined}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, description: e.target.value }));
+                  setErrors((p) => ({ ...p, description: undefined }));
+                }}
+                className={`w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm focus:border-brand-600 focus:outline-none ${errors.description ? invalidClass : ''}`}
+              />
+              <FieldError id="support-description-error" message={errors.description} />
+            </div>
+            <div className="flex justify-end">
+              <Button type="submit" disabled={sending}>
+                {sending ? 'Sending…' : 'Send request'}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </>
   );
 }
