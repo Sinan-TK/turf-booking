@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useListFilters } from '@/lib/use-list-filters';
 import { PAGE_SIZE, usePagedFetch } from '@/lib/use-paged-fetch';
 import { formatMoney, remainingAmount } from '@/lib/money';
-import { Badge, ErrorBanner, PageHeader } from '@/components/ui';
+import { Badge, Button, ErrorBanner, PageHeader } from '@/components/ui';
 import {
   DataTable,
   DateRangeFilter,
@@ -64,7 +64,15 @@ export default function BookingsPage() {
 
   return (
     <div>
-      <PageHeader title="Bookings" subtitle="Every booking made at your venues, online or walk-in." />
+      <PageHeader
+        title="Bookings"
+        subtitle="Every booking made at your venues, online or walk-in."
+        action={
+          <Link href="/walk-in">
+            <Button>+ Walk-in booking</Button>
+          </Link>
+        }
+      />
       <ListToolbar
         active={f.active}
         total={total}

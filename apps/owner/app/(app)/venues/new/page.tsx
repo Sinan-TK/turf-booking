@@ -273,7 +273,7 @@ export default function NewVenuePage() {
           </div>
         </div>
 
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-outline-variant/30 bg-surface/90 backdrop-blur-xl md:left-64">
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-outline-variant/30 bg-surface/90 backdrop-blur-xl md:left-[72px]">
           <div className="flex flex-wrap items-center justify-between gap-3 px-container-padding py-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="mr-1 text-xs font-medium text-on-surface-variant">

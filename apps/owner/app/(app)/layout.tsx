@@ -52,8 +52,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="bg-background">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="md:pl-64">
-        <header className="fixed inset-x-0 top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-outline-variant/20 bg-surface/80 px-container-padding backdrop-blur-xl md:left-64 md:justify-end">
+      <div className="md:pl-[72px]">
+        <header className="fixed inset-x-0 top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-outline-variant/20 bg-surface/80 px-container-padding backdrop-blur-xl md:left-[72px] md:justify-end">
           <button
             onClick={() => setSidebarOpen(true)}
             aria-label="Open menu"
