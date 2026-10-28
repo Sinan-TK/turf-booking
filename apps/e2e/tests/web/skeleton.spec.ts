@@ -29,7 +29,7 @@ test.describe('customer site: skeleton loading', () => {
     await expect(page.getByRole('status').filter({ hasText: 'Loading your bookings…' })).toHaveCount(0);
 
     await page.route('**/me/support-tickets', slow(2500));
-    await page.getByRole('tab', { name: 'Support' }).click();
+    await page.goto('/support');
     await expect(page.getByRole('status').filter({ hasText: 'Loading your requests…' })).toBeVisible();
     await expect(page.getByText('No requests yet.')).toBeVisible({ timeout: 20_000 });
   });

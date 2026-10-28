@@ -40,3 +40,21 @@ export async function logIn(page: Page, phone: string, name = 'PW Customer'): Pr
   await dialog.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 }
+
+/** Opens the venue's booking window ("Book Now" on its card), optionally on one of its units' tabs first. */
+export async function openBooking(page: Page, venueName: string, unitName?: string) {
+  const card = page.locator('article').filter({ hasText: venueName });
+  if (unitName) await card.getByRole('tab', { name: new RegExp('^' + unitName) }).click();
+  await card.getByRole('button', { name: 'Book Now' }).click();
+  const window = page.getByRole('dialog', { name: 'Book ' + venueName });
+  await expect(window).toBeVisible();
+  return window;
+}
+
+/** Opens the venue-type picker (the "Venue types" button in the header) and returns it. */
+export async function openVenueTypes(page: Page) {
+  await page.getByRole('banner').getByRole('button', { name: 'Venue types' }).click();
+  const picker = page.getByRole('dialog', { name: 'Venue types' });
+  await expect(picker).toBeVisible();
+  return picker;
+}

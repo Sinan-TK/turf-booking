@@ -1,3 +1,4 @@
+import { createCustomer, database } from '../../support/customer';
 import { expect, test } from '../../support/fixtures';
 
 /** Every Super Admin list has a heading, a search box, filter dropdowns, an empty state and "Clear filters". */
@@ -13,6 +14,17 @@ const LISTS = [
 ];
 
 test.describe('admin: list pages', () => {
+  // The support list is only worth searching when it has something in it: a fresh database has no tickets, so make one.
+  test.beforeAll(async () => {
+    const db = await database();
+    if ((await db.supportTicket.count()) > 0) return;
+    const { email } = await createCustomer('Ticket');
+    const customer = await db.customerProfile.findFirstOrThrow({ where: { email } });
+    await db.supportTicket.create({
+      data: { customerId: customer.id, category: 'OTHER', subject: 'PW list ticket', description: 'Made so the support list has a row.' },
+    });
+  });
+
   for (const { path, heading, search } of LISTS) {
     test(`${heading}: loads, searches, shows an empty state and clears`, async ({ page }) => {
       await page.goto(path);

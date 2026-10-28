@@ -1,5 +1,5 @@
 import { database, plantEmailCode } from '../../support/customer';
-import { logIn, searchNear, settled, shareLocation } from '../../support/customer-ui';
+import { logIn, openBooking, searchNear, settled, shareLocation } from '../../support/customer-ui';
 import { addDays, isoWeekday, istInstant, istToday, uniquePhone } from '../../support/dates';
 import { unique, URLS } from '../../support/env';
 import { expect, test } from '../../support/fixtures';
@@ -17,9 +17,9 @@ test.describe('customer site: booking a slot', () => {
     const price = isoWeekday(day) >= 6 ? 1000 : 800;
     await page.getByRole('button', { name: /\d+ [A-Za-z]{3}$/ }).nth(2).click();
     await settled(page);
-    const turf = page.getByRole('region', { name: `${remoteVenue.name}, Turf A` });
-    await turf.getByRole('button', { name: /^All [0-9]+ slots$/ }).click();
-    await turf.getByRole('button', { name: new RegExp('^10:00 AM ₹' + price) }).click();
+    const booking = await openBooking(page, remoteVenue.name, 'Turf A');
+    await booking.getByRole('button', { name: new RegExp('^10:00 AM ₹' + price) }).click();
+    await booking.getByRole('button', { name: /^Book/ }).last().click();
 
     // Checkout: the held slot, its price and a running hold timer. Nothing is paid.
     await expect(page).toHaveURL(/\/checkout\/[0-9a-f-]{36}$/, { timeout: 60_000 });
@@ -77,9 +77,9 @@ test.describe('customer site: booking needs a verified email or phone', () => {
     const price = isoWeekday(day) >= 6 ? 1000 : 800;
     await page.getByRole("button", { name: /[0-9]+ [A-Za-z]{3}$/ }).nth(2).click();
     await settled(page);
-    const turf = page.getByRole('region', { name: `${remoteVenue.name}, Turf A` });
-    await turf.getByRole('button', { name: /^All [0-9]+ slots$/ }).click();
-    await turf.getByRole('button', { name: new RegExp('^11:00 AM ₹' + price) }).click();
+    const booking = await openBooking(page, remoteVenue.name, 'Turf A');
+    await booking.getByRole('button', { name: new RegExp('^11:00 AM ₹' + price) }).click();
+    await booking.getByRole('button', { name: /^Book/ }).last().click();
 
     // No hold, no checkout: the profile opens with the verification dialog.
     await expect(page).toHaveURL(/[/]account[?]tab=profile&verify=email/);
@@ -146,8 +146,11 @@ test.describe('customer site: account and support', () => {
     await logIn(page, uniquePhone(), 'PW Helper');
 
     await page.goto('/support');
-    await expect(page.getByRole('heading', { name: 'Contact support' })).toBeVisible();
     await expect(page.getByText('No requests yet.')).toBeVisible();
+    // The form is not on the page: it opens from the New request button, in a modal.
+    await expect(page.getByRole('heading', { name: 'Contact support' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'New request' }).click();
+    await expect(page.getByRole('dialog', { name: 'Contact support' })).toBeVisible();
 
     const send = page.getByRole('button', { name: /Send|Submit/ });
     await expect(send).toBeEnabled();

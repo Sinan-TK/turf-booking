@@ -3,7 +3,7 @@ import { field, rowWith } from '../../support/ui';
 
 /**
  * Prices decide both what a slot costs and when a unit can be booked, and two active prices for
- * the same unit and duration may not cover the same day and time.
+ * the same unit may not cover the same day and time.
  */
 test.describe('owner portal: pricing', () => {
   test('lists the prices with their days, hours and amount', async ({ page, makeVenue }) => {

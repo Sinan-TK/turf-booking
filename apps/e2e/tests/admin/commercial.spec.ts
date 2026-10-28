@@ -58,6 +58,7 @@ test.describe('admin: commercial terms', () => {
 
   test('a venue can have its own deal for one facility; everything else keeps following the facility', async ({ page, venue, adminApi }) => {
     await page.goto(`/venues/${venue.id}`);
+    await page.getByRole('tab', { name: 'Commercial terms' }).click();
     const section = page.locator('section, div').filter({ has: page.getByRole('heading', { name: 'Commission & cancellation', level: 2 }) }).last();
     await expect(page.getByRole('heading', { name: 'Commission & cancellation', level: 2 })).toBeVisible();
     await expect(section.getByText(/minimum advance/).first()).toBeVisible();

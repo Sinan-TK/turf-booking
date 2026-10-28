@@ -2,11 +2,11 @@ import { createVenue } from '../../support/api';
 import { shareLocation } from '../../support/customer-ui';
 import { expect, test } from '../../support/fixtures';
 
-/** The day picker offers as many days as the venues here allow booking ahead: 7 by default, up to 14. */
+/** The day picker offers as many days as the venues here allow booking ahead: 14 by default (the most), fewer when the owner chooses. */
 test.describe('customer site: days offered', () => {
-  const dayChips = (page: import('@playwright/test').Page) => page.getByRole('button', { name: /^(Today|[A-Z][a-z]{2}) [0-9]{2} [A-Z][a-z]{2}$/ });
+  const dayChips = (page: import('@playwright/test').Page) => page.getByRole('button', { name: /^(Today|[A-Z][a-z]{2}) [0-9]{1,2} [A-Z][a-z]{2}$/ });
 
-  test('seven days to start with, and as many as the owner allows after that', async ({ page, context, ownerApi, adminApi }) => {
+  test('fourteen days to start with, and as many as the owner allows after that', async ({ page, context, ownerApi, adminApi }) => {
     test.setTimeout(180_000);
     const lat = 8 + Math.random() * 10;
     const lng = 60 + Math.random() * 10;
@@ -20,9 +20,9 @@ test.describe('customer site: days offered', () => {
     };
 
     await choosePlace();
-    await expect(dayChips(page)).toHaveCount(7);
+    await expect(dayChips(page)).toHaveCount(14);
 
-    for (const days of [3, 14, 10]) {
+    for (const days of [3, 10, 14]) {
       const saved = await ownerApi.patch(`/venues/${venue.id}`, { data: { advanceBookingDays: days } });
       expect(saved.ok(), await saved.text()).toBeTruthy();
       await choosePlace();

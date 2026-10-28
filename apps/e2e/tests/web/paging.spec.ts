@@ -27,16 +27,16 @@ test.describe('customer site: results load ten at a time', () => {
 
     const cards = page.getByRole('heading', { name: /^PW Venue / });
     await expect(cards).toHaveCount(10); // the first page: ten venue cards, not all twelve
-    await expect(page.getByRole('region')).toHaveCount(10); // each showing one of its two units (the other is one tab away)
+    await expect(page.getByRole('group', { name: /^(Turf A|Court 1), / })).toHaveCount(10); // each showing one of its two units (the other is one tab away)
     await expect(page.getByText('That is every venue for this search.')).toHaveCount(0);
 
     // Scrolling to the end brings the next ones, behind a loading animation.
     await page.route('**/search?*cursor=*', slow(2500));
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    const loadingMore = page.getByRole('status').filter({ hasText: 'Loading more venues…' });
-    await expect(loadingMore).toBeVisible();
-    await expect(loadingMore.locator('.animate-spin')).toBeVisible();
-    await expect(page.getByRole('status').filter({ hasText: 'Loading the next venues' }).locator('.animate-pulse').first()).toBeVisible();
+    // The next venues arrive as pulsing placeholder cards, announced to screen readers as a status.
+    const loadingMore = page.getByRole('status').filter({ hasText: 'Loading the next venues' });
+    await expect(loadingMore).toBeAttached();
+    await expect(page.locator('.animate-pulse').first()).toBeVisible();
     await expect(cards).toHaveCount(12, { timeout: 30_000 });
     await expect(loadingMore).toHaveCount(0);
     await expect(page.getByText('That is every venue for this search.')).toBeVisible();
@@ -62,9 +62,9 @@ test.describe('customer site: results load ten at a time', () => {
     await page.getByRole('button', { name: /[0-9]+ [A-Za-z]{3}$/ }).nth(2).click();
     await expect(page.getByRole('heading', { name: /^PW Venue / })).toHaveCount(10);
 
-    await page.getByPlaceholder('Search venues, names or areas...').fill(last.name);
+    await page.getByPlaceholder('Search venues, turfs, pools, badminton, activities...').fill(last.name);
     await expect(page.getByRole('heading', { name: last.name })).toBeVisible(); // found although it was not among the first ten
     await expect(page.getByRole('heading', { name: /^PW Venue / })).toHaveCount(1); // one card for it
-    await expect(page.getByRole('region')).toHaveCount(1); // showing one of its two units
+    await expect(page.getByRole('group', { name: /^(Turf A|Court 1), / })).toHaveCount(1); // showing one of its two units
   });
 });

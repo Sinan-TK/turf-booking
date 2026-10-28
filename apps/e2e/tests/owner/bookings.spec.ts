@@ -2,7 +2,8 @@ import type { APIRequestContext } from '@playwright/test';
 import { istInstant, nextIstDay, uniquePhone } from '../../support/dates';
 import type { PwVenue } from '../../support/api';
 import { expect, test } from '../../support/fixtures';
-import { unique } from '../../support/env';
+import { database } from '../../support/customer';
+import { ACCOUNTS, unique } from '../../support/env';
 import { field, rowWith } from '../../support/ui';
 
 /** A walk-in booking made through the API (the same call the form makes). */
@@ -145,6 +146,12 @@ test.describe('owner portal: payments, refunds, notifications, settings', () => 
   });
 
   test('notifications can be searched and filtered', async ({ page }) => {
+    // The search and tabs only appear once the owner has a notification: a fresh database has none, so add one.
+    const db = await database();
+    const owner = await db.venueOwnerUser.findFirstOrThrow({ where: { email: ACCOUNTS.owner.email } });
+    if ((await db.ownerNotification.count({ where: { ownerId: owner.id } })) === 0) {
+      await db.ownerNotification.create({ data: { ownerId: owner.id, type: 'SYSTEM', title: 'PW notification', message: 'Made so the list has a row.' } });
+    }
     await page.goto('/notifications');
     await expect(page.getByRole('heading', { name: 'Notifications', level: 1 })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'All' })).toBeVisible();

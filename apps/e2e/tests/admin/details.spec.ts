@@ -16,20 +16,51 @@ test.describe('admin: venue details', () => {
   test('units can be blocked and reopened, and a unit can be added', async ({ page, makeVenue }) => {
     const venue = await makeVenue();
     await page.goto(`/venues/${venue.id}`);
-    await expect(page.getByRole('heading', { name: 'Football Turf', level: 3, exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Badminton Court', level: 3, exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Football Turf', level: 2, exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Badminton Court', level: 2, exact: true })).toBeVisible();
 
     await page.getByRole('switch', { name: `Block ${venue.turfName}` }).click();
     await expect(page.getByRole('switch', { name: `Reopen ${venue.turfName}` })).not.toBeChecked();
     await page.getByRole('switch', { name: `Reopen ${venue.turfName}` }).click();
     await expect(page.getByRole('switch', { name: `Block ${venue.turfName}` })).toBeChecked();
 
-    // A facility with no preset types asks for no type.
-    await field(page, /^Facility$/).selectOption({ label: 'Badminton Court' });
-    await expect(page.locator('label').filter({ hasText: /type/i })).toHaveCount(0);
-    await field(page, /name/).fill('Court 2');
-    await page.getByRole('button', { name: 'Add unit' }).click();
+    // Adding a unit opens a dialog. A facility with no preset types asks for no type.
+    await page.getByRole('button', { name: '+ Add unit' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Add unit' });
+    await field(dialog, /^Facility$/).selectOption({ label: 'Badminton Court' });
+    await expect(dialog.locator('label').filter({ hasText: /type/i })).toHaveCount(0);
+    await field(dialog, /name/).fill('Court 2');
+    await dialog.getByRole('button', { name: 'Add unit' }).click();
+    await expect(dialog).toHaveCount(0);
     await expect(page.getByText('Court 2', { exact: true })).toBeVisible();
+  });
+
+  test('the venue page has Units, Settings and Commercial terms tabs, and units are searched', async ({ page, makeVenue }) => {
+    const venue = await makeVenue();
+    await page.goto(`/venues/${venue.id}`);
+    await expect(page.getByRole('tab', { name: /^Units/ })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByText('Open for booking')).toBeVisible();
+    await expect(page.getByRole('link', { name: /Owner organization/ })).toBeVisible();
+
+    // The status says what it means for customers.
+    await expect(page.getByText('Live. Customers can find and book this venue.')).toBeVisible();
+
+    // Units are searched by name, type or facility.
+    await page.getByLabel('Search units').fill(venue.courtName);
+    await expect(page.getByRole('heading', { name: 'Badminton Court', level: 2, exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Football Turf', level: 2, exact: true })).toHaveCount(0);
+    await page.getByLabel('Search units').fill('zzz-no-such-unit-zzz');
+    await expect(page.getByText('No units match your search.')).toBeVisible();
+
+    // Settings: the venue's details, map link and advance booking.
+    await page.getByRole('tab', { name: 'Settings' }).click();
+    await expect(page.getByRole('heading', { name: 'Venue details' })).toBeVisible();
+    await expect(page.getByText(venue.facilityCode).first()).toBeVisible();
+    await expect(page.getByText('Asia/Kolkata')).toBeVisible();
+
+    // Commercial terms.
+    await page.getByRole('tab', { name: 'Commercial terms' }).click();
+    await expect(page.getByRole('tabpanel')).toBeVisible();
   });
 
   test('the venue is found by name and by facility in the list', async ({ page, venue }) => {

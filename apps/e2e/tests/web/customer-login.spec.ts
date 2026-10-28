@@ -130,7 +130,7 @@ test.describe('customer sign-in', () => {
     // Edit stands out: a solid green button, not a plain outline.
     const editColour = await page.getByRole('button', { name: 'Edit' }).evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(editColour).not.toBe('rgb(255, 255, 255)');
-    expect(editColour).toBe('rgb(4, 120, 87)');
+    expect(editColour).toBe('rgb(12, 90, 68)'); // the brand green (brand-700)
 
     // Log out sits in the top right corner, on the back button's row, where the profile icon used to be.
     const logout = page.getByRole('button', { name: 'Log out' });
@@ -229,8 +229,8 @@ test.describe('customer sign-in', () => {
     await expect(page.getByRole('heading', { name: 'My account' })).toBeVisible();
     await expect(page.getByText('Not verified').first()).toBeVisible(); // phone typed, not proven
     await expect(page.getByText('Verified', { exact: true }).first()).toBeVisible(); // email proven by Google
-    // Four tabs. A Google-only customer has no password, so Profile offers no Change password.
-    await expect(page.getByRole('tab')).toHaveText(['Profile', 'Wallet', 'Bookings', 'Support']);
+    // Four tabs (Support is its own page, linked at the bottom of Profile). A Google-only customer has no password, so Profile offers no Change password.
+    await expect(page.getByRole('tab')).toHaveText(['Profile', 'Wallet', 'Bookings', 'Saved']);
     await expect(page.getByRole('heading', { name: 'Change password' })).toHaveCount(0);
   });
 
@@ -312,7 +312,7 @@ test.describe('customer sign-in', () => {
     await expect(page.locator('#password-next')).toHaveAttribute('aria-invalid', 'true');
     await page.locator('#password-next').fill('BrandNew456!y');
     await expect(page.getByText('Strength: Strong')).toBeVisible();
-    await expect(rulesList.locator('li', { hasText: 'Different from your current password' })).toHaveClass(/text-emerald-700/);
+    await expect(rulesList.locator('li', { hasText: 'Different from your current password' })).toHaveClass(/text-brand-700/);
     await expect(page.getByText('The two passwords are not the same.')).toBeVisible(); // now that the new password is good, the repeat ('zzz') is judged
     await expect(update).toBeDisabled();
     await page.locator('#password-confirm').fill('Different456!y');

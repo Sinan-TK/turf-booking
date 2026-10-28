@@ -11,6 +11,10 @@ test.describe('owner portal: earnings', () => {
     await expect(page.getByText('Waiting for the next payout')).toBeVisible();
     await expect(page.getByText('Last payout')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'This month, by facility' })).toBeVisible();
+    // The cap counts the calendar month, not the payout week, and each card says when it starts over.
+    await expect(page.getByText(/not the payout week/)).toBeVisible();
+    // The facility cards are paged (a dozen at a time) and searchable: look for this venue's two.
+    await page.getByLabel('Search venues').fill(venue.name);
     // The venue's facility is listed with the rate its next booking pays.
     await expect(page.getByText(venue.name, { exact: true })).toHaveCount(2); // a card each for its turf and its court
     await expect(page.getByText('Football Turf', { exact: true }).first()).toBeVisible();

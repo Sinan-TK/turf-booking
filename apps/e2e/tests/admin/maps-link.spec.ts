@@ -5,6 +5,7 @@ test.describe('admin: venue Google Maps link', () => {
   test('is added, shown as an Open link, and removed', async ({ page, makeVenue, adminApi }) => {
     const venue = await makeVenue();
     await page.goto(`/venues/${venue.id}`);
+    await page.getByRole('tab', { name: 'Settings' }).click();
     await expect(page.getByRole('heading', { name: 'Google Maps link' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Add a link' }).click();
