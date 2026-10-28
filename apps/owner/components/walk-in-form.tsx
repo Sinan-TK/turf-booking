@@ -13,6 +13,9 @@ export interface WalkInResource {
   name: string;
   groundType: string;
   category: { id: string; name: string };
+  /** The unit's own shortest and longest booking, in minutes. */
+  minDurationMinutes?: number;
+  maxDurationMinutes?: number;
 }
 
 /**
@@ -20,6 +23,13 @@ export interface WalkInResource {
  * while chess sells 30-minute games), not one list for the whole venue.
  */
 export function durationsFor(categories: VenueCategory[], resource: WalkInResource | undefined): number[] {
+  const min = resource?.minDurationMinutes;
+  const max = resource?.maxDurationMinutes;
+  if (min && max && min > 0 && max >= min && max % min === 0) {
+    const own: number[] = [];
+    for (let d = min; d <= max; d += min) own.push(d);
+    return own;
+  }
   const own = categories.find((c) => c.id === resource?.category.id)?.policy.durations;
   return own && own.length > 0 ? own : [60];
 }

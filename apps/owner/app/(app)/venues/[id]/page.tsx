@@ -10,6 +10,8 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SvgIcon } from '@/components/svg-icons';
 import { VenueMapLink } from '@/components/venue-map-link';
 import { VenueAdvanceBooking } from '@/components/venue-advance-booking';
+import { UnitPhotos, type UnitPhoto } from '@/components/unit-photos';
+import { DurationFields, UnitDurations, defaultDurations, durationsError } from '@/components/unit-durations';
 import {
   Badge,
   Button,
@@ -45,6 +47,11 @@ interface Resource {
   groundType: string;
   category: VenueCategorySummary;
   isBookable: boolean;
+  /** Shortest and longest booking, in minutes. The unit's prices are per block of the shortest. */
+  minDurationMinutes: number;
+  maxDurationMinutes: number;
+  /** Up to three, main photo first: what customers see on the venue card. */
+  photos: UnitPhoto[];
 }
 
 // Going live (ACTIVE), being suspended (SUSPENDED) and DRAFT are platform
@@ -76,6 +83,9 @@ export default function VenueDetailPage() {
   const [dialogError, setDialogError] = useState<string | null>(null);
 
   const [resourceForm, setResourceForm] = useState({ categoryId: '', name: '', groundType: '' });
+  // The new unit's shortest and longest booking; they start from the chosen facility's own values.
+  const [newDurations, setNewDurations] = useState({ min: 60, max: 180 });
+  const [durationErrors, setDurationErrors] = useState<{ min?: string; max?: string }>({});
   const [resourceError, setResourceError] = useState<string | null>(null);
   const [unitErrors, setUnitErrors] = useState<FieldErrors<'categoryId' | 'name' | 'groundType'>>({});
   const [resourceSubmitting, setResourceSubmitting] = useState(false);
@@ -127,6 +137,12 @@ export default function VenueDetailPage() {
       groundType: hasTypes && !resourceForm.groundType.trim() ? `Select the ${selectedCategory.unitLabel.toLowerCase()} type.` : undefined,
     };
     setUnitErrors(found);
+    const durationFound = selectedCategory ? durationsError(newDurations.min, newDurations.max) : {};
+    setDurationErrors(durationFound);
+    if (hasErrors(durationFound)) {
+      document.getElementById(durationFound.min ? 'new-unit-min' : 'new-unit-max')?.focus();
+      return;
+    }
     if (hasErrors(found)) {
       const first = (['categoryId', 'name', 'groundType'] as const).find((k) => found[k]);
       document.getElementById('unit-' + first)?.focus();
@@ -137,6 +153,8 @@ export default function VenueDetailPage() {
       await api.post('/resources', {
         venueId: id,
         ...resourceForm,
+        minDurationMinutes: newDurations.min,
+        maxDurationMinutes: newDurations.max,
         isBookable: true,
         sortOrder: resources?.length ?? 0,
       });
@@ -245,10 +263,8 @@ export default function VenueDetailPage() {
                 </header>
                 <ul className="divide-y divide-outline-variant/20">
                   {own.map((r) => (
-                    <li
-                      key={r.id}
-                      className="flex items-center justify-between gap-4 px-container-padding py-3.5"
-                    >
+                    <li key={r.id} className="px-container-padding py-3.5">
+                      <div className="flex items-center justify-between gap-4">
                       <div className="flex min-w-0 items-center gap-3">
                         <span
                           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-semibold ${
@@ -275,6 +291,17 @@ export default function VenueDetailPage() {
                         label={`${r.isBookable ? 'Block' : 'Reopen'} ${r.name}`}
                         onToggle={() => ask({ kind: 'unit', unit: r, open: !r.isBookable })}
                       />
+                      </div>
+                      <div className="space-y-3 pl-12">
+                        <UnitDurations
+                          unitId={r.id}
+                          min={r.minDurationMinutes}
+                          max={r.maxDurationMinutes}
+                          hasPrices
+                          onSaved={refetchResources}
+                        />
+                        <UnitPhotos unitId={r.id} unitName={r.name} initial={r.photos ?? []} />
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -316,6 +343,12 @@ export default function VenueDetailPage() {
                       value={resourceForm.categoryId}
                       onChange={(e) => {
                         setUnitErrors({});
+                        setDurationErrors({});
+                        const picked = categories?.find((c) => c.id === e.target.value);
+                        if (picked) {
+                          const own = defaultDurations(picked.policy);
+                          setNewDurations(own);
+                        }
                         setResourceForm((f) => ({
                           ...f,
                           categoryId: e.target.value,
@@ -376,6 +409,11 @@ export default function VenueDetailPage() {
                     </div>
                   )}
                 </div>
+                {selectedCategory && (
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <DurationFields idPrefix="new-unit" min={newDurations.min} max={newDurations.max} onChange={setNewDurations} errors={durationErrors} />
+                  </div>
+                )}
               </div>
 
               <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/20 bg-surface-container-low px-container-padding py-4">

@@ -1,12 +1,13 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useFetch } from '@/lib/use-fetch';
 import { PAGE_SIZE, usePagedFetch } from '@/lib/use-paged-fetch';
 import { useListFilters } from '@/lib/use-list-filters';
 import { formatMoney } from '@/lib/money';
 import { Badge, Card, EmptyState, ErrorBanner, Icon, PageHeader } from '@/components/ui';
-import { DataTable, Pagination, ROW } from '@/components/list-kit';
+import { DataTable, Pagination, ROW, SearchBox, usePageSlice } from '@/components/list-kit';
 
 interface FacilityEarnings {
   venueId: string;
@@ -14,6 +15,8 @@ interface FacilityEarnings {
   categoryId: string;
   facility: string;
   month: string;
+  /** When this month ends: the cap and the commission tiers start over then. */
+  resetsOn: string;
   bookings: number;
   commission: string;
   monthlyCommissionCap: string | null;
@@ -44,6 +47,10 @@ interface Payout {
 
 const INR = 'INR';
 const date = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { dateStyle: 'medium' });
+/** "2026-10" -> "October 2026". */
+const monthName = (month: string) => new Date(`${month}-15T12:00:00`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+/** "1 Nov": the day the cap starts over. */
+const resetDay = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 
 function rateText(f: FacilityEarnings): string {
   if (f.capReached) return `No commission now: only a ${f.afterCapFeePercent}% payment fee`;
@@ -51,10 +58,19 @@ function rateText(f: FacilityEarnings): string {
   return f.nextCommission.type === 'PERCENTAGE' ? `${f.nextCommission.value}% of the booking price` : `₹${f.nextCommission.value} per booking`;
 }
 
+const FACILITY_PAGE = 12;
+
 export default function EarningsPage() {
   const { data, error, loading } = useFetch<Earnings>('/owner/earnings');
   const f = useListFilters({});
   const payouts = usePagedFetch<Payout>('/owner/payouts', f.query, f.page);
+  // An owner can have hundreds of facility cards (one per venue and facility): show them a dozen at a time.
+  const [facilityQuery, setFacilityQuery] = useState('');
+  const shownFacilities = useMemo(() => {
+    const q = facilityQuery.trim().toLowerCase();
+    return (data?.facilities ?? []).filter((fe) => !q || fe.venueName.toLowerCase().includes(q) || fe.facility.toLowerCase().includes(q));
+  }, [data, facilityQuery]);
+  const facilityPage = usePageSlice(shownFacilities, FACILITY_PAGE, facilityQuery);
 
   return (
     <div>
@@ -95,10 +111,19 @@ export default function EarningsPage() {
             </Card>
           </div>
 
-          <h2 className="mb-3 mt-8 text-sm font-semibold">This month, by facility</h2>
+          <h2 className="mt-8 text-sm font-semibold">This month, by facility</h2>
+          <p className="mb-3 mt-0.5 text-xs text-on-surface-variant">
+            {data.facilities[0] ? `${monthName(data.facilities[0].month)}. ` : ''}The commission cap and the booking count for commission rates are for the calendar month, not the payout week.
+          </p>
           {data.facilities.length === 0 && <EmptyState message="Add a venue with bookable units to see its earnings here." />}
+          {data.facilities.length > FACILITY_PAGE && (
+            <div className="mb-3 max-w-md">
+              <SearchBox label="Search venues" placeholder="Search venue or facility…" value={facilityQuery} onChange={setFacilityQuery} />
+            </div>
+          )}
+          {data.facilities.length > 0 && shownFacilities.length === 0 && <EmptyState message="No venue or facility matches your search." />}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {data.facilities.map((fe) => {
+            {facilityPage.rows.map((fe) => {
               const cap = fe.monthlyCommissionCap === null ? null : Number(fe.monthlyCommissionCap);
               const used = Number(fe.commission);
               const pct = cap ? Math.min(100, Math.round((used / cap) * 100)) : 0;
@@ -123,7 +148,8 @@ export default function EarningsPage() {
                         <div className={`h-full rounded-full ${fe.capReached ? 'bg-secondary' : 'bg-primary'}`} style={{ width: `${pct}%` }} />
                       </div>
                       <p className="mt-1 text-xs text-on-surface-variant">
-                        {fe.capReached ? 'Cap reached: the rest of this month costs only the payment fee.' : `${formatMoney(INR, fe.capRemaining ?? 0)} until the cap.`}
+                        {fe.capReached ? 'Cap reached: the rest of this month costs only the payment fee.' : `${formatMoney(INR, fe.capRemaining ?? 0)} until the cap.`}{' '}
+                        Starts over on {resetDay(fe.resetsOn)}.
                       </p>
                     </div>
                   )}
@@ -131,6 +157,9 @@ export default function EarningsPage() {
                 </Card>
               );
             })}
+          </div>
+          <div className="mt-3 overflow-hidden rounded-lg">
+            <Pagination page={facilityPage.page} pageSize={FACILITY_PAGE} total={facilityPage.total} onPage={facilityPage.setPage} />
           </div>
         </>
       )}

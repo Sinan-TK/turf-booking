@@ -38,8 +38,9 @@ function send(path: string, options: RequestInit): Promise<Response> {
   return fetch(`${API_URL}${path}`, {
     ...options,
     credentials: 'include',
+    // A file upload (FormData) sets its own multipart Content-Type, boundary included.
     headers: {
-      'Content-Type': 'application/json',
+      ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
       ...options.headers,
     },
   });
@@ -91,4 +92,6 @@ export const api = {
   put: <T>(path: string, data?: unknown) =>
     request<T>(path, { method: 'PUT', body: data !== undefined ? JSON.stringify(data) : undefined }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  /** POST a multipart form (a file upload). */
+  upload: <T>(path: string, form: FormData) => request<T>(path, { method: 'POST', body: form }),
 };

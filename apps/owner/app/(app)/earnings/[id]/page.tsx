@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { useFetch } from '@/lib/use-fetch';
 import { formatMoney } from '@/lib/money';
 import { Badge, Card, ErrorBanner, PageHeader } from '@/components/ui';
-import { DataTable, ROW } from '@/components/list-kit';
+import { DataTable, Pagination, ROW, usePageSlice } from '@/components/list-kit';
 
 interface Settlement {
   id: string;
@@ -44,6 +44,8 @@ const KIND: Record<Settlement['kind'], string> = {
 export default function PayoutStatementPage() {
   const { id } = useParams<{ id: string }>();
   const { data, error } = useFetch<PayoutDetail>(`/owner/payouts/${id}`);
+  // A statement lists every booking in the payout, which can be hundreds: 25 at a time.
+  const lines = usePageSlice(data?.settlements ?? [], 25, '');
 
   if (error) return <ErrorBanner message={error} />;
   if (!data) return <div className="h-40 animate-pulse rounded-xl bg-surface-container-high" />;
@@ -71,8 +73,9 @@ export default function PayoutStatementPage() {
         loading={false}
         rowCount={data.settlements.length}
         empty="No bookings in this payout."
+        footer={<Pagination page={lines.page} pageSize={25} total={lines.total} onPage={lines.setPage} />}
       >
-        {data.settlements.map((s) => (
+        {lines.rows.map((s) => (
           <tr key={s.id} className={ROW}>
             <td className="whitespace-nowrap px-4 py-3 text-on-surface-variant">{new Date(s.slotStart).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</td>
             <td className="px-4 py-3 font-mono text-xs">

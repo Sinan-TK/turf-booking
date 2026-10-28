@@ -20,7 +20,8 @@ import {
   Select,
   invalidClass,
 } from '@/components/ui';
-import { WalkInForm, durationsFor } from '@/components/walk-in-form';
+import { WalkInForm } from '@/components/walk-in-form';
+import { Pagination, usePageSlice } from '@/components/list-kit';
 import { hasErrors, numberError, type FieldErrors } from '@/lib/validation';
 
 interface Resource {
@@ -28,6 +29,9 @@ interface Resource {
   name: string;
   groundType: string;
   category: { id: string; name: string };
+  /** The unit's shortest booking: its prices are per block of this length. */
+  minDurationMinutes: number;
+  maxDurationMinutes: number;
 }
 
 interface PricingRule {
@@ -128,7 +132,7 @@ function ruleDays(rule: Pick<PricingRule, 'weekdays' | 'dayType'>): number[] {
 function PriceModal({
   rule,
   resourceId,
-  durations,
+  blockMinutes,
   minAdvancePercent,
   onClose,
   onSaved,
@@ -136,14 +140,14 @@ function PriceModal({
   /** Present = editing that price; absent = adding a new one. */
   rule?: PricingRule;
   resourceId: string;
-  durations: number[];
+  /** The unit's shortest booking; the price is for one block of this length. */
+  blockMinutes: number;
   /** The least the customer must pay online, as a percentage of the full price (set by the platform for this facility). */
   minAdvancePercent?: number;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [form, setForm] = useState({
-    durationMinutes: String(rule?.durationMinutes ?? durations[0] ?? 60),
     days: rule ? ruleDays(rule) : [1, 2, 3, 4, 5, 6, 7],
     allDay: !(rule?.startWindow && rule?.endWindow),
     from: rule?.startWindow ?? '18:00',
@@ -223,7 +227,6 @@ function PriceModal({
     if (hasErrors(found)) return;
     const to = form.to === '23:59' ? '24:00' : form.to;
     const payload = {
-      durationMinutes: Number(form.durationMinutes),
       days: form.days,
       normalPrice: Number(form.normal),
       offerPrice: form.offer.trim() === '' ? null : Number(form.offer),
@@ -371,22 +374,10 @@ function PriceModal({
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <Label>Duration</Label>
-              <Select
-                value={form.durationMinutes}
-                onChange={(e) => setForm((f) => ({ ...f, durationMinutes: e.target.value }))}
-              >
-                {(durations.includes(Number(form.durationMinutes))
-                  ? durations
-                  : [...durations, Number(form.durationMinutes)]
-                ).map((d) => (
-                  <option key={d} value={d}>
-                    {durationLabel(d)}
-                  </option>
-                ))}
-              </Select>
-            </div>
+            <p className="text-xs text-on-surface-variant sm:col-span-2">
+              These prices are for {durationLabel(blockMinutes)}. A longer booking costs the price for each{' '}
+              {durationLabel(blockMinutes)} it covers, at the time that part starts.
+            </p>
             <div className="sm:col-span-2">
               <fieldset className="rounded-lg bg-surface-container-low p-4">
                 <legend className="px-1 text-body-md font-semibold text-on-surface">Prices (INR)</legend>
@@ -485,10 +476,8 @@ function PricingRulesSection({
   minAdvance: Record<string, number>;
 }) {
   const [resourceId, setResourceId] = useState(resources[0]?.id ?? '');
-  const durations = durationsFor(
-    categories,
-    resources.find((r) => r.id === resourceId),
-  );
+  const unit = resources.find((r) => r.id === resourceId);
+  const blockMinutes = unit?.minDurationMinutes ?? 60;
   const { data: rules, refetch } = useFetch<PricingRule[]>(
     resourceId ? `/resources/pricing-rules?resourceId=${resourceId}` : null,
   );
@@ -537,9 +526,9 @@ function PricingRulesSection({
           <h2 className="text-sm font-semibold text-on-surface">Pricing</h2>
           <p className="mt-0.5 max-w-2xl text-xs text-on-surface-variant">
             Prices also decide when a unit can be booked: a slot can only be booked where an active
-            price covers its day and time for that duration. Choose All day for around-the-clock, or
+            price covers its day and time. Each price is for one block of this unit’s shortest booking; a longer booking costs one price per block. Choose All day for around-the-clock, or
             specific hours (for example 9–12 and 4–10 as two prices) to set when it opens and
-            closes. Two active prices for the same unit and duration can&apos;t cover the same day
+            closes. Two active prices for the same unit can&apos;t cover the same day
             and time. Block or remove one first.
           </p>
         </div>
@@ -571,7 +560,7 @@ function PricingRulesSection({
               <tr>
                 <th className="px-4 py-2.5 font-medium">Days</th>
                 <th className="px-4 py-2.5 font-medium">Time of day</th>
-                <th className="px-4 py-2.5 font-medium">Duration</th>
+                <th className="px-4 py-2.5 font-medium">Per</th>
                 <th className="px-4 py-2.5 font-medium">Price</th>
                 <th className="px-4 py-2.5 font-medium">Pay online</th>
                 <th className="px-4 py-2.5 font-medium">Status</th>
@@ -598,7 +587,7 @@ function PricingRulesSection({
                       ? `${clock(r.startWindow)} – ${clock(r.endWindow)}`
                       : 'All day'}
                   </td>
-                  <td className="px-4 py-3">{r.durationMinutes} min</td>
+                  <td className="px-4 py-3">{durationLabel(r.durationMinutes)}</td>
                   <td className="whitespace-nowrap px-4 py-3 font-semibold">
                     {r.offerPrice != null && (
                       <span className="mr-2 text-xs font-normal text-on-surface-variant line-through">
@@ -680,7 +669,7 @@ function PricingRulesSection({
         <PriceModal
           rule={editing.rule}
           resourceId={resourceId}
-          durations={durations}
+          blockMinutes={blockMinutes}
           minAdvancePercent={minAdvance[resources.find((r) => r.id === resourceId)?.category.id ?? '']}
           onClose={() => setEditing(null)}
           onSaved={() => {
@@ -765,6 +754,8 @@ function BlockedDatesSection({ venueId, resources }: { venueId: string; resource
   const { data: blocked, refetch } = useFetch<BlockedDate[]>(
     `/venue-config/blocked-dates?venueId=${venueId}`,
   );
+  // Closed days pile up over a year: ten at a time.
+  const blockedPage = usePageSlice(blocked ?? [], 10, '');
   const [mode, setMode] = useState<'single' | 'range'>('single');
   const [form, setForm] = useState({ resourceId: '', date: '', endDate: '', reason: '' });
   const [error, setError] = useState<string | null>(null);
@@ -844,7 +835,7 @@ function BlockedDatesSection({ venueId, resources }: { venueId: string; resource
               </tr>
             </thead>
             <tbody>
-              {blocked.map((b) => {
+              {blockedPage.rows.map((b) => {
                 const start = new Date(b.startTime);
                 const end = new Date(b.endTime);
                 const sameDay = start.toDateString() === end.toDateString();
@@ -875,6 +866,7 @@ function BlockedDatesSection({ venueId, resources }: { venueId: string; resource
               })}
             </tbody>
           </table>
+          <Pagination page={blockedPage.page} pageSize={10} total={blockedPage.total} onPage={blockedPage.setPage} />
         </div>
       )}
       {blocked && blocked.length === 0 && (

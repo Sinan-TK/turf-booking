@@ -4,13 +4,17 @@ import { useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { Button, Card, ErrorBanner, Label, Select } from '@/components/ui';
 
-const DEFAULT_DAYS = 7;
+const DEFAULT_DAYS = 14;
 const MAX_DAYS = 14;
 
-const dayLabel = (n: number) => (n === 1 ? '1 day (today only)' : n === DEFAULT_DAYS ? `${n} days (usual)` : n === MAX_DAYS ? `${n} days (most)` : `${n} days`);
+const dayLabel = (n: number) => {
+  if (n === 1) return '1 day (today only)';
+  const notes = [n === DEFAULT_DAYS && 'usual', n === MAX_DAYS && 'most'].filter(Boolean);
+  return notes.length ? `${n} days (${notes.join(', ')})` : `${n} days`;
+};
 
 /**
- * How far ahead customers can book this venue: today and the next (n - 1) days. It starts at 7 and the owner can
+ * How far ahead customers can book this venue: today and the next (n - 1) days. It starts at 14 and the owner can
  * pick anything from 1 to 14. The customer site lists exactly that many days to choose from.
  */
 export function VenueAdvanceBooking({ venueId, days, onSaved }: { venueId: string; days: number; onSaved: (days: number) => void }) {

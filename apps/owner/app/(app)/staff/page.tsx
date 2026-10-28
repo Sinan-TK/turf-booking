@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { useFetch } from '@/lib/use-fetch';
+import { useListFilters } from '@/lib/use-list-filters';
+import { PAGE_SIZE, usePagedFetch } from '@/lib/use-paged-fetch';
 import { useAuth } from '@/lib/auth-context';
 import { api, ApiError } from '@/lib/api';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Modal } from '@/components/modal';
-import { DataTable, ROW } from '@/components/list-kit';
+import { DataTable, FilterSelect, ListToolbar, Pagination, ROW, SearchBox } from '@/components/list-kit';
 import {
   Badge,
   Button,
@@ -254,7 +255,8 @@ function VenuesModal({
 
 export default function StaffPage() {
   const { user } = useAuth();
-  const { data: staff, error, loading, refetch } = useFetch<Staff[]>('/owner/staff');
+  const f = useListFilters({ search: '', status: '' });
+  const { rows: staff, total, error, loading, refetch } = usePagedFetch<Staff>('/owner/staff', f.query, f.page);
   const venues: VenueOption[] = user?.venues ?? [];
 
   const [inviting, setInviting] = useState(false);
@@ -293,15 +295,41 @@ export default function StaffPage() {
           <SuccessBanner message={notice} />
         </div>
       )}
+      <ListToolbar
+        active={f.active}
+        total={total}
+        noun="staff member"
+        onClear={f.clear}
+        search={
+          <SearchBox
+            label="Search staff"
+            placeholder="Search name or email…"
+            value={f.values.search}
+            onChange={(v) => f.set('search', v)}
+          />
+        }
+      >
+        <FilterSelect
+          label="Status"
+          value={f.values.status}
+          options={[
+            { value: '', label: 'All' },
+            { value: 'ACTIVE', label: 'Active' },
+            { value: 'DISABLED', label: 'Disabled' },
+          ]}
+          onChange={(v) => f.set('status', v)}
+        />
+      </ListToolbar>
       {error && <ErrorBanner message={error} />}
       {!error && (
         <DataTable
           columns={['Name', 'Venues', 'Status', { label: '', className: 'w-56' }]}
           loading={loading}
-          rowCount={staff?.length ?? 0}
-          empty="No staff yet. Invite someone to let them take bookings at a venue."
+          rowCount={staff.length}
+          empty={f.active ? 'No staff match your search or filters.' : 'No staff yet. Invite someone to let them take bookings at a venue.'}
+          footer={<Pagination page={f.page} pageSize={PAGE_SIZE} total={total} onPage={f.setPage} />}
         >
-          {(staff ?? []).map((s) => (
+          {staff.map((s) => (
             <tr key={s.id} className={ROW}>
               <td className="px-4 py-3">
                 <p className="font-medium text-on-surface">{s.name}</p>
