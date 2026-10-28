@@ -50,11 +50,11 @@ TRUST_PROXY=<see below>
 
 ### Google sign-in
 
-Customers and owner-portal users can sign in with Google (not the Super Admin). In Google Cloud: OAuth consent screen,
-then Credentials > OAuth client ID > Web application. Add every app origin (customer site, owner portal, and
-`http://localhost:3000` / `:3002` for development) under Authorized JavaScript origins; no redirect URI is needed.
-Set the same ID as `GOOGLE_CLIENT_ID` on the API and `NEXT_PUBLIC_GOOGLE_CLIENT_ID` on the customer and owner apps
-(build time). Owner Google sign-in only works for an address already invited as an owner user. Customers can also
+Customers can sign in with Google. Owner-portal and Super Admin users sign in with email and password only. In Google Cloud: OAuth consent screen,
+then Credentials > OAuth client ID > Web application. Add the customer site origin (and
+`http://localhost:3000` for development) under Authorized JavaScript origins; no redirect URI is needed.
+Set the same ID as `GOOGLE_CLIENT_ID` on the API and `NEXT_PUBLIC_GOOGLE_CLIENT_ID` on the customer app
+(build time). Customers can also
 use email + password: creating the account and resetting the password both need a 6-digit code emailed to the address,
 so `RESEND_API_KEY` and `MAIL_FROM` are required in production (without them the code is only written to the API log).
 To style these emails, create a Resend template from `docs/email-templates/otp-code.html` (variables `HEADING`, `INTRO`,

@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { ApiError } from '@/lib/api';
 import { AuthShell } from '@/components/auth-shell';
-import { GoogleButton } from '@/components/google-button';
 import { Button, ErrorBanner, FieldError, Input, Label, PasswordInput, invalidClass } from '@/components/ui';
 import { emailError, hasErrors } from '@/lib/validation';
 
@@ -17,7 +16,7 @@ function validate(email: string, password: string): FieldErrors {
 }
 
 export default function LoginPage() {
-  const { login, loginWithGoogle } = useAuth();
+  const { login } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -54,22 +53,6 @@ export default function LoginPage() {
       } else {
         setBanner('We could not sign you in right now. Please try again.');
       }
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function onGoogle(credential: string) {
-    setBanner(null);
-    setSubmitting(true);
-    try {
-      await loginWithGoogle(credential);
-      router.push('/dashboard');
-    } catch (err) {
-      const status = err instanceof ApiError ? err.status : 0;
-      if (status === 401 && err instanceof ApiError) setBanner(err.message); // says which address to ask to be invited
-      else if (status === 429) setBanner('Too many sign-in attempts. Wait a minute and try again.');
-      else setBanner('We could not sign you in with Google right now. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -129,11 +112,6 @@ export default function LoginPage() {
         </a>
       </form>
 
-      <div className="my-5 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-on-surface-variant">
-        <span className="h-px flex-1 bg-outline-variant/40" /> or <span className="h-px flex-1 bg-outline-variant/40" />
-      </div>
-      <GoogleButton onCredential={onGoogle} disabled={submitting} />
-      <p className="mt-3 text-center text-xs text-on-surface-variant">Google sign-in works for people your owner admin has already invited.</p>
     </AuthShell>
   );
 }

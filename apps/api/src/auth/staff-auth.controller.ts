@@ -25,7 +25,6 @@ import {
   ChangePasswordDto,
   ForgotPasswordDto,
   ResetPasswordDto,
-  StaffGoogleDto,
   StaffLoginDto,
 } from './dto/staff-auth.dto';
 
@@ -56,24 +55,6 @@ export class StaffAuthController {
     const portal = parsePortal(rawPortal);
     const session = await this.auth.login(portal, dto.email, dto.password);
     this.setSessionCookies(res, portal, session);
-    return session.ctx;
-  }
-
-  /**
-   * Owner portal only: there is deliberately no Google sign-in for the Super Admin, so any other portal is a
-   * plain 404. Never creates a user; the email must already have been invited.
-   */
-  @Post(':portal/google')
-  @HttpCode(200)
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  async google(
-    @Param('portal') rawPortal: string,
-    @Body() dto: StaffGoogleDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    if (parsePortal(rawPortal) !== StaffPortal.OWNER) throw new NotFoundException();
-    const session = await this.auth.googleLoginOwner(dto.credential);
-    this.setSessionCookies(res, StaffPortal.OWNER, session);
     return session.ctx;
   }
 

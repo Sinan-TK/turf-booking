@@ -30,8 +30,6 @@ interface AuthContextValue {
   selectedVenue: OwnerVenue | null;
   selectVenue: (venueId: string) => void;
   login: (email: string, password: string) => Promise<void>;
-  /** Sign in with the signed ID token from Google's button (only for people already invited). */
-  loginWithGoogle: (credential: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   /** Asks the API to email a reset link (always succeeds, whether or not
@@ -106,14 +104,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [syncUser],
   );
 
-  const loginWithGoogle = useCallback(
-    async (credential: string) => {
-      await api.post('/auth/owner/google', { credential });
-      await syncUser();
-    },
-    [syncUser],
-  );
-
   const logout = useCallback(async () => {
     try {
       await api.post('/auth/owner/logout');
@@ -137,7 +127,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         selectedVenue,
         selectVenue,
         login,
-        loginWithGoogle,
         logout,
         refreshUser: syncUser,
         requestPasswordReset,
