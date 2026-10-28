@@ -131,8 +131,6 @@ model VenueOwnerUser {
   organizationId String        @db.Uuid
   organization   OwnerOrganization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   email          String        @unique
-  /// Google account id, bound at the first Google sign-in (see StaffAuthService.googleLogin).
-  googleSub      String?       @unique
   name           String
   phone          String?
   role           OwnerUserRole @default(OWNER_STAFF)
