@@ -21,6 +21,13 @@ import { CUSTOMER_SESSION_COOKIE, STAFF_COOKIES } from '../auth.constants';
  * one browser on a shared host (localhost in dev), so the cookie matching
  * the request's Origin is tried first; a token that fails verification
  * just falls through to the next candidate.
+ *
+ * The customer cookie lives on the same host too, so who a request is answered as depends on where it comes from:
+ * the customer site only ever acts as the customer, and the admin and owner portals only ever as staff. Without that,
+ * a staff sign-in still valid in the same browser would turn every customer request into a staff one (403, so the
+ * customer looks logged out), and a customer cookie would answer a portal whose own sign-in had expired (403 instead
+ * of the 401 that makes it sign in again). A request with no recognisable origin (tests, scripts) keeps the old
+ * order: staff first, then customer.
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -31,25 +38,40 @@ export class AuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
+    const caller = this.callerOf(request);
 
-    for (const token of this.staffTokenCandidates(request)) {
-      const authContext = await this.staffTokens.verifyAccessToken(token);
-      if (authContext) {
-        request.authContext = authContext;
-        return true;
+    if (caller !== 'CUSTOMER_SITE') {
+      for (const token of this.staffTokenCandidates(request)) {
+        const authContext = await this.staffTokens.verifyAccessToken(token);
+        if (authContext) {
+          request.authContext = authContext;
+          return true;
+        }
       }
     }
 
-    const customerToken = request.cookies?.[CUSTOMER_SESSION_COOKIE];
-    if (customerToken) {
-      const session = await this.customerSessions.validateSession(customerToken);
-      if (session) {
-        request.authContext = { role: Role.CUSTOMER, id: session.customerId };
-        return true;
+    if (caller !== 'STAFF_PORTAL') {
+      const customerToken = request.cookies?.[CUSTOMER_SESSION_COOKIE];
+      if (customerToken) {
+        const session = await this.customerSessions.validateSession(customerToken);
+        if (session) {
+          request.authContext = { role: Role.CUSTOMER, id: session.customerId };
+          return true;
+        }
       }
     }
 
     throw new UnauthorizedException('Authentication required');
+  }
+
+  /** Which of our apps the request comes from, judged by its Origin (or Referer); undefined for anything else. */
+  private callerOf(request: Request): 'CUSTOMER_SITE' | 'STAFF_PORTAL' | undefined {
+    const env = loadEnv();
+    const origin = this.originOf(request.headers.origin ?? request.headers.referer);
+    if (!origin) return undefined;
+    if (origin === this.originOf(env.WEB_APP_URL)) return 'CUSTOMER_SITE';
+    if (origin === this.originOf(env.ADMIN_APP_URL) || origin === this.originOf(env.OWNER_APP_URL)) return 'STAFF_PORTAL';
+    return undefined;
   }
 
   private staffTokenCandidates(request: Request): string[] {
