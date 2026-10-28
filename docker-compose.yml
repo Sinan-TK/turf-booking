@@ -30,5 +30,68 @@ services:
       timeout: 5s
       retries: 10
 
+  # The apps: "docker compose up -d --build" builds and starts all four, and the browser reaches them on the ports below.
+  # The API reads its settings (database, storage keys, secrets) from apps/api/.env when the container starts, so nothing
+  # secret is baked into an image. It stays in development mode: production mode insists on https addresses.
+  api:
+    build:
+      context: .
+      args:
+        APP: api
+    image: turf-api
+    restart: unless-stopped
+    env_file: ./apps/api/.env
+    environment:
+      NODE_ENV: development
+      PORT: "4000"
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  web:
+    build:
+      context: .
+      args:
+        APP: web
+    image: turf-web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+  admin:
+    build:
+      context: .
+      args:
+        APP: admin
+    image: turf-admin
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+
+  owner:
+    build:
+      context: .
+      args:
+        APP: owner
+    image: turf-owner
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "3002:3002"
+
 volumes:
   turf_postgres_data:

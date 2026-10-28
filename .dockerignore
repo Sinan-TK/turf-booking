@@ -1,0 +1,26 @@
+# Keeps images small and keeps secrets out of them.
+.git
+.github
+**/node_modules
+**/.next
+**/.next-*
+**/dist
+**/.turbo
+**/*.log
+
+# Secrets and local settings: any env file anywhere is left out by default, and the API gets its settings when the
+# container starts, not from the image.
+**/.env
+**/.env.*
+!**/.env.example
+# The three web apps' .env.local are let back in on purpose: they hold only NEXT_PUBLIC_* values (the browser gets
+# those anyway). Nothing else may be added to them: a secret there would be baked into the image.
+!apps/web/.env.local
+!apps/owner/.env.local
+!apps/admin/.env.local
+apps/api/.media
+
+# Test output and docs aren't needed to run the apps.
+apps/e2e/test-results
+apps/e2e/playwright-report
+docs
