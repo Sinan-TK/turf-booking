@@ -432,7 +432,7 @@ model Venue {
   cancellationPolicy        CancellationPolicy? @relation(fields: [cancellationPolicyId], references: [id])
   defaultSlotGranularityMinutes Int  @default(60)
   /// How many days customers can book ahead: today and the next (n - 1) days. The owner sets it, 1 to 14.
-  advanceBookingDays        Int      @default(7)
+  advanceBookingDays        Int      @default(14)
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
   deletedAt                 DateTime?
@@ -531,6 +531,10 @@ model Resource {
   isBookable  Boolean  @default(true)
   status      ResourceStatus @default(ACTIVE)
   sortOrder   Int      @default(0)
+  /// Shortest booking of this unit, in minutes. Its prices are per block of this length.
+  minDurationMinutes Int   @default(60)
+  /// Longest booking, in minutes: a whole multiple of minDurationMinutes (checked by the API).
+  maxDurationMinutes Int   @default(180)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -543,6 +547,8 @@ model Resource {
   bookingPolicies   BookingPolicy[]
   availabilityRules AvailabilityRule[]
   blockedPeriods    BlockedPeriod[]
+  /// Up to three photos shown on the customer's venue card (the limit is checked by the API).
+  photos            ResourcePhoto[]
 
   // composition graph: this resource as a PARENT (composed of children)
   compositionsAsParent ResourceComposition[] @relation("CompositionParent")
@@ -556,6 +562,20 @@ model Resource {
   @@index([venueId])
   @@index([categoryId])
   @@map("resources")
+}
+
+/// A photo of one unit (pitch, court, table…). The file lives in object storage under `key`; the API turns the key into
+/// a public URL. Ordered by sortOrder, the first being the card's main picture.
+model ResourcePhoto {
+  id         String   @id @default(uuid()) @db.Uuid
+  resourceId String   @db.Uuid
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  key        String
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([resourceId, sortOrder])
+  @@map("resource_photos")
 }
 
 enum ResourceStatus {

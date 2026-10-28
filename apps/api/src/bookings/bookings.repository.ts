@@ -74,9 +74,13 @@ export interface HoldAtomicParams {
     amount: string;
     currency: string;
     durationMinutes: number;
+    /** Length of one priced block (the unit's minimum booking length). */
+    blockMinutes?: number;
     normalPrice?: string;
     offerPrice?: string | null;
     bookingPrice?: string;
+    /** The price of each block of the booking, as it was when booked. */
+    blocks?: Array<{ start: string; amount: string; normalAmount: string | null; bookingPrice: string }>;
   };
   footprintIds: string[];
   durationMinutes: number;
@@ -166,7 +170,7 @@ export interface BookingsRepository {
     endTime: Date,
   ): Promise<ResourceLock | null>;
   /** Every rule for the unit and duration already in effect at `at`; the caller picks the one for the slot. */
-  findPricingRules(resourceId: string, durationMinutes: number, at: Date): Promise<PricingRule[]>;
+  findPricingRules(resourceId: string, at: Date): Promise<PricingRule[]>;
   findResourceGroupById(id: string): Promise<ResourceGroup | null>;
   findGroupPricingRules(resourceGroupId: string, durationMinutes: number, at: Date): Promise<PricingRule[]>;
   sumHeldGroupQuantity(resourceGroupId: string, startTime: Date, endTime: Date): Promise<number>;

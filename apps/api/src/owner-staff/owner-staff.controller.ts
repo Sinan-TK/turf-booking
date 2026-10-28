@@ -1,4 +1,7 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
+import { parsePage, setTotalCount } from '../common/pagination';
+import { parseEnumFilter, parseSearch } from '../common/list-filters';
 import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -16,9 +19,23 @@ import { InviteStaffDto, SetStaffStatusDto, SetStaffVenuesDto } from './dto/owne
 export class OwnerStaffController {
   constructor(private readonly staff: OwnerStaffService) {}
 
+  // ?search= (name or email), ?status=ACTIVE|DISABLED, ?limit=&offset=; the match count is in X-Total-Count.
   @Get()
-  list(@CurrentUser() actor: AuthContext) {
-    return this.staff.list(actor);
+  async list(
+    @CurrentUser() actor: AuthContext,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Res({ passthrough: true }) res?: Response,
+  ) {
+    const { rows, total } = await this.staff.list(actor, {
+      search: parseSearch(search),
+      status: parseEnumFilter(status, ['ACTIVE', 'DISABLED'] as const, 'status'),
+      ...parsePage(limit, offset),
+    });
+    if (res) setTotalCount(res, total);
+    return rows;
   }
 
   @Post()

@@ -7,7 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CommercialTermsService } from '../commercial/commercial-terms.service';
 import type { AuthContext } from '../auth/auth.types';
-import { periodMonthOf } from './settlements.service';
+import { nextMonthStart, periodMonthOf } from './settlements.service';
 
 const PAYOUT_DETAIL_INCLUDE = {
   organization: { select: { id: true, name: true } },
@@ -186,34 +186,39 @@ export class PayoutsService {
   }
 
   /**
-   * The owner's earnings at a glance: per venue and facility this month — bookings settled, commission paid,
-   * the cap and what is left of it, the rate the next booking pays — plus money waiting for the next payout.
+   * This month's commission usage for every facility of the given venues: bookings settled, commission paid, the cap and what
+   * is left of it, the rate the next booking pays, and when the month (and so the cap and the tiers) starts over. The month is
+   * each venue's own calendar month. Terms and counters are read in a few queries, not several per venue.
    */
-  async earningsForOwner(organizationId: string, now: Date = new Date()) {
-    const venues = await this.prisma.client.venue.findMany({
-      where: { organizationId, deletedAt: null },
-      select: { id: true, name: true, timezone: true },
-      orderBy: { name: 'asc' },
-    });
-    const facilities = [];
+  async monthUsage(venues: Array<{ id: string; name: string; timezone: string }>, now: Date) {
+    const termsByVenue = await this.commercialTerms.listForVenues(venues.map((v) => v.id));
+    const monthOf = new Map(venues.map((v) => [v.id, periodMonthOf(now, v.timezone)]));
+    const countersByMonth = new Map<string, Awaited<ReturnType<typeof this.prisma.client.venueCommissionMonth.findMany>>>();
+    await Promise.all(
+      [...new Set(monthOf.values())].map(async (month) => {
+        const ids = venues.filter((v) => monthOf.get(v.id) === month).map((v) => v.id);
+        countersByMonth.set(month, await this.prisma.client.venueCommissionMonth.findMany({ where: { venueId: { in: ids }, periodMonth: month } }));
+      }),
+    );
+    const usage = [];
     for (const venue of venues) {
-      const month = periodMonthOf(now, venue.timezone);
-      const [terms, counters] = await Promise.all([
-        this.commercialTerms.listForVenue(venue.id),
-        this.prisma.client.venueCommissionMonth.findMany({ where: { venueId: venue.id, periodMonth: month } }),
-      ]);
+      const month = monthOf.get(venue.id)!;
+      const terms = termsByVenue.get(venue.id) ?? [];
+      const counters = (countersByMonth.get(month) ?? []).filter((c) => c.venueId === venue.id);
       for (const f of terms) {
         const counter = counters.find((c) => c.categoryId === f.categoryId);
         const bookings = counter?.bookingCount ?? 0;
         const commissionMinor = toMinor(counter?.commissionTotal.toString() ?? 0);
         const cap = f.terms.monthlyCommissionCap;
         const capReached = cap !== null && commissionMinor >= toMinor(cap);
-        facilities.push({
+        usage.push({
           venueId: venue.id,
           venueName: venue.name,
           categoryId: f.categoryId,
           facility: f.name,
           month,
+          // When this month ends: the cap and the booking count (and so the commission tier) start again then.
+          resetsOn: nextMonthStart(month, venue.timezone).toISOString(),
           bookings,
           commission: fromMinor(commissionMinor),
           monthlyCommissionCap: cap === null ? null : fromMinor(toMinor(cap)),
@@ -225,6 +230,30 @@ export class PayoutsService {
         });
       }
     }
+    return usage;
+  }
+
+  /** One venue's facilities with this month's commission usage (the Super Admin's view of a venue's caps). */
+  async usageForVenue(venueId: string, now: Date = new Date()) {
+    const venue = await this.prisma.client.venue.findUnique({
+      where: { id: venueId },
+      select: { id: true, name: true, timezone: true },
+    });
+    if (!venue) throw new NotFoundException('Venue not found');
+    return this.monthUsage([venue], now);
+  }
+
+  /**
+   * The owner's earnings at a glance: per venue and facility this month — bookings settled, commission paid,
+   * the cap and what is left of it, the rate the next booking pays — plus money waiting for the next payout.
+   */
+  async earningsForOwner(organizationId: string, now: Date = new Date()) {
+    const venues = await this.prisma.client.venue.findMany({
+      where: { organizationId, deletedAt: null },
+      select: { id: true, name: true, timezone: true },
+      orderBy: { name: 'asc' },
+    });
+    const facilities = await this.monthUsage(venues, now);
     const [unpaid, pending, lastPaid, schedule] = await Promise.all([
       this.prisma.client.bookingSettlement.aggregate({
         where: { organizationId, payoutId: null },

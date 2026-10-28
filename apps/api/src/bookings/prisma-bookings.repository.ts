@@ -46,9 +46,9 @@ export class PrismaBookingsRepository implements BookingsRepository {
     });
   }
 
-  findPricingRules(resourceId: string, durationMinutes: number, at: Date) {
+  findPricingRules(resourceId: string, at: Date) {
     return this.prisma.client.pricingRule.findMany({
-      where: { resourceId, durationMinutes, isActive: true, effectiveFrom: { lte: at } },
+      where: { resourceId, isActive: true, effectiveFrom: { lte: at } },
     });
   }
 

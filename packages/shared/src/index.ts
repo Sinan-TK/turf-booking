@@ -10,3 +10,4 @@ export * from './maps';
 export * from './location';
 export * from './schemas/search';
 export * from './schemas/booking';
+export * from './unit-duration';

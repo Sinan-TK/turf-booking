@@ -40,7 +40,7 @@ export function isStartAligned(policy: BookingPolicyValues, startTime: Date, tim
 
 /**
  * The last instant a booking may start when customers can book `days` days ahead: the end of the venue's local
- * day number `days` counting today as the first (7 days = today and the next six). Counted on the venue's own
+ * day number `days` counting today as the first (14 days = today and the next 13). Counted on the venue's own
  * calendar, not the server's, and not as "24 hours times n from now", so the last day is bookable all day long.
  */
 export function lastBookableInstantMs(now: Date, timezone: string, days: number): number {

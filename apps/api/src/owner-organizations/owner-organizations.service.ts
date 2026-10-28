@@ -4,7 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { IdentityService } from '../identity/identity.service';
 import { OwnerScopeService } from '../owner-scope/owner-scope.service';
-import type { OwnerOrganizationStatus, OwnerUserStatus } from '@venue/database';
+import type { OwnerOrganizationStatus, OwnerUserRole, OwnerUserStatus } from '@venue/database';
+import { contains } from '../common/list-filters';
 import type { AuthContext } from '../auth/auth.types';
 import type { CreateOrganizationDto, CreateOwnerUserDto } from './dto/owner-organization.dto';
 
@@ -208,17 +209,35 @@ export class OwnerOrganizationsService {
     return ownerUser;
   }
 
-  async listOwnerUsers(organizationId: string) {
+  /** One page of an organization's logins, newest first, with the total that match (name/email search, role, status). */
+  async listOwnerUsers(
+    organizationId: string,
+    filters: { search?: string; role?: OwnerUserRole; status?: OwnerUserStatus; limit: number; offset: number },
+  ) {
     await this.getOrganization(organizationId);
-    const users = await this.prisma.client.venueOwnerUser.findMany({
-      where: { organizationId },
-      orderBy: { createdAt: 'desc' },
-      include: { venueAssignments: { select: { venueId: true } } },
-    });
+    const where = {
+      organizationId,
+      ...(filters.role ? { role: filters.role } : {}),
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.search ? { OR: [{ name: contains(filters.search) }, { email: contains(filters.search) }] } : {}),
+    };
+    const [users, total] = await Promise.all([
+      this.prisma.client.venueOwnerUser.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        skip: filters.offset,
+        take: filters.limit,
+        include: { venueAssignments: { select: { venueId: true } } },
+      }),
+      this.prisma.client.venueOwnerUser.count({ where }),
+    ]);
     // Never expose credential hashes.
-    return users.map(({ passwordHash: _passwordHash, venueAssignments, ...user }) => ({
-      ...user,
-      venueIds: venueAssignments.map((a) => a.venueId),
-    }));
+    return {
+      rows: users.map(({ passwordHash: _passwordHash, venueAssignments, ...user }) => ({
+        ...user,
+        venueIds: venueAssignments.map((a) => a.venueId),
+      })),
+      total,
+    };
   }
 }

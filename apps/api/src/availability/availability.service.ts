@@ -3,7 +3,7 @@ import { TIME_WINDOW_HOURS, normalizeFacilityCode } from '@venue/shared';
 import type { CommercialTerms, TimeWindow } from '@venue/shared';
 import { Prisma } from '@venue/database';
 import { DateTime } from 'luxon';
-import { atLeastMinAdvance, effectivePrice, pickPricingRule } from '../pricing/pricing-rules';
+import { atLeastMinAdvance, priceBooking } from '../pricing/pricing-rules';
 import { CommercialTermsService } from '../commercial/commercial-terms.service';
 import { ResourcesService } from '../resources/resources.service';
 import { PolicyResolverService, type ResolvedPolicy } from '../scheduling/policy-resolver.service';
@@ -12,6 +12,7 @@ import { isDurationAllowed, lastBookableInstantMs } from '../scheduling/policy-v
 import { allowedDurations } from '../common/booking-policy.defaults';
 import { pLimit } from '../common/concurrency';
 import { AVAILABILITY_REPOSITORY, type AvailabilityRepository } from './availability.repository';
+import { StorageService } from '../storage/storage.service';
 
 /** The response header that carries the cursor for the next page of search results. */
 export const NEXT_CURSOR_HEADER = 'X-Next-Cursor';
@@ -19,7 +20,7 @@ export const NEXT_CURSOR_HEADER = 'X-Next-Cursor';
 export const ADVANCE_DAYS_HEADER = 'X-Advance-Days';
 
 /** Venues worked on side by side, and the most database reads in flight at once for one search. */
-const DEFAULT_ADVANCE_DAYS = 7;
+const DEFAULT_ADVANCE_DAYS = 14;
 const VENUE_CHUNK = 3;
 const LOAD_CONCURRENCY = 8;
 
@@ -42,9 +43,12 @@ interface SearchParams {
   /** Optional venue-type filters. Omitted = every active venue type. */
   categoryId?: string;
   categorySlug?: string;
+  /** Several venue types: a unit of any of them matches. Combined with the two above. */
+  categorySlugs?: string[];
   date: string;
   timeWindow: TimeWindow;
-  durationMinutes: number;
+  /** Omitted: each unit is shown at its own minimum booking length. */
+  durationMinutes?: number;
   facilityCode?: string;
   districtId?: string;
   lat?: number;
@@ -70,7 +74,10 @@ export interface SearchResult {
     googleMapsUrl: string | null;
   };
   category: BookableResource['category'];
-  resource: { id: string; name: string; groundType: string };
+  /** The length (minutes) the start times and prices are for. */
+  durationMinutes: number;
+  /** photoUrls: the unit's photos (at most three, main one first); empty when the owner has added none. */
+  resource: { id: string; name: string; groundType: string; photoUrls: string[] };
   distanceKm: number | undefined;
   availableStartTimes: string[];
   policy: {
@@ -97,6 +104,7 @@ export class AvailabilityService {
     private readonly policies: PolicyResolverService,
     private readonly schedule: ScheduleService,
     private readonly commercialTerms: CommercialTermsService,
+    private readonly storage: StorageService,
   ) {}
 
   private async termsFor(venueId: string, categoryId: string, cache: Map<string, CommercialTerms>) {
@@ -135,11 +143,9 @@ export class AvailabilityService {
    * side (a few venues at a time, at most LOAD_CONCURRENCY reads in flight) instead of one after another.
    */
   async searchPage(params: SearchParams): Promise<{ results: SearchResult[]; nextCursor: string | null; advanceDays: number }> {
-    let categoryId = params.categoryId;
-    if (!categoryId && params.categorySlug) {
-      categoryId = (await this.availability.findCategoryIdBySlug(params.categorySlug)) ?? undefined;
-      if (!categoryId) return { results: [], nextCursor: null, advanceDays: DEFAULT_ADVANCE_DAYS };
-    }
+    const categoryIds = await this.resolveCategoryIds(params);
+    // Asked for venue types, none of which exist: nothing can match.
+    if (categoryIds && categoryIds.length === 0) return { results: [], nextCursor: null, advanceDays: DEFAULT_ADVANCE_DAYS };
 
     const candidates = await this.resolveCandidateVenues(params);
     // The day picker offers as many days as the venue that takes bookings furthest ahead (the text filter does not shrink it).
@@ -169,7 +175,7 @@ export class AvailabilityService {
     while (v < venues.length && venuesShown < wanted) {
       const chunk = venues.slice(v, v + VENUE_CHUNK);
       const perVenue = await Promise.all(
-        chunk.map((venue, i) => this.resultsForVenue(venue, params, categoryId, needle, now, termsCache, limitReads, i === 0 ? firstUnit : 0)),
+        chunk.map((venue, i) => this.resultsForVenue(venue, params, categoryIds, needle, now, termsCache, limitReads, i === 0 ? firstUnit : 0)),
       );
       let full = false;
       for (let i = 0; i < perVenue.length; i++) {
@@ -192,18 +198,26 @@ export class AvailabilityService {
     return { results, nextCursor: next ? `${next.venue}.${next.unit}` : null, advanceDays };
   }
 
+  /** The venue types asked for (by id, slug or several slugs), or undefined when the search is not narrowed by type. */
+  private async resolveCategoryIds(params: SearchParams): Promise<string[] | undefined> {
+    const slugs = [...(params.categorySlug ? [params.categorySlug] : []), ...(params.categorySlugs ?? [])];
+    if (!params.categoryId && slugs.length === 0) return undefined;
+    const ids = slugs.length > 0 ? await this.availability.findCategoryIdsBySlugs(slugs) : [];
+    return [...new Set([...(params.categoryId ? [params.categoryId] : []), ...ids])];
+  }
+
   /** The cards one venue contributes, each tagged with its position among the venue's units (for the cursor). */
   private async resultsForVenue(
     venue: CandidateVenue,
     params: SearchParams,
-    categoryId: string | undefined,
+    categoryIds: string[] | undefined,
     needle: string | undefined,
     now: Date,
     termsCache: Map<string, CommercialTerms>,
     limitReads: ReturnType<typeof pLimit>,
     fromUnit: number,
   ): Promise<Array<{ unitIndex: number; result: SearchResult }>> {
-    const allResources = await limitReads(() => this.availability.findBookableResources(venue.id, params.groundType, categoryId));
+    const allResources = await limitReads(() => this.availability.findBookableResources(venue.id, params.groundType, categoryIds));
     // A text filter keeps a venue's units when the venue's name or address matches, else only units whose sub-type does.
     const venueMatches = !needle || venue.name.toLowerCase().includes(needle) || venue.address.toLowerCase().includes(needle);
     const resources = venueMatches ? allResources : allResources.filter((r) => r.groundType.toLowerCase().includes(needle!));
@@ -245,17 +259,19 @@ export class AvailabilityService {
     termsCache: Map<string, CommercialTerms>,
     limitReads: ReturnType<typeof pLimit>,
   ): Promise<SearchResult | null> {
-    // A resource whose policy doesn't offer this duration simply has nothing to show for it (e.g. a 30-min
-    // request vs a 60-min venue).
-    if (!isDurationAllowed(policy, params.durationMinutes)) return null;
+    // Each unit has its own shortest and longest booking. The requested length is used where the unit offers it; otherwise
+    // (no length asked for, or one this unit does not offer, e.g. 90 minutes for a unit booked in 60-minute blocks) the unit
+    // is shown at its own shortest, and says so in `durationMinutes`.
+    const durationMinutes =
+      params.durationMinutes !== undefined && isDurationAllowed(policy, params.durationMinutes) ? params.durationMinutes : policy.minDurationMin;
 
-    const openWindows = await limitReads(() => this.schedule.openWindows({ resourceId: resource.id }, day.localDay, params.durationMinutes));
+    const openWindows = await limitReads(() => this.schedule.openWindows({ resourceId: resource.id }, day.localDay, durationMinutes));
     const startTimes = await limitReads(() =>
       this.candidateStartTimes({
         venueId: venue.id,
         resourceId: resource.id,
         policy,
-        durationMinutes: params.durationMinutes,
+        durationMinutes,
         windowStart: day.windowStart,
         windowEnd: day.windowEnd,
         openWindows,
@@ -266,23 +282,24 @@ export class AvailabilityService {
     );
     if (startTimes.length === 0) return null;
 
-    // The price depends on the day AND the time a slot starts, so each start time is priced on its own; `price`
-    // is the lowest of them.
+    // The price depends on the day AND the time each block starts, so each start time is priced on its own (the sum of
+    // its blocks); `price` is the lowest of them.
+    const blockMinutes = policy.minDurationMin;
     const latestStart = startTimes.reduce((a, b) => (a > b ? a : b));
+    const lastBlockStart = new Date(latestStart.getTime() + (durationMinutes - blockMinutes) * MINUTE_MS);
     const [pricingRules, terms] = await Promise.all([
-      limitReads(() => this.availability.findPricingRules(resource.id, params.durationMinutes, latestStart)),
+      limitReads(() => this.availability.findPricingRules(resource.id, lastBlockStart)),
       limitReads(() => this.termsFor(venue.id, resource.categoryId, termsCache)),
     ]);
-    const startPrices = startTimes.map((t) => pickPricingRule(pricingRules, t, venue.timezone));
+    const startPrices = startTimes.map((t) => priceBooking(pricingRules, t, durationMinutes, blockMinutes, venue.timezone));
     const priced = startPrices.filter((r): r is NonNullable<typeof r> => r !== null);
-    const pricingRule = priced.reduce<(typeof priced)[number] | null>(
-      (low, r) => (low === null || effectivePrice(r) < effectivePrice(low) ? r : low),
-      null,
-    );
-    const priceVaries = new Set(startPrices.map((r) => (r ? effectivePrice(r) : null))).size > 1;
+    const pricingRule = priced.reduce<(typeof priced)[number] | null>((low, r) => (low === null || r.amount < low.amount ? r : low), null);
+    const priceVaries = new Set(startPrices.map((r) => (r ? r.amount : null))).size > 1;
     // The advance shown is what a hold will charge: never below the facility's minimum.
     const advanceOf = (r: NonNullable<(typeof startPrices)[number]>) =>
-      atLeastMinAdvance(r.bookingPrice, new Prisma.Decimal(effectivePrice(r)), terms).toString();
+      atLeastMinAdvance(new Prisma.Decimal(r.advance), new Prisma.Decimal(r.amount), terms).toString();
+    // The struck-through normal price, only when an offer makes the booking cheaper than it.
+    const normalOf = (r: NonNullable<(typeof startPrices)[number]>) => (r.normalAmount > r.amount ? String(r.normalAmount) : null);
 
     return {
       venue: {
@@ -296,11 +313,18 @@ export class AvailabilityService {
         googleMapsUrl: venue.googleMapsUrl,
       },
       category: resource.category,
-      resource: { id: resource.id, name: resource.name, groundType: resource.groundType },
+      resource: {
+        id: resource.id,
+        name: resource.name,
+        groundType: resource.groundType,
+        photoUrls: resource.photos.map((p) => this.storage.publicUrl(p.key)),
+      },
       distanceKm:
         params.lat !== undefined && params.lng !== undefined
           ? Number(haversineKm(params.lat, params.lng, Number(venue.lat), Number(venue.lng)).toFixed(2))
           : undefined,
+      // The length the start times and prices are for (the requested one where this unit offers it, else its shortest).
+      durationMinutes,
       availableStartTimes: startTimes.map((t) => t.toISOString()),
       // What the UI needs to render durations and the slot grid without hardcoding anything per venue type.
       policy: {
@@ -316,17 +340,17 @@ export class AvailabilityService {
       // (only when an offer applies) and `bookingAmount` is the advance paid online.
       price: pricingRule
         ? {
-            amount: String(effectivePrice(pricingRule)),
+            amount: String(pricingRule.amount),
             currency: pricingRule.currency,
-            normalAmount: pricingRule.offerPrice != null ? pricingRule.normalPrice.toString() : null,
+            normalAmount: normalOf(pricingRule),
             bookingAmount: advanceOf(pricingRule),
           }
         : null,
       // True when different start times cost different amounts, so the UI can say "from".
       priceVaries,
       // Aligned with availableStartTimes; null where no price rule covers that time.
-      startPrices: startPrices.map((r) => (r ? String(effectivePrice(r)) : null)),
-      startNormalPrices: startPrices.map((r) => (r && r.offerPrice != null ? r.normalPrice.toString() : null)),
+      startPrices: startPrices.map((r) => (r ? String(r.amount) : null)),
+      startNormalPrices: startPrices.map((r) => (r ? normalOf(r) : null)),
       startBookingPrices: startPrices.map((r) => (r ? advanceOf(r) : null)),
     };
   }

@@ -21,7 +21,8 @@ export interface UnitCategory {
   unitTypes: string[];
 }
 
-export type BookableResource = Resource & { category: UnitCategory };
+/** A unit with its facility and its photos (storage keys, main photo first). */
+export type BookableResource = Resource & { category: UnitCategory; photos: Array<{ key: string }> };
 
 /**
  * Clean-Architecture port: AvailabilityService (read-model use-case)
@@ -39,13 +40,14 @@ export interface AvailabilityRepository {
     minLng: number;
     maxLng: number;
   }): Promise<VenueWithPhoto[]>;
-  findCategoryIdBySlug(slug: string): Promise<string | null>;
-  /** groundType omitted = every sub-type; categoryId omitted = every facility. */
+  /** Ids of the venue types with these slugs (unknown slugs are simply missing from the answer). */
+  findCategoryIdsBySlugs(slugs: string[]): Promise<string[]>;
   /** Ids of venues that have a bookable unit whose sub-type (e.g. "7S") contains the text, for the search box. */
   findVenueIdsByGroundType(text: string): Promise<string[]>;
-  findBookableResources(venueId: string, groundType?: string, categoryId?: string): Promise<BookableResource[]>;
+  /** groundType omitted = every sub-type; categoryIds omitted = every facility. */
+  findBookableResources(venueId: string, groundType?: string, categoryIds?: string[]): Promise<BookableResource[]>;
   /** Every rule for the unit and duration already in effect at `at`. */
-  findPricingRules(resourceId: string, durationMinutes: number, at: Date): Promise<PricingRule[]>;
+  findPricingRules(resourceId: string, at: Date): Promise<PricingRule[]>;
   findOverlappingLocks(
     footprintIds: string[],
     rangeStart: Date,

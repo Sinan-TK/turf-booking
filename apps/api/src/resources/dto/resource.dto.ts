@@ -13,12 +13,23 @@ export const createResourceSchema = z.object({
   groundType: z.string().trim().max(20).default(''),
   isBookable: z.boolean().default(true),
   sortOrder: z.number().int().default(0),
+  // Shortest and longest booking of this unit, in minutes (the longest a whole multiple of the shortest). Omitted: the
+  // facility's own defaults. Checked in ResourcesService, which knows the facility's start grid.
+  minDurationMinutes: z.number().int().positive().max(1440).optional(),
+  maxDurationMinutes: z.number().int().positive().max(1440).optional(),
 });
 export class CreateResourceDto extends createZodDto(createResourceSchema) {}
 
 // Block (false) or reopen (true) booking on one unit. Existing bookings are untouched.
 export const setResourceBookableSchema = z.object({ isBookable: z.boolean() });
 export class SetResourceBookableDto extends createZodDto(setResourceBookableSchema) {}
+
+// A unit's shortest and longest booking. Its prices are per block of the shortest.
+export const setResourceDurationsSchema = z.object({
+  minDurationMinutes: z.number().int().positive().max(1440),
+  maxDurationMinutes: z.number().int().positive().max(1440),
+});
+export class SetResourceDurationsDto extends createZodDto(setResourceDurationsSchema) {}
 
 // Same, for every unit of one facility inside one venue.
 export const setFacilityBookableSchema = z.object({
@@ -51,3 +62,7 @@ export const createResourceGroupSchema = z
     { message: 'POOLED groups require totalUnits' },
   );
 export class CreateResourceGroupDto extends createZodDto(createResourceGroupSchema) {}
+
+// The order of a unit's photos: every one of its photo ids, main photo first.
+export const reorderPhotosSchema = z.object({ photoIds: z.array(z.string().uuid()).min(1).max(3) });
+export class ReorderPhotosDto extends createZodDto(reorderPhotosSchema) {}

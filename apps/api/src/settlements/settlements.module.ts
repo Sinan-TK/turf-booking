@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { SettlementsService } from './settlements.service';
 import { PayoutsService } from './payouts.service';
-import { AdminPayoutsController, OwnerPayoutsController } from './payouts.controller';
+import { AdminCommissionUsageController, AdminPayoutsController, OwnerPayoutsController } from './payouts.controller';
 
 @Module({
-  controllers: [AdminPayoutsController, OwnerPayoutsController],
+  controllers: [AdminPayoutsController, AdminCommissionUsageController, OwnerPayoutsController],
   providers: [SettlementsService, PayoutsService],
   exports: [SettlementsService, PayoutsService],
 })

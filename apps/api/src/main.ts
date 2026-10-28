@@ -2,10 +2,12 @@ import 'reflect-metadata';
 import { config as loadDotenv } from 'dotenv';
 import { resolve } from 'node:path';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { loadEnv } from '@venue/config';
 import { AppModule } from './app.module';
+import { LOCAL_MEDIA_DIR } from './storage/storage.service';
 
 // `override: true` is load-bearing, not a style choice: TypeScript
 // compiles `import { AppModule } from './app.module'` to a `require()`
@@ -52,7 +54,7 @@ async function bootstrap() {
   // verification must hash the exact bytes sent, not a re-serialized
   // JSON.stringify(JSON.parse(body)), which can differ (key order,
   // whitespace) and would make every signature check fail.
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
 
   // req.ip drives the throttler and audit-log IPs. Behind a reverse proxy
   // it is the proxy's address unless Express is told how many hops to
@@ -66,6 +68,14 @@ async function bootstrap() {
 
   app.use(helmet());
   app.use(cookieParser());
+  // Without a bucket (development), uploaded photos are served from a local folder. The customer site is another
+  // origin, so these files must opt out of helmet's same-origin resource policy or the browser refuses to show them.
+  if (env.NODE_ENV !== 'production') {
+    app.useStaticAssets(LOCAL_MEDIA_DIR, {
+      prefix: '/media/',
+      setHeaders: (res) => res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin'),
+    });
+  }
   app.enableCors({
     origin: [env.WEB_APP_URL, env.ADMIN_APP_URL, env.OWNER_APP_URL],
     credentials: true,

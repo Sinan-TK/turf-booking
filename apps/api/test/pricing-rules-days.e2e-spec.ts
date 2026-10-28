@@ -112,6 +112,11 @@ describe('owner price rules: days, hours, blocking and overlaps', () => {
 
   const rule = (body: Record<string, unknown>) =>
     owner.post('/resources/pricing-rules').send({ resourceId: venue.halfAId, durationMinutes: 60, price: 1500, ...body });
+  /** Blocks every price of a unit, so a new one can be added without clashing. */
+  async function blockAll(resourceId: string) {
+    const list = await owner.get(`/resources/pricing-rules?resourceId=${resourceId}`).expect(200);
+    for (const x of list.body) await owner.patch(`/resources/pricing-rules/${x.id}`).send({ isActive: false }).expect(200);
+  }
   const book = (start: Date) =>
     owner.post('/owner/bookings').send({
       resourceId: venue.halfAId,
@@ -161,7 +166,8 @@ describe('owner price rules: days, hours, blocking and overlaps', () => {
   });
 
   it('a blocked price does not count as an overlap, and can be removed', async () => {
-    await rule({ days: [7], price: 999, durationMinutes: 120 }).expect(201); // other duration: no clash
+    // A unit's prices are per block, so a different duration in the body no longer sidesteps a clash.
+    await rule({ days: [7], price: 999, durationMinutes: 120 }).expect(409);
     const list = await owner.get(`/resources/pricing-rules?resourceId=${venue.halfAId}`).expect(200);
     expect(list.body.some((x: { id: string; isActive: boolean }) => x.id === weekdayRuleId && !x.isActive)).toBe(true);
     await other.patch(`/resources/pricing-rules/${weekdayRuleId}`).send({ isActive: true }).expect(403);
@@ -171,12 +177,14 @@ describe('owner price rules: days, hours, blocking and overlaps', () => {
   });
 
   it('still accepts the legacy dayType shorthand', async () => {
-    const res = await rule({ durationMinutes: 180, dayType: 'WEEKEND', price: 999, resourceId: venue.halfBId }).expect(201);
+    await blockAll(venue.halfBId);
+    const res = await rule({ dayType: 'WEEKEND', price: 999, resourceId: venue.halfBId }).expect(201);
     expect(res.body.weekdays).toEqual([6, 7]);
   });
 
   it('rejects rules with no days, a half or backwards time window, or a bad day', async () => {
-    const base = { durationMinutes: 180, price: 100 };
+    await blockAll(venue.halfAId);
+    const base = { price: 100 };
     await rule(base).expect(400);
     await rule({ ...base, days: [] }).expect(400);
     await rule({ ...base, days: [8] }).expect(400);
@@ -243,8 +251,11 @@ describe('editing a price', () => {
     await patch(weekend.id, { isActive: true }).expect(409); // and now the weekend price can't come back
   });
 
-  it('checks the duration against the facility policy, and rejects bad bodies', async () => {
-    await patch(weekday.id, { durationMinutes: 45 }).expect(400);
+  it('ignores a duration (a unit\'s price is per block of its shortest booking), and rejects bad bodies', async () => {
+    const before = (await owner.get(`/resources/pricing-rules?resourceId=${venue.halfAId}`).expect(200)).body.find((x: { id: string }) => x.id === weekday.id);
+    await patch(weekday.id, { durationMinutes: 45 }).expect(200);
+    const after = (await owner.get(`/resources/pricing-rules?resourceId=${venue.halfAId}`).expect(200)).body.find((x: { id: string }) => x.id === weekday.id);
+    expect(after.durationMinutes).toBe(before.durationMinutes);
     await patch(weekday.id, {}).expect(400);
     await patch(weekday.id, { startWindow: '10:00' }).expect(400);
     await patch(weekday.id, { startWindow: null, endWindow: '10:00' }).expect(400);

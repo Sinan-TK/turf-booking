@@ -1,4 +1,7 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
+import { parsePage, setTotalCount } from '../common/pagination';
+import { parseEnumFilter, parseSearch } from '../common/list-filters';
 import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -55,8 +58,24 @@ export class OwnerOrganizationsController {
     return this.orgs.createOwnerUser(organizationId, dto, actor);
   }
 
+  // ?search= (name or email), ?role=, ?status=, ?limit=&offset=; the match count is in X-Total-Count.
   @Get(':id/owner-users')
-  listOwnerUsers(@Param('id') organizationId: string) {
-    return this.orgs.listOwnerUsers(organizationId);
+  async listOwnerUsers(
+    @Param('id') organizationId: string,
+    @Query('search') search?: string,
+    @Query('role') role?: string,
+    @Query('status') status?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Res({ passthrough: true }) res?: Response,
+  ) {
+    const { rows, total } = await this.orgs.listOwnerUsers(organizationId, {
+      search: parseSearch(search),
+      role: parseEnumFilter(role, ['OWNER_ADMIN', 'OWNER_STAFF'] as const, 'role'),
+      status: parseEnumFilter(status, ['ACTIVE', 'DISABLED'] as const, 'status'),
+      ...parsePage(limit, offset),
+    });
+    if (res) setTotalCount(res, total);
+    return rows;
   }
 }

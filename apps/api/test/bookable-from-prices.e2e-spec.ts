@@ -99,27 +99,26 @@ describe('prices decide when a unit can be booked', () => {
     await hold(at(tuesday, 10)).expect(400);
   });
 
-  it('a duration with no price is not offered, even where another duration is', async () => {
-    // Friday has no price yet, so nothing is offered for either duration.
+  it('a longer booking is offered only where every block it covers is priced', async () => {
+    // Friday has no price yet, so nothing is offered for either length.
     expect(await startsOn(nextDay(5), 120)).toEqual([]);
-    await rule({ days: [5], startWindow: '09:00', endWindow: '12:00' }).expect(201); // 60 min only
-    expect(await startsOn(nextDay(5), 120)).toEqual([]); // still no 120-minute price
-    await rule({ days: [5], durationMinutes: 120, startWindow: '09:00', endWindow: '12:00', price: 1500 }).expect(201);
+    await rule({ days: [5], startWindow: '09:00', endWindow: '12:00' }).expect(201); // one price, per 60-minute block
     const starts = await startsOn(nextDay(5), 120);
     expect(starts).toContain('09:00');
     expect(starts).toContain('10:00'); // 10:00-12:00 fits
     expect(starts).not.toContain('11:00'); // 11:00-13:00 would run past the price
   });
 
-  it('prices that touch count as one run, so a booking may span them and is priced by its start', async () => {
+  it('prices that touch count as one run, so a booking may span them and each block is priced at its own start', async () => {
     const wednesday = nextDay(3);
     const starts = await startsOn(wednesday);
     expect(starts).toContain('17:00');
     expect(starts).toContain('23:00'); // 23:00-24:00 ends at midnight, which is allowed
-    const spanning = await hold(at(wednesday, 17), 120).expect(400); // no 120 min price on Wednesday
-    expect(spanning.body.message).toBeDefined();
-    const booked = await hold(at(wednesday, 17)).expect(201); // 17:00-18:00 stays in the first price
-    expect(Number(booked.body.amount ?? booked.body.price ?? 800)).toBeGreaterThan(0);
+    const booked = await hold(at(wednesday, 14)).expect(201); // 14:00-15:00 is in the first price
+    expect(Number(booked.body.amount)).toBe(800);
+    // 17:00-19:00 spans both prices: the 17:00 block costs 800, the 18:00 block 1500.
+    const spanning = await hold(at(wednesday, 17), 120).expect(201);
+    expect(Number(spanning.body.amount)).toBe(2300);
   });
 
   it('blocking a price takes those times away, and unblocking gives them back', async () => {

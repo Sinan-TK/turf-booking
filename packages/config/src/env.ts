@@ -91,6 +91,10 @@ const envSchema = z.object({
   STORAGE_BUCKET: optionalString(z.string().min(1)),
   STORAGE_ACCESS_KEY_ID: optionalString(z.string().min(1)),
   STORAGE_SECRET_ACCESS_KEY: optionalString(z.string().min(1)),
+  // Where the bucket's files are publicly readable (an R2 custom domain or r2.dev URL), no trailing slash.
+  STORAGE_PUBLIC_URL: optionalString(z.string().url()),
+  // This API's own public address, for links to files it serves itself (local photo storage in development).
+  API_PUBLIC_URL: z.string().url().default('http://localhost:4000'),
 
   WEB_APP_URL: z.string().url().default('http://localhost:3000'),
   ADMIN_APP_URL: z.string().url().default('http://localhost:3001'),

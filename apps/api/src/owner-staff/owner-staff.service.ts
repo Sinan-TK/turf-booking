@@ -3,6 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { IdentityService } from '../identity/identity.service';
 import { OwnerScopeService } from '../owner-scope/owner-scope.service';
+import type { OwnerUserStatus } from '@venue/database';
+import { contains } from '../common/list-filters';
 import type { AuthContext } from '../auth/auth.types';
 import type { InviteStaffDto } from './dto/owner-staff.dto';
 
@@ -39,13 +41,28 @@ export class OwnerStaffService {
     return { ...rest, venues: venueAssignments.map((a) => a.venue) };
   }
 
-  async list(actor: AuthContext) {
-    const users = await this.prisma.client.venueOwnerUser.findMany({
-      where: { organizationId: actor.organizationId, role: 'OWNER_STAFF' },
-      orderBy: { createdAt: 'desc' },
-      select: staffSelect,
-    });
-    return users.map((u) => this.shape(u));
+  /** One page of the organization's staff, newest first, with the total that match (name/email search, login status). */
+  async list(
+    actor: AuthContext,
+    filters: { search?: string; status?: OwnerUserStatus; limit: number; offset: number },
+  ) {
+    const where = {
+      organizationId: actor.organizationId,
+      role: 'OWNER_STAFF' as const,
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.search ? { OR: [{ name: contains(filters.search) }, { email: contains(filters.search) }] } : {}),
+    };
+    const [users, total] = await Promise.all([
+      this.prisma.client.venueOwnerUser.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        skip: filters.offset,
+        take: filters.limit,
+        select: staffSelect,
+      }),
+      this.prisma.client.venueOwnerUser.count({ where }),
+    ]);
+    return { rows: users.map((u) => this.shape(u)), total };
   }
 
   async invite(dto: InviteStaffDto, actor: AuthContext) {

@@ -41,17 +41,34 @@ export class PolicySet {
     /** Each unit's facility, so CATEGORY rules follow the unit being resolved. */
     private readonly resourceCategory: ReadonlyMap<string, string>,
     private readonly groupCategory: ReadonlyMap<string, string>,
+    /** Each unit's own shortest and longest booking; they replace the facility's durations for that unit. */
+    private readonly resourceDurations: ReadonlyMap<string, { min: number; max: number }> = new Map(),
   ) {}
 
-  resolve(target: { resourceId?: string | null; resourceGroupId?: string | null } = {}): ResolvedPolicy {
+  /** `categoryId` stands in for the unit's facility when the unit does not exist yet (a unit being created). */
+  resolve(target: { resourceId?: string | null; resourceGroupId?: string | null; categoryId?: string } = {}): ResolvedPolicy {
     const categoryId =
       (target.resourceId ? this.resourceCategory.get(target.resourceId) : undefined) ??
-      (target.resourceGroupId ? this.groupCategory.get(target.resourceGroupId) : undefined);
+      (target.resourceGroupId ? this.groupCategory.get(target.resourceGroupId) : undefined) ??
+      target.categoryId;
     // rows are pre-sorted by effectiveFrom desc, so find() = latest.
     const pick = (match: (r: BookingPolicy) => boolean, source: PolicySource) => {
       const row = this.rows.find(match);
       return row ? { ...values(row), source } : null;
     };
+    const policy = this.resolveRules(target, categoryId, pick);
+    // A unit's prices are per block of its own minimum, so its policy durations are its own: min, 2 x min ... max.
+    const own = target.resourceId ? this.resourceDurations.get(target.resourceId) : undefined;
+    return own
+      ? { ...policy, minDurationMin: own.min, maxDurationMin: own.max, durationIncrementMin: own.min }
+      : policy;
+  }
+
+  private resolveRules(
+    target: { resourceId?: string | null; resourceGroupId?: string | null },
+    categoryId: string | undefined,
+    pick: (match: (r: BookingPolicy) => boolean, source: PolicySource) => ResolvedPolicy | null,
+  ): ResolvedPolicy {
     return (
       (target.resourceId
         ? pick((r) => r.scope === 'RESOURCE' && r.resourceId === target.resourceId, 'RESOURCE')
@@ -74,12 +91,12 @@ export class PolicyResolverService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** Load the policy set for a venue: its own rules plus the rules of every facility its units belong to. */
-  async forVenue(venue: { id: string }, now: Date = new Date()): Promise<PolicySet> {
+  async forVenue(venue: { id: string }, now: Date = new Date(), extraCategoryIds?: string[]): Promise<PolicySet> {
     const [resources, groups] = await Promise.all([
-      this.prisma.client.resource.findMany({ where: { venueId: venue.id }, select: { id: true, categoryId: true } }),
+      this.prisma.client.resource.findMany({ where: { venueId: venue.id }, select: { id: true, categoryId: true, minDurationMinutes: true, maxDurationMinutes: true } }),
       this.prisma.client.resourceGroup.findMany({ where: { venueId: venue.id }, select: { id: true, categoryId: true } }),
     ]);
-    const categoryIds = [...new Set([...resources, ...groups].map((u) => u.categoryId))];
+    const categoryIds = [...new Set([...resources, ...groups].map((u) => u.categoryId)), ...(extraCategoryIds ?? [])];
     const rows = await this.prisma.client.bookingPolicy.findMany({
       where: {
         effectiveFrom: { lte: now },
@@ -98,6 +115,7 @@ export class PolicyResolverService {
       venue.id,
       new Map(resources.map((r) => [r.id, r.categoryId])),
       new Map(groups.map((g) => [g.id, g.categoryId])),
+      new Map(resources.map((r) => [r.id, { min: r.minDurationMinutes, max: r.maxDurationMinutes }])),
     );
   }
 

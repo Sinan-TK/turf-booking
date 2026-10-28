@@ -58,12 +58,11 @@ describe('Venue policy engine', () => {
 
   /**
    * A venue of a fresh category with the given policy and opening hours
-   * (every weekday), one resource, and 30/60 minute prices.
+   * (every weekday), one resource and one price per block of the policy minimum.
    */
   async function createVenue(
     policy: Partial<typeof basePolicy>,
     hours: [string, string] = ['10:00', '14:00'],
-    prices: number[] = [30, 60],
   ): Promise<Venue> {
     const slug = `E2E_${uniqueSuffix().toUpperCase()}`;
     const category = await adminAgent.post('/admin/categories').send({
@@ -93,23 +92,22 @@ describe('Venue policy engine', () => {
       .send({ venueId: venue.body.id, categoryId: category.body.id, name: 'Board 1', groundType: 'Standard' });
     expect(resource.status).toBe(201);
 
-    await Promise.all([
-      ...prices.flatMap((duration) =>
-        ['WEEKDAY', 'WEEKEND'].map((dayType) =>
-          ownerAgent
-            .post('/resources/pricing-rules')
-            .send({
-              resourceId: resource.body.id,
-              durationMinutes: duration,
-              dayType,
-              startWindow: hours[0],
-              endWindow: hours[1],
-              price: duration * 2,
-            })
-            .then((r) => expect(r.status).toBe(201)),
-        ),
+    // A unit's price is per block of its shortest booking (here the policy's minimum): one price per day type.
+    const block = resource.body.minDurationMinutes as number;
+    await Promise.all(
+      ['WEEKDAY', 'WEEKEND'].map((dayType) =>
+        ownerAgent
+          .post('/resources/pricing-rules')
+          .send({
+            resourceId: resource.body.id,
+            dayType,
+            startWindow: hours[0],
+            endWindow: hours[1],
+            price: block * 2,
+          })
+          .then((r) => expect(r.status).toBe(201)),
       ),
-    ]);
+    );
 
     return {
       categoryId: category.body.id,
@@ -179,9 +177,11 @@ describe('Venue policy engine', () => {
       expect(byId(lane.body.id).category.id).toBe(pool.body.id);
       expect(byId(lane.body.id).availableStartTimes.map(hhmm).every((t: string) => t.endsWith(':00'))).toBe(true);
 
-      // The pool does not offer 30 minutes, the chess boards do.
+      // The pool does not offer 30 minutes, the chess boards do: the pool unit is shown at its own shortest (60) instead.
       const half = await search(chess.facilityCode, localStart(3, 12), 30);
-      expect(half.body.map((r: { resource: { id: string } }) => r.resource.id)).toEqual([chess.resourceId]);
+      const lengthOf = (id: string) => half.body.find((r: { resource: { id: string } }) => r.resource.id === id)?.durationMinutes;
+      expect(lengthOf(chess.resourceId)).toBe(30);
+      expect(lengthOf(lane.body.id)).toBe(60);
 
       // Category filter narrows to that facility's units only.
       const onlyPool = await request(app.getHttpServer()).get('/search').query({
@@ -251,25 +251,25 @@ describe('Venue policy engine', () => {
       expect((await hold(v.resourceId, localStart(5, 13, 30), 30)).status).toBe(201);
     });
 
-    test('a duration the policy allows but nobody priced is rejected, not invented', async () => {
-      const unpriced = await hold(v.resourceId, localStart(6, 10, 0), 90);
-      expect(unpriced.status).toBe(400);
-      expect(unpriced.body.message).toMatch(/no price covers/i);
+    test('a longer booking costs one block price per block, and is rejected past the last priced block', async () => {
+      // 90 minutes = three 30-minute blocks at 60 each.
+      const ninety = await hold(v.resourceId, localStart(6, 10, 0), 90);
+      expect(ninety.status).toBe(201);
+      expect(Number(ninety.body.amount)).toBe(180);
 
-      // ...and a duration nobody priced is not offered in search either (a unit is bookable only where a price covers it).
+      // Hours are 10:00-14:00: a 90-minute booking from 13:00 would run past the last priced block.
+      const late = await hold(v.resourceId, localStart(6, 13, 0), 90);
+      expect(late.status).toBe(400);
+      expect(late.body.message).toMatch(/no price covers/i);
       const res = await search(v.facilityCode, localStart(6, 12), 90);
-      expect(res.body).toEqual([]);
+      expect(res.body[0].availableStartTimes.map(hhmm).slice(-1)).toEqual(['12:30']);
     });
 
-    test('pricing rules can only be created for durations the policy offers', async () => {
-      const bad = await ownerAgent.post('/resources/pricing-rules').send({
-        resourceId: v.resourceId,
-        durationMinutes: 45,
-        dayType: 'WEEKDAY',
-        price: 10,
-      });
+    test('a length the unit does not offer is rejected: not a multiple of its shortest, or beyond its longest', async () => {
+      const bad = await hold(v.resourceId, localStart(6, 11, 0), 45);
       expect(bad.status).toBe(400);
       expect(bad.body.message).toMatch(/allowed: 30, 60, 90, 120/);
+      expect((await hold(v.resourceId, localStart(6, 11, 0), 150)).status).toBe(400);
     });
 
     test('concurrent holds on one slot: exactly one wins, the rest get a conflict', async () => {
@@ -425,8 +425,10 @@ describe('Venue policy engine', () => {
       expect(slots.availableStartTimes.map(hhmm).every((t: string) => t.endsWith(':00'))).toBe(true);
       expect(slots.category.slug).toBe('FOOTBALL_TURF');
 
-      // 30 minutes is not offered by football, so there is nothing to show.
-      expect((await search(venue.facilityCode, day, 30)).body).toHaveLength(0);
+      // 30 minutes is not offered by football, so every unit is shown at its own shortest booking (an hour) instead.
+      const asked30 = (await search(venue.facilityCode, day, 30)).body;
+      expect(asked30.length).toBeGreaterThan(0);
+      expect(asked30.every((r: { durationMinutes: number }) => r.durationMinutes === 60)).toBe(true);
 
       const half = await hold(fixture.halfAId, localStart(3, 10, 30), 60);
       expect(half.status).toBe(400);

@@ -82,6 +82,19 @@ export class AdminPayoutsController {
   }
 }
 
+/** Super Admin: how much of each facility's monthly commission cap a venue has used this month. */
+@Controller('admin/venues')
+@UseGuards(AuthGuard, RolesGuard)
+@Roles(Role.SUPER_ADMIN)
+export class AdminCommissionUsageController {
+  constructor(private readonly payouts: PayoutsService) {}
+
+  @Get(':venueId/commission-month')
+  usage(@Param('venueId', ParseUUIDPipe) venueId: string) {
+    return this.payouts.usageForVenue(venueId);
+  }
+}
+
 @Controller('owner')
 @UseGuards(AuthGuard, RolesGuard)
 @Roles(Role.VENUE_OWNER)

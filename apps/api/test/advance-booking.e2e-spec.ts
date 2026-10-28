@@ -34,14 +34,14 @@ describe('how far ahead a venue can be booked', () => {
   });
   afterAll(async () => app.close());
 
-  it('is 7 days for a new venue, and the owner can set 1 to 14, nothing else', async () => {
-    // A venue made the normal way starts at 7 (the test fixture opens its own venue wider, to book weeks ahead).
+  it('is 14 days for a new venue, and the owner can set 1 to 14, nothing else', async () => {
+    // A venue made the normal way starts at 14 (the test fixture opens its own venue wider, to book weeks ahead).
     const states = await request(app.getHttpServer()).get('/states');
     const districts = await request(app.getHttpServer()).get(`/districts?stateId=${states.body[0].id}`);
     const fresh = { name: `Advance Days ${Date.now()}`, districtId: districts.body[0].id, address: '1 Test Lane', lat: 10, lng: 76 };
     const made = await owner.post('/venues').send(fresh).expect(201);
-    expect(made.body.advanceBookingDays).toBe(7);
-    expect((await owner.post('/venues').send({ ...fresh, name: `${fresh.name} b`, advanceBookingDays: 14 })).body.advanceBookingDays).toBe(14);
+    expect(made.body.advanceBookingDays).toBe(14);
+    expect((await owner.post('/venues').send({ ...fresh, name: `${fresh.name} b`, advanceBookingDays: 5 })).body.advanceBookingDays).toBe(5);
     expect((await owner.post('/venues').send({ ...fresh, name: `${fresh.name} c`, advanceBookingDays: 15 })).status).toBe(400);
     for (const bad of [0, 15, 30, 3.5, -1, '5', null]) expect((await setDays(bad)).status).toBe(400);
     expect((await setDays(14)).status).toBe(200);

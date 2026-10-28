@@ -214,6 +214,54 @@ export function atLeastMinAdvance(
   return raised.gt(amount) ? amount : raised;
 }
 
+export interface BlockPrice {
+  /** When this block starts (the instant its price is looked up at). */
+  start: Date;
+  amount: number;
+  /** The block's normal price when an offer applies, else null. */
+  normalAmount: number | null;
+  bookingPrice: number;
+}
+
+/**
+ * The price of a booking made of whole blocks. A unit's prices are per block of its minimum length, so a booking of
+ * n blocks costs n block prices, each looked up at the instant that block starts (a booking that runs from off-peak into
+ * peak hours pays each block at its own rate). Returns null when the length is not a whole number of blocks or when
+ * some block starts where no price applies, so the booking can't be made.
+ */
+export function priceBooking<T extends PricingRuleLike & { normalPrice: Money; offerPrice?: Money | null; bookingPrice: Money; currency: string }>(
+  rules: T[],
+  start: Date,
+  durationMinutes: number,
+  blockMinutes: number,
+  timezone: string,
+): { amount: number; normalAmount: number; advance: number; currency: string; blocks: BlockPrice[] } | null {
+  if (!Number.isInteger(blockMinutes) || blockMinutes <= 0 || durationMinutes <= 0 || durationMinutes % blockMinutes !== 0) return null;
+  const blocks: BlockPrice[] = [];
+  let currency = '';
+  for (let i = 0; i < durationMinutes / blockMinutes; i++) {
+    const at = new Date(start.getTime() + i * blockMinutes * 60_000);
+    const rule = pickPricingRule(rules, at, timezone);
+    if (!rule) return null;
+    currency ||= rule.currency;
+    blocks.push({
+      start: at,
+      amount: effectivePrice(rule),
+      normalAmount: rule.offerPrice != null ? cents(toNumber(rule.normalPrice)) : null,
+      bookingPrice: cents(toNumber(rule.bookingPrice)),
+    });
+  }
+  const sum = (values: number[]) => cents(values.reduce((a, b) => a + b, 0));
+  return {
+    amount: sum(blocks.map((b) => b.amount)),
+    // What the booking would cost without offers: a block with no offer counts at its normal (= full) price.
+    normalAmount: sum(blocks.map((b) => b.normalAmount ?? b.amount)),
+    advance: sum(blocks.map((b) => b.bookingPrice)),
+    currency,
+    blocks,
+  };
+}
+
 /** A rule as the API returns it: the stored three prices plus `price`, the effective full price. */
 export function withPrice<T extends { normalPrice: Money; offerPrice?: Money | null }>(rule: T): T & { price: number } {
   return { ...rule, price: effectivePrice(rule) };

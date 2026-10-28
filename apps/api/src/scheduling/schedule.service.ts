@@ -47,7 +47,8 @@ export class ScheduleService {
     if (target.resourceId === undefined && target.resourceGroupId === undefined) return [];
     const rules = await this.prisma.client.pricingRule.findMany({
       where: {
-        durationMinutes,
+        // A unit's prices are per block, whatever the booking length; only a pooled group is priced per duration.
+        ...(target.resourceGroupId !== undefined && target.resourceId === undefined ? { durationMinutes } : {}),
         isActive: true,
         effectiveFrom: { lte: localDay.endOf('day').toJSDate() },
         ...(target.resourceId !== undefined

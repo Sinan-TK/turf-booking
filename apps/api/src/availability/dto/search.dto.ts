@@ -9,11 +9,19 @@ export const searchSchema = z
     groundType: z.string().min(1).optional(),
     categoryId: z.string().uuid().optional(),
     categorySlug: z.string().min(1).max(40).optional(),
+    // Several venue types at once, comma-separated ("FOOTBALL_TURF,CRICKET_NETS"): a unit of any of them matches.
+    categorySlugs: z
+      .string()
+      .max(1000)
+      .optional()
+      .transform((v) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : undefined))
+      .pipe(z.array(z.string().min(1).max(40)).max(25).optional()),
     date: z.string().date(),
     timeWindow: z.nativeEnum(TimeWindow),
     // Whether this duration is offered is decided per venue by its
     // BookingPolicy (venues that do not offer it simply return no slots).
-    durationMinutes: z.coerce.number().int().positive().max(1440),
+    // Omitted: every unit is shown at its own minimum booking length.
+    durationMinutes: z.coerce.number().int().positive().max(1440).optional(),
     facilityCode: z.string().optional(),
     districtId: z.string().uuid().optional(),
     lat: z.coerce.number().min(-90).max(90).optional(),

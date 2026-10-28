@@ -19,7 +19,7 @@ import {
 } from '@venue/shared';
 import { loadEnv } from '@venue/config';
 import { Prisma, type BookingStatus } from '@venue/database';
-import { pickPricingRule, effectivePrice, atLeastMinAdvance } from '../pricing/pricing-rules';
+import { pickPricingRule, effectivePrice, atLeastMinAdvance, priceBooking } from '../pricing/pricing-rules';
 import { ResourcesService } from '../resources/resources.service';
 import { BOOKINGS_REPOSITORY, type AdminBookingFilters, type BookingsRepository } from './bookings.repository';
 import { AuditService } from '../audit/audit.service';
@@ -183,16 +183,11 @@ export class BookingsService {
       throw new BadRequestException("This can't be booked at that time: no price covers it.");
     }
 
-    const pricingRule = await this.resolvePricing(
-      resource.id,
-      dto.durationMinutes,
-      startTime,
-      venue.timezone,
-    );
+    const price = await this.priceForBooking(resource, startTime, dto.durationMinutes, venue.timezone);
     // The facility's commercial terms at booking time, kept on the booking (cancellation windows, commission).
     const { terms } = await this.commercialTerms.resolve(venue.id, resource.categoryId);
-    const amount = new Prisma.Decimal(effectivePrice(pricingRule));
-    const advanceAmount = atLeastMinAdvance(pricingRule.bookingPrice, amount, terms);
+    const amount = new Prisma.Decimal(price.amount);
+    const advanceAmount = atLeastMinAdvance(new Prisma.Decimal(price.advance), amount, terms);
     const footprintIds = await this.resources.getFootprintResourceIds(resource.id);
 
     // Owner-configured blackout (ARCHITECTURE.md's Phase 10 notes) — the
@@ -221,13 +216,21 @@ export class BookingsService {
         lockStartTime: lockRange.start,
         lockEndTime: lockRange.end,
         holdExpiresAt,
+        // What this booking was priced at, so a later price change never alters it: the total and, per block of the
+        // unit's minimum length, the price of each block.
         priceSnapshot: {
-          amount: String(effectivePrice(pricingRule)),
-          currency: pricingRule.currency,
+          amount: String(price.amount),
+          currency: price.currency,
           durationMinutes: dto.durationMinutes,
-          normalPrice: pricingRule.normalPrice.toString(),
-          offerPrice: pricingRule.offerPrice?.toString() ?? null,
-          bookingPrice: pricingRule.bookingPrice.toString(),
+          blockMinutes: resource.minDurationMinutes,
+          normalPrice: String(price.normalAmount),
+          bookingPrice: String(price.advance),
+          blocks: price.blocks.map((b) => ({
+            start: b.start.toISOString(),
+            amount: String(b.amount),
+            normalAmount: b.normalAmount === null ? null : String(b.normalAmount),
+            bookingPrice: String(b.bookingPrice),
+          })),
         },
         footprintIds,
         durationMinutes: dto.durationMinutes,
@@ -237,7 +240,7 @@ export class BookingsService {
         // never less than the facility's minimum advance.
         amount,
         advanceAmount,
-        currency: pricingRule.currency,
+        currency: price.currency,
         commercialTerms: terms,
       });
     } catch (error) {
@@ -514,14 +517,14 @@ export class BookingsService {
     let amount = dto.amount;
     let currency = 'INR';
     if (amount === undefined) {
-      const rule = await this.findPricingRule(resource.id, dto.durationMinutes, startTime, venue.timezone);
-      if (!rule) {
+      const price = await this.findBookingPrice(resource, startTime, dto.durationMinutes, venue.timezone);
+      if (!price) {
         throw new BadRequestException(
           'No pricing configured for this resource/duration — enter an amount manually',
         );
       }
-      amount = effectivePrice(rule);
-      currency = rule.currency;
+      amount = price.amount;
+      currency = price.currency;
     }
     // A walk-in is paid at the venue. By default it was paid in full; staff can record less (an advance),
     // and the rest shows as remaining on the booking.
@@ -603,31 +606,34 @@ export class BookingsService {
     }
   }
 
-  private async findPricingRule(
-    resourceId: string,
+  /**
+   * The price of a booking of this unit: its block price for every block of its minimum length the booking spans, each
+   * looked up at the block's own start. The day and time of day are evaluated in the VENUE's local time, not the
+   * server's (ARCHITECTURE.md engineering rule #11) — a booking a few hours either side of local midnight can otherwise
+   * land on the wrong calendar day and price against the wrong rule. Null when some block has no price.
+   */
+  private async findBookingPrice(
+    resource: { id: string; minDurationMinutes: number },
+    start: Date,
     durationMinutes: number,
-    at: Date,
     venueTimezone: string,
   ) {
-    // The day and time of day are evaluated in the VENUE's local time, not the
-    // server's (ARCHITECTURE.md engineering rule #11) — a booking a few
-    // hours either side of local midnight can otherwise land on the
-    // wrong calendar day and price against the wrong rule.
-    const rules = await this.bookings.findPricingRules(resourceId, durationMinutes, at);
-    return pickPricingRule(rules, at, venueTimezone);
+    const lastBlockStart = new Date(start.getTime() + (durationMinutes - resource.minDurationMinutes) * 60_000);
+    const rules = await this.bookings.findPricingRules(resource.id, lastBlockStart);
+    return priceBooking(rules, start, durationMinutes, resource.minDurationMinutes, venueTimezone);
   }
 
-  private async resolvePricing(
-    resourceId: string,
+  private async priceForBooking(
+    resource: { id: string; minDurationMinutes: number },
+    start: Date,
     durationMinutes: number,
-    at: Date,
     venueTimezone: string,
   ) {
-    const rule = await this.findPricingRule(resourceId, durationMinutes, at, venueTimezone);
-    if (!rule) {
+    const price = await this.findBookingPrice(resource, start, durationMinutes, venueTimezone);
+    if (!price) {
       throw new BadRequestException('No pricing configured for this resource/duration');
     }
-    return rule;
+    return price;
   }
 
   private async findGroupPricingRule(

@@ -30,6 +30,11 @@ export function periodMonthOf(startTime: Date, timezone: string): string {
   return DateTime.fromJSDate(startTime).setZone(timezone).toFormat('yyyy-MM');
 }
 
+/** The first instant of the month after `periodMonth` ("2026-10"), in the venue's own timezone: when its caps and tiers start over. */
+export function nextMonthStart(periodMonth: string, timezone: string): Date {
+  return DateTime.fromFormat(periodMonth, 'yyyy-MM', { zone: timezone }).plus({ months: 1 }).startOf('month').toJSDate();
+}
+
 /**
  * Splits what was collected online for each booking between the owner and the platform:
  *  - played and no-show bookings, once their slot has ended (commission by the month's tier, limited by the

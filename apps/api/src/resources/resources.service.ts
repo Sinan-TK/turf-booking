@@ -7,6 +7,9 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthContext } from '../auth/auth.types';
 import { OwnerScopeService } from '../owner-scope/owner-scope.service';
+import { StorageService } from '../storage/storage.service';
+import { PolicyResolverService } from '../scheduling/policy-resolver.service';
+import { unitDurationProblem } from '@venue/shared';
 
 /** The facility fields a unit carries to clients: labels, allowed sub-types, icon. */
 const CATEGORY_SUMMARY = {
@@ -25,7 +28,14 @@ export class ResourcesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scope: OwnerScopeService,
+    private readonly storage: StorageService,
+    private readonly policies: PolicyResolverService,
   ) {}
+
+  /** For the unit-photo endpoints: the same ownership check every write here makes. */
+  assertCanManageVenue(venueId: string, actor: AuthContext) {
+    return this.assertVenueOwnership(venueId, actor);
+  }
 
   /**
    * Every method (reads included) takes `actor` and re-derives the owning venue's
@@ -85,11 +95,14 @@ export class ResourcesService {
       groundType: string;
       isBookable: boolean;
       sortOrder: number;
+      minDurationMinutes?: number;
+      maxDurationMinutes?: number;
     },
     actor: AuthContext,
   ) {
     await this.assertVenueOwnership(dto.venueId, actor);
     const category = await this.requireActiveCategory(dto.categoryId);
+    const durations = await this.unitDurations(dto.venueId, { categoryId: category.id }, dto);
     this.assertValidUnitType(category, dto.groundType);
     // Types are a preset list per facility so units stay filterable. A facility with
     // no presets has no type at all: anything sent is ignored rather than stored as free text.
@@ -103,6 +116,8 @@ export class ResourcesService {
           groundType,
           isBookable: dto.isBookable,
           sortOrder: dto.sortOrder,
+          minDurationMinutes: durations.min,
+          maxDurationMinutes: durations.max,
         },
       });
       // Self-row is required by the closure-table algorithm (§6.1) —
@@ -112,6 +127,43 @@ export class ResourcesService {
         data: { ancestorId: resource.id, descendantId: resource.id, depth: 0 },
       });
       return resource;
+    });
+  }
+
+  /**
+   * A unit's shortest and longest booking: the given values, else the facility's own (its shortest, and the longest whole
+   * multiple of that which the facility allows). Rejected, never rounded, when the pair is not valid.
+   */
+  private async unitDurations(
+    venueId: string,
+    target: { resourceId?: string; categoryId?: string },
+    input: { minDurationMinutes?: number; maxDurationMinutes?: number },
+  ): Promise<{ min: number; max: number }> {
+    const policy = (await this.policies.forVenue({ id: venueId }, new Date(), target.categoryId ? [target.categoryId] : undefined)).resolve(target);
+    const min = input.minDurationMinutes ?? policy.minDurationMin;
+    const max = input.maxDurationMinutes ?? Math.max(min, Math.floor(policy.maxDurationMin / min) * min);
+    const problem = unitDurationProblem({ minMinutes: min, maxMinutes: max, slotIntervalMin: policy.slotIntervalMin });
+    if (problem) throw new BadRequestException(problem);
+    return { min, max };
+  }
+
+  /** Changes a unit's shortest and longest booking. Its prices are per block of the shortest. Bookings already made stay as they are. */
+  async setDurations(id: string, dto: { minDurationMinutes: number; maxDurationMinutes: number }, actor: AuthContext) {
+    const resource = await this.prisma.client.resource.findUnique({ where: { id } });
+    if (!resource) throw new NotFoundException('Unit not found');
+    await this.assertVenueOwnership(resource.venueId, actor);
+    // The unit's own saved values must not take part in the check, only the facility's start grid.
+    const policy = (await this.policies.forVenue({ id: resource.venueId })).resolve({ categoryId: resource.categoryId });
+    const problem = unitDurationProblem({
+      minMinutes: dto.minDurationMinutes,
+      maxMinutes: dto.maxDurationMinutes,
+      slotIntervalMin: policy.slotIntervalMin,
+    });
+    if (problem) throw new BadRequestException(problem);
+    return this.prisma.client.resource.update({
+      where: { id },
+      data: { minDurationMinutes: dto.minDurationMinutes, maxDurationMinutes: dto.maxDurationMinutes },
+      include: { category: { select: CATEGORY_SUMMARY } },
     });
   }
 
@@ -144,11 +196,16 @@ export class ResourcesService {
     // Reads are ownership-checked too: an owner must not enumerate another
     // organization's resources by guessing a venueId.
     await this.assertVenueOwnership(venueId, actor);
-    return this.prisma.client.resource.findMany({
+    const units = await this.prisma.client.resource.findMany({
       where: { venueId },
       orderBy: { sortOrder: 'asc' },
-      include: { category: { select: CATEGORY_SUMMARY } },
+      include: {
+        category: { select: CATEGORY_SUMMARY },
+        photos: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }], select: { id: true, key: true } },
+      },
     });
+    // Each unit carries its photos (main one first) as public URLs, ready for the owner's photo editor.
+    return units.map(({ photos, ...unit }) => ({ ...unit, photos: photos.map((p) => ({ id: p.id, url: this.storage.publicUrl(p.key) })) }));
   }
 
   /**

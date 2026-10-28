@@ -96,7 +96,7 @@ export class VenueConfigService {
     const candidate = {
       resourceId: dto.resourceId ?? null,
       resourceGroupId: dto.resourceGroupId ?? null,
-      durationMinutes: dto.durationMinutes,
+      durationMinutes: dto.durationMinutes ?? null,
       weekdays,
       startWindow: dto.startWindow ?? null,
       endWindow: dto.endWindow ?? null,
@@ -107,13 +107,13 @@ export class VenueConfigService {
       });
       if (!group) throw new NotFoundException('Resource group not found');
       const groupVenue = await this.assertVenueOwnership(group.venueId, actor);
-      await this.assertDurationAllowed(groupVenue, { resourceGroupId: group.id }, dto.durationMinutes);
+      await this.assertDurationAllowed(groupVenue, { resourceGroupId: group.id }, dto.durationMinutes!);
       await this.assertNoOverlap(candidate);
       const createdGroupRule = await this.prisma.client.pricingRule.create({
         data: {
           resourceId: null,
           resourceGroupId: dto.resourceGroupId,
-          durationMinutes: dto.durationMinutes,
+          durationMinutes: dto.durationMinutes!,
           weekdays,
           startWindow: dto.startWindow,
           endWindow: dto.endWindow,
@@ -129,14 +129,14 @@ export class VenueConfigService {
       where: { id: dto.resourceId! },
     });
     if (!resource) throw new NotFoundException('Resource not found');
-    const resourceVenue = await this.assertVenueOwnership(resource.venueId, actor);
-    await this.assertDurationAllowed(resourceVenue, { resourceId: resource.id }, dto.durationMinutes);
+    await this.assertVenueOwnership(resource.venueId, actor);
     await this.assertNoOverlap(candidate);
 
     const created = await this.prisma.client.pricingRule.create({
       data: {
         resourceId: dto.resourceId,
-        durationMinutes: dto.durationMinutes,
+        // The price is per block of the unit's minimum booking length.
+        durationMinutes: resource.minDurationMinutes,
         weekdays,
         startWindow: dto.startWindow,
         endWindow: dto.endWindow,
@@ -191,7 +191,8 @@ export class VenueConfigService {
     candidate: {
       resourceId: string | null;
       resourceGroupId: string | null;
-      durationMinutes: number;
+      /** Only a pooled group has prices per duration; null for a unit (all its active prices compete). */
+      durationMinutes: number | null;
       weekdays: number[];
       startWindow: string | null;
       endWindow: string | null;
@@ -202,7 +203,7 @@ export class VenueConfigService {
       where: {
         resourceId: candidate.resourceId,
         resourceGroupId: candidate.resourceGroupId,
-        durationMinutes: candidate.durationMinutes,
+        ...(candidate.resourceGroupId && candidate.durationMinutes !== null ? { durationMinutes: candidate.durationMinutes } : {}),
         isActive: true,
         ...(excludeId ? { id: { not: excludeId } } : {}),
       },
@@ -238,7 +239,8 @@ export class VenueConfigService {
     const next = {
       resourceId: rule.resourceId,
       resourceGroupId: rule.resourceGroupId,
-      durationMinutes: dto.durationMinutes ?? rule.durationMinutes,
+      // A unit's price is per block of its minimum length, so only a pooled group's rule can change duration.
+      durationMinutes: rule.resourceGroupId ? (dto.durationMinutes ?? rule.durationMinutes) : null,
       weekdays: dto.days ? [...new Set(dto.days)].sort((a, b) => a - b) : currentDays,
       startWindow: dto.startWindow === undefined ? rule.startWindow : dto.startWindow,
       endWindow: dto.endWindow === undefined ? rule.endWindow : dto.endWindow,
@@ -264,7 +266,7 @@ export class VenueConfigService {
         )
       : undefined;
     if (next.weekdays.length === 0) throw new BadRequestException('Choose the days this price applies to');
-    if (dto.durationMinutes !== undefined && dto.durationMinutes !== rule.durationMinutes) {
+    if (rule.resourceGroupId && dto.durationMinutes !== undefined && dto.durationMinutes !== rule.durationMinutes) {
       await this.assertDurationAllowed(
         venue,
         rule.resourceId ? { resourceId: rule.resourceId } : { resourceGroupId: rule.resourceGroupId! },
@@ -273,7 +275,7 @@ export class VenueConfigService {
     }
     const changesCoverage =
       (isActive && !rule.isActive) ||
-      next.durationMinutes !== rule.durationMinutes ||
+      (next.durationMinutes !== null && next.durationMinutes !== rule.durationMinutes) ||
       next.weekdays.join() !== currentDays.join() ||
       next.startWindow !== rule.startWindow ||
       next.endWindow !== rule.endWindow;
@@ -283,7 +285,7 @@ export class VenueConfigService {
       where: { id },
       data: {
         isActive,
-        durationMinutes: next.durationMinutes,
+        ...(next.durationMinutes !== null ? { durationMinutes: next.durationMinutes } : {}),
         weekdays: next.weekdays,
         startWindow: next.startWindow,
         endWindow: next.endWindow,

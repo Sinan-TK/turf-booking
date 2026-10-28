@@ -209,6 +209,75 @@ export class CommercialTermsService {
     }));
   }
 
+  /**
+   * listForVenue for many venues at once, in a fixed number of queries instead of several per venue: an owner with
+   * hundreds of venues would otherwise wait on hundreds of round trips. Same items, same order, keyed by venue id.
+   */
+  async listForVenues(venueIds: string[]) {
+    type Item = Awaited<ReturnType<CommercialTermsService['listForVenue']>>[number];
+    const result = new Map<string, Item[]>();
+    if (venueIds.length === 0) return result;
+    const [resources, groups, deals] = await Promise.all([
+      this.prisma.client.resource.findMany({
+        where: { venueId: { in: venueIds } },
+        select: { venueId: true, categoryId: true },
+        distinct: ['venueId', 'categoryId'],
+      }),
+      this.prisma.client.resourceGroup.findMany({
+        where: { venueId: { in: venueIds } },
+        select: { venueId: true, categoryId: true },
+        distinct: ['venueId', 'categoryId'],
+      }),
+      this.prisma.client.commercialPolicy.findMany({
+        where: { scope: 'VENUE_FACILITY', venueId: { in: venueIds } },
+        select: { venueId: true, categoryId: true },
+      }),
+    ]);
+    // The facilities each venue offers through its units, plus any it has a deal for.
+    const offered = new Map<string, Set<string>>();
+    const offer = (venueId: string | null, categoryId: string | null) => {
+      if (!venueId || !categoryId) return;
+      const set = offered.get(venueId) ?? new Set<string>();
+      set.add(categoryId);
+      offered.set(venueId, set);
+    };
+    for (const r of [...resources, ...groups, ...deals]) offer(r.venueId, r.categoryId);
+    const categoryIds = [...new Set([...offered.values()].flatMap((set) => [...set]))];
+    const [categories, rows] = await Promise.all([
+      this.prisma.client.venueCategory.findMany({
+        where: { id: { in: categoryIds } },
+        select: { id: true, name: true },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      }),
+      this.prisma.client.commercialPolicy.findMany({
+        where: {
+          OR: [
+            { scope: 'PLATFORM_DEFAULT' },
+            { scope: 'FACILITY', categoryId: { in: categoryIds } },
+            { scope: 'VENUE_FACILITY', venueId: { in: venueIds } },
+          ],
+        },
+      }),
+    ]);
+    for (const venueId of venueIds) {
+      const mine = offered.get(venueId) ?? new Set<string>();
+      result.set(
+        venueId,
+        categories
+          .filter((c) => mine.has(c.id))
+          .map((c) => ({
+            categoryId: c.id,
+            name: c.name,
+            own: (rows.find((r) => r.scope === 'VENUE_FACILITY' && r.venueId === venueId && r.categoryId === c.id)?.terms ?? null) as
+              | CommercialTermsOverride
+              | null,
+            ...this.mergeRows(rows, venueId, c.id),
+          })),
+      );
+    }
+    return result;
+  }
+
   async putVenueFacility(venueId: string, categoryId: string, body: unknown, actor: AuthContext) {
     const venue = await this.prisma.client.venue.findUnique({ where: { id: venueId }, select: { id: true } });
     if (!venue) throw new NotFoundException('Venue not found');

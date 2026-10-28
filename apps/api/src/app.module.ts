@@ -27,10 +27,12 @@ import { SupportModule } from './support/support.module';
 import { JobsModule } from './jobs/jobs.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { HealthModule } from './health/health.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
     PrismaModule,
+    StorageModule,
     OwnerScopeModule,
     AuditModule,
     NotificationsModule,

@@ -10,9 +10,9 @@ export const createPricingRuleSchema = z
     // P2: exactly one of resourceId/resourceGroupId. Pre-P2 clients send
     // resourceId only and keep the exclusive behavior byte-identically.
     resourceGroupId: z.string().uuid().optional(),
-    // Shape only: the allowed durations are the venue's BookingPolicy and
-    // are checked in VenueConfigService.
-    durationMinutes: z.number().int().positive().max(1440),
+    // Only a pooled group is priced per duration (checked in VenueConfigService). A unit's price is per block of its own
+    // minimum booking length, so for a unit this is ignored.
+    durationMinutes: z.number().int().positive().max(1440).optional(),
     // The days of the week this price applies to, ISO numbers 1 = Monday .. 7 = Sunday.
     days: z.array(z.number().int().min(1).max(7)).min(1).max(7).optional(),
     // Legacy shorthand for days: WEEKDAY = Mon-Fri, WEEKEND = Sat-Sun. Ignored when `days` is sent.
@@ -38,6 +38,9 @@ export const createPricingRuleSchema = z
   })
   .refine((d) => !!d.resourceId !== !!d.resourceGroupId, {
     message: 'Exactly one of resourceId, resourceGroupId is required',
+  })
+  .refine((d) => !d.resourceGroupId || d.durationMinutes !== undefined, {
+    message: 'Enter the duration this price is for',
   })
   .refine((d) => d.normalPrice !== undefined || d.price !== undefined, {
     message: 'Enter the normal price',

@@ -52,12 +52,12 @@ export class PrismaAvailabilityRepository implements AvailabilityRepository {
     });
   }
 
-  async findCategoryIdBySlug(slug: string) {
-    const category = await this.prisma.client.venueCategory.findUnique({
-      where: { slug },
+  async findCategoryIdsBySlugs(slugs: string[]) {
+    const categories = await this.prisma.client.venueCategory.findMany({
+      where: { slug: { in: slugs } },
       select: { id: true },
     });
-    return category?.id ?? null;
+    return categories.map((c) => c.id);
   }
 
   async findVenueIdsByGroundType(text: string) {
@@ -69,13 +69,17 @@ export class PrismaAvailabilityRepository implements AvailabilityRepository {
     return rows.map((r) => r.venueId);
   }
 
-  findBookableResources(venueId: string, groundType?: string, categoryId?: string) {
+  findBookableResources(venueId: string, groundType?: string, categoryIds?: string[]) {
     return this.prisma.client.resource.findMany({
-      include: { category: { select: UNIT_CATEGORY_SELECT } },
+      include: {
+        category: { select: UNIT_CATEGORY_SELECT },
+        // The unit's photos for the customer's card, main one first.
+        photos: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }], select: { key: true } },
+      },
       where: {
         venueId,
         ...(groundType ? { groundType } : {}),
-        ...(categoryId ? { categoryId } : {}),
+        ...(categoryIds ? { categoryId: { in: categoryIds } } : {}),
         isBookable: true,
         status: 'ACTIVE',
       },
@@ -83,9 +87,9 @@ export class PrismaAvailabilityRepository implements AvailabilityRepository {
     });
   }
 
-  findPricingRules(resourceId: string, durationMinutes: number, at: Date) {
+  findPricingRules(resourceId: string, at: Date) {
     return this.prisma.client.pricingRule.findMany({
-      where: { resourceId, durationMinutes, isActive: true, effectiveFrom: { lte: at } },
+      where: { resourceId, isActive: true, effectiveFrom: { lte: at } },
     });
   }
 
