@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { useFetch } from '@/lib/use-fetch';
 import { money } from '@/lib/commercial';
+import { Pagination, usePageSlice } from '@/components/pagination';
 import { Badge, Button, Card, ErrorBanner, FieldError, Input, Label, PageHeader, SkeletonDetailCard } from '@/components/ui';
 
 interface Settlement {
@@ -40,6 +41,8 @@ const KIND: Record<Settlement['kind'], string> = { PLAYED: 'Played', NO_SHOW: 'N
 export default function PayoutDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data, error, loading, refetch } = useFetch<PayoutDetail>(`/admin/payouts/${id}`);
+  // A payout lists every booking in it, which can be hundreds: 25 at a time.
+  const lines = usePageSlice(data?.settlements ?? [], 25, '');
   const [reference, setReference] = useState('');
   const [fieldError, setFieldError] = useState<string>();
   const [apiError, setApiError] = useState<string | null>(null);
@@ -130,7 +133,7 @@ export default function PayoutDetailPage() {
             </tr>
           </thead>
           <tbody>
-            {data.settlements.map((s) => (
+            {lines.rows.map((s) => (
               <tr key={s.id} className="border-b border-gray-100 last:border-0">
                 <td className="px-4 py-3 text-gray-600">{new Date(s.slotStart).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</td>
                 <td className="px-4 py-3">
@@ -150,6 +153,7 @@ export default function PayoutDetailPage() {
             ))}
           </tbody>
         </table>
+        <Pagination page={lines.page} pageSize={25} total={lines.total} onPage={lines.setPage} />
       </Card>
     </div>
   );

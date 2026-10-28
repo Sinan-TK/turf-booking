@@ -73,3 +73,15 @@
   font-feature-settings: 'liga';
   -webkit-font-smoothing: antialiased;
 }
+
+/*
+ * The sidebar scrolls when the window is short, but shows no scrollbar: the wheel, touch and keyboard still scroll it,
+ * and the narrow icon rail stays clean.
+ */
+.sidebar-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.sidebar-scroll::-webkit-scrollbar {
+  display: none;
+}

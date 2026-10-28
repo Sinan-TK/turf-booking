@@ -2,9 +2,14 @@ import Link from 'next/link';
 import type { ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes } from 'react';
 import { Icon, type IconName } from '@/components/icons';
 
+/**
+ * A white panel. It pads its content by default; a className that sets its own padding (`p-0` for a table or list that
+ * runs edge to edge) replaces that default instead of fighting it, since Tailwind would otherwise apply `p-5` over `p-0`.
+ */
 export function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  const ownPadding = /(^|\s)!?p-\d/.test(className);
   return (
-    <div className={`rounded-xl border border-gray-200/80 bg-white p-5 shadow-card ${className}`}>
+    <div className={`rounded-xl border border-gray-200/80 bg-white ${ownPadding ? '' : 'p-5 '}shadow-card ${className}`}>
       {children}
     </div>
   );

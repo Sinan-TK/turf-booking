@@ -130,7 +130,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           </button>
         </div>
 
-        <nav className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-3 pb-4 pt-1">
+        <nav className="sidebar-scroll flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-3 pb-4 pt-1">
           {NAV_GROUPS.map((group) => (
             <div key={group.title}>
               <p className={`mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 ${R}`}>

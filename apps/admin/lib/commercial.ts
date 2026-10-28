@@ -56,3 +56,17 @@ export function summarize(t: CommercialTerms): string {
 export function money(value: string | number): string {
   return `₹${Number(value).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
+
+/** One facility's commission usage this month (the cap and the booking count start over when the month ends). */
+export interface FacilityMonthUsage {
+  categoryId: string;
+  facility: string;
+  /** "2026-10" */
+  month: string;
+  resetsOn: string;
+  bookings: number;
+  commission: string;
+  monthlyCommissionCap: string | null;
+  capRemaining: string | null;
+  capReached: boolean;
+}
