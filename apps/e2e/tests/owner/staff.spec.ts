@@ -154,6 +154,56 @@ test.describe('owner portal: venue-based staff', () => {
     await expect(page).toHaveURL(/\/login$/); // and they cannot sign back in
   });
 
+  // This group starts signed out (staff sign in themselves); deleting staff is the owner admin's job, so use their saved sign-in.
+  test.describe('deleting a login', () => {
+  test.use({ storageState: '.auth/owner.json' });
+  test('a staff login is deleted only by holding the button: a click or a short press does nothing', async ({ page, ownerApi, venue }) => {
+    const staff = await createStaff(ownerApi, [venue.id], 'Doomed');
+    await page.goto('/staff');
+    await page.getByLabel('Search staff').fill(staff.email);
+    const row = page.getByRole('row').filter({ hasText: staff.email });
+    await row.getByRole('button', { name: `Delete ${staff.name}` }).click();
+
+    const dialog = page.getByRole('alertdialog');
+    await expect(dialog.getByRole('heading', { name: `Delete ${staff.name}?` })).toBeVisible();
+    await expect(dialog).toContainText('cannot undo');
+    const hold = dialog.getByRole('button', { name: /press and hold/ });
+    await expect(hold).toContainText('Hold to delete');
+
+    // A plain click, and a hold that is let go too early, change nothing and say what to do.
+    await hold.click();
+    await expect(dialog.getByText('Keep holding the button until it fills.')).toBeVisible();
+    const box = (await hold.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.waitForTimeout(500);
+    await expect(hold).toContainText('Keep holding');
+    await page.mouse.up();
+    await expect(hold).toContainText('Hold to delete');
+    expect((await ownerApi.get('/owner/staff?search=' + encodeURIComponent(staff.email))).ok()).toBeTruthy();
+    await expect(row).toBeVisible();
+
+    // Cancel closes it without deleting.
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(row).toBeVisible();
+
+    // Holding it all the way deletes the login.
+    await row.getByRole('button', { name: `Delete ${staff.name}` }).click();
+    const hold2 = page.getByRole('alertdialog').getByRole('button', { name: /press and hold/ });
+    const box2 = (await hold2.boundingBox())!;
+    await page.mouse.move(box2.x + box2.width / 2, box2.y + box2.height / 2);
+    await page.mouse.down();
+    await expect(page.getByText(`${staff.name} was deleted.`)).toBeVisible({ timeout: 10_000 });
+    await page.mouse.up();
+    await expect(row).toHaveCount(0);
+
+    // They cannot sign in any more.
+    const api = await ownerApi.get('/owner/staff?search=' + encodeURIComponent(staff.email));
+    expect(await api.json()).toEqual([]);
+  });
+  });
+
   test('staff with a single venue skip the chooser', async ({ page, ownerApi, venue }) => {
     const staff = await createStaff(ownerApi, [venue.id], 'Solo');
     await signIn(page, staff.email, staff.password);

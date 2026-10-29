@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useDialogKeys } from '@/components/use-dialog-keys';
 import { SvgIcon } from '@/components/svg-icons';
 import { ErrorBanner } from '@/components/ui';
@@ -19,6 +19,89 @@ const TONES: Record<Tone, { icon: string; button: string }> = {
   danger: { icon: 'bg-red-100 text-red-700', button: 'bg-error text-on-error hover:bg-error/90' },
 };
 
+/** How long the button has to be held. Long enough that a stray click can never do it, short enough not to feel like a chore. */
+export const HOLD_MS = 1500;
+
+/**
+ * A button that only acts when it is held down for HOLD_MS: a bar fills while you hold, letting go early starts over. Works with
+ * the mouse, touch and the keyboard (hold Space or Enter), and says so, since a plain click does nothing.
+ */
+function HoldButton({ label, busy, className, onComplete }: { label: string; busy: boolean; className: string; onComplete: () => void }) {
+  const [progress, setProgress] = useState(0); // 0..1
+  const [hint, setHint] = useState(false);
+  const frame = useRef<number | null>(null);
+  const startedAt = useRef<number | null>(null);
+  const done = useRef(false);
+
+  const stop = () => {
+    if (frame.current !== null) cancelAnimationFrame(frame.current);
+    frame.current = null;
+    startedAt.current = null;
+    setProgress(0);
+  };
+  const tick = () => {
+    if (startedAt.current === null) return;
+    const p = Math.min(1, (performance.now() - startedAt.current) / HOLD_MS);
+    setProgress(p);
+    if (p >= 1) {
+      if (!done.current) {
+        done.current = true;
+        onComplete();
+      }
+      stop();
+      return;
+    }
+    frame.current = requestAnimationFrame(tick);
+  };
+  const start = () => {
+    if (busy || startedAt.current !== null) return;
+    done.current = false;
+    setHint(false);
+    startedAt.current = performance.now();
+    frame.current = requestAnimationFrame(tick);
+  };
+  const release = () => {
+    if (startedAt.current !== null) setHint(true); // let go too early: remind them what to do
+    stop();
+  };
+  useEffect(() => () => stop(), []);
+
+  return (
+    <div className="flex flex-col items-stretch sm:items-end">
+      <button
+        type="button"
+        disabled={busy}
+        aria-label={`${label}: press and hold for ${HOLD_MS / 1000} seconds`}
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture?.(e.pointerId);
+          start();
+        }}
+        onPointerUp={release}
+        onPointerCancel={release}
+        onLostPointerCapture={release}
+        onKeyDown={(e) => {
+          if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
+            e.preventDefault();
+            start();
+          }
+        }}
+        onKeyUp={(e) => {
+          if (e.key === ' ' || e.key === 'Enter') release();
+        }}
+        onBlur={release}
+        className={`relative select-none overflow-hidden rounded-lg px-4 py-2 font-label-md text-label-md transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
+        style={{ touchAction: 'none' }}
+      >
+        <span aria-hidden="true" className="absolute inset-y-0 left-0 bg-black/25" style={{ width: `${progress * 100}%` }} />
+        <span className="relative">{busy ? 'Working…' : progress > 0 ? 'Keep holding…' : `Hold to ${label.toLowerCase()}`}</span>
+      </button>
+      <p role="status" className="mt-1 h-4 text-xs text-on-surface-variant">
+        {hint ? 'Keep holding the button until it fills.' : ''}
+      </p>
+    </div>
+  );
+}
+
 /**
  * A confirmation modal. Mount it to open it, unmount it to close it. Esc and
  * a click on the backdrop cancel (unless a request is in flight), Tab stays
@@ -32,6 +115,7 @@ export function ConfirmDialog({
   tone = 'primary',
   busy = false,
   error,
+  holdToConfirm = false,
   onConfirm,
   onCancel,
 }: {
@@ -41,6 +125,8 @@ export function ConfirmDialog({
   tone?: Tone;
   busy?: boolean;
   error?: string | null;
+  /** For something that cannot be undone: the confirm button has to be held down (or held with Space / Enter) to count. */
+  holdToConfirm?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -102,14 +188,18 @@ export function ConfirmDialog({
           >
             Cancel
           </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onConfirm}
-            className={`rounded-lg px-4 py-2 font-label-md text-label-md transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${t.button}`}
-          >
-            {busy ? 'Working…' : confirmLabel}
-          </button>
+          {holdToConfirm ? (
+            <HoldButton label={confirmLabel} busy={busy} className={t.button} onComplete={onConfirm} />
+          ) : (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onConfirm}
+              className={`rounded-lg px-4 py-2 font-label-md text-label-md transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${t.button}`}
+            >
+              {busy ? 'Working…' : confirmLabel}
+            </button>
+          )}
         </div>
       </div>
     </div>

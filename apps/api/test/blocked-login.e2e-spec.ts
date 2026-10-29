@@ -58,6 +58,25 @@ describe('Blocked logins stop working immediately', () => {
     await owner.get('/owner/bookings').expect(200);
   });
 
+  test('the owner can delete a staff login for good; nobody else can, and no owner admin can be deleted this way', async () => {
+    const other = await createOwnerFixture(app, admin);
+    const target = await createStaffFixture(app, organizationId, []);
+    await target.agent.get('/owner/bookings').expect(200);
+
+    await other.ownerAgent.delete(`/owner/staff/${target.staffId}`).expect(404); // another organisation's owner cannot see it
+    await staff.delete(`/owner/staff/${target.staffId}`).expect(403); // staff cannot delete anyone
+    const ownerAdmin = await prisma.venueOwnerUser.findFirstOrThrow({ where: { organizationId, role: 'OWNER_ADMIN' } });
+    await owner.delete(`/owner/staff/${ownerAdmin.id}`).expect(404); // the staff route only reaches staff
+
+    await owner.delete(`/owner/staff/${target.staffId}`).expect(200);
+    await target.agent.get('/owner/bookings').expect(401); // signed out at once
+    expect(await prisma.venueOwnerUser.findUnique({ where: { id: target.staffId } })).toBeNull();
+    expect(await prisma.staffRefreshSession.count({ where: { userId: target.staffId } })).toBe(0);
+    const entry = await prisma.auditLog.findFirst({ where: { action: 'OWNER_STAFF_DELETED', entityId: target.staffId } });
+    expect(entry).toBeTruthy(); // the deletion itself is kept in the audit log
+    await owner.delete(`/owner/staff/${target.staffId}`).expect(404); // already gone
+  });
+
   test('a removed login cannot act at all', async () => {
     const extra = await createStaffFixture(app, organizationId, []);
     await extra.agent.get('/owner/bookings').expect(200);

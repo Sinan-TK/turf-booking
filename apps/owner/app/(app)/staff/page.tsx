@@ -274,6 +274,24 @@ export default function StaffPage() {
   const [busy, setBusy] = useState(false);
   const [toggleError, setToggleError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<Staff | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function confirmDelete() {
+    if (!deleting) return;
+    setBusy(true);
+    setDeleteError(null);
+    try {
+      await api.delete(`/owner/staff/${deleting.id}`);
+      setNotice(`${deleting.name} was deleted.`);
+      setDeleting(null);
+      refetch();
+    } catch (err) {
+      setDeleteError(err instanceof ApiError ? err.message : 'Could not delete this login');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function confirmToggle() {
     if (!toggling) return;
@@ -420,6 +438,17 @@ export default function StaffPage() {
                   >
                     {s.status === 'ACTIVE' ? 'Disable' : 'Enable'}
                   </button>
+                  <button
+                    type="button"
+                    aria-label={`Delete ${s.name}`}
+                    className="rounded-lg px-3 py-1.5 text-sm font-medium text-error ring-1 ring-inset ring-error/30 transition-colors hover:bg-error/5"
+                    onClick={() => {
+                      setDeleteError(null);
+                      setDeleting(s);
+                    }}
+                  >
+                    Delete
+                  </button>
                 </div>
               </td>
             </tr>
@@ -448,6 +477,24 @@ export default function StaffPage() {
             refetch();
           }}
         />
+      )}
+      {deleting && (
+        <ConfirmDialog
+          title={`Delete ${deleting.name}?`}
+          confirmLabel="Delete"
+          tone="danger"
+          holdToConfirm
+          busy={busy}
+          error={deleteError}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleting(null)}
+        >
+          <p>
+            This removes {deleting.name} ({deleting.email}) for good. They are signed out at once and cannot sign in again, and you cannot undo
+            it. To keep the login but stop access, use Disable instead.
+          </p>
+          <p>Bookings they made stay as they are, and the audit log keeps what they did, without their name.</p>
+        </ConfirmDialog>
       )}
       {toggling && (
         <ConfirmDialog
