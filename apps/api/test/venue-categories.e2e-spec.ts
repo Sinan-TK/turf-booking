@@ -302,8 +302,19 @@ describe('Venue categories', () => {
     const dupCreate = await createCategory({ sortOrder: a.res.body.sortOrder });
     expect(dupCreate.res.status).toBe(409);
     expect(dupCreate.res.body.message).toMatch(new RegExp(`Display order ${a.res.body.sortOrder} is already used by E2E`));
+    expect(dupCreate.res.body.takenBy).toMatchObject({ id: a.res.body.id }); // who has it, so the admin can offer to switch places
     const dupUpdate = await adminAgent.patch(`/admin/categories/${b.res.body.id}`).send({ sortOrder: a.res.body.sortOrder });
     expect(dupUpdate.status).toBe(409);
+
+    // Switching places trades the two numbers, and a facility can't switch with itself.
+    const swapped = await adminAgent.post(`/admin/categories/${b.res.body.id}/swap-order`).send({ withId: a.res.body.id });
+    expect(swapped.status).toBe(201);
+    expect(swapped.body.sortOrder).toBe(a.res.body.sortOrder);
+    const aAfter = await adminAgent.get(`/admin/categories/${a.res.body.id}`);
+    expect(aAfter.body.sortOrder).toBe(b.res.body.sortOrder);
+    await adminAgent.post(`/admin/categories/${b.res.body.id}/swap-order`).send({ withId: b.res.body.id }).expect(400);
+    await adminAgent.post(`/admin/categories/${b.res.body.id}/swap-order`).send({ withId: '00000000-0000-4000-8000-000000000000' }).expect(404);
+    await adminAgent.post(`/admin/categories/${b.res.body.id}/swap-order`).send({ withId: a.res.body.id }).expect(201); // back again
 
     // A free number is fine, and so is saving the same number again or changing something else.
     const free = 80_000 + Math.floor(Math.random() * 10_000);

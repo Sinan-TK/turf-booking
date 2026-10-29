@@ -6,7 +6,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { VenueCategoriesService } from './venue-categories.service';
-import { CreateCategoryDto, UpdateCategoryDto } from './dto/venue-category.dto';
+import { CreateCategoryDto, SwapDisplayOrderDto, UpdateCategoryDto } from './dto/venue-category.dto';
 
 /** Public: customers and owners see active facilities only. */
 @Controller('categories')
@@ -49,6 +49,12 @@ export class AdminCategoriesController {
     @CurrentUser() actor: AuthContext,
   ) {
     return this.categories.update(id, dto, actor);
+  }
+
+  /** The facility and `withId` trade display order numbers (offered when a number is already taken). */
+  @Post(':id/swap-order')
+  swapOrder(@Param('id', ParseUUIDPipe) id: string, @Body() dto: SwapDisplayOrderDto, @CurrentUser() actor: AuthContext) {
+    return this.categories.swapDisplayOrder(id, dto.withId, actor);
   }
 
   @Post(':id/activate')

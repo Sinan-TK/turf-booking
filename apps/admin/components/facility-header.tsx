@@ -15,6 +15,9 @@ export function FacilityHeader({ category, onChanged }: { category: AdminVenueCa
   const [savingOrder, setSavingOrder] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [orderError, setOrderError] = useState<string | undefined>();
+  // The facility that already has the typed number: it can be asked to switch places.
+  const [taken, setTaken] = useState<{ id: string; name: string } | null>(null);
+  const [switching, setSwitching] = useState(false);
 
   const typed = order.trim() === '' ? NaN : Number(order);
   const orderValid = Number.isInteger(typed) && typed >= 0 && typed <= 100000;
@@ -41,13 +44,31 @@ export function FacilityHeader({ category, onChanged }: { category: AdminVenueCa
     }
     setSavingOrder(true);
     setOrderError(undefined);
+    setTaken(null);
     try {
       await api.patch(`/admin/categories/${category.id}`, { sortOrder: typed });
       onChanged();
     } catch (err) {
-      setOrderError(err instanceof ApiError ? err.message : 'Could not save the display order.');
+      const takenBy = err instanceof ApiError && err.status === 409 ? (err.details as { takenBy?: { id: string; name: string } } | undefined)?.takenBy : undefined;
+      if (takenBy) setTaken(takenBy);
+      else setOrderError(err instanceof ApiError ? err.message : 'Could not save the display order.');
     } finally {
       setSavingOrder(false);
+    }
+  }
+
+  async function switchPlaces() {
+    if (!taken) return;
+    setSwitching(true);
+    setOrderError(undefined);
+    try {
+      await api.post(`/admin/categories/${category.id}/swap-order`, { withId: taken.id });
+      setTaken(null);
+      onChanged();
+    } catch (err) {
+      setOrderError(err instanceof ApiError ? err.message : 'Could not switch places.');
+    } finally {
+      setSwitching(false);
     }
   }
 
@@ -88,7 +109,7 @@ export function FacilityHeader({ category, onChanged }: { category: AdminVenueCa
           )}
         </div>
 
-        <div className="sm:w-56">
+        <div className="sm:w-72">
           <Label htmlFor="facility-order">Display order</Label>
           <div className="flex items-center gap-2">
             <Input
@@ -100,6 +121,7 @@ export function FacilityHeader({ category, onChanged }: { category: AdminVenueCa
               onChange={(e) => {
                 setOrder(e.target.value);
                 setOrderError(undefined);
+                setTaken(null);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && orderChanged) void saveOrder();
@@ -111,7 +133,18 @@ export function FacilityHeader({ category, onChanged }: { category: AdminVenueCa
             </Button>
           </div>
           <FieldError id="facility-order-error" message={orderError} />
-          {!orderError && <p className="mt-1.5 text-xs text-gray-500">Lower numbers appear first. Each facility needs its own number.</p>}
+          {taken && (
+            <div role="alert" className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-200">
+              <p>
+                <strong>{taken.name}</strong> already has number {typed}. Pick another number, or switch places: {taken.name} would take number{' '}
+                {category.sortOrder} and {category.name} would take {typed}.
+              </p>
+              <Button type="button" variant="secondary" className="mt-2" loading={switching} onClick={switchPlaces}>
+                Switch places with {taken.name}
+              </Button>
+            </div>
+          )}
+          {!orderError && !taken && <p className="mt-1.5 text-xs text-gray-500">Lower numbers appear first. Each facility needs its own number.</p>}
         </div>
       </div>
     </section>

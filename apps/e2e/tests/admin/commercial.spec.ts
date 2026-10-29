@@ -93,7 +93,15 @@ test.describe('admin: commercial terms', () => {
 
     await header.getByLabel('Display order').fill(String(a.sortOrder));
     await header.getByRole('button', { name: 'Save' }).click();
-    await expect(header.getByText(new RegExp(`Display order ${a.sortOrder} is already used by PW Order`))).toBeVisible();
+    // The header says who has the number and offers to switch places with it.
+    await expect(header.getByText(new RegExp(`already has number ${a.sortOrder}`))).toBeVisible();
+    const bBefore = b.sortOrder;
+    await header.getByRole('button', { name: /Switch places with PW Order/ }).click();
+    await expect
+      .poll(async () => ((await (await adminApi.get(`/admin/categories/${b.id}`)).json()) as { sortOrder: number }).sortOrder)
+      .toBe(a.sortOrder);
+    const aNow = (await (await adminApi.get(`/admin/categories/${a.id}`)).json()) as { sortOrder: number };
+    expect(aNow.sortOrder).toBe(bBefore); // they traded numbers
 
     const free = 70_000 + Math.floor(Math.random() * 9_000);
     await header.getByLabel('Display order').fill(String(free));

@@ -67,3 +67,7 @@ export class CreateCategoryDto extends createZodDto(createCategorySchema) {}
 // slug is immutable once created (it is the stable identifier).
 export const updateCategorySchema = createCategorySchema.omit({ slug: true }).partial();
 export class UpdateCategoryDto extends createZodDto(updateCategorySchema) {}
+
+// Two facilities trade display order numbers.
+export const swapDisplayOrderSchema = z.object({ withId: z.string().uuid() });
+export class SwapDisplayOrderDto extends createZodDto(swapDisplayOrderSchema) {}

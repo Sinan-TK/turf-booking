@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma, BookingPolicy, VenueCategory } from '@venue/database';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -172,6 +172,29 @@ export class VenueCategoriesService {
     return this.getAdmin(id);
   }
 
+  /** Two facilities trade display order numbers, both or neither. */
+  async swapDisplayOrder(id: string, withId: string, actor: AuthContext) {
+    if (id === withId) throw new BadRequestException('Pick a different facility to switch with.');
+    await this.prisma.client.$transaction(async (tx) => {
+      await this.lockDisplayOrder(tx);
+      const [a, b] = await Promise.all([
+        tx.venueCategory.findUnique({ where: { id }, select: { id: true, name: true, sortOrder: true } }),
+        tx.venueCategory.findUnique({ where: { id: withId }, select: { id: true, name: true, sortOrder: true } }),
+      ]);
+      if (!a || !b) throw new NotFoundException('Facility not found');
+      await tx.venueCategory.update({ where: { id: a.id }, data: { sortOrder: b.sortOrder } });
+      await tx.venueCategory.update({ where: { id: b.id }, data: { sortOrder: a.sortOrder } });
+      await this.audit.record({
+        actor,
+        action: 'VENUE_CATEGORY_ORDER_SWAPPED',
+        entityType: 'VenueCategory',
+        entityId: a.id,
+        metadata: { with: { id: b.id, name: b.name }, from: a.sortOrder, to: b.sortOrder },
+      });
+    });
+    return this.getAdmin(id);
+  }
+
   async setActive(id: string, isActive: boolean, actor: AuthContext) {
     return this.update(id, { isActive }, actor);
   }
@@ -215,9 +238,17 @@ export class VenueCategoriesService {
   private async assertDisplayOrderFree(tx: Prisma.TransactionClient, sortOrder: number, exceptId?: string) {
     const taken = await tx.venueCategory.findFirst({
       where: { sortOrder, ...(exceptId ? { id: { not: exceptId } } : {}) },
-      select: { name: true },
+      select: { id: true, name: true },
     });
-    if (taken) throw new ConflictException(`Display order ${sortOrder} is already used by ${taken.name}. Pick another number.`);
+    // Who has it travels with the error, so the admin can offer to switch places.
+    if (taken) {
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        message: `Display order ${sortOrder} is already used by ${taken.name}. Pick another number.`,
+        takenBy: { id: taken.id, name: taken.name, sortOrder },
+      });
+    }
   }
 
   /** Deactivation hides the facility from "add unit" forms and the public list.
