@@ -52,7 +52,7 @@ export default function EditVenueTypePage() {
         subtitle={`${data.venueCount} venue${data.venueCount === 1 ? '' : 's'} offer this facility. Rule changes apply to new bookings straight away; existing bookings are not touched.`}
       />
 
-      <div role="tablist" aria-label="Facility sections" className="mb-5 flex gap-1 overflow-x-auto border-b border-gray-200">
+      <div role="tablist" aria-label="Facility sections" className="mb-5 flex gap-1 border-b border-gray-200">
         {TABS.map((t) => (
           <button
             key={t.key}
