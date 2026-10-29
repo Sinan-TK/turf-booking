@@ -7,5 +7,6 @@
     "^.+\\.(t|j)s$": "ts-jest"
   },
   "setupFilesAfterEnv": ["<rootDir>/setup/env.ts"],
+  "globalTeardown": "<rootDir>/setup/global-teardown.ts",
   "testTimeout": 30000
 }

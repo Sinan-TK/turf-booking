@@ -32,8 +32,15 @@ Needs the dev accounts from `pnpm --filter @venue/database seed:identity` (`admi
 
 ## What to know
 
-- **It uses the real dev database.** Every test creates its own data named `PW …` (venues, customers, bookings,
-  tickets) and never edits an existing venue. Nothing is deleted afterwards, as with the API tests.
+- **It uses the real dev database, and cleans up after itself.** Every test creates its own data named `PW …` (venues,
+  customers, bookings, tickets) and never edits an existing venue. When the whole run ends, a global teardown
+  (`support/global-teardown.ts`) removes everything the tests created and everything hanging off it, using
+  `purgeTestData` from `@venue/database`. It only ever matches the tests' own names (facility slugs `PW_…`/`E2E_…`,
+  venues and organisations named `PW …`/`E2E …`, logins `pw-…`/`e2e-…`, customers `PW …`/`pw…@example.com`), and runs in
+  one transaction. The API tests do the same after their run (`apps/api/test/setup/global-teardown.ts`).
+  - `E2E_KEEP_DATA=1` skips the cleanup, e.g. to look at a failure in the database.
+  - A run that was killed leaves its data behind: `pnpm --filter @venue/database purge:test-data` removes it
+    (add `-- --dry-run` to only list what would go).
 - **Customer login** is a WhatsApp code a test can't receive. The tests plant a code they know for the phone number
   in the same table the API writes (`support/customer.ts`, using `DATABASE_URL` and `CUSTOMER_SESSION_SECRET`
   from `apps/api/.env`), then type it into the real dialog.

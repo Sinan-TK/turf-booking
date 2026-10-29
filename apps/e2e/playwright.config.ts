@@ -15,6 +15,8 @@ const channel = process.env.E2E_CHANNEL ?? 'chrome';
 
 export default defineConfig({
   testDir: './tests',
+  // Removes what the tests created once the whole run is over (skip it with E2E_KEEP_DATA=1).
+  globalTeardown: './support/global-teardown.ts',
   outputDir: './test-results',
   timeout: 60_000,
   // Generous waits: the apps run in dev mode, where a page can take several seconds to compile the first time it is opened.
