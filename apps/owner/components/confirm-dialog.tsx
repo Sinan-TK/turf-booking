@@ -67,7 +67,8 @@ function HoldButton({ label, busy, className, onComplete }: { label: string; bus
   useEffect(() => () => stop(), []);
 
   return (
-    <div className="flex flex-col items-stretch sm:items-end">
+    // The hint sits below the button without taking part in the layout, so this button is exactly as tall as Cancel beside it.
+    <div className="relative flex flex-col items-stretch sm:items-end">
       <button
         type="button"
         disabled={busy}
@@ -95,7 +96,7 @@ function HoldButton({ label, busy, className, onComplete }: { label: string; bus
         <span aria-hidden="true" className="absolute inset-y-0 left-0 bg-black/25" style={{ width: `${progress * 100}%` }} />
         <span className="relative">{busy ? 'Working…' : progress > 0 ? 'Keep holding…' : `Hold to ${label.toLowerCase()}`}</span>
       </button>
-      <p role="status" className="mt-1 h-4 text-xs text-on-surface-variant">
+      <p role="status" className="absolute right-0 top-full mt-1 whitespace-nowrap text-xs text-on-surface-variant">
         {hint ? 'Keep holding the button until it fills.' : ''}
       </p>
     </div>

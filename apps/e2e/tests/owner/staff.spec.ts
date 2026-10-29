@@ -169,6 +169,9 @@ test.describe('owner portal: venue-based staff', () => {
     await expect(dialog).toContainText('cannot undo');
     const hold = dialog.getByRole('button', { name: /press and hold/ });
     await expect(hold).toContainText('Hold to delete');
+    // It is the same height as Cancel beside it.
+    const cancelBox = (await dialog.getByRole('button', { name: 'Cancel' }).boundingBox())!;
+    expect(Math.abs((await hold.boundingBox())!.height - cancelBox.height)).toBeLessThan(1);
 
     // A plain click, and a hold that is let go too early, change nothing and say what to do.
     await hold.click();
