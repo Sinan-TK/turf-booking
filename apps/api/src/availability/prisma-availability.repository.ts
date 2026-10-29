@@ -11,6 +11,7 @@ const UNIT_CATEGORY_SELECT = {
   slug: true,
   name: true,
   iconKey: true,
+  iconSvg: true,
   unitLabel: true,
   venueLabel: true,
   unitTypes: true,

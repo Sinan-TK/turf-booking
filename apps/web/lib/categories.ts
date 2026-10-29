@@ -14,6 +14,8 @@ export interface VenueCategory {
   slug: string;
   name: string;
   iconKey: string;
+  /** A custom SVG icon that replaces iconKey where set. */
+  iconSvg?: string | null;
   /** What one bookable unit is called ("Table", "Pitch"…). */
   unitLabel: string;
   /** What a venue of this type is called ("Chess club", "Venue"…). */

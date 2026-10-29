@@ -1,5 +1,6 @@
 'use client';
 
+import { SvgMaskIcon } from '@/components/svg-mask-icon';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useFetch } from '@/lib/use-fetch';
@@ -258,9 +259,13 @@ export default function VenueTypesPage() {
                             c.isActive ? 'bg-brand-50 text-brand-600' : 'bg-gray-100 text-gray-400'
                           }`}
                         >
-                          <span className="material-symbols-outlined text-[22px]" aria-hidden="true">
-                            {c.iconKey}
-                          </span>
+                          {c.iconSvg ? (
+                            <SvgMaskIcon svg={c.iconSvg} className="text-[22px]" />
+                          ) : (
+                            <span className="material-symbols-outlined text-[22px]" aria-hidden="true">
+                              {c.iconKey}
+                            </span>
+                          )}
                         </span>
                         <div className="min-w-0">
                           <div className="font-medium text-gray-900">{c.name}</div>

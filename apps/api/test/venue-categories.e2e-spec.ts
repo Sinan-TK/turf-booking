@@ -330,4 +330,31 @@ describe('Venue categories', () => {
 
     for (const c of [a, b]) await adminAgent.post(`/admin/categories/${c.res.body.id}/deactivate`);
   });
+
+  it('keeps a pasted SVG as the facility icon, refuses an unsafe one, and clears it again', async () => {
+    const svg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/></svg>';
+    const { res } = await createCategory({ iconSvg: svg });
+    expect(res.status).toBe(201);
+    expect(res.body.iconSvg).toBe('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/></svg>');
+    const id = res.body.id as string;
+
+    // The public list (what the customer site draws) carries it too.
+    const pub = await request(app.getHttpServer()).get('/categories');
+    expect(pub.body.find((c: { id: string }) => c.id === id).iconSvg).toBe(res.body.iconSvg);
+
+    // Unsafe markup is a clear 400 and the stored icon is untouched.
+    const bad = await adminAgent.patch(`/admin/categories/${id}`).send({ iconSvg: '<svg viewBox="0 0 24 24"><script>alert(1)</script></svg>' });
+    expect(bad.status).toBe(400);
+    expect(bad.body.message).toMatch(/script/);
+    expect((await adminAgent.get(`/admin/categories/${id}`)).body.iconSvg).toBe(res.body.iconSvg);
+    expect((await createCategory({ iconSvg: '<svg viewBox="0 0 24 24"><path d="M0 0" onclick="x()"/></svg>' })).res.status).toBe(400);
+
+    // Saving something else leaves it alone; null clears it, back to the icon name.
+    const renamed = await adminAgent.patch(`/admin/categories/${id}`).send({ unitLabel: 'Board' });
+    expect(renamed.body.iconSvg).toBe(res.body.iconSvg);
+    const cleared = await adminAgent.patch(`/admin/categories/${id}`).send({ iconSvg: null });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.iconSvg).toBeNull();
+    await adminAgent.post(`/admin/categories/${id}/deactivate`);
+  });
 });

@@ -1493,6 +1493,8 @@ model VenueCategory {
   isActive              Boolean        @default(true)
   /// UI icon key (mapped client-side), e.g. "sports_soccer".
   iconKey               String         @default("category")
+  /// A custom SVG (checked and tidied by cleanIconSvg) that replaces iconKey where set.
+  iconSvg               String?
   /// What one bookable unit is called: "Table", "Court", "Pitch"...
   unitLabel             String         @default("Unit")
   /// What a venue of this type is called: "Chess club", "Venue"...

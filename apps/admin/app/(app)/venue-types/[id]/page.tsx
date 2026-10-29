@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useFetch } from '@/lib/use-fetch';
 import type { AdminVenueCategory } from '@/lib/categories';
@@ -45,9 +44,6 @@ export default function EditVenueTypePage() {
 
   return (
     <div>
-      <Link href="/venue-types" className="mb-3 inline-block text-sm text-gray-500 hover:text-gray-800">
-        ← Facilities
-      </Link>
       <FacilityHeader category={data} onChanged={refetch} />
 
       <div role="tablist" aria-label="Facility sections" className="mb-5 flex gap-1 border-b border-gray-200">

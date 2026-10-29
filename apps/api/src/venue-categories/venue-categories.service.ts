@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { cleanIconSvg } from '@venue/shared';
 import type { Prisma, BookingPolicy, VenueCategory } from '@venue/database';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -94,6 +95,7 @@ export class VenueCategoriesService {
           name: dto.name,
           defaultAllocationMode: dto.defaultAllocationMode,
           iconKey: dto.iconKey,
+          iconSvg: this.cleanSvg(dto.iconSvg) ?? null,
           unitLabel: dto.unitLabel,
           venueLabel: dto.venueLabel,
           unitTypes: dto.unitTypes,
@@ -139,6 +141,7 @@ export class VenueCategoriesService {
       await this.assertSafeToDeactivate(id);
     }
 
+    const iconSvg = dto.iconSvg === undefined ? undefined : (this.cleanSvg(dto.iconSvg) ?? null);
     await this.prisma.client.$transaction(async (tx) => {
       const { policy, ...fields } = dto;
       // Only a changed order is checked, so facilities that already share a number can still be saved for other reasons.
@@ -147,7 +150,7 @@ export class VenueCategoriesService {
         await this.assertDisplayOrderFree(tx, fields.sortOrder, id);
       }
       if (Object.keys(fields).length > 0) {
-        await tx.venueCategory.update({ where: { id }, data: fields });
+        await tx.venueCategory.update({ where: { id }, data: { ...fields, ...(iconSvg !== undefined ? { iconSvg } : {}) } });
       }
       if (policy) {
         const existing = await tx.bookingPolicy.findFirst({
@@ -170,6 +173,14 @@ export class VenueCategoriesService {
       metadata: JSON.parse(JSON.stringify(dto)) as Prisma.InputJsonValue,
     });
     return this.getAdmin(id);
+  }
+
+  /** A pasted icon, checked and tidied; empty or null means "no custom icon". Anything unsafe is a clear 400, never stored. */
+  private cleanSvg(raw: string | null | undefined): string | undefined {
+    if (raw === null || raw === undefined || raw.trim() === '') return undefined;
+    const result = cleanIconSvg(raw);
+    if (!result.ok) throw new BadRequestException(`The icon SVG can't be used: ${result.problem}`);
+    return result.svg;
   }
 
   /** Two facilities trade display order numbers, both or neither. */

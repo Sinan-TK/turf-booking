@@ -54,6 +54,8 @@ export const createCategorySchema = z.object({
     .trim()
     .regex(/^[a-z0-9_]{1,40}$/, 'Use a Material Symbols icon name, e.g. sports_esports')
     .default('category'),
+  // A pasted SVG that replaces the icon; null or empty clears it. Checked in the service (cleanIconSvg).
+  iconSvg: z.string().max(12000).nullable().optional(),
   unitLabel: z.string().trim().min(1).max(40).default('Unit'),
   venueLabel: z.string().trim().min(1).max(60).default('Venue'),
   unitTypes: unitTypes.default([]),

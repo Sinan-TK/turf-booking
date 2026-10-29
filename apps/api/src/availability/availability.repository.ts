@@ -16,6 +16,7 @@ export interface UnitCategory {
   slug: string;
   name: string;
   iconKey: string;
+  iconSvg: string | null;
   unitLabel: string;
   venueLabel: string;
   unitTypes: string[];

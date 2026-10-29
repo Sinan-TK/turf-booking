@@ -17,6 +17,7 @@ const CATEGORY_SUMMARY = {
   slug: true,
   name: true,
   iconKey: true,
+  iconSvg: true,
   unitLabel: true,
   venueLabel: true,
   unitTypes: true,

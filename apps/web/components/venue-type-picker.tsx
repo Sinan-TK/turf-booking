@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Icon } from '@/components/ui';
+import { CategoryIcon, Icon } from '@/components/ui';
 import type { VenueCategory } from '@/lib/categories';
 
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -109,7 +109,7 @@ export function VenueTypePicker({
                         : 'border-slate-200 font-semibold text-slate-700 hover:border-brand-400 hover:bg-slate-50'
                     }`}
                   >
-                    <Icon name={c.iconKey} className={`text-[1.125rem] ${isOn ? 'text-brand-600' : 'text-slate-400'}`} />
+                    <CategoryIcon iconKey={c.iconKey} iconSvg={c.iconSvg} className={`text-[1.125rem] ${isOn ? 'text-brand-600' : 'text-slate-400'}`} />
                     <span className="min-w-0 flex-1 truncate">{c.name}</span>
                     <span
                       aria-hidden="true"

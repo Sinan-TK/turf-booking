@@ -18,6 +18,8 @@ export interface VenueCategory {
   slug: string;
   name: string;
   iconKey: string;
+  /** A pasted custom SVG that replaces the icon; null = use iconKey. */
+  iconSvg?: string | null;
   unitLabel: string;
   venueLabel: string;
   /** Allowed resource sub-types; empty = free text. */

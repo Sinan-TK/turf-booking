@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { useDebounced } from '@/lib/use-debounced';
 import { DISMISSED, useCustomer } from '@/lib/customer';
-import { ErrorBanner, Icon } from '@/components/ui';
+import { CategoryIcon, ErrorBanner, Icon } from '@/components/ui';
 import { LoadingNote, SearchingBar, Skeleton, VenueCardSkeleton, VenueCardsSkeleton } from '@/components/skeleton';
 import { AccountMenu } from '@/components/account-menu';
 import { useToast } from '@/components/toast';
@@ -18,7 +18,7 @@ interface SearchResult {
   venue: { id: string; name: string; facilityCode: string; address: string; photoUrl: string | null; lat: number; lng: number; googleMapsUrl?: string | null };
   /** photoUrls: the unit's photos (up to three, main one first); empty when the owner has added none. */
   resource: { id: string; name: string; groundType: string; photoUrls?: string[] };
-  category?: { slug: string; name: string; iconKey: string; unitLabel: string; venueLabel: string };
+  category?: { slug: string; name: string; iconKey: string; iconSvg?: string | null; unitLabel: string; venueLabel: string };
   distanceKm?: number;
   /** The length (minutes) the start times and prices are for: the one asked for where this unit offers it, else its shortest. */
   durationMinutes?: number;
@@ -549,7 +549,7 @@ export default function HomePage() {
                 onClick={() => selectCategories(c.slug ? [c.slug] : [])}
                 className={`inline-flex h-10 flex-shrink-0 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition active:scale-95 ${isActive ? 'border-brand-700 bg-brand-700 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-brand-400'}`}
               >
-                {c.slug && <Icon name={c.iconKey} className={`text-[1rem] ${isActive ? 'text-white' : 'text-slate-600'}`} />}
+                {c.slug && <CategoryIcon iconKey={c.iconKey} iconSvg={(c as { iconSvg?: string | null }).iconSvg} className={`text-[1rem] ${isActive ? 'text-white' : 'text-slate-600'}`} />}
                 <span>{c.name}</span>
               </button>
             );
@@ -796,7 +796,7 @@ function SlotBookingModal({
               />
             ) : (
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-brand-100">
-                <Icon name={r.category?.iconKey ?? 'category'} className="text-[1.5rem]" />
+                <CategoryIcon iconKey={r.category?.iconKey ?? 'category'} iconSvg={r.category?.iconSvg} className="text-[1.5rem]" />
               </div>
             )}
             <div className="min-w-0">
@@ -993,6 +993,7 @@ function VenueGroupCard({
         key={unit.resource.id}
         photos={photos}
         iconKey={unit.category?.iconKey ?? 'category'}
+        iconSvg={unit.category?.iconSvg}
         alt={`${venue.name}, ${unit.resource.name}`}
         badge={`${openSlots} slot${openSlots === 1 ? '' : 's'} open`}
         saved={saved}
@@ -1032,7 +1033,7 @@ function VenueGroupCard({
                 onClick={() => setPickedId(u.resource.id)}
                 className={`flex w-[8.5rem] shrink-0 items-center sm:w-[calc((100%-1rem)/3)] gap-2 rounded-xl border px-2 py-2.5 text-left transition active:scale-[0.98] ${on ? 'border-brand-700 bg-brand-700 text-white shadow-glow' : 'border-slate-200 bg-white text-slate-800 hover:border-brand-400'}`}
               >
-                <Icon name={u.category?.iconKey ?? 'category'} className={`text-[1.125rem] ${on ? 'text-white' : 'text-slate-500'}`} />
+                <CategoryIcon iconKey={u.category?.iconKey ?? 'category'} iconSvg={u.category?.iconSvg} className={`text-[1.125rem] ${on ? 'text-white' : 'text-slate-500'}`} />
                 <span className="min-w-0">
                   <span className="block truncate text-xs font-bold leading-tight">{u.resource.name}</span>
                   {u.price && (
@@ -1078,6 +1079,7 @@ const AUTO_PHOTO_MS = 2000;
 function CardGallery({
   photos,
   iconKey,
+  iconSvg,
   alt,
   badge,
   saved,
@@ -1086,6 +1088,7 @@ function CardGallery({
 }: {
   photos: string[];
   iconKey: string;
+  iconSvg?: string | null;
   alt: string;
   badge: string;
   saved: boolean;
@@ -1169,7 +1172,7 @@ function CardGallery({
           <div className="absolute inset-y-0 left-1/2 w-px bg-white/10" />
           <div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10" />
           <div className="absolute inset-0 flex items-center justify-center">
-            <Icon name={iconKey} className="text-[3.25rem] text-white/35" />
+            <CategoryIcon iconKey={iconKey} iconSvg={iconSvg} className="text-[3.25rem] text-white/35" />
           </div>
         </div>
       )}

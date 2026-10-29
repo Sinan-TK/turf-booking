@@ -7,6 +7,8 @@ import { Button, ErrorBanner, FieldError, Input, Label, invalidClass } from '@/c
 import { hasErrors, intError, textError, type FieldErrors } from '@/lib/validation';
 import { Icon } from '@/components/icons';
 import { SaveBar } from '@/components/save-bar';
+import { SvgMaskIcon } from '@/components/svg-mask-icon';
+import { cleanIconSvg } from '@venue/shared/dist/icon-svg';
 
 interface Props {
   /** Present = edit mode (slug is fixed; the booking style locks once venues exist). */
@@ -177,6 +179,11 @@ export function CategoryForm({ initial, onSaved }: Props) {
   });
   const [unitTypes, setUnitTypes] = useState<string[]>(initial?.unitTypes ?? []);
   const [unitTypeDraft, setUnitTypeDraft] = useState('');
+  // A pasted SVG that replaces the picked icon. Checked as you type with the same rules the server applies.
+  const [iconSvgText, setIconSvgText] = useState(initial?.iconSvg ?? '');
+  const svgCheck = useMemo(() => (iconSvgText.trim() === '' ? null : cleanIconSvg(iconSvgText)), [iconSvgText]);
+  const customSvg = svgCheck?.ok ? svgCheck.svg : null;
+  const svgProblem = svgCheck && !svgCheck.ok ? svgCheck.problem : undefined;
   const [customRules, setCustomRules] = useState(true);
   const [policy, setPolicy] = useState<PolicyForm>(initial ? policyToForm(initial.policy) : DEFAULT_POLICY);
   const [slugTouched, setSlugTouched] = useState(false);
@@ -185,7 +192,7 @@ export function CategoryForm({ initial, onSaved }: Props) {
   const [errors, setErrors] = useState<FieldErrors<keyof typeof form>>({});
   const [submitting, setSubmitting] = useState(false);
   // What was last saved (or loaded), so the save bar only appears once something in the form differs from it.
-  const snapshot = JSON.stringify({ form, unitTypes, unitTypeDraft, customRules, policy });
+  const snapshot = JSON.stringify({ form, unitTypes, unitTypeDraft, customRules, policy, iconSvgText });
   const [baseline, setBaseline] = useState<string | null>(null);
   useEffect(() => setBaseline((b) => b ?? snapshot), []);
   const dirty = baseline !== null && snapshot !== baseline;
@@ -246,6 +253,11 @@ export function CategoryForm({ initial, onSaved }: Props) {
       if (first) document.getElementById(ids[first])?.focus();
       return;
     }
+    if (svgProblem) {
+      setError(`The icon SVG can't be used: ${svgProblem}`);
+      document.getElementById('cat-icon-svg')?.focus();
+      return;
+    }
     if (customRules && problem) {
       setError(problem);
       return;
@@ -261,6 +273,7 @@ export function CategoryForm({ initial, onSaved }: Props) {
         name: form.name.trim(),
         defaultAllocationMode: form.defaultAllocationMode,
         iconKey: form.iconKey.trim(),
+        iconSvg: customSvg, // null clears a custom icon
         unitLabel: form.unitLabel.trim(),
         venueLabel: form.venueLabel.trim() || 'Venue',
         unitTypes: types,
@@ -346,10 +359,10 @@ export function CategoryForm({ initial, onSaved }: Props) {
                   type="button"
                   title={icon}
                   aria-label={icon}
-                  aria-pressed={form.iconKey === icon}
+                  aria-pressed={!customSvg && form.iconKey === icon}
                   onClick={() => set('iconKey', icon)}
                   className={`flex h-10 w-10 items-center justify-center rounded-lg border transition ${
-                    form.iconKey === icon
+                    !customSvg && form.iconKey === icon
                       ? 'border-brand-500 bg-brand-50 text-brand-700 ring-4 ring-brand-500/15'
                       : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-800'
                   }`}
@@ -380,6 +393,45 @@ export function CategoryForm({ initial, onSaved }: Props) {
               </a>
             </div>
             <FieldError id="cat-icon-error" message={errors.iconKey} />
+
+            <div className="mt-4 rounded-lg border border-dashed border-gray-300 bg-gray-50/60 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="cat-icon-svg">Or paste your own SVG</Label>
+                {iconSvgText.trim() !== '' && (
+                  <button type="button" onClick={() => setIconSvgText('')} className="text-xs font-medium text-gray-600 hover:text-gray-900 hover:underline">
+                    Remove custom icon
+                  </button>
+                )}
+              </div>
+              <div className="flex items-start gap-3">
+                <textarea
+                  id="cat-icon-svg"
+                  rows={4}
+                  spellCheck={false}
+                  aria-invalid={!!svgProblem}
+                  aria-describedby="cat-icon-svg-hint"
+                  placeholder={'<svg viewBox="0 0 24 24"><path d="…"/></svg>'}
+                  value={iconSvgText}
+                  onChange={(e) => setIconSvgText(e.target.value)}
+                  className={`min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 font-mono text-xs text-gray-800 shadow-sm focus:outline-none focus-visible:ring-4 ${
+                    svgProblem ? 'border-red-400 focus-visible:ring-red-500/15' : 'border-gray-300 focus-visible:border-brand-500 focus-visible:ring-brand-500/15'
+                  }`}
+                />
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-brand-600" aria-label="Preview of your icon">
+                  {customSvg ? <SvgMaskIcon svg={customSvg} className="text-[40px]" /> : <span className="text-[11px] text-gray-400">Preview</span>}
+                </div>
+              </div>
+              {svgProblem && (
+                <p role="alert" id="cat-icon-svg-error" className="mt-1.5 text-xs text-red-600">
+                  {svgProblem}
+                </p>
+              )}
+              <p id="cat-icon-svg-hint" className="mt-1.5 text-xs text-gray-500">
+                {customSvg ? 'This icon is used instead of the one picked above. ' : ''}
+                Simple shapes only (path, circle, rect, line, polygon…), no scripts, styles or images. It is drawn in one colour, the colour of the text
+                around it, so use a single-colour icon with a viewBox.
+              </p>
+            </div>
           </div>
         </Section>
 
@@ -586,7 +638,7 @@ export function CategoryForm({ initial, onSaved }: Props) {
             <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-gray-400">Category chips</p>
             <div className="flex flex-wrap gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-600 py-1.5 pl-2.5 pr-3.5 text-sm font-medium text-white shadow-sm">
-                <MaterialIcon name={form.iconKey} className="text-[18px]" />
+                {customSvg ? <SvgMaskIcon svg={customSvg} className="text-[18px]" /> : <MaterialIcon name={form.iconKey} className="text-[18px]" />}
                 {form.name.trim() || 'Facility'}
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white py-1.5 pl-2.5 pr-3.5 text-sm text-gray-500">

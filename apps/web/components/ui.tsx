@@ -115,6 +115,32 @@ export function Icon({ name, className = '' }: { name: string; className?: strin
   const LucideIconComponent = ICON_MAP[name] || Activity;
   return <LucideIconComponent size="1em" className={`shrink-0 ${className}`} />;
 }
+/**
+ * A facility's icon: its pasted SVG when it has one (drawn as a mask in the text colour, so it can never run code and follows the
+ * chip's colours), else the named icon.
+ */
+export function CategoryIcon({ iconKey, iconSvg, className = '' }: { iconKey: string; iconSvg?: string | null; className?: string }) {
+  if (!iconSvg) return <Icon name={iconKey} className={className} />;
+  const url = `url("data:image/svg+xml,${encodeURIComponent(iconSvg)}")`;
+  return (
+    <span
+      aria-hidden="true"
+      className={`inline-block shrink-0 bg-current align-middle ${className}`}
+      style={{
+        width: '1em',
+        height: '1em',
+        WebkitMaskImage: url,
+        maskImage: url,
+        WebkitMaskSize: 'contain',
+        maskSize: 'contain',
+        WebkitMaskRepeat: 'no-repeat',
+        maskRepeat: 'no-repeat',
+        WebkitMaskPosition: 'center',
+        maskPosition: 'center',
+      }}
+    />
+  );
+}
 export function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={`rounded-lg border border-gray-200 bg-white p-5 shadow-sm ${className}`}>

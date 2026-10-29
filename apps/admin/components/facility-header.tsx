@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import type { AdminVenueCategory } from '@/lib/categories';
+import { Icon } from '@/components/icons';
 import { Button, FieldError, Input, Label } from '@/components/ui';
 
 /**
@@ -74,12 +76,22 @@ export function FacilityHeader({ category, onChanged }: { category: AdminVenueCa
 
   return (
     <section className="mb-5 flex flex-col gap-5 rounded-xl border border-gray-200/80 bg-white p-5 shadow-card md:flex-row md:items-start md:justify-between">
-      <div className="min-w-0">
-        <h1 className="text-2xl font-semibold tracking-tight text-gray-900">{category.name}</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          {category.venueCount} venue{category.venueCount === 1 ? '' : 's'} offer this facility. Rule changes apply to new bookings straight away;
-          existing bookings are not touched.
-        </p>
+      <div className="flex min-w-0 items-start gap-3">
+        <Link
+          href="/venue-types"
+          aria-label="Back"
+          title="Back"
+          className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 ring-1 ring-gray-300 transition-colors hover:bg-gray-50 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+        >
+          <Icon name="back" className="h-5 w-5" />
+        </Link>
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">{category.name}</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {category.venueCount} venue{category.venueCount === 1 ? '' : 's'} offer this facility. Rule changes apply to new bookings straight away;
+            existing bookings are not touched.
+          </p>
+        </div>
       </div>
 
       <div className="flex shrink-0 flex-col gap-4 sm:flex-row sm:items-start md:justify-end">
