@@ -119,9 +119,8 @@ describe('Venue-scoped owner staff', () => {
     await staff.post('/venues').send({}).expect(403);
   });
 
-  it('cannot reach payments, refunds, the revenue dashboard or staff admin', async () => {
+  it('cannot reach payments, the revenue dashboard or staff admin', async () => {
     await staff.get('/owner/payments').expect(403);
-    await staff.get('/owner/refunds').expect(403);
     await staff.get('/owner/dashboard/summary').expect(403);
     await staff.get('/owner/staff').expect(403);
     await staff.post('/owner/staff').send({}).expect(403);

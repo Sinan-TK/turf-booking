@@ -148,30 +148,4 @@ export class OwnerPaymentsController {
     if (res) setTotalCount(res, total);
     return rows;
   }
-
-  @Get('refunds')
-  async listRefunds(
-    @CurrentUser() actor: AuthContext,
-    @Query('status') status?: string,
-    @Query('search') search?: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
-    @Res({ passthrough: true }) res?: Response,
-  ) {
-    const page = parsePage(limit, offset);
-    const filters = {
-      organizationId: actor.organizationId!,
-      status: parseEnumFilter(status, Object.values(RefundStatus), 'status'),
-      search: parseSearch(search),
-      range: parseDateRange(from, to),
-    };
-    const [rows, total] = await Promise.all([
-      this.payments.listRefundsForAdmin({ ...filters, ...page }),
-      this.payments.countRefundsForAdmin(filters),
-    ]);
-    if (res) setTotalCount(res, total);
-    return rows;
-  }
 }

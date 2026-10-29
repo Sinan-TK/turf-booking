@@ -103,7 +103,7 @@ test.describe('owner portal: venue-based staff', () => {
     for (const label of ['Dashboard', 'Day view', 'Bookings', 'Walk-in booking', 'Notifications']) {
       await expect(nav.getByRole('link', { name: new RegExp(label + '$') })).toBeVisible();
     }
-    for (const label of ['My Venues', 'Staff', 'Payments', 'Refunds']) {
+    for (const label of ['My Venues', 'Staff', 'Payments']) {
       await expect(nav.getByRole('link', { name: new RegExp(label + '$') })).toHaveCount(0);
     }
 

@@ -53,7 +53,8 @@ test.describe('owner portal: bookings', () => {
     const alice = `PW Alice ${unique()}`;
     const bob = `PW Bob ${unique()}`;
     await walkIn(ownerApi, venue.turfId, day, 9, phoneA, alice);
-    await walkIn(ownerApi, venue.turfId, day, 10, phoneB, bob);
+    // Two hours apart: the Football facility keeps 30 minutes free before and after each booking.
+    await walkIn(ownerApi, venue.turfId, day, 12, phoneB, bob);
 
     await page.goto('/bookings');
     await expect(page.getByRole('heading', { name: 'Bookings', level: 1 })).toBeVisible();
@@ -124,11 +125,10 @@ test.describe('owner portal: bookings', () => {
   });
 });
 
-test.describe('owner portal: payments, refunds, notifications, settings', () => {
-  test('payments and refunds have a search, filters and a table or empty state', async ({ page }) => {
+test.describe('owner portal: payments, notifications, settings', () => {
+  test('payments have a search, filters and a table or empty state', async ({ page }) => {
     for (const [path, heading, status] of [
       ['/payments', 'Payments', 'SUCCESS'],
-      ['/refunds', 'Refunds', 'COMPLETED'],
     ] as const) {
       await page.goto(path);
       await expect(page.getByRole('heading', { name: heading, level: 1 })).toBeVisible();

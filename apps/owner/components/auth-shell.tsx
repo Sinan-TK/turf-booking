@@ -2,7 +2,7 @@ import { SvgIcon, type SvgIconName } from '@/components/svg-icons';
 
 const HIGHLIGHTS: Array<{ icon: SvgIconName; text: string }> = [
   { icon: 'calendar', text: 'Live bookings and availability for every pitch' },
-  { icon: 'card', text: 'Payments and refunds, always reconciled' },
+  { icon: 'card', text: 'Payments and payouts, always reconciled' },
   { icon: 'bell', text: 'Instant alerts when a slot is booked' },
 ];
 

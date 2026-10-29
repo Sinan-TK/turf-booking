@@ -73,7 +73,7 @@ describe('owner portal lists: search, filters and pagination', () => {
     await owner.get('/owner/bookings?offset=-1').expect(400);
   });
 
-  it.each(['/owner/payments', '/owner/refunds'])('%s is paged, filterable and organization-scoped', async (path) => {
+  it.each(['/owner/payments'])('%s is paged, filterable and organization-scoped', async (path) => {
     const res = await owner.get(`${path}?limit=5`).expect(200);
     expect(Array.isArray(res.body)).toBe(true);
     expect(Number(res.headers[TOTAL])).toBeGreaterThanOrEqual(0);
@@ -81,5 +81,9 @@ describe('owner portal lists: search, filters and pagination', () => {
     expect(none.body).toEqual([]);
     expect(Number(none.headers[TOTAL])).toBe(0);
     await owner.get(`${path}?status=NOPE`).expect(400);
+  });
+
+  it('has no separate refunds list: an owner sees a refund on its booking', async () => {
+    await owner.get('/owner/refunds').expect(404);
   });
 });

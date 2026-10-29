@@ -25,7 +25,6 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/notifications', label: 'Notifications', icon: 'notifications', roles: ALL },
   { href: '/earnings', label: 'Earnings', icon: 'account_balance_wallet', roles: ADMIN },
   { href: '/payments', label: 'Payments', icon: 'payments', roles: ADMIN },
-  { href: '/refunds', label: 'Refunds', icon: 'currency_exchange', roles: ADMIN },
   { href: '/audit-log', label: 'Audit log', icon: 'history', roles: ADMIN },
   { href: '/settings', label: 'Settings', icon: 'settings', roles: ALL },
 ];
@@ -46,7 +45,7 @@ export const ROLE_LABEL: Record<OwnerRole, string> = {
 
 /** One sentence on what each role is for, shown on the account page. */
 export const ROLE_SUMMARY: Record<OwnerRole, string> = {
-  OWNER_ADMIN: 'You manage every venue, its prices, your staff, and see earnings, payments and refunds.',
+  OWNER_ADMIN: 'You manage every venue, its prices, your staff, and see earnings and payments.',
   OWNER_STAFF: 'You take and manage bookings at the venues your owner admin assigned to you.',
 };
 
@@ -56,4 +55,4 @@ export const STAFF_CAN = [
   'Take walk-in bookings',
   'Get alerts when a slot is booked',
 ];
-export const STAFF_CANNOT = ['Earnings, payments and refunds', 'Venues, units, prices and closed days', 'Inviting or changing other staff'];
+export const STAFF_CANNOT = ['Earnings and payments', 'Venues, units, prices and closed days', 'Inviting or changing other staff'];

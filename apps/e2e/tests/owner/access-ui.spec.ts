@@ -8,7 +8,7 @@ test.describe('owner portal: owner and staff access, in words', () => {
     await page.goto('/staff');
     await expect(page.getByRole('heading', { name: 'What staff can do' })).toBeVisible();
     await expect(page.getByText('Take walk-in bookings')).toBeVisible();
-    await expect(page.getByText('Earnings, payments and refunds')).toBeVisible();
+    await expect(page.getByText('Earnings and payments')).toBeVisible();
 
     await page.getByLabel('Search staff').fill(staff.email);
     const row = page.getByRole('row').filter({ hasText: staff.email });

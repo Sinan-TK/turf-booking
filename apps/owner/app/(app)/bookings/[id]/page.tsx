@@ -19,7 +19,11 @@ interface Payment {
 interface Refund {
   id: string;
   status: string;
+  /** What the customer had paid online for this booking. */
+  originalAmount: string;
+  originalCurrency: string;
   coinAmountCredited: string;
+  reason: string | null;
   createdAt: string;
 }
 interface BookingDetail {
@@ -222,7 +226,13 @@ export default function BookingDetailPage() {
               <tbody>
                 {booking.refunds.map((r) => (
                   <tr key={r.id} className="border-b border-outline-variant/20 last:border-0">
-                    <td className="py-2">🪙 {r.coinAmountCredited} Coins</td>
+                    <td className="py-2">
+                      <p>🪙 {r.coinAmountCredited} Coins returned to the customer</p>
+                      <p className="text-xs text-on-surface-variant">
+                        Paid online: {formatMoney(r.originalCurrency, r.originalAmount)}
+                        {r.reason ? ` · ${r.reason}` : ''}
+                      </p>
+                    </td>
                     <td className="py-2">
                       <Badge value={r.status} />
                     </td>

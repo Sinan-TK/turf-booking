@@ -21,7 +21,6 @@ test.describe('owner portal: shell and dashboard', () => {
       [/Bookings/, /\/bookings$/, 'Bookings'],
       [/Notifications/, /\/notifications$/, 'Notifications'],
       [/Payments/, /\/payments$/, 'Payments'],
-      [/Refunds/, /\/refunds$/, 'Refunds'],
       [/Settings/, /\/settings$/, 'Settings'],
     ];
     for (const [link, url, heading] of sections) {
