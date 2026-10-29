@@ -6,6 +6,7 @@ import { durationLabel, type AdminVenueCategory } from '@/lib/categories';
 import { Button, ErrorBanner, FieldError, Input, Label, invalidClass } from '@/components/ui';
 import { hasErrors, intError, textError, type FieldErrors } from '@/lib/validation';
 import { Icon } from '@/components/icons';
+import { SaveBar } from '@/components/save-bar';
 
 interface Props {
   /** Present = edit mode (slug is fixed; the booking style locks once venues exist). */
@@ -566,13 +567,14 @@ export function CategoryForm({ initial, onSaved }: Props) {
         )}
 
         {(!editing || dirty) && (
-        <div role="region" aria-label="Unsaved changes" className="sticky bottom-0 z-10 -mx-4 flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50/90 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-xl sm:border sm:bg-white/90 sm:shadow-pop">
-          {editing && !(customRules && problem) && <p className="mr-auto text-xs text-gray-500">You have unsaved changes.</p>}
-          {customRules && problem && <p className="mr-auto text-xs text-red-600">Fix the booking rules to save.</p>}
-          <Button type="submit" loading={submitting}>
-            {submitting ? 'Saving…' : editing ? 'Save changes' : 'Create facility'}
-          </Button>
-        </div>
+          <SaveBar
+            message={customRules && problem ? 'Fix the booking rules to save.' : editing ? 'You have unsaved changes.' : undefined}
+            tone={customRules && problem ? 'error' : 'info'}
+          >
+            <Button type="submit" loading={submitting}>
+              {submitting ? 'Saving…' : editing ? 'Save changes' : 'Create facility'}
+            </Button>
+          </SaveBar>
         )}
       </div>
 

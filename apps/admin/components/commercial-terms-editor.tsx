@@ -11,6 +11,7 @@ import {
   type TermKey,
   type TermSource,
 } from '@/lib/commercial';
+import { SaveBar } from '@/components/save-bar';
 import { Button, ErrorBanner, FieldError, Input, Label, Select, SuccessBanner, invalidClass } from '@/components/ui';
 
 /**
@@ -485,12 +486,11 @@ export function CommercialTermsEditor({
       )}
 
       {dirty && (
-        <div role="region" aria-label="Unsaved changes" className="sticky bottom-0 z-10 flex items-center justify-end gap-3 rounded-lg border border-gray-200 bg-white/95 px-4 py-3 shadow-pop backdrop-blur">
-          <p className="mr-auto text-xs text-gray-500">You have unsaved changes.</p>
+        <SaveBar message="You have unsaved changes.">
           <Button type="button" onClick={submit} loading={saving}>
             Save terms
           </Button>
-        </div>
+        </SaveBar>
       )}
     </div>
   );
