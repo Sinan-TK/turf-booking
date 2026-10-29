@@ -32,3 +32,28 @@
     transform: none;
   }
 }
+
+/*
+ * Thin scrollbars everywhere (the page, tables, dialogs, lists) instead of the browser's wide default. The thumb is a soft grey on a
+ * clear track, so it stays out of the way. Browsers without the standard properties get the same look from the WebKit ones.
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(156 163 175 / 0.7) transparent;
+}
+@supports not (scrollbar-width: thin) {
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: rgb(156 163 175 / 0.7);
+    border-radius: 9999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(107 114 128 / 0.9);
+  }
+}
