@@ -9,7 +9,8 @@ import type { PrismaClient } from '@prisma/client';
  *  - owner logins with an email starting pw- or e2e-, and admin logins with an email starting e2e-,
  *  - customers named "PW …" or "E2E …" or with an email like pw…@example.com.
  *
- * Rows that depend on those (units, bookings, payments, prices, sessions…) go with them. The dependency map is read from the
+ * Rows that depend on those (units, bookings, payments, prices, sessions…) go with them, and so do audit log entries about them
+ * (the log refers to its subject by a plain id, so those are matched by id). The dependency map is read from the
  * database's own foreign keys, so new tables are covered without changing this file. It works from the seeds downwards and never
  * deletes a parent of something it keeps, and it runs in one transaction: any problem leaves everything as it was.
  */
@@ -94,18 +95,27 @@ export async function purgeTestData(prisma: PrismaClient, options: { dryRun?: bo
         );
       }
 
+      // Audit entries about the rows being removed (entityId is a plain string, not a foreign key).
+      const withId = chosen.filter((t) => hasId.has(t));
+      const aboutTest = withId.map((t) => `SELECT id::text FROM ${q(`d_${t}`)}`).join(' UNION ALL ');
       const counts: Record<string, number> = {};
       for (const t of chosen) {
         const n = (await tx.$queryRawUnsafe<Array<{ n: number }>>(`SELECT count(*)::int AS n FROM ${q(`d_${t}`)}`))[0]?.n ?? 0;
         if (n > 0) counts[t] = n;
       }
+      const auditAbout = aboutTest
+        ? (await tx.$queryRawUnsafe<Array<{ n: number }>>(`SELECT count(*)::int AS n FROM audit_logs WHERE "entityId" IN (${aboutTest})`))[0]?.n ?? 0
+        : 0;
       if (!dryRun) {
+        if (auditAbout > 0) await tx.$executeRawUnsafe(`DELETE FROM audit_logs WHERE "entityId" IN (${aboutTest})`);
         // Children first, so nothing is still referenced when its parent goes.
         for (const t of [...chosen].reverse()) {
           // By id where there is one: another table's SET NULL rule can update a row and so move its physical position (ctid).
           if (counts[t]) await tx.$executeRawUnsafe(`DELETE FROM ${q(t)} WHERE ${hasId.has(t) ? 'id IN (SELECT id FROM' : 'ctid IN (SELECT rid FROM'} ${q(`d_${t}`)})`);
         }
       }
+      // Entries that were removed with their actor are already counted under audit_logs; these are the ones about test rows.
+      if (auditAbout > 0) counts.audit_logs = (counts.audit_logs ?? 0) + auditAbout;
       return { tables: counts, total: Object.values(counts).reduce((a, b) => a + b, 0), dryRun };
     },
     { timeout: 300_000, maxWait: 30_000 },
