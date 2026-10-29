@@ -85,6 +85,9 @@ export class VenueCategoriesService {
     if (existing) throw new ConflictException(`A facility with slug ${dto.slug} already exists`);
 
     const category = await this.prisma.client.$transaction(async (tx) => {
+      await this.lockDisplayOrder(tx);
+      const sortOrder = dto.sortOrder ?? (await this.nextDisplayOrder(tx));
+      if (dto.sortOrder !== undefined) await this.assertDisplayOrderFree(tx, sortOrder);
       const created = await tx.venueCategory.create({
         data: {
           slug: dto.slug,
@@ -94,7 +97,7 @@ export class VenueCategoriesService {
           unitLabel: dto.unitLabel,
           venueLabel: dto.venueLabel,
           unitTypes: dto.unitTypes,
-          sortOrder: dto.sortOrder,
+          sortOrder,
           isActive: dto.isActive,
         },
       });
@@ -138,6 +141,11 @@ export class VenueCategoriesService {
 
     await this.prisma.client.$transaction(async (tx) => {
       const { policy, ...fields } = dto;
+      // Only a changed order is checked, so facilities that already share a number can still be saved for other reasons.
+      if (fields.sortOrder !== undefined && fields.sortOrder !== current.sortOrder) {
+        await this.lockDisplayOrder(tx);
+        await this.assertDisplayOrderFree(tx, fields.sortOrder, id);
+      }
       if (Object.keys(fields).length > 0) {
         await tx.venueCategory.update({ where: { id }, data: fields });
       }
@@ -192,6 +200,24 @@ export class VenueCategoriesService {
       metadata: { slug: category.slug },
     });
     return { deleted: true };
+  }
+
+  /** Serializes display-order changes, so two admins can't both take the same number (no database index backs this rule). */
+  private async lockDisplayOrder(tx: Prisma.TransactionClient) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('venue_category_display_order'))`;
+  }
+
+  private async nextDisplayOrder(tx: Prisma.TransactionClient): Promise<number> {
+    const top = await tx.venueCategory.aggregate({ _max: { sortOrder: true } });
+    return (top._max.sortOrder ?? -1) + 1;
+  }
+
+  private async assertDisplayOrderFree(tx: Prisma.TransactionClient, sortOrder: number, exceptId?: string) {
+    const taken = await tx.venueCategory.findFirst({
+      where: { sortOrder, ...(exceptId ? { id: { not: exceptId } } : {}) },
+      select: { name: true },
+    });
+    if (taken) throw new ConflictException(`Display order ${sortOrder} is already used by ${taken.name}. Pick another number.`);
   }
 
   /** Deactivation hides the facility from "add unit" forms and the public list.

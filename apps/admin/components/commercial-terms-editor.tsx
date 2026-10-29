@@ -22,7 +22,7 @@ import { Button, ErrorBanner, FieldError, Input, Label, Select, SuccessBanner, i
  */
 type Mode = 'platform' | 'facility' | 'override';
 
-type Group = 'commission' | 'cap' | 'afterCap' | 'advance' | 'cancellation' | 'cutoff' | 'payout';
+export type Group = 'commission' | 'cap' | 'afterCap' | 'advance' | 'cancellation' | 'cutoff' | 'payout';
 const GROUP_KEYS: Record<Group, TermKey[]> = {
   commission: ['commissionTiers'],
   cap: ['monthlyCommissionCap'],
@@ -203,8 +203,11 @@ export function CommercialTermsEditor({
   sources,
   onSave,
   onRemove,
+  show,
 }: {
   mode: Mode;
+  /** Only these cards are shown (a tab of the facility page). Every group is still saved, with the stored values for the hidden ones. */
+  show?: Group[];
   /** Values set at this level (override mode: null = no deal yet). */
   own: Partial<CommercialTerms> | null;
   /** What applies right now, to prefill and to describe what an unset group inherits. */
@@ -215,6 +218,7 @@ export function CommercialTermsEditor({
   onRemove?: () => Promise<void>;
 }) {
   const groups = mode === 'platform' ? [...FACILITY_GROUPS, 'payout' as Group] : FACILITY_GROUPS;
+  const shown = show ? groups.filter((g) => show.includes(g)) : groups;
   const initialDraft = toDraft({ ...effective, ...(own ?? {}) } as CommercialTerms);
   const [draft, setDraft] = useState<Draft>(initialDraft);
   const [enabled, setEnabled] = useState<Record<Group, boolean>>(() =>
@@ -259,7 +263,7 @@ export function CommercialTermsEditor({
   async function submit() {
     const active = groups.filter((g) => enabled[g]);
     const found: Partial<Record<Group, string>> = {};
-    for (const g of active) {
+    for (const g of active.filter((g) => shown.includes(g))) {
       const message = groupError(g, draft);
       if (message) found[g] = message;
     }
@@ -286,7 +290,7 @@ export function CommercialTermsEditor({
 
   return (
     <div className="space-y-4">
-      {groups.includes('commission') && (
+      {shown.includes('commission') && (
         <GroupCard
           title="Commission"
           hint="What the platform takes from the full price of each played booking, by the venue's booking count in the month. Add a tier to change the rate after a milestone."
@@ -344,21 +348,21 @@ export function CommercialTermsEditor({
       )}
 
       <div className="grid gap-4 md:grid-cols-3">
-        {groups.includes('cap') && (
+        {shown.includes('cap') && (
           <GroupCard title="Monthly cap" hint="Most commission one venue pays for this facility in a month. Empty = no cap." override={override('cap')} error={errors.cap}>
             <Unit unit="₹">
               <Input type="number" min={0} placeholder="No cap" value={draft.monthlyCommissionCap} onChange={(e) => patch({ monthlyCommissionCap: e.target.value })} className={`pr-8 ${errors.cap ? invalidClass : ''}`} aria-label="Monthly commission cap" />
             </Unit>
           </GroupCard>
         )}
-        {groups.includes('afterCap') && (
+        {shown.includes('afterCap') && (
           <GroupCard title="Fee after the cap" hint="Percentage of the amount paid online, charged once the cap is reached." override={override('afterCap')} error={errors.afterCap}>
             <Unit unit="%">
               <Input type="number" min={0} max={100} step="0.01" value={draft.afterCapFeePercent} onChange={(e) => patch({ afterCapFeePercent: e.target.value })} className="pr-8" aria-label="Fee after the cap" />
             </Unit>
           </GroupCard>
         )}
-        {groups.includes('advance') && (
+        {shown.includes('advance') && (
           <GroupCard title="Minimum advance" hint="Paid online, as a percentage of the full price. Commission is taken out of it." override={override('advance')} error={errors.advance}>
             <Unit unit="%">
               <Input type="number" min={0} max={100} step="0.01" value={draft.minAdvancePercent} onChange={(e) => patch({ minAdvancePercent: e.target.value })} className="pr-8" aria-label="Minimum advance" />
@@ -367,7 +371,7 @@ export function CommercialTermsEditor({
         )}
       </div>
 
-      {groups.includes('cancellation') && (
+      {shown.includes('cancellation') && (
         <GroupCard
           title="Cancellation windows"
           hint="A customer who cancels at least this many hours before the start gets the customer share back as coins; the owner share goes to the owner and the rest stays with the platform."
@@ -419,7 +423,7 @@ export function CommercialTermsEditor({
         </GroupCard>
       )}
 
-      {groups.includes('cutoff') && (
+      {shown.includes('cutoff') && (
         <GroupCard title="Cancellation cut-off" hint="Customers can't cancel a paid booking inside this time before the start. Venue staff still can." override={override('cutoff')} error={errors.cutoff}>
           <div className="max-w-xs">
             <Unit unit="minutes">
@@ -429,7 +433,7 @@ export function CommercialTermsEditor({
         </GroupCard>
       )}
 
-      {groups.includes('payout') && (
+      {shown.includes('payout') && (
         <GroupCard title="Owner payouts" hint="Owners are paid once a week for the slots played before this day. Applies to every facility." error={errors.payout}>
           <div className="grid max-w-lg gap-3 sm:grid-cols-2">
             <div>

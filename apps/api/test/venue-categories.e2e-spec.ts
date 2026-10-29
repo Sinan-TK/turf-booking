@@ -290,4 +290,33 @@ describe('Venue categories', () => {
     const reactivated = await adminAgent.post(`/admin/categories/${category.body.id}/activate`);
     expect(reactivated.body.isActive).toBe(true);
   });
+
+  it('gives each facility its own display order: the next free number by default, and a taken one is refused', async () => {
+    const a = await createCategory();
+    const b = await createCategory();
+    expect(a.res.status).toBe(201);
+    expect(b.res.status).toBe(201);
+    expect(b.res.body.sortOrder).toBeGreaterThan(a.res.body.sortOrder);
+
+    // Asking for a number another facility has is a clear 409 that names it, on create and on update.
+    const dupCreate = await createCategory({ sortOrder: a.res.body.sortOrder });
+    expect(dupCreate.res.status).toBe(409);
+    expect(dupCreate.res.body.message).toMatch(new RegExp(`Display order ${a.res.body.sortOrder} is already used by E2E`));
+    const dupUpdate = await adminAgent.patch(`/admin/categories/${b.res.body.id}`).send({ sortOrder: a.res.body.sortOrder });
+    expect(dupUpdate.status).toBe(409);
+
+    // A free number is fine, and so is saving the same number again or changing something else.
+    const free = 80_000 + Math.floor(Math.random() * 10_000);
+    const moved = await adminAgent.patch(`/admin/categories/${b.res.body.id}`).send({ sortOrder: free });
+    expect(moved.status).toBe(200);
+    expect(moved.body.sortOrder).toBe(free);
+    await adminAgent.patch(`/admin/categories/${b.res.body.id}`).send({ sortOrder: free }).expect(200);
+
+    // Facilities that already share a number (older data) can still be saved for other reasons.
+    await prisma.venueCategory.update({ where: { id: b.res.body.id }, data: { sortOrder: a.res.body.sortOrder } });
+    const rename = await adminAgent.patch(`/admin/categories/${b.res.body.id}`).send({ unitLabel: 'Board' });
+    expect(rename.status).toBe(200);
+
+    for (const c of [a, b]) await adminAgent.post(`/admin/categories/${c.res.body.id}/deactivate`);
+  });
 });

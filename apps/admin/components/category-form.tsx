@@ -171,7 +171,7 @@ export function CategoryForm({ initial, onSaved }: Props) {
     iconKey: initial?.iconKey ?? 'category',
     unitLabel: initial?.unitLabel ?? 'Table',
     venueLabel: initial?.venueLabel ?? '',
-    sortOrder: String(initial?.sortOrder ?? 100),
+    sortOrder: initial ? String(initial.sortOrder) : '', // new: empty = the next free number
     isActive: initial?.isActive ?? true,
   });
   const [unitTypes, setUnitTypes] = useState<string[]>(initial?.unitTypes ?? []);
@@ -231,7 +231,7 @@ export function CategoryForm({ initial, onSaved }: Props) {
           : undefined,
       unitLabel: textError(form.unitLabel, 'Unit wording', 1, 40),
       venueLabel: form.venueLabel.trim().length > 60 ? 'Venue wording can be at most 60 characters.' : undefined,
-      sortOrder: intError(form.sortOrder, 'Display order', 0, 100000),
+      sortOrder: !editing && form.sortOrder.trim() === '' ? undefined : intError(form.sortOrder, 'Display order', 0, 100000),
     };
     setErrors(found);
     if (hasErrors(found)) {
@@ -258,7 +258,7 @@ export function CategoryForm({ initial, onSaved }: Props) {
         unitLabel: form.unitLabel.trim(),
         venueLabel: form.venueLabel.trim() || 'Venue',
         unitTypes: types,
-        sortOrder: Number(form.sortOrder) || 0,
+        ...(form.sortOrder.trim() === '' ? {} : { sortOrder: Number(form.sortOrder) }),
         isActive: form.isActive,
         ...(policyPayload ? { policy: policyPayload } : {}),
       };
@@ -267,7 +267,13 @@ export function CategoryForm({ initial, onSaved }: Props) {
         : await api.post<AdminVenueCategory>('/admin/categories', { slug: form.slug.trim(), ...body });
       onSaved(saved);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to save facility');
+      if (err instanceof ApiError && err.status === 409 && /^Display order/.test(err.message)) {
+        // Another facility has this number: say so next to the field, not in the banner.
+        setErrors((p) => ({ ...p, sortOrder: err.message }));
+        document.getElementById('cat-sort-order')?.focus();
+      } else {
+        setError(err instanceof ApiError ? err.message : 'Failed to save facility');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -545,9 +551,9 @@ export function CategoryForm({ initial, onSaved }: Props) {
           />
           <div className="max-w-[12rem]">
             <Label htmlFor="cat-sort-order">Display order</Label>
-            <Input id="cat-sort-order" aria-invalid={!!errors.sortOrder} className={errors.sortOrder ? invalidClass : ''} type="number" min={0} value={form.sortOrder} onChange={(e) => set('sortOrder', e.target.value)} />
+            <Input id="cat-sort-order" aria-invalid={!!errors.sortOrder} className={errors.sortOrder ? invalidClass : ''} type="number" min={0} placeholder={editing ? undefined : 'Next free'} value={form.sortOrder} onChange={(e) => set('sortOrder', e.target.value)} />
             <FieldError id="cat-sort-order-error" message={errors.sortOrder} />
-            <Hint>Lower numbers appear first.</Hint>
+            <Hint>Each facility needs its own number. Lower numbers appear first.{editing ? '' : ' Leave empty to put it last.'}</Hint>
           </div>
         </Section>
 

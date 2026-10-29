@@ -57,7 +57,8 @@ export const createCategorySchema = z.object({
   unitLabel: z.string().trim().min(1).max(40).default('Unit'),
   venueLabel: z.string().trim().min(1).max(60).default('Venue'),
   unitTypes: unitTypes.default([]),
-  sortOrder: z.number().int().min(0).max(100000).default(0),
+  // Where it appears among the facilities (lower first). Omitted on create: the next free number. Each facility has its own.
+  sortOrder: z.number().int().min(0).max(100000).optional(),
   isActive: z.boolean().default(true),
   policy: categoryPolicySchema.optional(),
 });
