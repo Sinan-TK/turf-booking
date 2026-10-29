@@ -257,6 +257,40 @@ function VenuesModal({
 const MAX_VENUE_CHIPS = 3;
 
 /** "Asha Menon" -> "AM". */
+/** A row action as an icon button: the full action (with the person's name) is its accessible name, the short one its tooltip. */
+function IconAction({
+  icon,
+  label,
+  tip,
+  tone = 'neutral',
+  onClick,
+}: {
+  icon: string;
+  label: string;
+  tip: string;
+  tone?: 'neutral' | 'danger' | 'primary';
+  onClick: () => void;
+}) {
+  const tones = {
+    neutral: 'text-on-surface ring-outline-variant/50 hover:bg-surface-container-low',
+    danger: 'text-error ring-error/30 hover:bg-error/5',
+    primary: 'text-primary ring-primary/30 hover:bg-primary/5',
+  };
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={tip}
+      onClick={onClick}
+      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${tones[tone]}`}
+    >
+      <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
+        {icon}
+      </span>
+    </button>
+  );
+}
+
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   return ((parts[0]?.[0] ?? '?') + (parts.length > 1 ? parts[parts.length - 1]![0]! : '')).toUpperCase();
@@ -417,38 +451,27 @@ export default function StaffPage() {
               </td>
               <td className="px-4 py-3">
                 <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    className="rounded-lg px-3 py-1.5 text-sm font-medium text-on-surface ring-1 ring-inset ring-outline-variant/50 transition-colors hover:bg-surface-container-low"
-                    onClick={() => setEditing(s)}
-                  >
-                    Edit venues
-                  </button>
-                  <button
-                    type="button"
-                    className={`rounded-lg px-3 py-1.5 text-sm font-medium ring-1 ring-inset transition-colors ${
-                      s.status === 'ACTIVE'
-                        ? 'text-error ring-error/30 hover:bg-error/5'
-                        : 'text-primary ring-primary/30 hover:bg-primary/5'
-                    }`}
+                  <IconAction icon="edit" label={`Edit venues for ${s.name}`} tip="Edit venues" onClick={() => setEditing(s)} />
+                  <IconAction
+                    icon={s.status === 'ACTIVE' ? 'block' : 'lock_open'}
+                    label={`${s.status === 'ACTIVE' ? 'Disable' : 'Enable'} ${s.name}`}
+                    tip={s.status === 'ACTIVE' ? 'Disable' : 'Enable'}
+                    tone={s.status === 'ACTIVE' ? 'danger' : 'primary'}
                     onClick={() => {
                       setToggleError(null);
                       setToggling(s);
                     }}
-                  >
-                    {s.status === 'ACTIVE' ? 'Disable' : 'Enable'}
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Delete ${s.name}`}
-                    className="rounded-lg px-3 py-1.5 text-sm font-medium text-error ring-1 ring-inset ring-error/30 transition-colors hover:bg-error/5"
+                  />
+                  <IconAction
+                    icon="delete"
+                    label={`Delete ${s.name}`}
+                    tip="Delete"
+                    tone="danger"
                     onClick={() => {
                       setDeleteError(null);
                       setDeleting(s);
                     }}
-                  >
-                    Delete
-                  </button>
+                  />
                 </div>
               </td>
             </tr>
