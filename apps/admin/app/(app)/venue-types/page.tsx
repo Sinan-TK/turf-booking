@@ -190,7 +190,8 @@ export default function VenueTypesPage() {
                   setSort({ key, dir });
                 }}
                 options={[
-                  { value: 'order:asc', label: 'Display order' },
+                  { value: 'order:asc', label: 'Display order (first to last)' },
+                  { value: 'order:desc', label: 'Display order (last to first)' },
                   { value: 'name:asc', label: 'Name A–Z' },
                   { value: 'name:desc', label: 'Name Z–A' },
                   { value: 'venues:desc', label: 'Most venues' },
@@ -231,6 +232,7 @@ export default function VenueTypesPage() {
           <table className="w-full text-left text-sm">
             <thead className="border-b border-gray-200 bg-gray-50/70 text-xs font-medium uppercase tracking-wide text-gray-500">
               <tr>
+                <SortHeader label="Order" k="order" sort={sort} onSort={onSort} />
                 <SortHeader label="Type" k="name" sort={sort} onSort={onSort} />
                 <SortHeader label="Booking style" k="style" sort={sort} onSort={onSort} />
                 <SortHeader label="Starts" k="starts" sort={sort} onSort={onSort} />
@@ -248,6 +250,7 @@ export default function VenueTypesPage() {
                     key={c.id}
                     className={`border-b border-gray-100 last:border-0 transition-colors hover:bg-brand-50/40 ${c.isActive ? '' : 'bg-gray-50/50 text-gray-500'}`}
                   >
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-sm tabular-nums text-gray-500">{c.sortOrder}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <span
