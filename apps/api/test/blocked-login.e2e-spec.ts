@@ -1,0 +1,67 @@
+import type { INestApplication } from '@nestjs/common';
+import { createTestApp } from './setup/test-app';
+import { createOwnerFixture, createStaffFixture, createVenueFixture, loginAsSuperAdmin, prisma, type TestAgent } from './setup/fixtures';
+
+/**
+ * A login that is blocked stops working at once, even though the access token it already holds has minutes left to live:
+ * the guard checks the account on every request, not only when the token is issued.
+ */
+describe('Blocked logins stop working immediately', () => {
+  let app: INestApplication;
+  let admin: TestAgent;
+  let owner: TestAgent;
+  let organizationId: string;
+  let staff: TestAgent;
+  let staffId: string;
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    admin = await loginAsSuperAdmin(app);
+    const fx = await createOwnerFixture(app, admin);
+    owner = fx.ownerAgent;
+    organizationId = fx.organizationId;
+    const venue = await createVenueFixture(app, owner, admin);
+    ({ agent: staff, staffId } = await createStaffFixture(app, organizationId, [venue.venueId]));
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  test('a staff member the owner blocks is refused straight away, and works again once enabled', async () => {
+    await staff.get('/owner/bookings').expect(200);
+
+    await owner.patch(`/owner/staff/${staffId}/status`).send({ status: 'DISABLED' }).expect(200);
+    const refused = await staff.get('/owner/bookings');
+    expect(refused.status).toBe(401);
+    expect(refused.body.message).toMatch(/no longer active/);
+    await staff.get('/auth/owner/me').expect(401);
+
+    await owner.patch(`/owner/staff/${staffId}/status`).send({ status: 'ACTIVE' }).expect(200);
+    await staff.get('/owner/bookings').expect(200); // the same token, now that the login is active again
+  });
+
+  test('a staff member whose role changes must sign in again', async () => {
+    await staff.get('/owner/bookings').expect(200);
+    await prisma.venueOwnerUser.update({ where: { id: staffId }, data: { role: 'OWNER_ADMIN' } });
+    await staff.get('/owner/bookings').expect(401); // the token still says staff
+    await prisma.venueOwnerUser.update({ where: { id: staffId }, data: { role: 'OWNER_STAFF' } });
+    await staff.get('/owner/bookings').expect(200);
+  });
+
+  test('suspending the organisation stops its owner and staff, and reinstating brings them back', async () => {
+    await owner.get('/owner/bookings').expect(200);
+    await admin.patch(`/admin/organizations/${organizationId}/status`).send({ status: 'SUSPENDED', reason: 'test' }).expect(200);
+    await owner.get('/owner/bookings').expect(401);
+    await staff.get('/owner/bookings').expect(401);
+    await admin.patch(`/admin/organizations/${organizationId}/status`).send({ status: 'ACTIVE' }).expect(200);
+    await owner.get('/owner/bookings').expect(200);
+  });
+
+  test('a removed login cannot act at all', async () => {
+    const extra = await createStaffFixture(app, organizationId, []);
+    await extra.agent.get('/owner/bookings').expect(200);
+    await prisma.venueOwnerUser.delete({ where: { id: extra.staffId } });
+    await extra.agent.get('/owner/bookings').expect(401);
+  });
+});

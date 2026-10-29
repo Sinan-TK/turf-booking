@@ -138,6 +138,22 @@ test.describe('owner portal: venue-based staff', () => {
     await expect(page.getByText('PW Mine Guest')).toHaveCount(0);
   });
 
+  test('a staff member the owner blocks is signed out at once, not when their session runs out', async ({ page, ownerApi, venue }) => {
+    const staff = await createStaff(ownerApi, [venue.id], 'Blocked');
+    await signIn(page, staff.email, staff.password);
+    await expect(page).toHaveURL(/\/dashboard$/);
+
+    // The owner blocks them while they are signed in and the portal is open.
+    const blocked = await ownerApi.patch(`/owner/staff/${staff.id}/status`, { data: { status: 'DISABLED' } });
+    expect(blocked.ok(), await blocked.text()).toBeTruthy();
+
+    // Their very next move in the portal ends at the sign-in page, instead of carrying on with a session that should be gone.
+    await page.getByRole('navigation').getByRole('link', { name: /Bookings$/ }).click();
+    await expect(page).toHaveURL(/\/login$/);
+    await signIn(page, staff.email, staff.password);
+    await expect(page).toHaveURL(/\/login$/); // and they cannot sign back in
+  });
+
   test('staff with a single venue skip the chooser', async ({ page, ownerApi, venue }) => {
     const staff = await createStaff(ownerApi, [venue.id], 'Solo');
     await signIn(page, staff.email, staff.password);

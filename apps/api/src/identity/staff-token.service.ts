@@ -5,6 +5,7 @@ import { loadEnv } from '@venue/config';
 import { Role } from '@venue/shared';
 import type { OwnerUserRole } from '@venue/shared';
 import type { AuthContext } from '../auth/auth.types';
+import { PrismaService } from '../prisma/prisma.service';
 
 const ISSUER = 'turf-booking-api';
 const AUDIENCE = 'venue-staff';
@@ -18,12 +19,14 @@ interface StaffAccessPayload {
 
 /**
  * Admin/owner credentials plumbing: short-lived HS256 access JWTs (claims
- * = role + ids, so AuthGuard authorizes without a DB hit) and opaque
+ * = role + ids, so AuthGuard reads who and which role from them, then confirms the account is still active) and opaque
  * random tokens (refresh, invite, password-reset) of which only the sha256
  * is ever stored.
  */
 @Injectable()
 export class StaffTokenService {
+  constructor(private readonly prisma: PrismaService) {}
+
   private key() {
     return new TextEncoder().encode(loadEnv().AUTH_JWT_SECRET);
   }
@@ -72,6 +75,33 @@ export class StaffTokenService {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Whether the person behind a verified access token may still act: their login is active (and, for an owner, so is their
+   * organisation), and an owner's role is still the one in the token. A token is only a signed claim that lives for minutes, so
+   * without this a login that was blocked, an organisation that was suspended, or a staff member who was demoted would keep
+   * working until the token ran out. One lookup by primary key per request.
+   */
+  async isStillActive(ctx: AuthContext): Promise<boolean> {
+    if (ctx.role === Role.SUPER_ADMIN) {
+      const admin = await this.prisma.client.adminUser.findUnique({ where: { id: ctx.id }, select: { status: true } });
+      return admin?.status === 'ACTIVE';
+    }
+    if (ctx.role === Role.VENUE_OWNER) {
+      const user = await this.prisma.client.venueOwnerUser.findUnique({
+        where: { id: ctx.id },
+        select: { status: true, role: true, organizationId: true, organization: { select: { status: true } } },
+      });
+      return (
+        !!user &&
+        user.status === 'ACTIVE' &&
+        user.organization.status === 'ACTIVE' &&
+        user.organizationId === ctx.organizationId &&
+        user.role === ctx.ownerRole
+      );
+    }
+    return false;
   }
 
   generateOpaqueToken(): { raw: string; hash: string } {

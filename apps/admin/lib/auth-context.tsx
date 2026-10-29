@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { api } from './api';
+import { api, onSessionEnded } from './api';
 
 interface AdminUser {
   role: 'SUPER_ADMIN';
@@ -40,6 +40,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     syncUser().finally(() => setLoading(false));
   }, [syncUser]);
+
+  // If the API stops accepting the session while the portal is open (the login was blocked, or the session expired for good),
+  // forget the user: the layout then sends them to the sign-in page instead of showing errors.
+  useEffect(() => {
+    onSessionEnded(() => setUser(null));
+    return () => onSessionEnded(null);
+  }, []);
 
   const login = useCallback(
     async (email: string, password: string) => {

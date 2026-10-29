@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { api } from './api';
+import { api, onSessionEnded } from './api';
 
 export interface OwnerVenue {
   id: string;
@@ -72,6 +72,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     syncUser().finally(() => setLoading(false));
   }, [syncUser]);
+
+  // If the API stops accepting the session while the portal is open (the login was blocked, the organisation suspended, or the
+  // session expired for good), forget the user: the layout then sends them to the sign-in page instead of showing errors.
+  useEffect(() => {
+    onSessionEnded(() => {
+      setUser(null);
+      setChosenVenueId(null);
+    });
+    return () => onSessionEnded(null);
+  }, []);
 
   const isStaff = user?.ownerRole === 'OWNER_STAFF';
 

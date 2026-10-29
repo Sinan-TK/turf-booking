@@ -9,8 +9,8 @@ import { CUSTOMER_SESSION_COOKIE, STAFF_COOKIES } from '../auth.constants';
 
 /**
  * Single guard for all three identity types (ARCHITECTURE.md §12):
- * a self-issued HS256 access JWT for admin/owner — verified locally and
- * stateless, no DB lookup — and a server-side session lookup for customer
+ * a self-issued HS256 access JWT for admin/owner —
+ * verified locally, then checked against the account so a blocked login stops at once — and a server-side session lookup for customer
  * (cookie). Populates `request.authContext` uniformly so downstream code —
  * RolesGuard, @CurrentUser, every scoped service method — never has to
  * know which mechanism authenticated the caller.
@@ -44,6 +44,11 @@ export class AuthGuard implements CanActivate {
       for (const token of this.staffTokenCandidates(request)) {
         const authContext = await this.staffTokens.verifyAccessToken(token);
         if (authContext) {
+          // A valid token is not enough: a login that was blocked (or whose organisation was suspended, or whose role changed)
+          // is refused straight away, not when the token happens to expire. The portals answer a 401 by signing the person out.
+          if (!(await this.staffTokens.isStillActive(authContext))) {
+            throw new UnauthorizedException('This login is no longer active');
+          }
           request.authContext = authContext;
           return true;
         }

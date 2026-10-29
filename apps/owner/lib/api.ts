@@ -32,7 +32,14 @@ function refreshSession(): Promise<boolean> {
   return refreshing;
 }
 
-const NO_REFRESH_PATH = /\/(login|refresh|logout|forgot-password|reset-password)$/;
+let sessionEnded: (() => void) | null = null;
+
+/** The app's reaction to "you are no longer signed in" (a request refused even after a refresh). Pass null to remove it. */
+export function onSessionEnded(handler: (() => void) | null): void {
+  sessionEnded = handler;
+}
+
+const NO_REFRESH_PATH =/\/(login|refresh|logout|forgot-password|reset-password)$/;
 
 function send(path: string, options: RequestInit): Promise<Response> {
   return fetch(`${API_URL}${path}`, {
@@ -52,8 +59,10 @@ async function request<T>(
   onResponse?: (res: Response) => void,
 ): Promise<T> {
   let res = await send(path, options);
-  if (res.status === 401 && !NO_REFRESH_PATH.test(path) && (await refreshSession())) {
-    res = await send(path, options);
+  if (res.status === 401 && !NO_REFRESH_PATH.test(path)) {
+    if (await refreshSession()) res = await send(path, options);
+    // Still refused after a refresh: the login was blocked, or the session ended. Tell the app, which sends the person to sign in.
+    if (res.status === 401) sessionEnded?.();
   }
 
   onResponse?.(res);

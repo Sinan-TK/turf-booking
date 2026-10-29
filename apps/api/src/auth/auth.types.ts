@@ -5,7 +5,7 @@ import type { OwnerUserRole, Role } from '@venue/shared';
  * service method takes as its mandatory first argument (ARCHITECTURE.md
  * §12 — ownership is never implied by role alone). For SUPER_ADMIN/
  * VENUE_OWNER, derived straight from the verified access JWT's claims
- * (see identity/staff-token.service.ts) — no DB lookup.
+ * (see identity/staff-token.service.ts) — the claims say who and which role; the guard then confirms the login is still active (StaffTokenService.isStillActive).
  */
 export interface AuthContext {
   role: Role;
