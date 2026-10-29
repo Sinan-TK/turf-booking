@@ -45,7 +45,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <p className="text-sm font-semibold text-gray-900">Venue Booking</p>
       </header>
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <main className="min-w-0 flex-1 overflow-x-auto p-4 sm:p-6 lg:px-8 lg:py-8">
+      <main className="min-w-0 flex-1 overflow-x-clip p-4 sm:p-6 lg:px-8 lg:py-8">
         <div className="w-full">{children}</div>
       </main>
     </div>

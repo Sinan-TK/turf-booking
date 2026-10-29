@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { durationLabel, type AdminVenueCategory } from '@/lib/categories';
 import { Button, ErrorBanner, FieldError, Input, Label, invalidClass } from '@/components/ui';
@@ -183,6 +183,11 @@ export function CategoryForm({ initial, onSaved }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldErrors<keyof typeof form>>({});
   const [submitting, setSubmitting] = useState(false);
+  // What was last saved (or loaded), so the save bar only appears once something in the form differs from it.
+  const snapshot = JSON.stringify({ form, unitTypes, unitTypeDraft, customRules, policy });
+  const [baseline, setBaseline] = useState<string | null>(null);
+  useEffect(() => setBaseline((b) => b ?? snapshot), []);
+  const dirty = baseline !== null && snapshot !== baseline;
 
   const { problem, durations } = useMemo(() => validatePolicy(policy), [policy]);
   const lockedMode = editing && (initial?.venueCount ?? 0) > 0;
@@ -231,7 +236,7 @@ export function CategoryForm({ initial, onSaved }: Props) {
           : undefined,
       unitLabel: textError(form.unitLabel, 'Unit wording', 1, 40),
       venueLabel: form.venueLabel.trim().length > 60 ? 'Venue wording can be at most 60 characters.' : undefined,
-      sortOrder: !editing && form.sortOrder.trim() === '' ? undefined : intError(form.sortOrder, 'Display order', 0, 100000),
+      sortOrder: editing || form.sortOrder.trim() === '' ? undefined : intError(form.sortOrder, 'Display order', 0, 100000),
     };
     setErrors(found);
     if (hasErrors(found)) {
@@ -258,13 +263,14 @@ export function CategoryForm({ initial, onSaved }: Props) {
         unitLabel: form.unitLabel.trim(),
         venueLabel: form.venueLabel.trim() || 'Venue',
         unitTypes: types,
-        ...(form.sortOrder.trim() === '' ? {} : { sortOrder: Number(form.sortOrder) }),
-        isActive: form.isActive,
+        // An existing facility's status and display order are changed in the page header, so saving here never overwrites them.
+        ...(editing ? {} : { isActive: form.isActive, ...(form.sortOrder.trim() === '' ? {} : { sortOrder: Number(form.sortOrder) }) }),
         ...(policyPayload ? { policy: policyPayload } : {}),
       };
       const saved = editing
         ? await api.patch<AdminVenueCategory>(`/admin/categories/${initial!.id}`, body)
         : await api.post<AdminVenueCategory>('/admin/categories', { slug: form.slug.trim(), ...body });
+      setBaseline(snapshot);
       onSaved(saved);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409 && /^Display order/.test(err.message)) {
@@ -542,27 +548,32 @@ export function CategoryForm({ initial, onSaved }: Props) {
           ) : null}
         </Section>
 
-        <Section step={5} title="Visibility">
-          <Switch
-            checked={form.isActive}
-            onChange={(v) => set('isActive', v)}
-            label="Active"
-            hint="Customers can see it and owners can pick it when adding a venue."
-          />
-          <div className="max-w-[12rem]">
-            <Label htmlFor="cat-sort-order">Display order</Label>
-            <Input id="cat-sort-order" aria-invalid={!!errors.sortOrder} className={errors.sortOrder ? invalidClass : ''} type="number" min={0} placeholder={editing ? undefined : 'Next free'} value={form.sortOrder} onChange={(e) => set('sortOrder', e.target.value)} />
-            <FieldError id="cat-sort-order-error" message={errors.sortOrder} />
-            <Hint>Each facility needs its own number. Lower numbers appear first.{editing ? '' : ' Leave empty to put it last.'}</Hint>
-          </div>
-        </Section>
+        {!editing && (
+          <Section step={5} title="Visibility">
+            <Switch
+              checked={form.isActive}
+              onChange={(v) => set('isActive', v)}
+              label="Active"
+              hint="Customers can see it and owners can pick it when adding a venue."
+            />
+            <div className="max-w-[12rem]">
+              <Label htmlFor="cat-sort-order">Display order</Label>
+              <Input id="cat-sort-order" aria-invalid={!!errors.sortOrder} className={errors.sortOrder ? invalidClass : ''} type="number" min={0} placeholder={editing ? undefined : 'Next free'} value={form.sortOrder} onChange={(e) => set('sortOrder', e.target.value)} />
+              <FieldError id="cat-sort-order-error" message={errors.sortOrder} />
+              <Hint>Each facility needs its own number. Lower numbers appear first.{editing ? '' : ' Leave empty to put it last.'}</Hint>
+            </div>
+          </Section>
+        )}
 
-        <div className="sticky bottom-0 -mx-4 flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50/90 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-xl sm:border sm:bg-white/90">
+        {(!editing || dirty) && (
+        <div role="region" aria-label="Unsaved changes" className="sticky bottom-0 z-10 -mx-4 flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50/90 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-xl sm:border sm:bg-white/90 sm:shadow-pop">
+          {editing && !(customRules && problem) && <p className="mr-auto text-xs text-gray-500">You have unsaved changes.</p>}
           {customRules && problem && <p className="mr-auto text-xs text-red-600">Fix the booking rules to save.</p>}
           <Button type="submit" loading={submitting}>
             {submitting ? 'Saving…' : editing ? 'Save changes' : 'Create facility'}
           </Button>
         </div>
+        )}
       </div>
 
       {/* Live preview — what customers will see. */}
@@ -624,9 +635,11 @@ export function CategoryForm({ initial, onSaved }: Props) {
             )}
           </div>
         </div>
-        <p className="text-xs text-gray-400">
-          {form.isActive ? 'Visible to customers once saved.' : 'Hidden from customers until activated.'}
-        </p>
+        {!editing && (
+          <p className="text-xs text-gray-400">
+            {form.isActive ? 'Visible to customers once saved.' : 'Hidden from customers until activated.'}
+          </p>
+        )}
       </aside>
     </form>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ApiError } from '@/lib/api';
 import {
   WEEKDAYS,
@@ -230,6 +230,11 @@ export function CommercialTermsEditor({
   const [saving, setSaving] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  // What was last saved (or loaded), so the save bar only appears once something differs from it.
+  const snapshot = JSON.stringify({ draft, enabled });
+  const [baseline, setBaseline] = useState<string | null>(null);
+  useEffect(() => setBaseline((b) => b ?? snapshot), []);
+  const dirty = baseline !== null && snapshot !== baseline;
 
   const patch = (p: Partial<Draft>) => {
     setDraft((d) => ({ ...d, ...p }));
@@ -274,6 +279,7 @@ export function CommercialTermsEditor({
     setSaving(true);
     try {
       await onSave(body);
+      setBaseline(snapshot);
       setSaved(true);
     } catch (err) {
       setApiError(err instanceof ApiError ? err.message : 'Could not save');
@@ -456,11 +462,8 @@ export function CommercialTermsEditor({
 
       {apiError && <ErrorBanner message={apiError} />}
       {saved && <SuccessBanner message="Saved. New bookings use these terms; existing bookings keep the terms they were made under." />}
-      <div className="flex items-center gap-3">
-        <Button type="button" onClick={submit} loading={saving}>
-          Save terms
-        </Button>
-        {mode === 'override' && onRemove && own && (
+      {mode === 'override' && onRemove && own && (
+        <div className="flex items-center gap-3">
           <Button
             type="button"
             variant="secondary"
@@ -478,8 +481,17 @@ export function CommercialTermsEditor({
           >
             Remove this venue's deal
           </Button>
-        )}
-      </div>
+        </div>
+      )}
+
+      {dirty && (
+        <div role="region" aria-label="Unsaved changes" className="sticky bottom-0 z-10 flex items-center justify-end gap-3 rounded-lg border border-gray-200 bg-white/95 px-4 py-3 shadow-pop backdrop-blur">
+          <p className="mr-auto text-xs text-gray-500">You have unsaved changes.</p>
+          <Button type="button" onClick={submit} loading={saving}>
+            Save terms
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useFetch } from '@/lib/use-fetch';
 import type { AdminVenueCategory } from '@/lib/categories';
-import { ErrorBanner, PageHeader, SkeletonDetailCard, SuccessBanner } from '@/components/ui';
+import { ErrorBanner, SkeletonDetailCard, SuccessBanner } from '@/components/ui';
+import { FacilityHeader } from '@/components/facility-header';
 import { CategoryForm } from '@/components/category-form';
 import { FacilityTermsSection } from '@/components/facility-terms-section';
 
@@ -19,7 +20,7 @@ const TABS: Array<{ key: Tab; label: string }> = [
 export default function EditVenueTypePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { data, error, loading } = useFetch<AdminVenueCategory>(`/admin/categories/${id}`);
+  const { data, error, loading, refetch } = useFetch<AdminVenueCategory>(`/admin/categories/${id}`);
   const [saved, setSaved] = useState(false);
   const [tab, setTab] = useState<Tab>('info');
 
@@ -38,7 +39,7 @@ export default function EditVenueTypePage() {
     window.history.replaceState(null, '', url);
   };
 
-  if (loading) return <SkeletonDetailCard fields={6} />;
+  if (loading && !data) return <SkeletonDetailCard fields={6} />; // a refetch after a change keeps the page as it is
   if (error) return <ErrorBanner message={error} />;
   if (!data) return null;
 
@@ -47,10 +48,7 @@ export default function EditVenueTypePage() {
       <Link href="/venue-types" className="mb-3 inline-block text-sm text-gray-500 hover:text-gray-800">
         ← Facilities
       </Link>
-      <PageHeader
-        title={data.name}
-        subtitle={`${data.venueCount} venue${data.venueCount === 1 ? '' : 's'} offer this facility. Rule changes apply to new bookings straight away; existing bookings are not touched.`}
-      />
+      <FacilityHeader category={data} onChanged={refetch} />
 
       <div role="tablist" aria-label="Facility sections" className="mb-5 flex gap-1 border-b border-gray-200">
         {TABS.map((t) => (

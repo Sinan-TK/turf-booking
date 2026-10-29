@@ -32,7 +32,9 @@ test.describe('admin: commercial terms', () => {
     await expect(page).toHaveURL(/[?&]tab=commission/);
     await expect(page.getByRole('heading', { name: 'Commission', level: 2 })).toBeVisible();
     await expect(page.getByLabel('Cancellation cut-off in minutes')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Save terms' })).toHaveCount(0); // nothing changed yet
     await page.getByLabel('Minimum advance').fill('40');
+    await expect(page.getByRole('button', { name: 'Save terms' })).toBeVisible();
     await page.getByLabel('Monthly commission cap').fill('1500');
     await page.getByRole('button', { name: 'Add a tier' }).click();
     await page.getByLabel('Tier 2 starts at booking').fill('30');
@@ -71,7 +73,7 @@ test.describe('admin: commercial terms', () => {
     expect(terms.terms.cancelCutoffMinutes).toBe(90);
   });
 
-  test('a facility display order is its own: a number another facility has is refused next to the field', async ({ page, adminApi }) => {
+  test('a facility display order is its own: a number another facility has is refused in the header', async ({ page, adminApi }) => {
     const make = async (extra: Record<string, unknown> = {}) => {
       const slug = `PW_${unique().toUpperCase()}`;
       const res = await adminApi.post('/admin/categories', {
@@ -85,14 +87,53 @@ test.describe('admin: commercial terms', () => {
     expect(b.sortOrder).toBeGreaterThan(a.sortOrder); // a new facility takes the next free number
 
     await page.goto(`/venue-types/${b.id}`);
-    await page.getByLabel('Display order').fill(String(a.sortOrder));
-    await page.getByRole('button', { name: 'Save changes' }).click();
-    await expect(page.getByText(new RegExp(`Display order ${a.sortOrder} is already used by PW Order`))).toBeVisible();
-    await expect(page.getByLabel('Display order')).toBeFocused();
+    const header = page.locator('section').filter({ has: page.getByRole('heading', { level: 1 }) }).first();
+    // The Info form no longer has these two: they live in the header section, on the right.
+    await expect(page.getByRole('heading', { name: 'Visibility' })).toHaveCount(0);
 
-    await page.getByLabel('Display order').fill(String(b.sortOrder));
+    await header.getByLabel('Display order').fill(String(a.sortOrder));
+    await header.getByRole('button', { name: 'Save' }).click();
+    await expect(header.getByText(new RegExp(`Display order ${a.sortOrder} is already used by PW Order`))).toBeVisible();
+
+    const free = 70_000 + Math.floor(Math.random() * 9_000);
+    await header.getByLabel('Display order').fill(String(free));
+    await header.getByRole('button', { name: 'Save' }).click();
+    await expect
+      .poll(async () => ((await (await adminApi.get(`/admin/categories/${b.id}`)).json()) as { sortOrder: number }).sortOrder)
+      .toBe(free);
+    await expect(header.getByRole('button', { name: 'Save' })).toBeDisabled(); // saved: nothing left to save
+  });
+
+  test('a facility is switched active or inactive from the header, and saving the Info tab does not undo it', async ({ page, adminApi }) => {
+    const slug = `PW_${unique().toUpperCase()}`;
+    const res = await adminApi.post('/admin/categories', {
+      data: { slug, name: `PW Status ${slug}`, defaultAllocationMode: 'EXCLUSIVE', iconKey: 'category', unitLabel: 'Unit', venueLabel: 'Venue', unitTypes: [] },
+    });
+    expect(res.ok(), await res.text()).toBeTruthy();
+    const { id } = (await res.json()) as { id: string };
+    const isActive = async () => ((await (await adminApi.get(`/admin/categories/${id}`)).json()) as { isActive: boolean }).isActive;
+
+    await page.goto(`/venue-types/${id}`);
+    const status = page.getByRole('switch', { name: 'Active' });
+    await expect(status).toHaveAttribute('aria-checked', 'true');
+    await status.click();
+    await expect(status).toHaveAttribute('aria-checked', 'false');
+    await expect(page.getByText('Inactive', { exact: true })).toBeVisible();
+    expect(await isActive()).toBe(false);
+
+    // Saving the Info form (opened before the change was made, so it holds the old value) leaves the status alone.
+    // The save bar is not there until something in the form changes.
+    await expect(page.getByRole('button', { name: 'Save changes' })).toHaveCount(0);
+    await page.getByLabel('One bookable unit is a…').fill('Board');
+    await expect(page.getByText('You have unsaved changes.')).toBeVisible();
     await page.getByRole('button', { name: 'Save changes' }).click();
     await expect(page.getByText('Facility saved.')).toBeVisible();
+    expect(await isActive()).toBe(false);
+    await expect(page.getByRole('button', { name: 'Save changes' })).toHaveCount(0); // saved: the bar goes away again
+
+    await status.click();
+    await expect(status).toHaveAttribute('aria-checked', 'true');
+    expect(await isActive()).toBe(true);
   });
 
   test('a venue can have its own deal for one facility; everything else keeps following the facility', async ({ page, venue, adminApi }) => {
