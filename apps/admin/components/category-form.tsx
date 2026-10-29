@@ -412,7 +412,10 @@ export function CategoryForm({ initial, onSaved }: Props) {
                   aria-describedby="cat-icon-svg-hint"
                   placeholder={'<svg viewBox="0 0 24 24"><path d="…"/></svg>'}
                   value={iconSvgText}
-                  onChange={(e) => setIconSvgText(e.target.value)}
+                  onChange={(e) => {
+                    setIconSvgText(e.target.value);
+                    setError(null); // an earlier "can't be used" message is out of date once it is edited
+                  }}
                   className={`min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 font-mono text-xs text-gray-800 shadow-sm focus:outline-none focus-visible:ring-4 ${
                     svgProblem ? 'border-red-400 focus-visible:ring-red-500/15' : 'border-gray-300 focus-visible:border-brand-500 focus-visible:ring-brand-500/15'
                   }`}
