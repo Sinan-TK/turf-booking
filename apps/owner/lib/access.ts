@@ -26,6 +26,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/earnings', label: 'Earnings', icon: 'account_balance_wallet', roles: ADMIN },
   { href: '/payments', label: 'Payments', icon: 'payments', roles: ADMIN },
   { href: '/refunds', label: 'Refunds', icon: 'currency_exchange', roles: ADMIN },
+  { href: '/audit-log', label: 'Audit log', icon: 'history', roles: ADMIN },
   { href: '/settings', label: 'Settings', icon: 'settings', roles: ALL },
 ];
 

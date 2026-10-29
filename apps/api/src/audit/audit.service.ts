@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthContext } from '../auth/auth.types';
-import type { AuditActorType, Prisma } from '@venue/database';
+import { Prisma, type AuditActorType } from '@venue/database';
 import { contains, dateWhere, type DateRange } from '../common/list-filters';
 
 /**
@@ -117,5 +117,105 @@ export class AuditService {
       this.prisma.client.auditLog.findMany({ distinct: ['action'], select: { action: true }, orderBy: { action: 'asc' } }),
     ]);
     return { entityTypes: entityTypes.map((e) => e.entityType), actions: actions.map((a) => a.action) };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Reading (an owner's own audit log)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * What belongs to one organisation: what its own logins did, and everything done to its venues, units, bookings, refunds,
+   * payouts, logins and the organisation itself, by anyone. The log refers to its subject by a plain id, so each kind is matched
+   * through the table it points at.
+   */
+  private ownerScope(organizationId: string): Prisma.Sql {
+    const org = Prisma.sql`${organizationId}::uuid`;
+    return Prisma.sql`(
+      a."actorOwnerUserId" IN (SELECT id FROM venue_owner_users WHERE "organizationId" = ${org})
+      OR (a."entityType" = 'OwnerOrganization' AND a."entityId" = ${organizationId})
+      OR (a."entityType" = 'VenueOwnerUser' AND a."entityId" IN (SELECT id::text FROM venue_owner_users WHERE "organizationId" = ${org}))
+      OR (a."entityType" = 'Venue' AND a."entityId" IN (SELECT id::text FROM venues WHERE "organizationId" = ${org}))
+      OR (a."entityType" = 'Turf' AND a."entityId" IN (SELECT r.id::text FROM resources r JOIN venues v ON v.id = r."venueId" WHERE v."organizationId" = ${org}))
+      OR (a."entityType" = 'Booking' AND a."entityId" IN (SELECT b.id::text FROM bookings b JOIN venues v ON v.id = b."venueId" WHERE v."organizationId" = ${org}))
+      OR (a."entityType" = 'Refund' AND a."entityId" IN (SELECT f.id::text FROM refunds f JOIN bookings b ON b.id = f."bookingId" JOIN venues v ON v.id = b."venueId" WHERE v."organizationId" = ${org}))
+      OR (a."entityType" = 'Payout' AND a."entityId" IN (SELECT id::text FROM payouts WHERE "organizationId" = ${org}))
+    )`;
+  }
+
+  private ownerWhere(
+    organizationId: string,
+    f: { q?: string; actorType?: AuditActorType; entityType?: string; action?: string; range?: DateRange },
+  ): Prisma.Sql {
+    const parts: Prisma.Sql[] = [this.ownerScope(organizationId)];
+    if (f.actorType) parts.push(Prisma.sql`a."actorType" = ${f.actorType}::"AuditActorType"`);
+    if (f.entityType) parts.push(Prisma.sql`a."entityType" = ${f.entityType}`);
+    if (f.action) parts.push(Prisma.sql`a.action = ${f.action}`);
+    if (f.range?.from) parts.push(Prisma.sql`a."createdAt" >= ${f.range.from}`);
+    if (f.range?.to) parts.push(Prisma.sql`a."createdAt" < ${f.range.to}`);
+    if (f.q) {
+      const like = `%${f.q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+      parts.push(Prisma.sql`(
+        a.action ILIKE ${like} OR a."entityType" ILIKE ${like} OR a."entityId" ILIKE ${like}
+        OR a."actorOwnerUserId" IN (SELECT id FROM venue_owner_users WHERE "organizationId" = ${organizationId}::uuid AND (email ILIKE ${like} OR name ILIKE ${like}))
+      )`);
+    }
+    return Prisma.join(parts, ' AND ');
+  }
+
+  async countForOrganization(organizationId: string, f: Parameters<AuditService['ownerWhere']>[1]): Promise<number> {
+    const rows = await this.prisma.client.$queryRaw<Array<{ n: number }>>(
+      Prisma.sql`SELECT count(*)::int AS n FROM audit_logs a WHERE ${this.ownerWhere(organizationId, f)}`,
+    );
+    return rows[0]?.n ?? 0;
+  }
+
+  /**
+   * One page of an organisation's log. Its own people are named; anything done by the platform team, a customer or the system is
+   * shown only as that, with no name, address, IP or recorded details, because those belong to someone else.
+   */
+  async listForOrganization(organizationId: string, f: Parameters<AuditService['ownerWhere']>[1] & { limit: number; offset: number }) {
+    const rows = await this.prisma.client.$queryRaw<
+      Array<{
+        id: string;
+        createdAt: Date;
+        actorType: AuditActorType;
+        actorOwnerUserId: string | null;
+        action: string;
+        entityType: string;
+        entityId: string;
+        metadata: Prisma.JsonValue | null;
+      }>
+    >(
+      Prisma.sql`SELECT a.id, a."createdAt", a."actorType", a."actorOwnerUserId", a.action, a."entityType", a."entityId", a.metadata
+        FROM audit_logs a WHERE ${this.ownerWhere(organizationId, f)}
+        ORDER BY a."createdAt" DESC, a.id DESC LIMIT ${f.limit} OFFSET ${f.offset}`,
+    );
+    const ids = [...new Set(rows.map((r) => r.actorOwnerUserId).filter((id): id is string => !!id))];
+    const people = ids.length
+      ? await this.prisma.client.venueOwnerUser.findMany({ where: { id: { in: ids }, organizationId }, select: { id: true, name: true, email: true, role: true } })
+      : [];
+    const byId = new Map(people.map((p) => [p.id, p]));
+    return rows.map((r) => {
+      const own = r.actorType === 'OWNER' && r.actorOwnerUserId ? byId.get(r.actorOwnerUserId) : undefined;
+      return {
+        id: r.id,
+        createdAt: r.createdAt,
+        actorType: r.actorType,
+        actor: own ? { id: own.id, name: own.name, email: own.email, role: own.role } : null,
+        action: r.action,
+        entityType: r.entityType,
+        entityId: r.entityId,
+        metadata: own ? r.metadata : null,
+      };
+    });
+  }
+
+  async facetsForOrganization(organizationId: string) {
+    const scope = this.ownerScope(organizationId);
+    const [types, actions] = await Promise.all([
+      this.prisma.client.$queryRaw<Array<{ v: string }>>(Prisma.sql`SELECT DISTINCT a."entityType" AS v FROM audit_logs a WHERE ${scope} ORDER BY 1`),
+      this.prisma.client.$queryRaw<Array<{ v: string }>>(Prisma.sql`SELECT DISTINCT a.action AS v FROM audit_logs a WHERE ${scope} ORDER BY 1`),
+    ]);
+    return { entityTypes: types.map((t) => t.v), actions: actions.map((a) => a.v) };
   }
 }
