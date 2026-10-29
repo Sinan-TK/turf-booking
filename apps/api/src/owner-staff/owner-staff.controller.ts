@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { parsePage, setTotalCount } from '../common/pagination';
 import { parseEnumFilter, parseSearch } from '../common/list-filters';
@@ -50,6 +50,11 @@ export class OwnerStaffController {
     @CurrentUser() actor: AuthContext,
   ) {
     return this.staff.setVenues(id, dto.venueIds, actor);
+  }
+
+  @Delete(':id')
+  remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthContext) {
+    return this.staff.remove(id, actor);
   }
 
   @Patch(':id/status')

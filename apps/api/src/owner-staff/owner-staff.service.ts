@@ -110,6 +110,29 @@ export class OwnerStaffService {
     return this.get(id, organizationId);
   }
 
+  /**
+   * Deletes a staff login for good. Their history stays: audit entries and the blocks they created lose only the link to the
+   * person, and their assignments and alerts go with them. Sessions and sign-in links are not linked by the database, so they are
+   * removed here, which also signs them out. The token the browser holds stops working at once (the guard finds no account).
+   */
+  async remove(id: string, actor: AuthContext) {
+    const organizationId = actor.organizationId!;
+    const person = await this.get(id, organizationId);
+    await this.prisma.client.$transaction([
+      this.prisma.client.staffRefreshSession.deleteMany({ where: { portal: 'OWNER', userId: id } }),
+      this.prisma.client.staffAuthToken.deleteMany({ where: { portal: 'OWNER', userId: id } }),
+      this.prisma.client.venueOwnerUser.delete({ where: { id } }),
+    ]);
+    await this.audit.record({
+      actor,
+      action: 'OWNER_STAFF_DELETED',
+      entityType: 'VenueOwnerUser',
+      entityId: id,
+      metadata: { organizationId, name: person.name, email: person.email },
+    });
+    return { deleted: true };
+  }
+
   async setStatus(id: string, status: 'ACTIVE' | 'DISABLED', actor: AuthContext) {
     const organizationId = actor.organizationId!;
     await this.get(id, organizationId);

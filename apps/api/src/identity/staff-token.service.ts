@@ -85,8 +85,9 @@ export class StaffTokenService {
    */
   async isStillActive(ctx: AuthContext): Promise<boolean> {
     if (ctx.role === Role.SUPER_ADMIN) {
-      const admin = await this.prisma.client.adminUser.findUnique({ where: { id: ctx.id }, select: { status: true } });
-      return admin?.status === 'ACTIVE';
+      const admin = await this.prisma.client.adminUser.findUnique({ where: { id: ctx.id }, select: { status: true, role: true } });
+      // Like the owner check below: the account must be active and still hold the role the token claims.
+      return admin?.status === 'ACTIVE' && admin.role === 'SUPER_ADMIN';
     }
     if (ctx.role === Role.VENUE_OWNER) {
       const user = await this.prisma.client.venueOwnerUser.findUnique({
