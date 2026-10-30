@@ -154,7 +154,7 @@ export function LocationPicker({
             type="button"
             onClick={onClose}
             aria-label="Back"
-            className="rounded-none p-2 text-slate-600 hover:bg-slate-100 sm:hidden"
+            className="rounded-md p-2 text-slate-600 hover:bg-slate-100 sm:hidden"
           >
             <Icon name="arrow_back" className="text-[1.25rem]" />
           </button>
@@ -165,7 +165,7 @@ export function LocationPicker({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="hidden rounded-none p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 sm:block"
+            className="hidden rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 sm:block"
           >
             <Icon name="close" className="text-[1.125rem]" />
           </button>

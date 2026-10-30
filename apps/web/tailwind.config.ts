@@ -3,8 +3,8 @@ import type { Config } from 'tailwindcss';
 const config: Config = {
   content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}'],
   theme: {
-    // Boxes have sharp corners across the customer site; only true circles (rounded-full on a square: avatars, dots, spinners) stay round.
-    borderRadius: { none: '0', DEFAULT: '0', sm: '0', md: '0', lg: '0', xl: '0', '2xl': '0', '3xl': '0', full: '9999px' },
+    // Boxes have only a slight curve across the customer site; true circles (rounded-full on a square: avatars, dots, spinners) stay round.
+    borderRadius: { none: '0', DEFAULT: '3px', sm: '2px', md: '4px', lg: '5px', xl: '6px', '2xl': '8px', '3xl': '8px', full: '9999px' },
     extend: {
       colors: {
         // The customer site's theme. Change this one scale to re-theme every page.

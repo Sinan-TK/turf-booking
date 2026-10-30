@@ -73,7 +73,7 @@ export function LoadingNote({ label }: { label: string }) {
 export function SearchingBar({ label = 'Checking live availability…' }: { label?: string }) {
   return (
     <Region label={label} className="mb-3">
-      <Skeleton className="h-1.5 w-full rounded-none" />
+      <Skeleton className="h-1.5 w-full rounded-md" />
     </Region>
   );
 }

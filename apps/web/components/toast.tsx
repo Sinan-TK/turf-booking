@@ -44,7 +44,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           <div
             role="status"
             aria-live="polite"
-            className={`rounded-none bg-slate-900 px-5 py-2.5 text-sm font-medium text-white shadow-lg transition-opacity duration-300 ${
+            className={`rounded-md bg-slate-900 px-5 py-2.5 text-sm font-medium text-white shadow-lg transition-opacity duration-300 ${
               toast.fading ? 'opacity-0' : 'opacity-100'
             }`}
           >

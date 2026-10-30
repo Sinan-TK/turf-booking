@@ -83,7 +83,7 @@ export function VenueTypePicker({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded-none p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
           >
             <Icon name="close" className="text-[1.125rem]" />
           </button>
@@ -131,7 +131,7 @@ export function VenueTypePicker({
             type="button"
             onClick={() => setDraft([])}
             disabled={draft.length === 0}
-            className="rounded-none px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:hover:bg-transparent"
+            className="rounded-md px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:hover:bg-transparent"
           >
             Clear all
           </button>

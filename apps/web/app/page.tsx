@@ -507,7 +507,7 @@ export default function HomePage() {
               <Icon name="category" className="text-[1.125rem] text-brand-600" />
               Venue types
               {form.categorySlugs.length > 0 && (
-                <span className="rounded-none bg-brand-700 px-1.5 text-[0.6875rem] leading-[1.125rem] text-white">{form.categorySlugs.length}</span>
+                <span className="rounded-md bg-brand-700 px-1.5 text-[0.6875rem] leading-[1.125rem] text-white">{form.categorySlugs.length}</span>
               )}
               <Icon name="expand_more" className="text-[1rem] text-slate-400" />
             </button>
@@ -569,7 +569,7 @@ export default function HomePage() {
                 type="button"
                 onClick={() => setForm((f) => ({ ...f, groundType: t.value }))}
                 aria-pressed={isActive}
-                className={`flex-shrink-0 rounded-none border px-3 py-1 text-[0.6875rem] font-bold transition ${isActive ? 'border-brand-700 bg-brand-700 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-brand-400'}`}
+                className={`flex-shrink-0 rounded-md border px-3 py-1 text-[0.6875rem] font-bold transition ${isActive ? 'border-brand-700 bg-brand-700 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-brand-400'}`}
               >
                 {t.label}
               </button>
@@ -598,7 +598,7 @@ export default function HomePage() {
                       districtName: choice.districtName,
                     })
                   }
-                  className="mt-4 rounded-none bg-brand-600 px-4 py-2 text-xs font-bold text-white hover:bg-brand-700"
+                  className="mt-4 rounded-md bg-brand-600 px-4 py-2 text-xs font-bold text-white hover:bg-brand-700"
                 >
                   Browse all of {choice.districtName}
                 </button>
@@ -644,7 +644,7 @@ export default function HomePage() {
             {moreError && (
               <div className="mt-4 flex flex-col items-center gap-2">
                 <ErrorBanner message={moreError} />
-                <button type="button" onClick={() => void loadMore()} className="rounded-none bg-brand-600 px-4 py-2 text-xs font-bold text-white hover:bg-brand-700">
+                <button type="button" onClick={() => void loadMore()} className="rounded-md bg-brand-600 px-4 py-2 text-xs font-bold text-white hover:bg-brand-700">
                   Try again
                 </button>
               </div>
@@ -812,7 +812,7 @@ function SlotBookingModal({
                   href={googleMapsLink(r.venue)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-none border border-brand-500/30 bg-brand-50 px-2.5 py-1 text-[0.6875rem] font-bold text-brand-700 transition hover:bg-brand-100 active:scale-95"
+                  className="inline-flex items-center gap-1 rounded-md border border-brand-500/30 bg-brand-50 px-2.5 py-1 text-[0.6875rem] font-bold text-brand-700 transition hover:bg-brand-100 active:scale-95"
                 >
                   <Icon name="location_on" className="text-[0.875rem]" />
                   Directions
@@ -826,13 +826,13 @@ function SlotBookingModal({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50/70 px-5 py-3 text-xs">
-          <span className="inline-flex items-center gap-1 rounded-none bg-white px-2.5 py-1 font-bold text-slate-700 ring-1 ring-slate-200">
+          <span className="inline-flex items-center gap-1 rounded-md bg-white px-2.5 py-1 font-bold text-slate-700 ring-1 ring-slate-200">
             {formatDateLabel(dateIso)}
           </span>
-          <span className="inline-flex items-center gap-1 rounded-none bg-white px-2.5 py-1 font-bold text-slate-700 ring-1 ring-slate-200">
+          <span className="inline-flex items-center gap-1 rounded-md bg-white px-2.5 py-1 font-bold text-slate-700 ring-1 ring-slate-200">
             {r.resource.groundType ? `${r.resource.name} · ${r.resource.groundType}` : r.resource.name}
           </span>
-          <span className="inline-flex items-center gap-1 rounded-none bg-white py-0.5 pl-1 pr-2 font-bold text-slate-700 ring-1 ring-slate-200">
+          <span className="inline-flex items-center gap-1 rounded-md bg-white py-0.5 pl-1 pr-2 font-bold text-slate-700 ring-1 ring-slate-200">
             <button
               type="button"
               aria-label="Shorter booking"
@@ -1216,14 +1216,14 @@ function CardGallery({
                 onClick={() => setIndex(i)}
                 aria-label={`Photo ${i + 1} of ${photos.length}`}
                 aria-current={i === index}
-                className={`h-1.5 rounded-none transition-all ${i === index ? 'w-4 bg-white' : 'w-1.5 bg-white/60 hover:bg-white/90'}`}
+                className={`h-1.5 rounded-md transition-all ${i === index ? 'w-4 bg-white' : 'w-1.5 bg-white/60 hover:bg-white/90'}`}
               />
             ))}
           </div>
         </>
       )}
 
-      <span className="absolute bottom-2.5 right-2.5 rounded-none bg-white px-2.5 py-1 text-[0.6875rem] font-bold text-brand-700 shadow-sm">{badge}</span>
+      <span className="absolute bottom-2.5 right-2.5 rounded-md bg-white px-2.5 py-1 text-[0.6875rem] font-bold text-brand-700 shadow-sm">{badge}</span>
     </div>
   );
 }
@@ -1338,10 +1338,10 @@ function UnitPanel({ result: r, liveResult, durationMinutes: requestedDuration, 
                 onClick={() => bookSlot(c.start!)}
                 title={`${shortHour(c.hour)} · available, tap to book ${durationLabel(durationMinutes).toLowerCase()}`}
                 aria-label={`Book ${formatStart(c.start, r.timezone)}`}
-                className={`h-6 flex-1 rounded-none ${CELL_COLOURS.available} transition hover:brightness-110 active:scale-95 disabled:cursor-wait ${busyStart === c.start ? 'animate-pulse' : ''}`}
+                className={`h-6 flex-1 rounded-md ${CELL_COLOURS.available} transition hover:brightness-110 active:scale-95 disabled:cursor-wait ${busyStart === c.start ? 'animate-pulse' : ''}`}
               />
             ) : (
-              <span key={c.hour} title={`${shortHour(c.hour)} · ${c.state}`} className={`h-6 flex-1 rounded-none ${CELL_COLOURS[c.state]}`} />
+              <span key={c.hour} title={`${shortHour(c.hour)} · ${c.state}`} className={`h-6 flex-1 rounded-md ${CELL_COLOURS[c.state]}`} />
             ),
           )}
         </div>

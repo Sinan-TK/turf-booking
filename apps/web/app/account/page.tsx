@@ -48,7 +48,7 @@ function labelFor(type: string): string {
 function VerifiedChip({ verified, what }: { verified: boolean; what: string }) {
   return (
     <span
-      className={`ml-2 rounded-none px-2 py-0.5 align-middle text-[0.6875rem] font-semibold ${
+      className={`ml-2 rounded-md px-2 py-0.5 align-middle text-[0.6875rem] font-semibold ${
         verified ? 'bg-brand-50 text-brand-700' : 'bg-amber-50 text-amber-800'
       }`}
       aria-label={`${what} ${verified ? 'verified' : 'not verified'}`}
@@ -423,7 +423,7 @@ function ChangePassword() {
             <div className="mt-1.5" aria-live="polite">
               <div className="flex gap-1" aria-hidden="true">
                 {[1, 2, 3].map((n) => (
-                  <span key={n} className={`h-1.5 flex-1 rounded-none ${next && strength.level >= n ? STRENGTH_BAR[strength.level] : 'bg-gray-200'}`} />
+                  <span key={n} className={`h-1.5 flex-1 rounded-md ${next && strength.level >= n ? STRENGTH_BAR[strength.level] : 'bg-gray-200'}`} />
                 ))}
               </div>
               {strength.label && <p className="mt-1 text-xs text-gray-500">Strength: {strength.label}</p>}
