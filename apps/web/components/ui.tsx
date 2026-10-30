@@ -229,7 +229,7 @@ export function Badge({ value }: { value: string | null | undefined }) {
   if (!value) return <span className="text-gray-400">—</span>;
   const color = BADGE_COLORS[value] ?? 'bg-gray-100 text-gray-700';
   return (
-    <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${color}`}>
+    <span className={`inline-block rounded-none px-2.5 py-0.5 text-xs font-medium ${color}`}>
       {value}
     </span>
   );

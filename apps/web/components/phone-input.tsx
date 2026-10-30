@@ -8,7 +8,7 @@ const CHAKRA_SPOKES = Array.from({ length: 24 }, (_, i) => {
 });
 function IndiaFlag() {
   return (
-    <svg viewBox="0 0 900 600" width="24" height="16" role="img" aria-label="Flag of India" className="shrink-0 rounded-[3px] ring-1 ring-black/10">
+    <svg viewBox="0 0 900 600" width="24" height="16" role="img" aria-label="Flag of India" className="shrink-0 rounded-none ring-1 ring-black/10">
       <rect width="900" height="600" fill="#fff" />
       <rect width="900" height="200" fill="#ff9933" />
       <rect y="400" width="900" height="200" fill="#138808" />
