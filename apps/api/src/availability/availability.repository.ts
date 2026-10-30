@@ -49,6 +49,8 @@ export interface AvailabilityRepository {
   findBookableResources(venueId: string, groundType?: string, categoryIds?: string[]): Promise<BookableResource[]>;
   /** Every rule for the unit and duration already in effect at `at`. */
   findPricingRules(resourceId: string, at: Date): Promise<PricingRule[]>;
+  /** Every active price rule of all these units already in effect at `upTo`, in one read (search works a whole venue at once). */
+  findPricingRulesForUnits(resourceIds: string[], upTo: Date): Promise<PricingRule[]>;
   findOverlappingLocks(
     footprintIds: string[],
     rangeStart: Date,

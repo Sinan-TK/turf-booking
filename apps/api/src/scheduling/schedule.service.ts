@@ -59,6 +59,48 @@ export class ScheduleService {
     return coverageWindows(rules, localDay.weekday);
   }
 
+  /** The windows a unit can be booked on a day, from its price rules already read (the same rule as openWindows, with no read of its own). */
+  openWindowsFromRules(rules: Parameters<typeof coverageWindows>[0], localDay: DateTime): OpenWindow[] {
+    const endOfDay = localDay.endOf('day').toJSDate();
+    return coverageWindows(
+      rules.filter((r) => r.effectiveFrom <= endOfDay),
+      localDay.weekday,
+    );
+  }
+
+  /**
+   * Every blackout in [start, end) that could matter to a venue's units: venue-wide ones and those for any of the given units, in one
+   * read. Whether one applies to a unit is decided by blockAppliesTo.
+   */
+  async findVenueBlocks(
+    venueId: string,
+    footprintIds: string[],
+    start: Date,
+    end: Date,
+  ): Promise<Array<{ resourceId: string | null; resourceGroupId: string | null; startTime: Date; endTime: Date }>> {
+    if (this.useRules()) {
+      return this.prisma.client.blockedPeriod.findMany({
+        where: {
+          venueId,
+          startTime: { lt: end },
+          endTime: { gt: start },
+          OR: [{ resourceId: null, resourceGroupId: null }, ...(footprintIds.length ? [{ resourceId: { in: footprintIds } }] : [])],
+        },
+        select: { resourceId: true, resourceGroupId: true, startTime: true, endTime: true },
+      });
+    }
+    const legacy = await this.prisma.client.blockedDate.findMany({
+      where: {
+        venueId,
+        startTime: { lt: end },
+        endTime: { gt: start },
+        OR: [{ resourceId: null }, ...(footprintIds.length ? [{ resourceId: { in: footprintIds } }] : [])],
+      },
+      select: { resourceId: true, startTime: true, endTime: true },
+    });
+    return legacy.map((b) => ({ ...b, resourceGroupId: null }));
+  }
+
   /** Blocked ranges overlapping [start, end) that apply to the target. */
   async findBlocks(
     venueId: string,

@@ -94,6 +94,12 @@ export class PrismaAvailabilityRepository implements AvailabilityRepository {
     });
   }
 
+  findPricingRulesForUnits(resourceIds: string[], upTo: Date) {
+    return this.prisma.client.pricingRule.findMany({
+      where: { resourceId: { in: resourceIds }, isActive: true, effectiveFrom: { lte: upTo } },
+    });
+  }
+
   findOverlappingLocks(footprintIds: string[], rangeStart: Date, rangeEnd: Date) {
     return this.prisma.client.resourceLock.findMany({
       where: {

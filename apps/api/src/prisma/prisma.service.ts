@@ -13,6 +13,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     await this.client.$connect();
+    // Opening a database connection takes about a second to a far-away database, and the pool opens them only as they are needed, so the
+    // first search after a start used to pay for several at once. Open a handful now, in the background.
+    void Promise.allSettled(Array.from({ length: 8 }, () => this.client.$queryRaw`SELECT 1`));
   }
 
   async onModuleDestroy() {

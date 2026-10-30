@@ -301,6 +301,34 @@ export class ResourcesService {
    * closure table) that are not themselves a parent of any composition
    * edge — i.e., that have no children.
    */
+  /** The footprints (see getFootprintResourceIds) of many units at once: two reads for all of them, not two each. */
+  async getFootprintsFor(resourceIds: string[]): Promise<Map<string, string[]>> {
+    if (resourceIds.length === 0) return new Map();
+    const closure = await this.prisma.client.resourceClosure.findMany({
+      where: { ancestorId: { in: resourceIds } },
+      select: { ancestorId: true, descendantId: true },
+    });
+    const allDescendants = [...new Set(closure.map((c) => c.descendantId))];
+    const parents = await this.prisma.client.resourceComposition.findMany({
+      where: { parentResourceId: { in: allDescendants } },
+      select: { parentResourceId: true },
+      distinct: ['parentResourceId'],
+    });
+    const nonLeaf = new Set(parents.map((p) => p.parentResourceId));
+    const byUnit = new Map<string, string[]>();
+    for (const c of closure) {
+      const list = byUnit.get(c.ancestorId) ?? [];
+      list.push(c.descendantId);
+      byUnit.set(c.ancestorId, list);
+    }
+    const footprints = new Map<string, string[]>();
+    for (const id of resourceIds) {
+      const leaves = (byUnit.get(id) ?? []).filter((d) => !nonLeaf.has(d));
+      footprints.set(id, leaves.length > 0 ? leaves : [id]);
+    }
+    return footprints;
+  }
+
   async getFootprintResourceIds(resourceId: string): Promise<string[]> {
     const descendants = await this.prisma.client.resourceClosure.findMany({
       where: { ancestorId: resourceId },
