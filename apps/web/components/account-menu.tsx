@@ -6,7 +6,6 @@ import { useCustomer } from '@/lib/customer';
 import { ConfirmLogout } from '@/components/confirm-logout';
 import { Icon } from '@/components/ui';
 import { Skeleton } from '@/components/skeleton';
-import { CoinBalance } from '@/components/coin-balance';
 
 const ITEMS = [
   { href: '/account?tab=profile', label: 'Profile', icon: 'person' },
@@ -57,7 +56,6 @@ export function AccountMenu() {
 
   return (
     <div className="flex items-center gap-2 md:gap-3">
-      <CoinBalance />
       <div ref={root} className="relative">
       <button
         type="button"
