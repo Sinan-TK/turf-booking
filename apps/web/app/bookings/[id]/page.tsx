@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
+import { trustedMapsUrl } from '@/lib/maps';
 import { LoginGate } from '@/components/login-gate';
 import { Badge, Button, Card, ErrorBanner, SuccessBanner } from '@/components/ui';
 import { DetailSkeleton } from '@/components/skeleton';
@@ -35,7 +36,8 @@ interface Booking {
 
 /** Directions to the venue: its own Google Maps link when it has one, else a pin at its coordinates. */
 function directionsLink(venue: Booking['venue']): string {
-  if (venue.googleMapsUrl) return venue.googleMapsUrl;
+  const own = trustedMapsUrl(venue.googleMapsUrl);
+  if (own) return own;
   if (Number.isFinite(venue.lat) && Number.isFinite(venue.lng) && (venue.lat !== 0 || venue.lng !== 0)) {
     return `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`;
   }

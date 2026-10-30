@@ -91,4 +91,13 @@ test.describe('customer site: booking details', () => {
     await expect(booked).toContainText('Kayaking');
     await expect(page.locator('dl > div').filter({ hasText: /^When/ })).toContainText('30 minutes');
   });
+
+  test('a map link that is not a real Google Maps link is never followed: directions fall back to the venue pin', async ({ page }) => {
+    for (const hostile of ['javascript:alert(1)', 'https://evil.example/maps/x', 'http://maps.app.goo.gl/PwInsecure', 'https://user:pw@maps.app.goo.gl/x', 'data:text/html,<script>1</script>']) {
+      await open(page, booking({ venue: { id: 'v3', name: 'Odd Venue', address: '1 Odd Street', facilityCode: 'ODD-003', googleMapsUrl: hostile, lat: 11.5, lng: 76.5 } }));
+      const href = await page.getByRole('link', { name: 'Get directions' }).getAttribute('href');
+      expect(href, hostile).toBe('https://www.google.com/maps/dir/?api=1&destination=11.5,76.5');
+      await page.unrouteAll();
+    }
+  });
 });

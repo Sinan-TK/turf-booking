@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { useDebounced } from '@/lib/use-debounced';
+import { trustedMapsUrl } from '@/lib/maps';
 import { DISMISSED, useCustomer } from '@/lib/customer';
 import { CategoryIcon, ErrorBanner, Icon } from '@/components/ui';
 import { LoadingNote, SearchingBar, Skeleton, VenueCardSkeleton, VenueCardsSkeleton } from '@/components/skeleton';
@@ -129,7 +130,8 @@ function formatPrice(price: { amount: string; currency: string }): string {
  * by name and address.
  */
 function googleMapsLink(venue: { googleMapsUrl?: string | null; lat?: number; lng?: number; name: string; address: string }): string {
-  if (venue.googleMapsUrl) return venue.googleMapsUrl;
+  const own = trustedMapsUrl(venue.googleMapsUrl);
+  if (own) return own;
   if (venue.lat !== undefined && venue.lng !== undefined) {
     return `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`;
   }
