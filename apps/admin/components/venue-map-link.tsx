@@ -52,7 +52,7 @@ export function VenueMapLink({
               {link ? (
                 <>
                   Customers&apos; Directions button opens{' '}
-                  <a href={link} target="_blank" rel="noopener noreferrer" className="break-all text-brand-700 underline">
+                  <a href={googleMapsUrlProblem(link) === undefined ? link : undefined} target="_blank" rel="noopener noreferrer" className="break-all text-brand-700 underline">
                     {link}
                   </a>
                   .
