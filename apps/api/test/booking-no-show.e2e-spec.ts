@@ -184,6 +184,29 @@ describe('Marking a booking as a no-show', () => {
     expect(await prisma.bookingSettlement.count({ where: { bookingId: walkIn.body.id } })).toBe(0);
   });
 
+  test('the customer is never told: to them the booking is simply completed', async () => {
+    const id = await ended();
+    const mine = customer; // the customer who made this booking
+    await owner.post(`/owner/bookings/${id}/no-show`).expect(201);
+
+    const page = await mine.get(`/me/bookings/${id}`);
+    expect(page.status).toBe(200);
+    expect(page.body.status).toBe('COMPLETED');
+    const list = await mine.get('/me/bookings');
+    expect(list.body.find((b: { id: string }) => b.id === id).status).toBe('COMPLETED');
+    expect(JSON.stringify([page.body, list.body])).not.toMatch(/no.?show/i);
+
+    // Even a refused attempt to cancel it gives nothing away.
+    const cancel = await mine.post(`/me/bookings/${id}/cancel`).send({});
+    expect(cancel.status).toBe(400);
+    expect(cancel.body.message).toMatch(/completed booking can't be cancelled/);
+    expect(JSON.stringify(cancel.body)).not.toMatch(/no.?show/i);
+    expect((await mine.get(`/me/bookings/${id}/cancellation`)).body.canCancel).toBe(false);
+
+    // The venue still sees what it recorded.
+    expect((await owner.get(`/owner/bookings/${id}`)).body.status).toBe('NO_SHOW');
+  });
+
   test('the owner list and detail show it, and the status filter finds it', async () => {
     const id = await ended();
     await owner.post(`/owner/bookings/${id}/no-show`).expect(201);

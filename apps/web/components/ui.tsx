@@ -223,7 +223,6 @@ const BADGE_COLORS: Record<string, string> = {
   PROCESSING: 'bg-yellow-100 text-yellow-800',
   CANCELLED: 'bg-red-100 text-red-800',
   FAILED: 'bg-red-100 text-red-800',
-  NO_SHOW: 'bg-gray-100 text-gray-700',
 };
 
 export function Badge({ value }: { value: string | null | undefined }) {

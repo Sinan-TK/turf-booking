@@ -704,14 +704,14 @@ export class BookingsService {
     }
     const { resource, slotHold, ...booking } = view;
     return {
-      ...booking,
+      ...forCustomer(booking),
       resourceName: resource?.name ?? null,
       holdExpiresAt: slotHold.holdExpiresAt,
     };
   }
 
   async listForCustomer(actor: AuthContext) {
-    return this.bookings.listForCustomer(actor.id);
+    return (await this.bookings.listForCustomer(actor.id)).map(forCustomer);
   }
 
   /**
@@ -873,7 +873,7 @@ export class BookingsService {
    */
   async cancel(bookingId: string, reason: string | undefined, actor: AuthContext) {
     const booking = await this.getForCustomer(bookingId, actor);
-    assertCancellable(booking.status);
+    assertCancellable(forCustomer(booking).status);
 
     const paidMinor = this.paidOnlineMinor(booking);
     if (paidMinor === 0) {
@@ -1053,6 +1053,14 @@ export class BookingsService {
 }
 
 /** A clear 400 for a booking that is already cancelled, completed or a no-show (not an illegal-transition 500). */
+/**
+ * What a customer is shown of a booking. Whether the customer came is the venue's own record and is never shown to them: a booking
+ * marked as a no-show reads, to the customer, as an ordinary completed one (in lists, on the booking page and in any message).
+ */
+function forCustomer<T extends { status: BookingStatus }>(booking: T): T {
+  return booking.status === 'NO_SHOW' ? { ...booking, status: 'COMPLETED' as BookingStatus } : booking;
+}
+
 function assertCancellable(status: BookingStatus) {
   if (!BOOKING_TRANSITIONS[status]?.includes('CANCELLED')) {
     throw new BadRequestException(
