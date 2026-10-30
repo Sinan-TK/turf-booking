@@ -24,7 +24,25 @@ interface Booking {
   endTime: string;
   groundType: string;
   paymentMethod: string | null;
+  /** How many were booked (a pooled item, like kayaks); 1 for a single unit. */
+  quantity?: number;
+  venue: { id: string; name: string; address: string; facilityCode: string; googleMapsUrl: string | null; lat: number; lng: number };
+  /** The unit (a court, a pitch) or the pooled item that was booked. */
+  resourceName: string | null;
+  /** The kind of venue it is: "Badminton Court", with what one bookable unit is called ("Court"). */
+  facility: { name: string; unitLabel: string } | null;
 }
+
+/** Directions to the venue: its own Google Maps link when it has one, else a pin at its coordinates. */
+function directionsLink(venue: Booking['venue']): string {
+  if (venue.googleMapsUrl) return venue.googleMapsUrl;
+  if (Number.isFinite(venue.lat) && Number.isFinite(venue.lng) && (venue.lat !== 0 || venue.lng !== 0)) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`;
+  }
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${venue.name}, ${venue.address}`)}`;
+}
+
+const minutesLabel = (m: number) => (m % 60 === 0 ? `${m / 60} hour${m === 60 ? '' : 's'}` : `${m} minutes`);
 
 function BookingDetail() {
   const { id } = useParams<{ id: string }>();
@@ -84,21 +102,44 @@ function BookingDetail() {
               <SuccessBanner message={cancelResultMessage} />
             </div>
           )}
-          <div className="mb-4 flex items-center justify-between">
-            <p className="font-semibold text-gray-900">{booking.orderId}</p>
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wide text-gray-500">Order {booking.orderId}</p>
+              <h2 className="mt-0.5 text-lg font-semibold text-gray-900">{booking.venue.name}</h2>
+              <p className="text-xs text-gray-500">{booking.venue.address}</p>
+              <a
+                href={directionsLink(booking.venue)}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 inline-block text-xs font-medium text-brand-700 underline underline-offset-2 hover:text-brand-600"
+              >
+                Get directions
+              </a>
+            </div>
             <Badge value={booking.status} />
           </div>
           <dl className="space-y-2 text-sm">
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-3">
               <dt className="text-gray-500">When</dt>
-              <dd>
-                {new Date(booking.startTime).toLocaleString()} –{' '}
-                {new Date(booking.endTime).toLocaleTimeString()}
+              <dd className="text-right">
+                {new Date(booking.startTime).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                <span className="block font-medium text-gray-900">
+                  {new Date(booking.startTime).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })} –{' '}
+                  {new Date(booking.endTime).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })} (
+                  {minutesLabel(Math.round((new Date(booking.endTime).getTime() - new Date(booking.startTime).getTime()) / 60_000))})
+                </span>
               </dd>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-3">
               <dt className="text-gray-500">Booked</dt>
-              <dd>{booking.groundType}</dd>
+              <dd className="text-right">
+                <span className="font-medium text-gray-900">
+                  {booking.quantity && booking.quantity > 1 ? `${booking.quantity} × ` : ''}
+                  {booking.resourceName ?? booking.facility?.name ?? 'Your slot'}
+                  {booking.groundType ? ` · ${booking.groundType}` : ''}
+                </span>
+                {booking.facility && booking.resourceName && <span className="block text-xs text-gray-500">{booking.facility.name}</span>}
+              </dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-gray-500">Amount</dt>

@@ -702,10 +702,13 @@ export class BookingsService {
     if (view.customerId !== actor.id) {
       throw new ForbiddenException("Cannot access another customer's booking");
     }
-    const { resource, slotHold, ...booking } = view;
+    const { resource, resourceGroup, slotHold, ...booking } = view;
+    const booked = resource ?? resourceGroup; // a single unit (a court), or a pooled item (kayaks) with a quantity
     return {
       ...forCustomer(booking),
-      resourceName: resource?.name ?? null,
+      venue: { ...booking.venue, lat: Number(booking.venue.lat), lng: Number(booking.venue.lng) },
+      resourceName: booked?.name ?? null,
+      facility: booked ? { name: booked.category.name, unitLabel: booked.category.unitLabel } : null,
       holdExpiresAt: slotHold.holdExpiresAt,
     };
   }

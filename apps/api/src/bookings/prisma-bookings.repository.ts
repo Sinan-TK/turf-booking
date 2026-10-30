@@ -125,8 +125,9 @@ export class PrismaBookingsRepository implements BookingsRepository {
     return this.prisma.client.booking.findUnique({
       where: { id },
       include: {
-        venue: { select: { id: true, name: true, facilityCode: true, address: true } },
-        resource: { select: { name: true } },
+        venue: { select: { id: true, name: true, facilityCode: true, address: true, googleMapsUrl: true, lat: true, lng: true } },
+        resource: { select: { name: true, category: { select: { name: true, unitLabel: true } } } },
+        resourceGroup: { select: { name: true, category: { select: { name: true, unitLabel: true } } } },
         slotHold: { select: { holdExpiresAt: true } },
       },
     });

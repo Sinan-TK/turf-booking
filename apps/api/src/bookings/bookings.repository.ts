@@ -32,8 +32,9 @@ type RawBookingDetail = Prisma.BookingGetPayload<{
 /** Booking with what the customer's checkout/receipt page shows. */
 export type BookingCheckoutView = Prisma.BookingGetPayload<{
   include: {
-    venue: { select: { id: true; name: true; facilityCode: true; address: true } };
-    resource: { select: { name: true } };
+    venue: { select: { id: true; name: true; facilityCode: true; address: true; googleMapsUrl: true; lat: true; lng: true } };
+    resource: { select: { name: true; category: { select: { name: true; unitLabel: true } } } };
+    resourceGroup: { select: { name: true; category: { select: { name: true; unitLabel: true } } } };
     slotHold: { select: { holdExpiresAt: true } };
   };
 }>;
