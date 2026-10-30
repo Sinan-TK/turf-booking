@@ -61,6 +61,9 @@ function isSlotConflictError(error: unknown): boolean {
   return false;
 }
 
+/** How many days after a slot ends the venue can still mark it a no-show, or take that back. */
+export const NO_SHOW_WINDOW_DAYS = 7;
+
 @Injectable()
 export class BookingsService {
   constructor(
@@ -759,6 +762,55 @@ export class BookingsService {
       metadata: { orderId: booking.orderId, collected: collect.toString(), paidAmount: updated.paidAmount.toString() },
     });
     return updated;
+  }
+
+  /**
+   * The customer did not come. Owner admins and the staff assigned to the venue say so once the slot has started, and can still
+   * say so (or take it back) for ${NO_SHOW_WINDOW_DAYS} days after it ended, because a slot is marked completed automatically minutes
+   * after it ends. Nothing is refunded: the customer's advance stays with the venue, and the booking is settled like a played one
+   * (commission taken, the rest the owner's), only labelled "no-show" on statements.
+   */
+  async markNoShow(bookingId: string, actor: AuthContext) {
+    return this.setAttendance(bookingId, actor, 'NO_SHOW');
+  }
+
+  /** Takes a no-show back: the customer did come after all. Same people, same window. */
+  async markPlayed(bookingId: string, actor: AuthContext) {
+    return this.setAttendance(bookingId, actor, 'COMPLETED');
+  }
+
+  private async setAttendance(bookingId: string, actor: AuthContext, to: 'NO_SHOW' | 'COMPLETED') {
+    const booking = await this.getForOwner(bookingId, actor.organizationId!);
+    await this.scope.assertVenue(actor, booking.venue.id);
+    const from: BookingStatus[] = to === 'NO_SHOW' ? ['CONFIRMED', 'COMPLETED'] : ['NO_SHOW'];
+    if (!from.includes(booking.status)) {
+      throw new BadRequestException(
+        booking.status === to
+          ? to === 'NO_SHOW' ? 'This booking is already marked as a no-show.' : 'This booking is not marked as a no-show.'
+          : to === 'NO_SHOW'
+            ? `A ${booking.status.toLowerCase().replace('_', ' ')} booking can't be marked as a no-show.`
+            : `Only a no-show can be marked as played again.`,
+      );
+    }
+    assertTransition('Booking', BOOKING_TRANSITIONS, booking.status, to);
+    const now = Date.now();
+    if (booking.startTime.getTime() > now) {
+      throw new BadRequestException("This slot hasn't started yet. If it won't go ahead, cancel the booking instead.");
+    }
+    if (now > booking.endTime.getTime() + NO_SHOW_WINDOW_DAYS * 86_400_000) {
+      throw new BadRequestException(`More than ${NO_SHOW_WINDOW_DAYS} days have passed since this slot, so it can no longer be changed.`);
+    }
+    if (!(await this.bookings.setAttendance(bookingId, from, to))) {
+      throw new BadRequestException('This booking was just changed by someone else. Reload it and try again.');
+    }
+    await this.audit.record({
+      actor,
+      action: to === 'NO_SHOW' ? 'BOOKING_NO_SHOW' : 'BOOKING_MARKED_PLAYED',
+      entityType: 'Booking',
+      entityId: bookingId,
+      metadata: { orderId: booking.orderId, from: booking.status },
+    });
+    return this.getForOwner(bookingId, actor.organizationId!);
   }
 
   async getForAdmin(bookingId: string) {

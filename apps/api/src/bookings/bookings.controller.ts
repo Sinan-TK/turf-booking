@@ -208,6 +208,18 @@ export class OwnerBookingsController {
     return this.bookings.cancelByStaff(id, dto.reason, actor);
   }
 
+  // The customer did not come (from the slot's start, for a week after it ends); nothing is refunded. Owner admins and assigned staff.
+  @Post(':id/no-show')
+  noShow(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthContext) {
+    return this.bookings.markNoShow(id, actor);
+  }
+
+  // Takes a no-show back: the customer did come.
+  @Post(':id/played')
+  played(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthContext) {
+    return this.bookings.markPlayed(id, actor);
+  }
+
   @Get(':id')
   async getById(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthContext) {
     const booking = await this.bookings.getForOwner(id, actor.organizationId!);

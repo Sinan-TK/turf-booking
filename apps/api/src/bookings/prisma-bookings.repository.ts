@@ -92,6 +92,19 @@ export class PrismaBookingsRepository implements BookingsRepository {
     return this.prisma.client.booking.update({ where: { id }, data: { paidAmount: { increment: delta } } });
   }
 
+  async setAttendance(id: string, from: BookingStatus[], to: 'COMPLETED' | 'NO_SHOW') {
+    return this.prisma.client.$transaction(async (tx) => {
+      const moved = await tx.booking.updateMany({ where: { id, status: { in: from } }, data: { status: to } });
+      if (moved.count === 0) return false;
+      // The money is the same either way (the advance is kept and commission is taken); only the label on the statement differs.
+      await tx.bookingSettlement.updateMany({
+        where: { bookingId: id, kind: to === 'NO_SHOW' ? 'PLAYED' : 'NO_SHOW' },
+        data: { kind: to === 'NO_SHOW' ? 'NO_SHOW' : 'PLAYED' },
+      });
+      return true;
+    });
+  }
+
   async findBookingDetailById(id: string) {
     const booking = await this.prisma.client.booking.findUnique({
       where: { id },

@@ -87,6 +87,7 @@ const BADGE_COLORS: Record<string, string> = {
   CONFIRMED: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
   SUCCESS: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
   COMPLETED: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+  NO_SHOW: 'bg-amber-50 text-amber-700 ring-amber-600/20',
   RESOLVED: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
   OPEN: 'bg-sky-50 text-sky-700 ring-sky-600/20',
   PENDING: 'bg-amber-50 text-amber-700 ring-amber-600/20',

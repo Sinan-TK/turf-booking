@@ -1,6 +1,7 @@
 import type {
   Booking,
   BookingCancellationReasonCode,
+  BookingStatus,
   CustomerProfile,
   InventoryReservation,
   PaymentMethod,
@@ -178,6 +179,11 @@ export interface BookingsRepository {
   findBookingById(id: string): Promise<Booking | null>;
   /** Adds money collected (at the venue) to what the booking has been paid so far. */
   addPaidAmount(id: string, delta: Prisma.Decimal | number | string): Promise<Booking>;
+  /**
+   * Records whether the customer came: moves a booking from one of the `from` statuses to COMPLETED or NO_SHOW, and relabels its
+   * settlement (played / no-show) in the same step. False when the booking was no longer in one of `from` (someone else changed it).
+   */
+  setAttendance(id: string, from: BookingStatus[], to: 'COMPLETED' | 'NO_SHOW'): Promise<boolean>;
   findBookingDetailById(id: string): Promise<BookingDetail | null>;
   findBookingCheckoutViewById(id: string): Promise<BookingCheckoutView | null>;
   listForCustomer(customerId: string): Promise<Booking[]>;

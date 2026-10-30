@@ -92,6 +92,7 @@ const BADGE_COLORS: Record<string, string> = {
   DRAFT: 'bg-surface-container-high text-on-surface-variant',
   INACTIVE: 'bg-surface-container-high text-on-surface-variant',
   CANCELLED: 'bg-error-container text-on-error-container',
+  NO_SHOW: 'bg-tertiary-container/30 text-on-tertiary-container',
   FAILED: 'bg-error-container text-on-error-container',
   SUSPENDED: 'bg-error-container text-on-error-container',
   CLOSED: 'bg-surface-container-high text-on-surface-variant',
@@ -105,7 +106,7 @@ export function Badge({ value }: { value: string | null | undefined }) {
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${color}`}
     >
-      {value}
+      {value.replace(/_/g, " ")}
     </span>
   );
 }

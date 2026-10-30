@@ -38,8 +38,10 @@ export const BOOKING_TRANSITIONS: TransitionMap<BookingStatus> = {
   PENDING_PAYMENT: [BookingStatus.CONFIRMED, BookingStatus.CANCELLED],
   CONFIRMED: [BookingStatus.CANCELLED, BookingStatus.COMPLETED, BookingStatus.NO_SHOW],
   CANCELLED: [],
-  COMPLETED: [],
-  NO_SHOW: [],
+  // Whether the customer came is the venue's record, and it can be put right for a while after the slot: a played booking can
+  // turn out to be a no-show (the slot is auto-completed minutes after it ends), and a no-show marked by mistake can be taken back.
+  COMPLETED: [BookingStatus.NO_SHOW],
+  NO_SHOW: [BookingStatus.COMPLETED],
 };
 
 export const PAYMENT_TRANSITIONS: TransitionMap<PaymentStatus> = {

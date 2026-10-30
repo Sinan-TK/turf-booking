@@ -60,6 +60,25 @@ export default function BookingDetailPage() {
   const [cancelling, setCancelling] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelError, setCancelError] = useState<string | null>(null);
+  // "The customer did not come" (or, taking that back, "they did come"): which one is being confirmed.
+  const [attendance, setAttendance] = useState<'no-show' | 'played' | null>(null);
+  const [attendanceError, setAttendanceError] = useState<string | null>(null);
+
+  async function saveAttendance() {
+    if (!attendance) return;
+    setBusy(true);
+    setAttendanceError(null);
+    try {
+      await api.post(`/owner/bookings/${id}/${attendance === 'no-show' ? 'no-show' : 'played'}`, {});
+      setNotice(attendance === 'no-show' ? 'Marked as a no-show.' : 'Marked as played again.');
+      setAttendance(null);
+      refetch();
+    } catch (err) {
+      setAttendanceError(err instanceof ApiError ? err.message : 'Could not save this');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function collect() {
     setBusy(true);
@@ -96,6 +115,12 @@ export default function BookingDetailPage() {
   if (error) return <ErrorBanner message={error} />;
   if (!booking) return null;
   const canCancel = booking.status === 'CONFIRMED' || booking.status === 'PENDING_PAYMENT';
+  // Whether the customer came can be recorded from the slot's start until a week after it ends (the same rule as the server's).
+  const slotStarted = new Date(booking.startTime).getTime() <= Date.now();
+  const inWindow = Date.now() <= new Date(booking.endTime).getTime() + 7 * 86_400_000;
+  const canMarkNoShow = slotStarted && inWindow && (booking.status === 'CONFIRMED' || booking.status === 'COMPLETED');
+  const canMarkPlayed = inWindow && booking.status === 'NO_SHOW';
+  const paidOnline = Number(booking.advanceAmount) > 0;
 
   return (
     <div className="space-y-6">
@@ -105,11 +130,37 @@ export default function BookingDetailPage() {
       <Card>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <Badge value={booking.status} />
-          {canCancel && (
-            <Button type="button" variant="secondary" onClick={() => setCancelling(true)}>
-              Cancel this booking
-            </Button>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {canMarkNoShow && (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setAttendanceError(null);
+                  setAttendance('no-show');
+                }}
+              >
+                Mark as no-show
+              </Button>
+            )}
+            {canMarkPlayed && (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setAttendanceError(null);
+                  setAttendance('played');
+                }}
+              >
+                Mark as played
+              </Button>
+            )}
+            {canCancel && (
+              <Button type="button" variant="secondary" onClick={() => setCancelling(true)}>
+                Cancel this booking
+              </Button>
+            )}
+          </div>
         </div>
         <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
           <div>
@@ -244,6 +295,28 @@ export default function BookingDetailPage() {
           </div>
         )}
       </Card>
+      {attendance && (
+        <ConfirmDialog
+          title={attendance === 'no-show' ? 'Mark as a no-show?' : 'Mark as played?'}
+          confirmLabel={attendance === 'no-show' ? 'Yes, they did not come' : 'Yes, they came'}
+          tone="warn"
+          busy={busy}
+          error={attendanceError}
+          onConfirm={saveAttendance}
+          onCancel={() => setAttendance(null)}
+        >
+          {attendance === 'no-show' ? (
+            <p>
+              {paidOnline
+                ? `Nothing is refunded: the ${formatMoney(booking.currency, booking.advanceAmount)} they paid online stays with you, settled like a played booking (the platform's commission is taken, the rest is yours).`
+                : 'Nothing was paid online, so this only records that they did not come.'}{' '}
+              You can change this for up to 7 days after the slot.
+            </p>
+          ) : (
+            <p>The booking goes back to played. The amount you earn stays the same; only the label on your earnings changes.</p>
+          )}
+        </ConfirmDialog>
+      )}
       {cancelling && (
         <ConfirmDialog
           title="Cancel this booking?"
