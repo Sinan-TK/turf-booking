@@ -50,6 +50,7 @@ import {
   Navigation,
   Layers,
   CalendarCheck,
+  CalendarX,
   type LucideIcon
 } from 'lucide-react';
 
@@ -109,6 +110,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   layers: Layers,
   calendar: CalendarDays,
   book: CalendarCheck,
+  event_busy: CalendarX,
 };
 
 export function Icon({ name, className = '' }: { name: string; className?: string; filled?: boolean }) {

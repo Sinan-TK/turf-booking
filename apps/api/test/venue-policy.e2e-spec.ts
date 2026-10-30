@@ -377,6 +377,22 @@ describe('Venue policy engine', () => {
     });
   });
 
+  describe('a unit with nothing left to book', () => {
+    test('is still listed, with no start times and no price, once every slot is taken', async () => {
+      const v = await createVenue({}, ['10:00', '11:00']); // one hour of opening: a single 60-minute booking fills the day
+      const day = 4;
+      const before = await search(v.facilityCode, localStart(day, 10), 60);
+      expect(before.body[0].availableStartTimes.length).toBeGreaterThan(0);
+      expect((await hold(v.resourceId, localStart(day, 10), 60)).status).toBe(201);
+      const after = await search(v.facilityCode, localStart(day, 10), 60);
+      expect(after.status).toBe(200);
+      expect(after.body).toHaveLength(1); // not dropped
+      expect(after.body[0].availableStartTimes).toEqual([]);
+      expect(after.body[0].price).toBeNull();
+      expect(after.body[0].resource.id).toBe(v.resourceId);
+    });
+  });
+
   describe('policy precedence: RESOURCE > VENUE > CATEGORY', () => {
     test('narrower scopes override wider ones in search and holds', async () => {
       const v = await createVenue({}, ['10:00', '14:00']);

@@ -248,7 +248,7 @@ export class AvailabilityService {
     return built.filter((b): b is { unitIndex: number; result: SearchResult } => b !== null);
   }
 
-  /** One card: the open start times for a unit on the day, priced, or null when it has nothing to show. */
+  /** One card: the open start times for a unit on the day, priced. A unit with none left (all booked, or the time has passed) is still returned, with no start times and no price, so the site can show it greyed out. */
   private async resultForResource(
     venue: CandidateVenue,
     resource: BookableResource,
@@ -280,15 +280,22 @@ export class AvailabilityService {
         advanceDays: venue.advanceBookingDays,
       }),
     );
-    if (startTimes.length === 0) return null;
+    // Nothing to book: when the unit is open that day and the day can be booked, it is kept in the list (all booked, or the time has
+    // passed) and the site greys it out. A closed day, or a day beyond how far ahead the venue takes bookings, is not listed at all.
+    if (startTimes.length === 0) {
+      const closedThatDay = openWindows !== null && openWindows.length === 0;
+      const beyondWindow =
+        day.windowStart.getTime() > Math.min(now.getTime() + policy.maxAdvanceDays * 86_400_000, lastBookableInstantMs(now, venue.timezone, venue.advanceBookingDays));
+      if (closedThatDay || beyondWindow) return null;
+    }
 
     // The price depends on the day AND the time each block starts, so each start time is priced on its own (the sum of
     // its blocks); `price` is the lowest of them.
     const blockMinutes = policy.minDurationMin;
-    const latestStart = startTimes.reduce((a, b) => (a > b ? a : b));
-    const lastBlockStart = new Date(latestStart.getTime() + (durationMinutes - blockMinutes) * MINUTE_MS);
+    const latestStart = startTimes.length > 0 ? startTimes.reduce((a, b) => (a > b ? a : b)) : null;
+    const lastBlockStart = latestStart ? new Date(latestStart.getTime() + (durationMinutes - blockMinutes) * MINUTE_MS) : null;
     const [pricingRules, terms] = await Promise.all([
-      limitReads(() => this.availability.findPricingRules(resource.id, lastBlockStart)),
+      lastBlockStart ? limitReads(() => this.availability.findPricingRules(resource.id, lastBlockStart)) : Promise.resolve([]),
       limitReads(() => this.termsFor(venue.id, resource.categoryId, termsCache)),
     ]);
     const startPrices = startTimes.map((t) => priceBooking(pricingRules, t, durationMinutes, blockMinutes, venue.timezone));

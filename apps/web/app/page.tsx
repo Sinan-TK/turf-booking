@@ -965,13 +965,16 @@ function VenueGroupCard({
   // A re-search can drop the picked unit (a filter, a new day): fall back to the first one.
   const unit = units.find((u) => u.resource.id === pickedId) ?? units[0]!;
   const openSlots = units.reduce((n, u) => n + u.availableStartTimes.length, 0);
+  // Everything is taken, or the day's time has passed: the card stays in the list but greyed out.
+  const soldOut = openSlots === 0;
   const unitPhotos = unit.resource.photoUrls ?? [];
   const photos = unitPhotos.length > 0 ? unitPhotos : venue.photoUrl ? [venue.photoUrl] : [];
 
   return (
     <article
       aria-label={venue.name}
-      className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm transition-shadow duration-300 hover:shadow-lg"
+      data-sold-out={soldOut ? 'true' : undefined}
+      className={`flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm transition-shadow duration-300 hover:shadow-lg ${soldOut ? 'opacity-70 grayscale' : ''}`}
     >
       <CardGallery
         key={unit.resource.id}
@@ -979,7 +982,7 @@ function VenueGroupCard({
         iconKey={unit.category?.iconKey ?? 'category'}
         iconSvg={unit.category?.iconSvg}
         alt={`${venue.name}, ${unit.resource.name}`}
-        badge={`${openSlots} slot${openSlots === 1 ? '' : 's'} open`}
+        badge={soldOut ? 'No slots left' : `${openSlots} slot${openSlots === 1 ? '' : 's'} open`}
         saved={saved}
         onToggleSave={onToggleSave}
         venueName={venue.name}
@@ -1020,8 +1023,10 @@ function VenueGroupCard({
                 <CategoryIcon iconKey={u.category?.iconKey ?? 'category'} iconSvg={u.category?.iconSvg} className={`text-[1.125rem] ${on ? 'text-white' : 'text-slate-500'}`} />
                 <span className="min-w-0">
                   <span className="block truncate text-xs font-bold leading-tight">{u.resource.name}</span>
-                  {u.price && (
-                    <span className={`block text-xs font-semibold ${on ? 'text-brand-100' : 'text-brand-700'}`}>{formatPrice(u.price)}</span>
+                  {u.availableStartTimes.length === 0 ? (
+                    <span className={`block text-xs font-semibold ${on ? 'text-white/80' : 'text-slate-400'}`}>No slots left</span>
+                  ) : (
+                    u.price && <span className={`block text-xs font-semibold ${on ? 'text-brand-100' : 'text-brand-700'}`}>{formatPrice(u.price)}</span>
                   )}
                 </span>
               </button>
@@ -1342,14 +1347,25 @@ function UnitPanel({ result: r, liveResult, durationMinutes: requestedDuration, 
           <ErrorBanner message={bookError} />
         </div>
       )}
-      <button
-        type="button"
-        onClick={() => setModalOpen(true)}
-        className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-700 text-sm font-bold text-white shadow-glow transition hover:bg-brand-800 active:scale-[0.99]"
-      >
-        <Icon name="book" className="text-[1.125rem]" />
-        Book Now
-      </button>
+      {r.availableStartTimes.length === 0 ? (
+        <button
+          type="button"
+          disabled
+          className="flex h-12 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-slate-200 text-sm font-bold text-slate-500"
+        >
+          <Icon name="event_busy" className="text-[1.125rem]" />
+          No slots left for this day
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setModalOpen(true)}
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-700 text-sm font-bold text-white shadow-glow transition hover:bg-brand-800 active:scale-[0.99]"
+        >
+          <Icon name="book" className="text-[1.125rem]" />
+          Book Now
+        </button>
+      )}
       {modalOpen && (
         <SlotBookingModal
           result={liveResult}
