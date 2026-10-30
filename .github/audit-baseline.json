@@ -1,0 +1,117 @@
+{
+  "_about": "High and critical advisories that were reviewed and accepted for now. scripts/audit-check.mjs fails on any high or critical advisory that is not listed here, and on a listed one after its reviewBy date. Remove an entry as soon as the advisory is fixed.",
+  "accepted": [
+    {
+      "id": "GHSA-2464-fhr4-w9xw",
+      "package": "next",
+      "severity": "critical",
+      "reason": "Next.js 14.2 is fixed only in 15.x (a major upgrade, tracked as its own piece of work). Mitigations in place: the image optimizer is switched off (images.unoptimized), no Server Actions, i18n, rewrites or Pages Router are used, production runs on Linux, and a nonce-based CSP is set by our own middleware, which ignores any inbound CSP header.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "id": "GHSA-2xp9-vwfh-vxw4",
+      "package": "next",
+      "severity": "critical",
+      "reason": "Next.js 14.2 is fixed only in 15.x (a major upgrade, tracked as its own piece of work). Mitigations in place: the image optimizer is switched off (images.unoptimized), no Server Actions, i18n, rewrites or Pages Router are used, production runs on Linux, and a nonce-based CSP is set by our own middleware, which ignores any inbound CSP header.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "id": "GHSA-36qx-fr4f-26g5",
+      "package": "next",
+      "severity": "high",
+      "reason": "Next.js 14.2 is fixed only in 15.x (a major upgrade, tracked as its own piece of work). Mitigations in place: the image optimizer is switched off (images.unoptimized), no Server Actions, i18n, rewrites or Pages Router are used, production runs on Linux, and a nonce-based CSP is set by our own middleware, which ignores any inbound CSP header.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "id": "GHSA-89xv-2m56-2m9x",
+      "package": "next",
+      "severity": "high",
+      "reason": "Next.js 14.2 is fixed only in 15.x (a major upgrade, tracked as its own piece of work). Mitigations in place: the image optimizer is switched off (images.unoptimized), no Server Actions, i18n, rewrites or Pages Router are used, production runs on Linux, and a nonce-based CSP is set by our own middleware, which ignores any inbound CSP header.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "id": "GHSA-8h8q-6873-q5fj",
+      "package": "next",
+      "severity": "high",
+      "reason": "Next.js 14.2 is fixed only in 15.x (a major upgrade, tracked as its own piece of work). Mitigations in place: the image optimizer is switched off (images.unoptimized), no Server Actions, i18n, rewrites or Pages Router are used, production runs on Linux, and a nonce-based CSP is set by our own middleware, which ignores any inbound CSP header.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "id": "GHSA-c4j6-fc7j-m34r",
+      "package": "next",
+      "severity": "high",
+      "reason": "Next.js 14.2 is fixed only in 15.x (a major upgrade, tracked as its own piece of work). Mitigations in place: the image optimizer is switched off (images.unoptimized), no Server Actions, i18n, rewrites or Pages Router are used, production runs on Linux, and a nonce-based CSP is set by our own middleware, which ignores any inbound CSP header.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "id": "GHSA-h25m-26qc-wcjf",
+      "package": "next",
+      "severity": "high",
+      "reason": "Next.js 14.2 is fixed only in 15.x (a major upgrade, tracked as its own piece of work). Mitigations in place: the image optimizer is switched off (images.unoptimized), no Server Actions, i18n, rewrites or Pages Router are used, production runs on Linux, and a nonce-based CSP is set by our own middleware, which ignores any inbound CSP header.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "id": "GHSA-m99w-x7hq-7vfj",
+      "package": "next",
+      "severity": "high",
+      "reason": "Next.js 14.2 is fixed only in 15.x (a major upgrade, tracked as its own piece of work). Mitigations in place: the image optimizer is switched off (images.unoptimized), no Server Actions, i18n, rewrites or Pages Router are used, production runs on Linux, and a nonce-based CSP is set by our own middleware, which ignores any inbound CSP header.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "id": "GHSA-p293-qw3h-jr36",
+      "package": "next",
+      "severity": "critical",
+      "reason": "Next.js 14.2 is fixed only in 15.x (a major upgrade, tracked as its own piece of work). Mitigations in place: the image optimizer is switched off (images.unoptimized), no Server Actions, i18n, rewrites or Pages Router are used, production runs on Linux, and a nonce-based CSP is set by our own middleware, which ignores any inbound CSP header.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "id": "GHSA-p3m5-59mp-jv5r",
+      "package": "next",
+      "severity": "high",
+      "reason": "Next.js 14.2 is fixed only in 15.x (a major upgrade, tracked as its own piece of work). Mitigations in place: the image optimizer is switched off (images.unoptimized), no Server Actions, i18n, rewrites or Pages Router are used, production runs on Linux, and a nonce-based CSP is set by our own middleware, which ignores any inbound CSP header.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "id": "GHSA-p9j2-gv94-2wf4",
+      "package": "next",
+      "severity": "high",
+      "reason": "Next.js 14.2 is fixed only in 15.x (a major upgrade, tracked as its own piece of work). Mitigations in place: the image optimizer is switched off (images.unoptimized), no Server Actions, i18n, rewrites or Pages Router are used, production runs on Linux, and a nonce-based CSP is set by our own middleware, which ignores any inbound CSP header.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "id": "GHSA-q4gf-8mx6-v5v3",
+      "package": "next",
+      "severity": "high",
+      "reason": "Next.js 14.2 is fixed only in 15.x (a major upgrade, tracked as its own piece of work). Mitigations in place: the image optimizer is switched off (images.unoptimized), no Server Actions, i18n, rewrites or Pages Router are used, production runs on Linux, and a nonce-based CSP is set by our own middleware, which ignores any inbound CSP header.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "id": "GHSA-6g55-p6wh-862q",
+      "package": "postcss",
+      "severity": "high",
+      "reason": "Bundled inside Next.js 14 (build-time CSS tooling, not fed untrusted input at runtime). Goes away with the Next.js 15 upgrade.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "id": "GHSA-r28c-9q8g-f849",
+      "package": "postcss",
+      "severity": "high",
+      "reason": "Bundled inside Next.js 14 (build-time CSS tooling, not fed untrusted input at runtime). Goes away with the Next.js 15 upgrade.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "id": "GHSA-68fv-2mgg-jv7q",
+      "package": "source-map-js",
+      "severity": "high",
+      "reason": "Bundled inside Next.js 14 (build-time tooling). Goes away with the Next.js 15 upgrade.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "id": "GHSA-mrhx-c7xc-m3w5",
+      "package": "zod",
+      "severity": "high",
+      "reason": "Fixed only in zod 4 (a major upgrade that changes the API used by every DTO). Input is size-limited at the API; schedule with the framework upgrades.",
+      "reviewBy": "2026-12-31"
+    }
+  ]
+}

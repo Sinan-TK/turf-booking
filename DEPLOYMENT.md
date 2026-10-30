@@ -104,3 +104,12 @@ node apps/api/dist/main.js
 - Migration `20261031000000_unit_min_max_duration` gives each existing unit its shortest booking from its smallest priced duration (a unit with no prices takes its venue type's value) and switches off (not deletes) its prices for longer durations. Multi-hour discounts of the old per-duration model therefore go away; owners can delete the switched-off rows from the prices page. Existing bookings are untouched.
 - Pooled groups (kayak fleets) still use one price per duration.
 - A search with no `durationMinutes` shows every unit at its own shortest booking; with one, units that offer that length use it and the others fall back to their own shortest (each result says which in `durationMinutes`).
+
+## Dependency vulnerability checks
+
+- `.github/workflows/dependency-audit.yml` runs weekly (Monday 04:00 UTC), on pull requests that touch a `package.json`, the lockfile or the baseline, and on demand. It runs `node scripts/audit-check.mjs` (also `pnpm audit:check` locally).
+- The gate fails on any HIGH or CRITICAL advisory in the production dependencies that is not listed in `.github/audit-baseline.json`, and on a listed one after its `reviewBy` date. Moderate and low advisories are reported only.
+- The baseline holds what was reviewed and accepted for now, each with a reason. Today that is mostly Next.js 14 (fixed only in 15.x: a separate migration), zod 3 and the build tools bundled in Next. Remove an entry when the advisory is fixed (the script lists entries that no longer apply).
+- `.github/dependabot.yml` opens weekly update PRs (npm grouped minor/patch, GitHub Actions, Docker). Major upgrades of Next, NestJS and zod are left out on purpose.
+- Transitive fixes that need no major upgrade are pinned in the root `package.json` under `pnpm.overrides`.
+- The image optimizer is switched off in all three Next apps (`images.unoptimized`), as none of them use `next/image`.
