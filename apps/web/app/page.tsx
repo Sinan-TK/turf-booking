@@ -464,10 +464,10 @@ export default function HomePage() {
             onClick={() => setPickerOpen(true)}
             aria-label={`Change location, now ${locationLabel}`}
             aria-haspopup="dialog"
-            className="group flex h-11 min-w-0 max-w-[65%] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-left transition hover:border-brand-400 active:scale-[0.98] md:h-12 md:w-56 md:max-w-none xl:w-64"
+            className="group flex h-11 min-w-0 max-w-[65%] items-center gap-1.5 px-1 text-left transition active:opacity-70 md:h-12 md:w-auto md:max-w-[16rem] md:shrink-0"
           >
             <Icon name="location_on" className="text-[1.125rem] text-brand-600" />
-            <span className="min-w-0 flex-1 truncate text-sm font-bold text-slate-900">{locationLabel}</span>
+            <span className="min-w-0 truncate text-sm font-bold text-slate-900 underline decoration-transparent decoration-2 underline-offset-4 transition group-hover:decoration-brand-600">{locationLabel}</span>
             <Icon name="expand_more" className="text-[1rem] text-slate-400 transition group-hover:text-brand-600" />
           </button>
           <div className="ml-auto md:order-last">
