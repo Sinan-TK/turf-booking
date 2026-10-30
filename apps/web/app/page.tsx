@@ -497,15 +497,16 @@ export default function HomePage() {
                 <Icon name="close" className="text-[0.9375rem]" />
               </button>
             )}
-            {/* Wide screens: pick several venue types at once, as part of the same bar. */}
+            {/* Pick several venue types at once, as part of the same bar (the word is left off on phones to save room). */}
             <button
               type="button"
               onClick={() => setTypePickerOpen(true)}
+              aria-label={form.categorySlugs.length > 0 ? `Venue types, ${form.categorySlugs.length} selected` : "Venue types"}
               aria-haspopup="dialog"
-              className={`-mr-3.5 ml-1 hidden h-full flex-shrink-0 items-center gap-2 border-l px-4 text-sm font-bold transition md:inline-flex ${form.categorySlugs.length > 0 ? 'border-brand-600 bg-brand-50 text-brand-800' : 'border-slate-200 bg-transparent text-slate-700 hover:bg-slate-100'}`}
+              className={`-mr-3.5 ml-1 inline-flex h-full flex-shrink-0 items-center gap-1.5 border-l px-3 text-sm font-bold transition sm:gap-2 sm:px-4 ${form.categorySlugs.length > 0 ? 'border-brand-600 bg-brand-50 text-brand-800' : 'border-slate-200 bg-transparent text-slate-700 hover:bg-slate-100'}`}
             >
               <Icon name="category" className="text-[1.125rem] text-brand-600" />
-              Venue types
+              <span className="hidden sm:inline">Venue types</span>
               {form.categorySlugs.length > 0 && (
                 <span className="rounded-md bg-brand-700 px-1.5 text-[0.6875rem] leading-[1.125rem] text-white">{form.categorySlugs.length}</span>
               )}
@@ -538,25 +539,6 @@ export default function HomePage() {
               </button>
             );
           })}
-        </div>
-        {/* Phones have no Venue types button in the header, so the types are chips here. */}
-        <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto scrollbar-hide md:hidden">
-          {[{ slug: '', name: 'All', iconKey: 'apps' }, ...categories].map((c) => {
-            const isActive = c.slug ? form.categorySlugs.includes(c.slug) : form.categorySlugs.length === 0;
-            return (
-              <button
-                key={c.slug || 'all'}
-                type="button"
-                aria-pressed={isActive}
-                onClick={() => selectCategories(c.slug ? [c.slug] : [])}
-                className={`inline-flex h-10 flex-shrink-0 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition active:scale-95 ${isActive ? 'border-brand-700 bg-brand-700 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-brand-400'}`}
-              >
-                {c.slug && <CategoryIcon iconKey={c.iconKey} iconSvg={(c as { iconSvg?: string | null }).iconSvg} className={`text-[1rem] ${isActive ? 'text-white' : 'text-slate-600'}`} />}
-                <span>{c.name}</span>
-              </button>
-            );
-          })}
-          {categoriesLoading && [0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-24 flex-shrink-0 rounded-xl" />)}
         </div>
       </section>
       {activeCategory && activeCategory.unitTypes.length > 0 && (
