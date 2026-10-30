@@ -21,8 +21,8 @@ export const ADVANCE_DAYS_HEADER = 'X-Advance-Days';
 
 /** Venues worked on side by side, and the most database reads in flight at once for one search. */
 const DEFAULT_ADVANCE_DAYS = 14;
-const VENUE_CHUNK = 3;
-const LOAD_CONCURRENCY = 8;
+const VENUE_CHUNK = 5;
+const LOAD_CONCURRENCY = 24;
 
 const EARTH_RADIUS_KM = 6371;
 const MINUTE_MS = 60_000;
@@ -217,12 +217,15 @@ export class AvailabilityService {
     limitReads: ReturnType<typeof pLimit>,
     fromUnit: number,
   ): Promise<Array<{ unitIndex: number; result: SearchResult }>> {
-    const allResources = await limitReads(() => this.availability.findBookableResources(venue.id, params.groundType, categoryIds));
+    // The unit list and the venue's booking rules do not depend on each other: read together.
+    const [allResources, policySet] = await Promise.all([
+      limitReads(() => this.availability.findBookableResources(venue.id, params.groundType, categoryIds)),
+      limitReads(() => this.policies.forVenue(venue, now)),
+    ]);
     // A text filter keeps a venue's units when the venue's name or address matches, else only units whose sub-type does.
     const venueMatches = !needle || venue.name.toLowerCase().includes(needle) || venue.address.toLowerCase().includes(needle);
     const resources = venueMatches ? allResources : allResources.filter((r) => r.groundType.toLowerCase().includes(needle!));
     if (resources.length === 0 || fromUnit >= resources.length) return [];
-    const policySet = await limitReads(() => this.policies.forVenue(venue, now));
 
     // Resolved per-venue, in that venue's own timezone — candidate venues from a geo/district search can
     // legitimately span timezones on a global platform, and "today"/weekday must mean the venue's local
@@ -265,11 +268,16 @@ export class AvailabilityService {
     const durationMinutes =
       params.durationMinutes !== undefined && isDurationAllowed(policy, params.durationMinutes) ? params.durationMinutes : policy.minDurationMin;
 
-    const openWindows = await limitReads(() => this.schedule.openWindows({ resourceId: resource.id }, day.localDay, durationMinutes));
+    const [openWindows, footprintIds, terms] = await Promise.all([
+      limitReads(() => this.schedule.openWindows({ resourceId: resource.id }, day.localDay, durationMinutes)),
+      limitReads(() => this.resources.getFootprintResourceIds(resource.id)),
+      limitReads(() => this.termsFor(venue.id, resource.categoryId, termsCache)),
+    ]);
     const startTimes = await limitReads(() =>
       this.candidateStartTimes({
         venueId: venue.id,
         resourceId: resource.id,
+        footprintIds,
         policy,
         durationMinutes,
         windowStart: day.windowStart,
@@ -294,10 +302,7 @@ export class AvailabilityService {
     const blockMinutes = policy.minDurationMin;
     const latestStart = startTimes.length > 0 ? startTimes.reduce((a, b) => (a > b ? a : b)) : null;
     const lastBlockStart = latestStart ? new Date(latestStart.getTime() + (durationMinutes - blockMinutes) * MINUTE_MS) : null;
-    const [pricingRules, terms] = await Promise.all([
-      lastBlockStart ? limitReads(() => this.availability.findPricingRules(resource.id, lastBlockStart)) : Promise.resolve([]),
-      limitReads(() => this.termsFor(venue.id, resource.categoryId, termsCache)),
-    ]);
+    const pricingRules = lastBlockStart ? await limitReads(() => this.availability.findPricingRules(resource.id, lastBlockStart)) : [];
     const startPrices = startTimes.map((t) => priceBooking(pricingRules, t, durationMinutes, blockMinutes, venue.timezone));
     const priced = startPrices.filter((r): r is NonNullable<typeof r> => r !== null);
     const pricingRule = priced.reduce<(typeof priced)[number] | null>((low, r) => (low === null || r.amount < low.amount ? r : low), null);
@@ -434,6 +439,7 @@ export class AvailabilityService {
   private async candidateStartTimes(args: {
     venueId: string;
     resourceId: string;
+    footprintIds: string[];
     policy: ResolvedPolicy;
     durationMinutes: number;
     windowStart: Date;
@@ -472,18 +478,16 @@ export class AvailabilityService {
     const rangeStart = new Date(Math.min(...bounds.map((b) => b.from.getTime())));
     const rangeEnd = new Date(Math.max(...bounds.map((b) => b.to.getTime())));
 
-    const footprintIds = await this.resources.getFootprintResourceIds(args.resourceId);
-    const existingLocks = await this.availability.findOverlappingLocks(
-      footprintIds,
-      new Date(rangeStart.getTime() - padBeforeMs),
-      new Date(rangeEnd.getTime() + padAfterMs),
-    );
+    const footprintIds = args.footprintIds;
     // Owner-configured blackouts: venue-wide blocks apply to every
     // resource; resource-specific blocks only to that resource's own
     // footprint (blocking a 5s half doesn't block the 7s full ground it
     // composes — a documented scope limit, not an oversight). Blackouts
     // are not buffer-padded.
-    const blocks = await this.schedule.findBlocks(args.venueId, { footprintIds }, rangeStart, rangeEnd);
+    const [existingLocks, blocks] = await Promise.all([
+      this.availability.findOverlappingLocks(footprintIds, new Date(rangeStart.getTime() - padBeforeMs), new Date(rangeEnd.getTime() + padAfterMs)),
+      this.schedule.findBlocks(args.venueId, { footprintIds }, rangeStart, rangeEnd),
+    ]);
 
     const midnightMs = localMidnight.toMillis();
     const candidates = new Map<number, Date>();
