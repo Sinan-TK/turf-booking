@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DateTime } from 'luxon';
 import { commercialTermsSchema, commissionTierFor, fromMinor, toMinor } from '@venue/shared';
@@ -65,7 +65,9 @@ export class PayoutsService {
           update: {},
           create: { ...key, totalOwnerAmount: 0, settlementCount: 0 },
         });
-        if (row.status === 'PAID') return null;
+        // Lock the payout while it is filled, so it cannot be marked paid half way through (a paid payout never changes).
+        const locked = await tx.$queryRaw<Array<{ status: string }>>`SELECT status::text AS status FROM payouts WHERE id = ${row.id}::uuid FOR UPDATE`;
+        if (row.status === 'PAID' || locked[0]?.status === 'PAID') return null;
         await tx.bookingSettlement.updateMany({
           where: { payoutId: null, organizationId: g.organizationId, currency: g.currency, slotStart: { lt: periodEnd } },
           data: { payoutId: row.id },
@@ -123,15 +125,31 @@ export class PayoutsService {
     return payout;
   }
 
-  /** The admin has transferred the money: record the bank reference. */
-  async markPaid(id: string, reference: string, actor: AuthContext) {
+  /**
+   * The admin has transferred the money: record the bank reference. When the admin says which amount they reviewed
+   * (`expectedTotal`), the payout is only closed if it still has exactly that total: a late settlement can join an unpaid payout,
+   * and the transfer would then not match what is recorded. The check and the change are one atomic update, so two admins paying at
+   * the same moment cannot both succeed, and nothing can slip in between.
+   */
+  async markPaid(id: string, reference: string, actor: AuthContext, expectedTotal?: string) {
     const payout = await this.prisma.client.payout.findUnique({ where: { id } });
     if (!payout) throw new NotFoundException('Payout not found');
     if (payout.status === 'PAID') throw new BadRequestException('This payout is already marked as paid.');
-    const updated = await this.prisma.client.payout.update({
-      where: { id, status: 'PENDING' },
+    if (expectedTotal !== undefined && !/^\d+(\.\d{1,2})?$/.test(expectedTotal)) {
+      throw new BadRequestException('The reviewed amount is not a valid amount.');
+    }
+    const closed = await this.prisma.client.payout.updateMany({
+      where: { id, status: 'PENDING', ...(expectedTotal !== undefined ? { totalOwnerAmount: new Prisma.Decimal(expectedTotal) } : {}) },
       data: { status: 'PAID', reference, paidAt: new Date(), paidByAdminId: actor.id },
     });
+    if (closed.count === 0) {
+      const now = await this.prisma.client.payout.findUniqueOrThrow({ where: { id } });
+      if (now.status === 'PAID') throw new BadRequestException('This payout is already marked as paid.');
+      throw new ConflictException(
+        `This payout changed after you opened it: it is now ${fromMinor(toMinor(now.totalOwnerAmount.toString()))} for ${now.settlementCount} booking(s). Review it again before paying.`,
+      );
+    }
+    const updated = await this.prisma.client.payout.findUniqueOrThrow({ where: { id } });
     await this.audit.record({
       actor,
       action: 'PAYOUT_MARKED_PAID',

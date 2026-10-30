@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, UseGuards, ParseUUIDPipe } from '@nestjs/common';
 import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -25,7 +25,7 @@ export class SavedVenuesController {
   }
 
   @Delete(':venueId')
-  async unsave(@Param('venueId') venueId: string, @CurrentUser() actor: AuthContext) {
+  async unsave(@Param('venueId', ParseUUIDPipe) venueId: string, @CurrentUser() actor: AuthContext) {
     await this.savedVenues.unsave(actor.id, venueId);
     return { status: 'ok' };
   }

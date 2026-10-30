@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Query, Res, UseGuards, ParseUUIDPipe } from '@nestjs/common';
 import type { Response } from 'express';
 import { parsePage, setTotalCount } from '../common/pagination';
 import { parseDateRange, parseEnumFilter, parseSearch } from '../common/list-filters';
@@ -54,19 +54,19 @@ export class BookingsController {
   }
 
   @Get('me/bookings/:id')
-  getMine(@Param('id') id: string, @CurrentUser() actor: AuthContext) {
+  getMine(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthContext) {
     return this.bookings.getCheckoutViewForCustomer(id, actor);
   }
 
   // What cancelling would return now, and the cancellation deadlines as times.
   @Get('me/bookings/:id/cancellation')
-  cancellationPreview(@Param('id') id: string, @CurrentUser() actor: AuthContext) {
+  cancellationPreview(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthContext) {
     return this.bookings.cancellationPreview(id, actor);
   }
 
   @Post('me/bookings/:id/cancel')
   cancel(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CancelBookingDto,
     @CurrentUser() actor: AuthContext,
   ) {
@@ -115,13 +115,13 @@ export class AdminBookingsController {
   }
 
   @Get(':id')
-  getById(@Param('id') id: string) {
+  getById(@Param('id', ParseUUIDPipe) id: string) {
     return this.bookings.getForAdmin(id);
   }
 
   // Cancels on the venue's behalf: everything paid online back as coins.
   @Post(':id/cancel')
-  cancel(@Param('id') id: string, @Body() dto: CancelBookingDto, @CurrentUser() actor: AuthContext) {
+  cancel(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CancelBookingDto, @CurrentUser() actor: AuthContext) {
     return this.bookings.cancelByStaff(id, dto.reason, actor);
   }
 }
@@ -197,19 +197,19 @@ export class OwnerBookingsController {
 
   // The customer paid the rest at the venue: record it, so the booking shows nothing remaining.
   @Post(':id/collect')
-  collect(@Param('id') id: string, @Body() dto: CollectBalanceDto, @CurrentUser() actor: AuthContext) {
+  collect(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CollectBalanceDto, @CurrentUser() actor: AuthContext) {
     return this.bookings.collectBalance(id, dto.amount, actor);
   }
 
   // Rain, closure, a double sale: the venue cancels (any time before it is played), everything paid online
   // back to the customer as coins. Owner admins and the staff assigned to the venue.
   @Post(':id/cancel')
-  cancel(@Param('id') id: string, @Body() dto: CancelBookingDto, @CurrentUser() actor: AuthContext) {
+  cancel(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CancelBookingDto, @CurrentUser() actor: AuthContext) {
     return this.bookings.cancelByStaff(id, dto.reason, actor);
   }
 
   @Get(':id')
-  async getById(@Param('id') id: string, @CurrentUser() actor: AuthContext) {
+  async getById(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthContext) {
     const booking = await this.bookings.getForOwner(id, actor.organizationId!);
     await this.scope.assertVenue(actor, booking.venue.id);
     return booking;

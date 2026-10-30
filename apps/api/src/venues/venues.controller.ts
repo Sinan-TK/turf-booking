@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards, ParseUUIDPipe } from '@nestjs/common';
 import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -31,7 +31,7 @@ export class VenuesController {
   @Get(':id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.SUPER_ADMIN, Role.VENUE_OWNER)
-  getById(@Param('id') id: string, @CurrentUser() actor: AuthContext) {
+  getById(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthContext) {
     return this.venues.getById(id, actor);
   }
 
@@ -39,7 +39,7 @@ export class VenuesController {
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.SUPER_ADMIN, Role.VENUE_OWNER)
   @OwnerRoles('OWNER_ADMIN')
-  update(@Param('id') id: string, @Body() dto: UpdateVenueDto, @CurrentUser() actor: AuthContext) {
+  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateVenueDto, @CurrentUser() actor: AuthContext) {
     return this.venues.update(id, dto, actor);
   }
 

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards, ParseUUIDPipe } from '@nestjs/common';
 import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -30,7 +30,7 @@ export class CoinsController {
   // shared one that could accept a split amount.
   @Post('bookings/:id/pay-with-coins')
   @Roles(Role.CUSTOMER)
-  payWithCoins(@Param('id') bookingId: string, @CurrentUser() actor: AuthContext) {
+  payWithCoins(@Param('id', ParseUUIDPipe) bookingId: string, @CurrentUser() actor: AuthContext) {
     return this.coins.redeemForBooking(bookingId, actor);
   }
 

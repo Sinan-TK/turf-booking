@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards, ParseUUIDPipe } from '@nestjs/common';
 import type { Response } from 'express';
 import { parsePage, setTotalCount } from '../common/pagination';
 import { parseEnumFilter, parseSearch } from '../common/list-filters';
@@ -29,7 +29,7 @@ export class SupportController {
   }
 
   @Get(':id')
-  get(@Param('id') id: string, @CurrentUser() actor: AuthContext) {
+  get(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthContext) {
     return this.support.getForCustomer(id, actor);
   }
 }
@@ -66,17 +66,17 @@ export class AdminSupportController {
   }
 
   @Get(':id')
-  getById(@Param('id') id: string) {
+  getById(@Param('id', ParseUUIDPipe) id: string) {
     return this.support.getForAdmin(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateTicketDto) {
+  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateTicketDto) {
     return this.support.updateForAdmin(id, dto);
   }
 
   @Post(':id/messages')
-  reply(@Param('id') id: string, @Body() dto: ReplyTicketDto, @CurrentUser() actor: AuthContext) {
+  reply(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReplyTicketDto, @CurrentUser() actor: AuthContext) {
     return this.support.replyForAdmin(id, dto.body, actor);
   }
 }

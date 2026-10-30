@@ -53,6 +53,7 @@ export default function PayoutDetailPage() {
   if (!data) return null;
 
   async function markPaid() {
+    if (!data) return;
     if (reference.trim().length < 3) {
       setFieldError('Enter the bank transfer reference (UTR).');
       return;
@@ -61,10 +62,12 @@ export default function PayoutDetailPage() {
     setApiError(null);
     setSaving(true);
     try {
-      await api.post(`/admin/payouts/${id}/mark-paid`, { reference: reference.trim() });
+      // The amount on screen is the one being paid: if a late booking joined this payout meanwhile, the server refuses and says so.
+      await api.post(`/admin/payouts/${id}/mark-paid`, { reference: reference.trim(), totalOwnerAmount: data.totalOwnerAmount });
       refetch();
     } catch (err) {
       setApiError(err instanceof ApiError ? err.message : 'Could not mark as paid');
+      if (err instanceof ApiError && err.status === 409) refetch(); // show the new total
     } finally {
       setSaving(false);
     }

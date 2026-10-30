@@ -16,7 +16,11 @@ import { PayoutsService } from './payouts.service';
 import { SettlementsService } from './settlements.service';
 
 class MarkPaidDto extends createZodDto(
-  z.object({ reference: z.string().trim().min(3, 'Enter the bank transfer reference.').max(100) }),
+  z.object({
+    reference: z.string().trim().min(3, 'Enter the bank transfer reference.').max(100),
+    // The amount the admin reviewed and transferred. If the payout has changed since (a late settlement joined it), paying is refused.
+    totalOwnerAmount: z.union([z.string(), z.number()]).transform((v) => String(v)).optional(),
+  }),
 ) {}
 
 class RunDto extends createZodDto(
@@ -78,7 +82,7 @@ export class AdminPayoutsController {
 
   @Post(':id/mark-paid')
   markPaid(@Param('id', ParseUUIDPipe) id: string, @Body() dto: MarkPaidDto, @CurrentUser() actor: AuthContext) {
-    return this.payouts.markPaid(id, dto.reference, actor);
+    return this.payouts.markPaid(id, dto.reference, actor, dto.totalOwnerAmount);
   }
 }
 

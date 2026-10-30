@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards, ParseUUIDPipe } from '@nestjs/common';
 import type { Response } from 'express';
 import { parsePage, setTotalCount } from '../common/pagination';
 import { parseEnumFilter, parseSearch } from '../common/list-filters';
@@ -30,19 +30,19 @@ export class OwnerOrganizationsController {
   }
 
   @Get(':id')
-  getById(@Param('id') id: string) {
+  getById(@Param('id', ParseUUIDPipe) id: string) {
     return this.orgs.getOrganizationDetail(id);
   }
 
   @Patch(':id/status')
-  setStatus(@Param('id') id: string, @Body() dto: SetOrganizationStatusDto, @CurrentUser() actor: AuthContext) {
+  setStatus(@Param('id', ParseUUIDPipe) id: string, @Body() dto: SetOrganizationStatusDto, @CurrentUser() actor: AuthContext) {
     return this.orgs.setStatus(id, dto.status, dto.reason, actor);
   }
 
   @Patch(':id/owner-users/:userId/status')
   setOwnerUserStatus(
-    @Param('id') id: string,
-    @Param('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
     @Body() dto: SetOwnerUserStatusDto,
     @CurrentUser() actor: AuthContext,
   ) {
@@ -51,7 +51,7 @@ export class OwnerOrganizationsController {
 
   @Post(':id/owner-users')
   createOwnerUser(
-    @Param('id') organizationId: string,
+    @Param('id', ParseUUIDPipe) organizationId: string,
     @Body() dto: CreateOwnerUserDto,
     @CurrentUser() actor: AuthContext,
   ) {
@@ -61,7 +61,7 @@ export class OwnerOrganizationsController {
   // ?search= (name or email), ?role=, ?status=, ?limit=&offset=; the match count is in X-Total-Count.
   @Get(':id/owner-users')
   async listOwnerUsers(
-    @Param('id') organizationId: string,
+    @Param('id', ParseUUIDPipe) organizationId: string,
     @Query('search') search?: string,
     @Query('role') role?: string,
     @Query('status') status?: string,

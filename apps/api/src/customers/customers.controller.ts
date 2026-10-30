@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Query, Res, UseGuards, ParseUUIDPipe } from '@nestjs/common';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -48,12 +48,12 @@ export class CustomersController {
   }
 
   @Get(':id')
-  getById(@Param('id') id: string) {
+  getById(@Param('id', ParseUUIDPipe) id: string) {
     return this.customers.getForAdmin(id);
   }
 
   @Patch(':id/status')
-  setStatus(@Param('id') id: string, @Body() dto: SetCustomerStatusDto, @CurrentUser() admin: AuthContext) {
+  setStatus(@Param('id', ParseUUIDPipe) id: string, @Body() dto: SetCustomerStatusDto, @CurrentUser() admin: AuthContext) {
     return this.customers.setStatusForAdmin(id, dto.status, dto.reason, admin);
   }
 }

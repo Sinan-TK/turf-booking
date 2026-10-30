@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards, ParseUUIDPipe } from '@nestjs/common';
 import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -18,7 +18,7 @@ export class PoliciesController {
   }
 
   @Get('cancellation-policies/resolve/:venueId')
-  resolveCancellationPolicy(@Param('venueId') venueId: string) {
+  resolveCancellationPolicy(@Param('venueId', ParseUUIDPipe) venueId: string) {
     return this.policies.resolveCancellationPolicy(venueId);
   }
 
@@ -28,7 +28,7 @@ export class PoliciesController {
   }
 
   @Get('commissions/resolve/:organizationId')
-  resolveCommission(@Param('organizationId') organizationId: string) {
+  resolveCommission(@Param('organizationId', ParseUUIDPipe) organizationId: string) {
     return this.policies.resolveCommission(organizationId);
   }
 }

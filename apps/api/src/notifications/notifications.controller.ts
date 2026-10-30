@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Patch, Query, UseGuards, ParseUUIDPipe } from '@nestjs/common';
 import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -35,7 +35,7 @@ export class OwnerNotificationsController {
   }
 
   @Patch(':id/read')
-  async markAsRead(@Param('id') id: string, @CurrentUser() actor: AuthContext) {
+  async markAsRead(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthContext) {
     await this.notifications.markAsRead(actor.id, id);
     return { status: 'ok' };
   }

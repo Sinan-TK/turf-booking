@@ -15,7 +15,8 @@ import type { PrismaClient } from '@prisma/client';
  * deletes a parent of something it keeps, and it runs in one transaction: any problem leaves everything as it was.
  */
 const SEEDS: Record<string, string> = {
-  venue_categories: `"slug" LIKE 'PW\_%' OR "slug" LIKE 'E2E\_%'`,
+  // The backslash is doubled so SQL receives \_ (a literal underscore); a single one would be dropped by the template string.
+  venue_categories: `"slug" LIKE 'PW\\_%' OR "slug" LIKE 'E2E\\_%'`,
   venues: `"name" LIKE 'PW %' OR "name" LIKE 'E2E %'`,
   owner_organizations: `"name" LIKE 'PW %' OR "name" LIKE 'E2E %'`,
   venue_owner_users: `"email" LIKE 'pw-%@%' OR "email" LIKE 'e2e-%@%'`,

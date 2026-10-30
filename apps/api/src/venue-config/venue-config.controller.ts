@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards, ParseUUIDPipe } from '@nestjs/common';
 import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -34,12 +34,12 @@ export class VenueConfigController {
   }
 
   @Patch('resources/pricing-rules/:id')
-  updatePricingRule(@Param('id') id: string, @Body() dto: UpdatePricingRuleDto, @CurrentUser() actor: AuthContext) {
+  updatePricingRule(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdatePricingRuleDto, @CurrentUser() actor: AuthContext) {
     return this.config.updatePricingRule(id, dto, actor);
   }
 
   @Delete('resources/pricing-rules/:id')
-  deletePricingRule(@Param('id') id: string, @CurrentUser() actor: AuthContext) {
+  deletePricingRule(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthContext) {
     return this.config.deletePricingRule(id, actor);
   }
 
@@ -54,7 +54,7 @@ export class VenueConfigController {
   }
 
   @Delete('venue-config/blocked-dates/:id')
-  deleteBlockedDate(@Param('id') id: string, @CurrentUser() actor: AuthContext) {
+  deleteBlockedDate(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthContext) {
     return this.config.deleteBlockedDate(id, actor);
   }
 }
