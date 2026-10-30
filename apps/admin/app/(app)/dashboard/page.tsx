@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useFetch } from '@/lib/use-fetch';
 import { Icon, type IconName } from '@/components/icons';
+import { SystemStatusCard } from '@/components/api-status';
 import { Card, ErrorBanner, PageHeader, SkeletonStatGrid, StatCard } from '@/components/ui';
 
 interface Summary {
@@ -93,6 +94,10 @@ export default function DashboardPage() {
           </div>
         </>
       )}
+
+      <div className="mt-10">
+        <SystemStatusCard />
+      </div>
 
       <h2 className="mb-3 mt-10 text-sm font-semibold text-gray-900">Quick actions</h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">

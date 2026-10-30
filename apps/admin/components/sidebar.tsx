@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '../lib/auth-context';
 import { Icon, type IconName } from './icons';
 import { ConfirmLogout } from './confirm-logout';
+import { ApiStatusPill } from './api-status';
 
 const NAV_GROUPS: Array<{ title: string; items: Array<{ href: string; label: string; icon: IconName }> }> = [
   {
@@ -173,6 +174,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         </nav>
 
         <div className="border-t border-white/10 p-3">
+          <ApiStatusPill expanded={expanded} />
           <button
             onClick={() => setConfirmingLogout(true)}
             title="Log out"
