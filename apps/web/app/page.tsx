@@ -473,7 +473,7 @@ export default function HomePage() {
           <div className="ml-auto md:order-last">
             <AccountMenu />
           </div>
-          <div className="nav-search order-last flex h-11 w-full items-center rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 transition-[box-shadow,border-color,background-color] hover:border-slate-300 focus-within:border-brand-500 focus-within:bg-white md:order-none md:h-12 md:w-auto md:max-w-2xl md:flex-1">
+          <div className="nav-search order-last flex h-11 w-full items-center rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 transition-[box-shadow,border-color,background-color] hover:border-slate-300 focus-within:border-brand-500 focus-within:bg-white md:order-none md:h-12 md:w-auto md:max-w-3xl md:flex-1">
             <Icon name="search" className="text-[1.125rem] text-slate-500" />
             <input
               ref={searchBox}
@@ -497,21 +497,21 @@ export default function HomePage() {
                 <Icon name="close" className="text-[0.9375rem]" />
               </button>
             )}
+            {/* Wide screens: pick several venue types at once, as part of the same bar. */}
+            <button
+              type="button"
+              onClick={() => setTypePickerOpen(true)}
+              aria-haspopup="dialog"
+              className={`-mr-3.5 ml-1 hidden h-full flex-shrink-0 items-center gap-2 border-l px-4 text-sm font-bold transition md:inline-flex ${form.categorySlugs.length > 0 ? 'border-brand-600 bg-brand-50 text-brand-800' : 'border-slate-200 bg-transparent text-slate-700 hover:bg-slate-100'}`}
+            >
+              <Icon name="category" className="text-[1.125rem] text-brand-600" />
+              Venue types
+              {form.categorySlugs.length > 0 && (
+                <span className="rounded-none bg-brand-700 px-1.5 text-[0.6875rem] leading-[1.125rem] text-white">{form.categorySlugs.length}</span>
+              )}
+              <Icon name="expand_more" className="text-[1rem] text-slate-400" />
+            </button>
           </div>
-          {/* Wide screens: pick several venue types at once. */}
-          <button
-            type="button"
-            onClick={() => setTypePickerOpen(true)}
-            aria-haspopup="dialog"
-            className={`hidden h-12 flex-shrink-0 items-center gap-2 rounded-xl border px-4 text-sm font-bold transition md:inline-flex ${form.categorySlugs.length > 0 ? 'border-brand-600 bg-brand-50 text-brand-800' : 'border-slate-200 bg-white text-slate-800 hover:border-brand-400'}`}
-          >
-            <Icon name="category" className="text-[1.125rem] text-brand-600" />
-            Venue types
-            {form.categorySlugs.length > 0 && (
-              <span className="rounded-none bg-brand-700 px-1.5 text-[0.6875rem] leading-[1.125rem] text-white">{form.categorySlugs.length}</span>
-            )}
-            <Icon name="expand_more" className="text-[1rem] text-slate-400" />
-          </button>
         </div>
       </header>
 
