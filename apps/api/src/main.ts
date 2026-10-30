@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { loadEnv } from '@venue/config';
 import { AppModule } from './app.module';
+import { cspReportContentType } from './health/csp-report.middleware';
 import { LOCAL_MEDIA_DIR } from './storage/storage.service';
 
 // `override: true` is load-bearing, not a style choice: TypeScript
@@ -67,6 +68,7 @@ async function bootstrap() {
   }
 
   app.use(helmet());
+  app.use('/csp-report', cspReportContentType);
   app.use(cookieParser());
   // Without a bucket (development), uploaded photos are served from a local folder. The customer site is another
   // origin, so these files must opt out of helmet's same-origin resource policy or the browser refuses to show them.

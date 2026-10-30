@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import { randomUUID } from 'node:crypto';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module';
+import { cspReportContentType } from '../../src/health/csp-report.middleware';
 import { RazorpayProvider } from '../../src/payments/razorpay.provider';
 import { PAYMENT_PROVIDER } from '../../src/payments/payment-provider.interface';
 import {
@@ -81,6 +82,7 @@ export async function createTestApp(options: { throttle?: boolean } = {}): Promi
   const moduleFixture = await builder.compile();
 
   const app = moduleFixture.createNestApplication({ rawBody: true });
+  app.use('/csp-report', cspReportContentType);
   app.use(cookieParser());
   await app.init();
   return app;

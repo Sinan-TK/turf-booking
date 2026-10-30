@@ -113,3 +113,17 @@ node apps/api/dist/main.js
 - `.github/dependabot.yml` opens weekly update PRs (npm grouped minor/patch, GitHub Actions, Docker). Major upgrades of Next, NestJS and zod are left out on purpose.
 - Transitive fixes that need no major upgrade are pinned in the root `package.json` under `pnpm.overrides`.
 - The image optimizer is switched off in all three Next apps (`images.unoptimized`), as none of them use `next/image`.
+
+## Content Security Policy (web, admin, owner)
+
+Each app's `middleware.ts` sets a policy per request, built by `packages/shared/src/csp.ts`. Scripts: `'self'` plus a fresh nonce and `'strict-dynamic'` (no `unsafe-inline`; `unsafe-eval` only in development). Styles: own files and Google Fonts; style *attributes* are allowed inline (`style-src-attr`). Also `object-src 'none'`, `frame-ancestors 'none'`, `base-uri 'self'`, `form-action 'self'`. Any CSP or `x-nonce` header a visitor sends is discarded. Pages render per request (the root layout reads headers) so the nonce can change each time.
+
+- `CSP_MODE` (set on each web app): `enforce` (default in production) blocks; `report-only` only reports; `off` removes the header. To trial a change, deploy with `report-only` and watch the API log for `[csp]` lines (browsers post to `POST /csp-report`, throttled, logged without query strings, never stored).
+- `NEXT_PUBLIC_API_URL` is added to `connect-src` and `img-src` automatically. Set `CSP_IMG_ORIGINS` (space or comma separated origins) to the public photo storage origin (the host of `STORAGE_PUBLIC_URL`) on every app that shows photos, or production photos will be blocked.
+- Customer site only: Google sign-in, Razorpay checkout (`checkout.razorpay.com`, `api.razorpay.com`, `lumberjack.razorpay.com`) and `style-src-elem 'unsafe-inline'`, because Google's sign-in script writes its button styles as an inline `<style>` and the button renders broken without it. If Razorpay or Google change the hosts they use, the browser console and the API log show the blocked host: add it in `apps/web/middleware.ts`.
+- Admin and owner: map pins from `unpkg.com` and tiles from `*.tile.openstreetmap.org` (images only).
+- `apps/e2e/tests/*/csp.spec.ts` open the main pages and fail on any violation, check a fresh nonce per request, and check a hostile inbound policy is ignored. The Razorpay checkout page itself is not covered by a browser test (it needs a real payment order): after a deploy, make a test payment with `CSP_MODE=report-only` first.
+
+## API health on the Super Admin pages
+
+`GET /health` is the public probe (200 `{status:'ok'}`, 503 `{status:'down'}` when the database does not answer; the Docker health check uses it). `GET /admin/system/health` (Super Admin only) adds per-part checks, response time and uptime, with fixed messages only (no connection strings or error text; the real error goes to the log). The admin dashboard shows a status card and every admin page a status dot in the sidebar; both refresh every 30 seconds while the tab is visible and when it regains focus, and tell "API up, database down" apart from "API unreachable".

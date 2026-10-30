@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
 
@@ -8,6 +9,9 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // Reading the request headers makes every page render per request, which the Content-Security-Policy nonce (set in middleware.ts) needs:
+  // a page built once ahead of time could not carry a nonce that changes with each request.
+  headers();
   return (
     <html lang="en">
       <head>
