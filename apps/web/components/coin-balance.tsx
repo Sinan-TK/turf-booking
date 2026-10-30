@@ -63,7 +63,6 @@ export function CoinBalance() {
       <Icon name="coins" className="text-[1.125rem] text-amber-500" />
       <span>
         {formatCoins(balance)}
-        <span className="hidden md:inline"> Coins</span>
       </span>
     </Link>
   );
