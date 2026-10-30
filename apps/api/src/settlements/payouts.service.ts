@@ -2,7 +2,8 @@ import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundEx
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DateTime } from 'luxon';
 import { commercialTermsSchema, commissionTierFor, fromMinor, toMinor } from '@venue/shared';
-import { Prisma, type PayoutStatus } from '@venue/database';
+import { Prisma, type PayoutStatus, type SettlementKind } from '@venue/database';
+import { contains, dateWhere, type DateRange } from '../common/list-filters';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CommercialTermsService } from '../commercial/commercial-terms.service';
@@ -241,6 +242,91 @@ export class PayoutsService {
     });
     if (!venue) throw new NotFoundException('Venue not found');
     return this.monthUsage([venue], now);
+  }
+
+  /**
+   * What an organisation earned in a period, in total, by venue and by facility. A settled booking counts in the period its slot
+   * started in. Every venue and facility the owner has is listed, with zeros where nothing was settled, so the lists are complete.
+   * `collected` is what customers paid online, `platform` what the platform kept (commission, fees and the platform's share of
+   * late cancellations), `refunded` what went back to customers, and `earned` what is the owner's.
+   */
+  async earningsBreakdown(organizationId: string, range: DateRange) {
+    const where: Prisma.BookingSettlementWhereInput = { organizationId, slotStart: dateWhere(range) };
+    const sums = { collected: true, platformAmount: true, refunded: true, ownerAmount: true } as const;
+    const [total, byVenue, byCategory, venues, units] = await Promise.all([
+      this.prisma.client.bookingSettlement.aggregate({ where, _sum: sums, _count: true }),
+      this.prisma.client.bookingSettlement.groupBy({ by: ['venueId'], where, _sum: sums, _count: true }),
+      this.prisma.client.bookingSettlement.groupBy({ by: ['categoryId'], where, _sum: sums, _count: true }),
+      this.prisma.client.venue.findMany({ where: { organizationId, deletedAt: null }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+      this.prisma.client.resource.findMany({ where: { venue: { organizationId, deletedAt: null } }, select: { categoryId: true, venueId: true }, distinct: ['categoryId', 'venueId'] }),
+    ]);
+    const categoryIds = [...new Set([...byCategory.map((c) => c.categoryId), ...units.map((u) => u.categoryId)])];
+    const categories = await this.prisma.client.venueCategory.findMany({
+      where: { id: { in: categoryIds } },
+      select: { id: true, name: true, iconKey: true, iconSvg: true },
+      orderBy: { name: 'asc' },
+    });
+    const zero = new Prisma.Decimal(0);
+    const figures = (row?: { _sum: { collected: Prisma.Decimal | null; platformAmount: Prisma.Decimal | null; refunded: Prisma.Decimal | null; ownerAmount: Prisma.Decimal | null }; _count: number | { _all: number } }) => ({
+      bookings: typeof row?._count === 'number' ? row._count : (row?._count as { _all: number } | undefined)?._all ?? 0,
+      collected: (row?._sum.collected ?? zero).toString(),
+      platform: (row?._sum.platformAmount ?? zero).toString(),
+      refunded: (row?._sum.refunded ?? zero).toString(),
+      earned: (row?._sum.ownerAmount ?? zero).toString(),
+    });
+    const venueRow = new Map(byVenue.map((r) => [r.venueId, r]));
+    const categoryRow = new Map(byCategory.map((r) => [r.categoryId, r]));
+    const facilitiesOf = new Map<string, number>();
+    for (const u of units) facilitiesOf.set(u.venueId, (facilitiesOf.get(u.venueId) ?? 0) + 1);
+    return {
+      total: figures(total),
+      byVenue: venues.map((v) => ({ id: v.id, name: v.name, facilities: facilitiesOf.get(v.id) ?? 0, ...figures(venueRow.get(v.id)) })),
+      byFacility: categories.map((c) => ({ ...c, venues: units.filter((u) => u.categoryId === c.id).length, ...figures(categoryRow.get(c.id)) })),
+    };
+  }
+
+  private settlementWhere(
+    organizationId: string,
+    f: { search?: string; venueId?: string; categoryId?: string; kind?: SettlementKind; range?: DateRange },
+  ): Prisma.BookingSettlementWhereInput {
+    return {
+      organizationId,
+      venueId: f.venueId,
+      categoryId: f.categoryId,
+      kind: f.kind,
+      slotStart: dateWhere(f.range),
+      ...(f.search ? { booking: { orderId: contains(f.search) } } : {}),
+    };
+  }
+
+  countSettlementsForOwner(organizationId: string, f: Parameters<PayoutsService['settlementWhere']>[1]) {
+    return this.prisma.client.bookingSettlement.count({ where: this.settlementWhere(organizationId, f) });
+  }
+
+  /** The bookings behind the earnings, newest slot first, each with what was paid, what the platform kept and what is the owner's. */
+  listSettlementsForOwner(organizationId: string, f: Parameters<PayoutsService['settlementWhere']>[1] & { limit: number; offset: number }) {
+    return this.prisma.client.bookingSettlement.findMany({
+      where: this.settlementWhere(organizationId, f),
+      select: {
+        id: true,
+        kind: true,
+        slotStart: true,
+        currency: true,
+        collected: true,
+        commission: true,
+        fee: true,
+        refunded: true,
+        platformAmount: true,
+        ownerAmount: true,
+        booking: { select: { id: true, orderId: true } },
+        venue: { select: { id: true, name: true } },
+        category: { select: { id: true, name: true } },
+        payout: { select: { id: true, status: true } },
+      },
+      orderBy: [{ slotStart: 'desc' }, { id: 'desc' }],
+      take: f.limit,
+      skip: f.offset,
+    });
   }
 
   /**

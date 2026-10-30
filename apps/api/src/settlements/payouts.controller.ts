@@ -2,7 +2,7 @@ import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Post,
 import type { Response } from 'express';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { PayoutStatus } from '@venue/database';
+import { PayoutStatus, SettlementKind } from '@venue/database';
 import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -11,7 +11,7 @@ import { OwnerRoles } from '../auth/decorators/owner-roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { parsePage, setTotalCount } from '../common/pagination';
-import { parseEnumFilter } from '../common/list-filters';
+import { parseDateRange, parseEnumFilter, parseSearch } from '../common/list-filters';
 import { PayoutsService } from './payouts.service';
 import { SettlementsService } from './settlements.service';
 
@@ -105,6 +105,42 @@ export class OwnerPayoutsController {
   @Get('earnings')
   earnings(@CurrentUser() actor: AuthContext) {
     return this.payouts.earningsForOwner(actor.organizationId!);
+  }
+
+  // What was earned in a period (?from=&to=), in total, by venue and by facility.
+  @Get('earnings/breakdown')
+  breakdown(@CurrentUser() actor: AuthContext, @Query('from') from?: string, @Query('to') to?: string) {
+    return this.payouts.earningsBreakdown(actor.organizationId!, parseDateRange(from, to));
+  }
+
+  // The bookings behind the earnings, filterable and paged (the total is in X-Total-Count).
+  @Get('earnings/settlements')
+  async settlements(
+    @CurrentUser() actor: AuthContext,
+    @Query('search') search?: string,
+    @Query('venueId', new ParseUUIDPipe({ optional: true })) venueId?: string,
+    @Query('categoryId', new ParseUUIDPipe({ optional: true })) categoryId?: string,
+    @Query('kind') kind?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Res({ passthrough: true }) res?: Response,
+  ) {
+    const filters = {
+      search: parseSearch(search),
+      venueId,
+      categoryId,
+      kind: parseEnumFilter(kind, Object.values(SettlementKind), 'kind') as SettlementKind | undefined,
+      range: parseDateRange(from, to),
+    };
+    const org = actor.organizationId!;
+    const [rows, total] = await Promise.all([
+      this.payouts.listSettlementsForOwner(org, { ...filters, ...parsePage(limit, offset) }),
+      this.payouts.countSettlementsForOwner(org, filters),
+    ]);
+    if (res) setTotalCount(res, total);
+    return rows;
   }
 
   @Get('payouts')
