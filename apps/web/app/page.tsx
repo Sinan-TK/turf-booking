@@ -12,6 +12,7 @@ import { AccountMenu } from '@/components/account-menu';
 import { useToast } from '@/components/toast';
 import { LocationPicker } from '@/components/location-picker';
 import { VenueTypePicker } from '@/components/venue-type-picker';
+import { readSearch, writeSearch } from '@/lib/search-cache';
 import { locationParams, useLocationChoice, type LocationChoice } from '@/lib/location';
 import { durationLabel, type VenueCategory } from '@/lib/categories';
 
@@ -348,18 +349,27 @@ export default function HomePage() {
     const date = form.date;
     // A new day, place, type or text: the old cards go at once and the skeleton shows until the new ones arrive.
     // A duration change made inside an open booking window keeps the cards, so that window stays open.
+    const path = searchPath();
+    // A repeat of a recent search paints its saved cards at once (the live answer replaces them a moment later, and the slim
+    // "checking live availability" bar shows meanwhile). Otherwise the skeleton shows until the cards arrive.
+    const saved = keepLoaded.current ? null : readSearch<SearchResult>(path);
     if (!keepLoaded.current) {
-      setResults([]);
-      setNextCursor(null);
+      setResults(saved ? saved.data : []);
+      setNextCursor(saved ? saved.nextCursor : null);
+      if (saved) {
+        setResultsDate(date);
+        setSearched(true);
+      }
     }
     setSearching(true);
     setLoadingMore(false);
     setMoreError(null);
     setErrorMessage(null);
     try {
-      const page = await api.getPage<SearchResult[]>(searchPath());
+      const page = await api.getPage<SearchResult[]>(path);
       keepLoaded.current = false;
       if (mine !== latestSearch.current) return;
+      writeSearch<SearchResult>(path, { data: page.data, nextCursor: page.nextCursor, advanceDays: page.advanceDays ?? null });
       setResults(page.data);
       setResultsDate(date);
       setNextCursor(page.nextCursor);
@@ -1085,6 +1095,10 @@ function CardGallery({
   venueName: string;
 }) {
   const [index, setIndex] = useState(0);
+  // Photos that have finished loading (they fade in) and ones the gallery has already shown (kept, so going back is instant).
+  const [loaded, setLoaded] = useState<Set<string>>(() => new Set());
+  const [visited, setVisited] = useState<Set<number>>(() => new Set([0]));
+  useEffect(() => setVisited((v) => (v.has(index) ? v : new Set(v).add(index))), [index]);
   const touchX = useRef<number | null>(null);
   const many = photos.length > 1;
   const go = (step: number) => setIndex((i) => (i + step + photos.length) % photos.length);
@@ -1144,17 +1158,21 @@ function CardGallery({
       }}
     >
       {photos.length > 0 ? (
-        photos.map((src, i) => (
-          <img
-            key={src}
-            src={src}
-            alt={i === index ? alt : ''}
-            aria-hidden={i !== index}
-            loading="lazy"
-            decoding="async"
-            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${i === index ? 'opacity-100' : 'opacity-0'}`}
-          />
-        ))
+        photos.map((src, i) =>
+          // Only the photo on show is fetched, and the next one once that has arrived: a card with three photos does not pull three.
+          i === index || visited.has(i) || (loaded.has(photos[index] ?? '') && i === (index + 1) % photos.length) ? (
+            <img
+              key={src}
+              src={src}
+              alt={i === index ? alt : ''}
+              aria-hidden={i !== index}
+              loading="lazy"
+              decoding="async"
+              onLoad={() => setLoaded((l) => (l.has(src) ? l : new Set(l).add(src)))}
+              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${i === index && loaded.has(src) ? 'opacity-100' : 'opacity-0'}`}
+            />
+          ) : null,
+        )
       ) : (
         <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900">
           {/* Faint pitch markings: a halfway line and centre circle. */}

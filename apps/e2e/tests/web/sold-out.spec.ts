@@ -9,7 +9,7 @@ test.use({ baseURL: URLS.web });
  */
 test.describe('customer site: nothing left to book', () => {
   test('a venue with no slots left is shown greyed out, says so, and cannot be booked', async ({ page }) => {
-    await page.route(`${URLS.api}/availability/search**`, async (route) => {
+    await page.route(`${URLS.api}/search**`, async (route) => {
       const res = await route.fetch();
       const rows = (await res.json()) as Array<Record<string, unknown>>;
       const emptied = rows.map((r) => ({ ...r, availableStartTimes: [], price: null, priceVaries: false, startPrices: [], startNormalPrices: [], startBookingPrices: [] }));
