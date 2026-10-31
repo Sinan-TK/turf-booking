@@ -12,7 +12,7 @@ import { AccountMenu } from '@/components/account-menu';
 import { useToast } from '@/components/toast';
 import { LocationPicker } from '@/components/location-picker';
 import { VenueTypePicker } from '@/components/venue-type-picker';
-import { VenueTypesIcon } from '@/components/venue-types-icon';
+import { RotatingTypeIcon } from '@/components/rotating-type-icon';
 import { readSearch, writeSearch } from '@/lib/search-cache';
 import { locationParams, useLocationChoice, type LocationChoice } from '@/lib/location';
 import { durationLabel, type VenueCategory } from '@/lib/categories';
@@ -516,7 +516,7 @@ export default function HomePage() {
               aria-haspopup="dialog"
               className={`-mr-3.5 ml-1 inline-flex h-full flex-shrink-0 items-center gap-1.5 border-l px-3 text-sm font-bold transition sm:gap-2 sm:px-4 ${form.categorySlugs.length > 0 ? 'border-brand-600 bg-brand-50 text-brand-800' : 'border-slate-200 bg-transparent text-slate-700 hover:bg-slate-100'}`}
             >
-              <VenueTypesIcon className={`text-[1.375rem] ${form.categorySlugs.length > 0 ? "text-brand-800" : "text-brand-600"}`} />
+              <RotatingTypeIcon types={categories} className={`text-[1.375rem] ${form.categorySlugs.length > 0 ? "text-brand-800" : "text-brand-600"}`} />
               <span className="hidden sm:inline">Venue types</span>
               {form.categorySlugs.length > 0 && (
                 <span className="rounded-md bg-brand-700 px-1.5 text-[0.6875rem] leading-[1.125rem] text-white">{form.categorySlugs.length}</span>
