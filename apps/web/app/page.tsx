@@ -122,9 +122,9 @@ export default function LandingPage() {
               </form>
 
               {/* Straight to a kind of venue. */}
-              <div className="landing-rise mt-5 flex max-w-xl flex-wrap items-center gap-2" style={{ '--d': '260ms' } as React.CSSProperties}>
+              <div className="landing-rise mt-5 flex max-w-2xl flex-wrap items-center gap-2" style={{ '--d': '260ms' } as React.CSSProperties}>
                 {categories === null && [0, 1, 2].map((i) => <Skeleton key={i} className="h-9 w-28 rounded-lg" />)}
-                {categories?.slice(0, 6).map((c) => (
+                {categories?.map((c) => (
                   <Link
                     key={c.slug}
                     href={`/explore?type=${encodeURIComponent(c.slug)}`}
@@ -134,9 +134,6 @@ export default function LandingPage() {
                     {c.name}
                   </Link>
                 ))}
-                <Link href="/explore" className={`ml-1 rounded-md px-1 py-1 text-sm font-extrabold text-brand-700 hover:underline ${focus}`}>
-                  Browse all venues
-                </Link>
               </div>
             </div>
 
