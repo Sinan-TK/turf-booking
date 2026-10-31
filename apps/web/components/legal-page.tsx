@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { LEGAL, LEGAL_LINKS } from '@/lib/legal';
+import { LEGAL } from '@/lib/legal';
+import { SiteFooter } from '@/components/site-footer';
 
 export interface LegalSection {
   id: string;
@@ -74,18 +75,7 @@ export function LegalPage({ title, intro, sections }: { title: string; intro: Re
         </div>
       </main>
 
-      <footer className="border-t border-slate-200 bg-slate-50">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-4 py-6 text-sm sm:px-6">
-          <nav aria-label="Legal" className="flex flex-wrap gap-x-5 gap-y-2 font-bold text-slate-600">
-            {LEGAL_LINKS.map((l) => (
-              <Link key={l.href} href={l.href} className={`rounded-md hover:text-brand-700 ${focus}`}>
-                {l.label}
-              </Link>
-            ))}
-          </nav>
-          <p className="text-slate-500">&copy; {new Date().getFullYear()} {LEGAL.operator}. All rights reserved.</p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

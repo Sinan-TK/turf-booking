@@ -9,7 +9,6 @@ const PAGES = [
   { path: '/privacy', title: 'Privacy Policy', link: 'Privacy Policy' },
   { path: '/refunds', title: 'Cancellation & Refund Policy', link: 'Cancellation & Refunds' },
   { path: '/cookies', title: 'Cookie Policy', link: 'Cookie Policy' },
-  { path: '/partner-terms', title: 'Venue Partner Terms', link: 'Venue Partner Terms' },
 ];
 
 /** The legal pages: each opens without signing in, has a dated title and a working contents list, and is linked from the footer. */
@@ -32,6 +31,18 @@ test.describe('customer site: legal pages', () => {
       for (const q of PAGES) await expect(legal.getByRole('link', { name: q.link })).toBeVisible();
     });
   }
+
+  test('the footer on the landing page and on a legal page also leads venue owners to the owner portal, where the Venue Partner Terms live', async ({ page }) => {
+    for (const path of ['/', '/terms']) {
+      await page.goto(path);
+      const owners = page.getByRole('navigation', { name: 'For venue owners' });
+      await expect(owners.getByRole('link', { name: 'List your venue' })).toHaveAttribute('href', /\/register$/);
+      await expect(owners.getByRole('link', { name: 'Owner sign in' })).toHaveAttribute('href', /\/login$/);
+      await expect(owners.getByRole('link', { name: 'Venue Partner Terms' })).toHaveAttribute('href', /\/partner-terms$/);
+    }
+    // The customer site no longer carries those terms itself.
+    expect((await page.request.get('/partner-terms')).status()).toBe(404);
+  });
 
   test('the landing page footer links to every legal page', async ({ page }) => {
     await page.goto('/');

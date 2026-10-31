@@ -112,6 +112,13 @@ export default function LoginPage() {
         </a>
       </form>
 
+      <p className="mt-6 border-t border-outline-variant/50 pt-5 text-center text-sm text-on-surface-variant">
+        New here?{' '}
+        <a href="/register" className="font-semibold text-primary underline underline-offset-2">
+          Create an owner account
+        </a>
+      </p>
+
     </AuthShell>
   );
 }

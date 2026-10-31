@@ -29,5 +29,7 @@ export const LEGAL_LINKS: LegalLink[] = [
   { href: '/privacy', label: 'Privacy Policy' },
   { href: '/refunds', label: 'Cancellation & Refunds' },
   { href: '/cookies', label: 'Cookie Policy' },
-  { href: '/partner-terms', label: 'Venue Partner Terms' },
 ];
+
+/** Where venue owners sign in, create an account and read the Venue Partner Terms (the owner portal, a separate site). */
+export const OWNER_PORTAL_URL = (process.env.NEXT_PUBLIC_OWNER_URL || 'http://localhost:3002').replace(/\/$/, '');
