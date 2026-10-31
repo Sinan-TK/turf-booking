@@ -294,6 +294,10 @@ export default function HomePage() {
   // Active venue types (Super-Admin managed) drive the filter chips.
   const [categories, setCategories] = useState<VenueCategory[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
+  // The facilities' pictures start downloading as soon as the list is known, so the venue-type picker has them by the time it opens.
+  useEffect(() => {
+    for (const c of categories) if (c.imageUrl) new Image().src = c.imageUrl;
+  }, [categories]);
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);

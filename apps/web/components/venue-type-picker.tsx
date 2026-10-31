@@ -23,6 +23,8 @@ export function VenueTypePicker({
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState<string[]>(selected);
+  // Pictures that have arrived (they fade in over the icon).
+  const [loaded, setLoaded] = useState<Set<string>>(() => new Set());
 
   const toggle = (slug: string) => setDraft((d) => (d.includes(slug) ? d.filter((s) => s !== slug) : [...d, slug]));
 
@@ -103,32 +105,31 @@ export function VenueTypePicker({
                     role="checkbox"
                     aria-checked={isOn}
                     onClick={() => toggle(c.slug)}
-                    className={`flex flex-col overflow-hidden rounded-xl border text-left text-sm transition ${
+                    className={`flex flex-col overflow-hidden rounded-xl border-[3px] text-left text-sm transition ${
+                      // A thick border (same width either way, so nothing shifts) marks the picked ones.
                       isOn
                         ? 'border-brand-600 bg-brand-50 font-bold text-brand-800'
-                        : 'border-slate-200 font-semibold text-slate-700 hover:border-brand-400 hover:bg-slate-50'
+                        : 'border-slate-200 font-semibold text-slate-700 hover:border-brand-300 hover:bg-slate-50'
                     }`}
                   >
                     {/* The facility's picture; without one, its icon on a soft green field, so every tile has the same shape. */}
                     <span className="relative block aspect-[4/3] w-full bg-brand-50">
-                      {c.imageUrl ? (
-                        <img src={c.imageUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
-                      ) : (
-                        <span className="absolute inset-0 flex items-center justify-center">
-                          <CategoryIcon iconKey={c.iconKey} iconSvg={c.iconSvg} className={`text-[2rem] ${isOn ? 'text-brand-600' : 'text-slate-400'}`} />
-                        </span>
+                      {/* The icon is always there, so a tile is never blank while its picture is still coming; the picture fades in over it. */}
+                      <span className="absolute inset-0 flex items-center justify-center">
+                        <CategoryIcon iconKey={c.iconKey} iconSvg={c.iconSvg} className={`text-[2rem] ${isOn ? 'text-brand-600' : 'text-slate-400'}`} />
+                      </span>
+                      {c.imageUrl && (
+                        <img
+                          src={c.imageUrl}
+                          alt=""
+                          decoding="async"
+                          onLoad={() => setLoaded((l) => (l.has(c.slug) ? l : new Set(l).add(c.slug)))}
+                          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${loaded.has(c.slug) ? 'opacity-100' : 'opacity-0'}`}
+                        />
                       )}
                     </span>
                     <span className="flex w-full items-center gap-2.5 px-3 py-2.5">
                     <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                    <span
-                      aria-hidden="true"
-                      className={`flex h-4 w-4 items-center justify-center rounded border ${
-                        isOn ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white'
-                      }`}
-                    >
-                      {isOn && <Icon name="check" className="text-[0.75rem]" />}
-                    </span>
                     </span>
                   </button>
                 );
