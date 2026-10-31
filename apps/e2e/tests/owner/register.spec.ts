@@ -12,7 +12,7 @@ async function fillAndReachReview(page: Page) {
   await page.getByLabel('Your name').fill('Asha Menon');
   await page.getByLabel('Email').fill('asha@example.com');
   await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByLabel('Business or venue name').fill('PW Sports Hub');
+  await page.getByLabel('Business name').fill('PW Sports Hub');
   await page.getByLabel('Mobile number').fill('9847012345');
   await page.getByRole('button', { name: 'Continue' }).click();
 }
@@ -44,15 +44,15 @@ test.describe('owner portal: creating an account', () => {
     // Step 2.
     await expect(progress.locator('[aria-current="step"]')).toContainText('Business');
     await expect(page.getByText('Step 2 of 3')).toBeVisible();
-    await expect(page.getByLabel('Business or venue name')).toBeFocused();
+    await expect(page.getByLabel('Business name')).toBeFocused();
     await page.getByRole('button', { name: 'Continue' }).click();
-    await expect(page.getByText('Enter the business or venue name.')).toBeVisible();
+    await expect(page.getByText('Enter the business name.')).toBeVisible();
     await expect(page.getByText('Enter your mobile number.')).toBeVisible();
     // Back keeps what was typed.
     await page.getByRole('button', { name: 'Back' }).click();
     await expect(page.getByLabel('Your name')).toHaveValue('Asha Menon');
     await page.getByRole('button', { name: 'Continue' }).click();
-    await page.getByLabel('Business or venue name').fill('PW Sports Hub');
+    await page.getByLabel('Business name').fill('PW Sports Hub');
     await page.getByLabel('Mobile number').fill('9847012345');
     await page.getByRole('button', { name: 'Continue' }).click();
 
@@ -63,8 +63,8 @@ test.describe('owner portal: creating an account', () => {
     await expect(page.getByText('+91 98470 12345')).toBeVisible();
     await page.getByRole('button', { name: 'Create account' }).click();
     await expect(page.getByText('Please accept the Venue Partner Terms to continue.')).toBeVisible();
-    await page.getByRole('button', { name: 'Change business or venue' }).click();
-    await expect(page.getByLabel('Business or venue name')).toHaveValue('PW Sports Hub');
+    await page.getByRole('button', { name: 'Change business name' }).click();
+    await expect(page.getByLabel('Business name')).toHaveValue('PW Sports Hub');
 
     // The terms are readable before an account exists, from the owner portal itself.
     await page.getByRole('button', { name: 'Continue' }).click();

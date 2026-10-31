@@ -19,9 +19,13 @@ interface Organization {
   contactEmail: string;
   contactPhone: string;
   status: string;
+  /** The owner admin's name (null if the organization has no login yet). */
+  ownerName: string | null;
+  /** Venues that are live (active) right now. */
+  activeVenues: number;
 }
 
-type SortKey = 'name' | 'status';
+type SortKey = 'name' | 'owner' | 'venues' | 'status';
 type SortChoice = `${SortKey}:${SortDir}`;
 
 const PAGE_SIZE = 25;
@@ -37,6 +41,8 @@ const STATUS_LABELS: Record<string, string> = {
 
 const SORTERS: Record<SortKey, (a: Organization, b: Organization) => number> = {
   name: (a, b) => a.name.localeCompare(b.name),
+  owner: (a, b) => (a.ownerName ?? '').localeCompare(b.ownerName ?? '') || a.name.localeCompare(b.name),
+  venues: (a, b) => a.activeVenues - b.activeVenues || a.name.localeCompare(b.name),
   status: (a, b) => a.status.localeCompare(b.status) || a.name.localeCompare(b.name),
 };
 
@@ -109,7 +115,7 @@ export default function OwnersPage() {
     const rows = (data ?? []).filter((o) => {
       if (status !== 'all' && o.status !== status) return false;
       if (!q) return true;
-      return [o.name, o.contactEmail, o.contactPhone, formatPhone(o.contactPhone)].some((s) => s.toLowerCase().includes(q));
+      return [o.name, o.ownerName ?? '', o.contactEmail, o.contactPhone, formatPhone(o.contactPhone)].some((s) => s.toLowerCase().includes(q));
     });
     rows.sort(SORTERS[sort.key]);
     if (sort.dir === 'desc') rows.reverse();
@@ -224,7 +230,7 @@ export default function OwnersPage() {
         </Card>
       )}
 
-      {loading && <SkeletonTable columns={4} />}
+      {loading && <SkeletonTable columns={6} />}
       {error && <ErrorBanner message={error} />}
       {data && data.length === 0 && <EmptyState message="No owner organizations yet." />}
       {data && data.length > 0 && visible.length === 0 && (
@@ -235,8 +241,10 @@ export default function OwnersPage() {
           <table className="w-full text-left text-sm">
             <thead className="border-b border-gray-200 bg-gray-50/70 text-xs font-medium uppercase tracking-wide text-gray-500">
               <tr>
-                <SortHeader label="Name" k="name" sortKey={sort.key} dir={sort.dir} onSort={onSort} />
+                <SortHeader label="Business" k="name" sortKey={sort.key} dir={sort.dir} onSort={onSort} />
+                <SortHeader label="Owner" k="owner" sortKey={sort.key} dir={sort.dir} onSort={onSort} />
                 <th className="px-4 py-3">Contact</th>
+                <SortHeader label="Active venues" k="venues" sortKey={sort.key} dir={sort.dir} onSort={onSort} />
                 <SortHeader label="Status" k="status" sortKey={sort.key} dir={sort.dir} onSort={onSort} />
                 <th className="px-4 py-3" />
               </tr>
@@ -245,11 +253,13 @@ export default function OwnersPage() {
               {paged.rows.map((org) => (
                 <tr key={org.id} className="border-b border-gray-100 last:border-0 transition-colors hover:bg-brand-50/40">
                   <td className="px-4 py-3 font-medium text-gray-900">{org.name}</td>
+                  <td className="px-4 py-3 text-gray-700">{org.ownerName ?? <span className="text-gray-400">No login yet</span>}</td>
                   <td className="px-4 py-3 text-gray-600">
                     {org.contactEmail}
                     <br />
                     {formatPhone(org.contactPhone)}
                   </td>
+                  <td className="px-4 py-3 tabular-nums text-gray-900">{org.activeVenues}</td>
                   <td className="px-4 py-3">
                     <Badge value={org.status} />
                   </td>

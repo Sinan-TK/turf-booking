@@ -47,8 +47,19 @@ export class OwnerOrganizationsService {
     return org;
   }
 
+  /**
+   * Every organization, with its owner's name (the owner admin who has been there longest) and how many of its venues are active, so the
+   * Super Admin's list says who and how big without opening each one. Draft, inactive and suspended venues do not count.
+   */
   async listOrganizations() {
-    return this.prisma.client.ownerOrganization.findMany({ orderBy: { createdAt: 'desc' } });
+    const rows = await this.prisma.client.ownerOrganization.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        ownerUsers: { where: { role: 'OWNER_ADMIN' }, orderBy: { createdAt: 'asc' }, take: 1, select: { name: true } },
+        _count: { select: { venues: { where: { status: 'ACTIVE', deletedAt: null } } } },
+      },
+    });
+    return rows.map(({ ownerUsers, _count, ...org }) => ({ ...org, ownerName: ownerUsers[0]?.name ?? null, activeVenues: _count.venues }));
   }
 
   async getOrganization(id: string) {

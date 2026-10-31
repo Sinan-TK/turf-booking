@@ -14,7 +14,7 @@ type Field = 'name' | 'email' | 'businessName' | 'phone' | 'terms';
 /** The three steps: who you are, your business, then a look over everything before it is sent. */
 const STEPS = [
   { title: 'About you', blurb: 'Who should we send the sign-in link to?' },
-  { title: 'Business', blurb: 'Tell us about the venue business you run.' },
+  { title: 'Business', blurb: 'Tell us about the business you run.' },
   { title: 'Review', blurb: 'Check your details and agree to the terms.' },
 ] as const;
 
@@ -103,7 +103,7 @@ export default function RegisterPage() {
   const check = (): FieldErrors<Field> => ({
     name: required(form.name, 'Enter your name.', 1, 150, 'Your name'),
     email: emailError(form.email),
-    businessName: required(form.businessName, 'Enter the business or venue name.', 2, 150, 'The business or venue name'),
+    businessName: required(form.businessName, 'Enter the business name.', 2, 150, 'The business name'),
     phone: form.phone ? indianPhoneError(form.phone) : 'Enter your mobile number.',
     terms: accepted ? undefined : 'Please accept the Venue Partner Terms to continue.',
   });
@@ -257,7 +257,7 @@ export default function RegisterPage() {
           {step === 1 && (
             <>
               <div className="mb-4">
-                <Label htmlFor="register-businessName">Business or venue name</Label>
+                <Label htmlFor="register-businessName">Business name</Label>
                 <Input
                   id="register-businessName"
                   autoComplete="organization"
@@ -287,7 +287,7 @@ export default function RegisterPage() {
                   [
                     ['Your name', form.name.trim(), 0],
                     ['Email', form.email.trim(), 0],
-                    ['Business or venue', form.businessName.trim(), 1],
+                    ['Business name', form.businessName.trim(), 1],
                     ['Mobile number', formatPhone(`+91${form.phone}`), 1],
                   ] as const
                 ).map(([label, value, back]) => (
