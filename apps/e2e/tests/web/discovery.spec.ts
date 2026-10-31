@@ -78,6 +78,11 @@ test.describe('customer site: finding a venue', () => {
     await page.getByRole('button', { name: /\d+ [A-Za-z]{3}$/ }).nth(2).click();
     await settled(page);
 
+    // The facilities' names are the Super Admin's to change, so they are looked up by their fixed codes, never typed here.
+    const api = await request.newContext({ baseURL: URLS.api });
+    const all = (await (await api.get('/categories')).json()) as Array<{ slug: string; name: string }>;
+    const nameOf = (slug: string) => all.find((c) => c.slug === slug)!.name;
+
     // Pick one type, apply it, then look at the card.
     const pick = async (name: string) => {
       const picker = await openVenueTypes(page);
@@ -88,15 +93,15 @@ test.describe('customer site: finding a venue', () => {
       await settled(page);
     };
 
-    await pick('Football Turf');
+    await pick(nameOf('FOOTBALL_TURF'));
     await expect(card.getByRole('group', { name: /^Turf A, / })).toHaveCount(1);
     await expect(card).not.toContainText('Court 1');
 
-    await pick('Badminton Court');
+    await pick(nameOf('BADMINTON'));
     await expect(card.getByRole('group', { name: /^Court 1, / })).toHaveCount(1);
     await expect(card).not.toContainText('Turf A');
 
-    await pick('Kayaking');
+    await pick(nameOf('KAYAKING'));
     await expect(card).toHaveCount(0);
 
     // No type picked shows every type again.
