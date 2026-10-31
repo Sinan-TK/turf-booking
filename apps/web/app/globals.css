@@ -95,3 +95,24 @@ html {
     0 0 0 4px rgba(16, 107, 81, 0.12),
     0 6px 20px -8px rgba(12, 90, 68, 0.35);
 }
+
+/* Landing page: the headline, text and search rise into place once, one after another (the delay comes from --d). */
+@keyframes landing-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.landing-rise {
+  animation: landing-rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-rise {
+    animation: none;
+  }
+}

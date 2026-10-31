@@ -15,6 +15,8 @@ interface Banner {
 }
 
 const EVERY_MS = 5500;
+/** Taller on a phone (the words need the room), wide and low on a desktop, so the banner never takes over the page. */
+const SHAPE = 'aspect-[16/8] sm:aspect-[16/5] lg:aspect-[16/4.4]';
 
 /** A link is followed only if it is a path on this site or an https address (the API refuses anything else when it is saved; checked again here). */
 function safeLink(url: string | null): { href: string; external: boolean } | null {
@@ -55,7 +57,7 @@ export function BannerSlider() {
     return () => clearInterval(timer);
   }, [count, held, still]);
 
-  if (banners === null) return <Skeleton className="aspect-[16/5] w-full rounded-xl" />;
+  if (banners === null) return <Skeleton className={`${SHAPE} w-full rounded-xl`} />;
   if (count === 0) return null;
   const go = (step: number) => setIndex((i) => (i + step + count) % count);
 
@@ -63,7 +65,7 @@ export function BannerSlider() {
     <section
       aria-roledescription="carousel"
       aria-label="Offers and announcements"
-      className="group relative overflow-hidden rounded-xl bg-brand-800"
+      className="group relative overflow-hidden rounded-xl bg-brand-800 shadow-[0_18px_40px_-24px_rgba(10,46,29,0.55)]"
       onMouseEnter={() => setHeld(true)}
       onMouseLeave={() => setHeld(false)}
       onFocus={() => setHeld(true)}
@@ -71,20 +73,26 @@ export function BannerSlider() {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHeld(false);
       }}
     >
-      <div className="relative aspect-[16/5] w-full" aria-live={held ? 'polite' : 'off'}>
+      <div className={`relative ${SHAPE} w-full`} aria-live={held ? 'polite' : 'off'}>
         {banners.map((b, i) => {
           const link = safeLink(b.linkUrl);
           const body = (
             <>
               {b.imageUrl ? (
-                <img src={b.imageUrl} alt="" decoding="async" loading={i === 0 ? 'eager' : 'lazy'} className="absolute inset-0 h-full w-full object-cover" />
+                <img src={b.imageUrl} alt="" decoding="async" loading={i === 0 ? 'eager' : 'lazy'} className="absolute inset-0 h-full w-full object-cover transition duration-[1200ms] ease-out group-hover/slide:scale-[1.03]" />
               ) : (
                 <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900" />
               )}
-              <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/20 to-transparent" />
-              <div className="absolute inset-y-0 left-0 flex max-w-[80%] flex-col justify-center gap-1 px-5 sm:px-10">
-                <h3 className="text-lg font-black leading-tight tracking-tight text-white sm:text-3xl">{b.title}</h3>
-                {b.subtitle && <p className="text-xs font-medium text-white/90 sm:text-base">{b.subtitle}</p>}
+              <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-black/65 via-black/25 to-transparent" />
+              <div className="absolute inset-y-0 left-0 flex max-w-[85%] flex-col items-start justify-center gap-1.5 px-5 sm:max-w-[70%] sm:gap-2 sm:px-10 lg:px-14">
+                <h3 className="text-balance text-xl font-black leading-tight tracking-tight text-white drop-shadow-sm sm:text-3xl lg:text-4xl">{b.title}</h3>
+                {b.subtitle && <p className="text-pretty text-sm font-medium leading-snug text-white/90 sm:text-lg">{b.subtitle}</p>}
+                {link && (
+                  <span className="mt-1 inline-flex items-center gap-1 rounded-lg bg-white px-3.5 py-1.5 text-xs font-extrabold text-brand-800 shadow-sm transition group-hover/slide:bg-brand-50 sm:mt-2 sm:px-4 sm:py-2 sm:text-sm">
+                    View offer
+                    <Icon name="chevron_right" className="text-[1rem]" />
+                  </span>
+                )}
               </div>
             </>
           );
@@ -93,7 +101,7 @@ export function BannerSlider() {
             'aria-label': `${i + 1} of ${count}: ${b.title}`,
             'aria-hidden': i !== index,
             tabIndex: i === index ? 0 : -1,
-            className: `absolute inset-0 block transition-opacity duration-500 ${i === index ? 'opacity-100' : 'pointer-events-none opacity-0'}`,
+            className: `group/slide absolute inset-0 block rounded-xl outline-none transition-opacity duration-700 focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-white/70 ${i === index ? 'opacity-100' : 'pointer-events-none opacity-0'}`,
           } as const;
           if (!link) return <div key={b.id} {...shared}>{body}</div>;
           return link.external ? (
@@ -114,7 +122,7 @@ export function BannerSlider() {
             type="button"
             onClick={() => go(-1)}
             aria-label="Previous banner"
-            className="absolute left-2 top-1/2 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-800 opacity-0 shadow-sm transition group-hover:opacity-100 focus-visible:opacity-100 sm:flex"
+            className="absolute left-2 top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-slate-800 opacity-0 shadow-md transition hover:bg-white hover:scale-105 group-hover:opacity-100 focus-visible:opacity-100 sm:flex"
           >
             <Icon name="chevron_left" className="text-[1.125rem]" />
           </button>
@@ -122,7 +130,7 @@ export function BannerSlider() {
             type="button"
             onClick={() => go(1)}
             aria-label="Next banner"
-            className="absolute right-2 top-1/2 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-800 opacity-0 shadow-sm transition group-hover:opacity-100 focus-visible:opacity-100 sm:flex"
+            className="absolute right-2 top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-slate-800 opacity-0 shadow-md transition hover:bg-white hover:scale-105 group-hover:opacity-100 focus-visible:opacity-100 sm:flex"
           >
             <Icon name="chevron_right" className="text-[1.125rem]" />
           </button>
@@ -134,7 +142,7 @@ export function BannerSlider() {
                 onClick={() => setIndex(i)}
                 aria-label={`Banner ${i + 1} of ${count}`}
                 aria-current={i === index}
-                className={`h-1.5 rounded-full transition-all ${i === index ? 'w-5 bg-white' : 'w-1.5 bg-white/60 hover:bg-white/90'}`}
+                className={`h-1.5 rounded-full transition-all duration-300 ${i === index ? 'w-6 bg-white' : 'w-1.5 bg-white/55 hover:bg-white/90'}`}
               />
             ))}
           </div>
