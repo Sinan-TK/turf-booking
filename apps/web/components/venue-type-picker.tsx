@@ -72,7 +72,7 @@ export function VenueTypePicker({
         role="dialog"
         aria-modal="true"
         aria-labelledby="venue-type-picker-title"
-        className="relative flex max-h-[80vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl"
+        className="relative flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-2xl sm:max-w-xl md:max-w-2xl lg:max-w-4xl"
       >
         <header className="flex items-center gap-2 border-b border-slate-100 px-5 py-4">
           <div className="flex-1">
@@ -95,7 +95,7 @@ export function VenueTypePicker({
           {categories.length === 0 ? (
             <p className="py-6 text-center text-sm text-slate-500">No venue types to choose from yet.</p>
           ) : (
-            <div className="grid grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {categories.map((c) => {
                 const isOn = draft.includes(c.slug);
                 return (
