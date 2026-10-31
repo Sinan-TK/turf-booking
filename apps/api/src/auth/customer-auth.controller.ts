@@ -22,6 +22,7 @@ import {
   RequestCodeDto,
   ResetPasswordDto,
   SignUpDto,
+  EmailCheckDto,
   UpdateProfileDto,
   VerifyCodeDto,
   VerifyEmailDto,
@@ -69,6 +70,14 @@ export class CustomerAuthController {
   }
 
   // --- Email + password -----------------------------------------------------
+
+  /** Whether a customer account already uses this email, so the sign-up form can say so while it is being typed. */
+  @Post('email-check')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  async emailCheck(@Body() dto: EmailCheckDto) {
+    return { available: !(await this.customers.emailTaken(dto.email)) };
+  }
 
   @Post('signup')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })

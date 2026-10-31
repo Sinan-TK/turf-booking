@@ -16,10 +16,21 @@ export const registerOwnerSchema = z.object({
 });
 export class RegisterOwnerDto extends createZodDto(registerOwnerSchema) {}
 
+export const emailCheckSchema = z.object({ email: z.string().trim().email().max(254) });
+export class EmailCheckDto extends createZodDto(emailCheckSchema) {}
+
 /** Public: a venue owner creating their own account. */
 @Controller('auth/owner')
 export class OwnerRegistrationController {
   constructor(private readonly registration: OwnerRegistrationService) {}
+
+  /** Whether an owner login already uses this email, so the sign-up (and the invite forms) can say so while it is being typed. */
+  @Post('email-check')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  async emailCheck(@Body() dto: EmailCheckDto) {
+    return { available: !(await this.registration.emailTaken(dto.email)) };
+  }
 
   @Post('register')
   @HttpCode(202)

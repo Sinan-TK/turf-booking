@@ -192,6 +192,12 @@ export class CustomersService {
     }
   }
 
+  /** Whether a customer account already uses this email (other kinds of account do not count). */
+  async emailTaken(rawEmail: string): Promise<boolean> {
+    const found = await this.prisma.client.customerProfile.findUnique({ where: { email: normalizeEmail(rawEmail) }, select: { id: true } });
+    return !!found;
+  }
+
   /** Refuses early (before a code is emailed) a sign-up that could not succeed. */
   async assertSignUpPossible(email: string, phone: string) {
     const db = this.prisma.client;

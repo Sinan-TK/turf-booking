@@ -26,6 +26,7 @@ describe('Owner self-registration', () => {
   });
   afterAll(async () => {
     await prisma.ownerOrganization.deleteMany({ where: { name: { startsWith: 'E2E Sports ' } } });
+    await prisma.customerProfile.deleteMany({ where: { email: { startsWith: 'e2e-cust-' } } });
     await app.close();
   });
 
@@ -96,18 +97,29 @@ describe('Owner self-registration', () => {
     expect((await ownerAgent.get('/owner/dashboard/summary')).status).toBe(200);
   });
 
-  it('answers the same when the email already has an account, and makes nothing new', async () => {
+  it('says plainly that an email is already in use by an owner, and makes nothing new', async () => {
     const before = await prisma.ownerOrganization.count();
     const again = await http().post('/auth/owner/register').send(body(2, { email: mail(1).toUpperCase() }));
-    expect(again.status).toBe(202);
-    expect(again.body).toEqual({ ok: true });
+    expect(again.status).toBe(409);
+    expect(again.body.message).toMatch(/owner account with this email already exists/i);
     const { ownerEmail } = await createOwnerFixture(app, admin);
     const existing = await http().post('/auth/owner/register').send(body(3, { email: ownerEmail }));
-    expect(existing.status).toBe(202);
-    expect(existing.body).toEqual({ ok: true });
+    expect(existing.status).toBe(409);
     // Only the owner fixture made an organization; neither sign-up did.
     expect(await prisma.ownerOrganization.count()).toBe(before + 1);
     expect(await prisma.ownerOrganization.count({ where: { name: { in: [`E2E Sports ${tag} 2`, `E2E Sports ${tag} 3`] } } })).toBe(0);
+  });
+
+  it('the email check says whether an owner already uses an address, whatever its letter case, and ignores other kinds of account', async () => {
+    const taken = await http().post('/auth/owner/email-check').send({ email: mail(1).toUpperCase() });
+    expect(taken.status).toBe(200);
+    expect(taken.body).toEqual({ available: false });
+    expect((await http().post('/auth/owner/email-check').send({ email: `e2e-free-${tag}@example.com` })).body).toEqual({ available: true });
+    // The same address used by a customer, or by the Super Admin, is not "in use" for an owner.
+    await prisma.customerProfile.create({ data: { name: 'E2E Customer', email: `e2e-cust-${tag}@example.com`, whatsappNumber: `+9199${Math.floor(10_000_000 + Math.random() * 89_999_999)}` } });
+    expect((await http().post('/auth/owner/email-check').send({ email: `e2e-cust-${tag}@example.com` })).body).toEqual({ available: true });
+    expect((await http().post('/auth/owner/email-check').send({ email: 'admin@turf.local' })).body).toEqual({ available: true });
+    expect((await http().post('/auth/owner/email-check').send({ email: 'not-an-email' })).status).toBe(400);
   });
 
   it('refuses a request without accepting the terms, or with missing or bad details', async () => {

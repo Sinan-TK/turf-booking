@@ -7,6 +7,7 @@ import { useFetch } from '@/lib/use-fetch';
 import { PAGE_SIZE, usePagedFetch } from '@/lib/use-paged-fetch';
 import { useListFilters } from '@/lib/use-list-filters';
 import { api, ApiError } from '@/lib/api';
+import { isOwnerEmailTaken, OWNER_EMAIL_TAKEN_MESSAGE } from '@/lib/email-check';
 import { Icon } from '@/components/icons';
 import { Modal } from '@/components/modal';
 import { StatusAction } from '@/components/status-action';
@@ -629,7 +630,12 @@ function InviteForm({
       });
       onInvited(form.email.trim());
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : 'Failed to create owner user');
+      if (err instanceof ApiError && err.status === 409) {
+        setErrors((p) => ({ ...p, email: OWNER_EMAIL_TAKEN_MESSAGE + ' Use a different email.' }));
+        document.getElementById('invite-email')?.focus();
+      } else {
+        setFormError(err instanceof ApiError ? err.message : 'Failed to create owner user');
+      }
       setSubmitting(false);
     }
   }
@@ -661,6 +667,9 @@ function InviteForm({
           aria-invalid={!!errors.email}
           className={errors.email ? invalidClass : ''}
           onChange={(e) => edit('email', e.target.value)}
+          onBlur={async () => {
+            if (await isOwnerEmailTaken(form.email)) setErrors((p) => ({ ...p, email: OWNER_EMAIL_TAKEN_MESSAGE + ' Use a different email.' }));
+          }}
         />
         <FieldError id="invite-email-error" message={errors.email} />
       </div>

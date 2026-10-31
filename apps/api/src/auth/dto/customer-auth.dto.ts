@@ -26,6 +26,9 @@ export const signUpSchema = z.object({
 });
 export class SignUpDto extends createZodDto(signUpSchema) {}
 
+export const emailCheckSchema = z.object({ email });
+export class EmailCheckDto extends createZodDto(emailCheckSchema) {}
+
 // The login password is deliberately not length-checked, so the policy isn't revealed.
 export const passwordLoginSchema = z.object({ email, password: z.string().min(1).max(128) });
 export class PasswordLoginDto extends createZodDto(passwordLoginSchema) {}

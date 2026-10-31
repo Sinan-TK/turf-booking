@@ -5,6 +5,7 @@ import { useListFilters } from '@/lib/use-list-filters';
 import { PAGE_SIZE, usePagedFetch } from '@/lib/use-paged-fetch';
 import { useAuth } from '@/lib/auth-context';
 import { api, ApiError } from '@/lib/api';
+import { isOwnerEmailTaken, OWNER_EMAIL_TAKEN_MESSAGE } from '@/lib/email-check';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Modal } from '@/components/modal';
 import { DataTable, FilterSelect, ListToolbar, Pagination, ROW, SearchBox } from '@/components/list-kit';
@@ -121,7 +122,13 @@ function InviteModal({ venues, onClose, onDone }: { venues: VenueOption[]; onClo
       });
       onDone(form.email.trim());
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not invite this person');
+      if (err instanceof ApiError && err.status === 409) {
+        // The address is already an owner login: shown on the email field, where it can be fixed.
+        setErrors((p) => ({ ...p, email: OWNER_EMAIL_TAKEN_MESSAGE + ' Use a different email.' }));
+        document.getElementById('staff-email')?.focus();
+      } else {
+        setError(err instanceof ApiError ? err.message : 'Could not invite this person');
+      }
       setSaving(false);
     }
   }
@@ -157,6 +164,9 @@ function InviteModal({ venues, onClose, onDone }: { venues: VenueOption[]; onClo
               aria-invalid={!!errors.email}
               className={errors.email ? invalidClass : ''}
               onChange={(e) => set('email', e.target.value)}
+              onBlur={async () => {
+                if (await isOwnerEmailTaken(form.email)) setErrors((p) => ({ ...p, email: OWNER_EMAIL_TAKEN_MESSAGE + ' Use a different email.' }));
+              }}
             />
             <FieldError id="staff-email-error" message={errors.email} />
           </div>

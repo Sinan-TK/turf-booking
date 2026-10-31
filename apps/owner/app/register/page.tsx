@@ -7,6 +7,7 @@ import { PhoneInput, formatPhone } from '@/components/phone-input';
 import { Button, ErrorBanner, FieldError, Input, Label, invalidClass } from '@/components/ui';
 import { emailError, indianPhoneError, type FieldErrors } from '@/lib/validation';
 import { CUSTOMER_SITE_URL } from '@/lib/legal';
+import { isOwnerEmailTaken } from '@/lib/email-check';
 
 type Field = 'name' | 'email' | 'businessName' | 'phone' | 'terms';
 
@@ -75,6 +76,8 @@ export default function RegisterPage() {
   const [banner, setBanner] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
+  // The address an owner already uses (found while typing, on Continue, or when the server refuses it): the step cannot be passed.
+  const [takenEmail, setTakenEmail] = useState<string | null>(null);
   const stepBox = useRef<HTMLDivElement>(null);
 
   // A new step puts the cursor in its first field (or, on the review step, on the heading), so the keyboard carries on where the eyes are.
@@ -87,6 +90,14 @@ export default function RegisterPage() {
     setForm((f) => ({ ...f, [field]: value }));
     setBanner(null);
     setErrors((p) => (p[field] ? { ...p, [field]: undefined } : p));
+    if (field === 'email') setTakenEmail(null);
+  }
+
+  /** Asks the server whether an owner already uses this email; remembers the answer. */
+  async function checkEmail(): Promise<boolean> {
+    const taken = await isOwnerEmailTaken(form.email);
+    if (taken) setTakenEmail(form.email.trim().toLowerCase());
+    return taken === true;
   }
 
   const check = (): FieldErrors<Field> => ({
@@ -112,6 +123,10 @@ export default function RegisterPage() {
     e.preventDefault();
     setBanner(null);
     if (!stepIsValid(step)) return;
+    if (step === 0 && (takenEmail === form.email.trim().toLowerCase() || (await checkEmail()))) {
+      document.getElementById('register-email')?.focus();
+      return;
+    }
     if (step < STEPS.length - 1) return setStep(step + 1);
 
     // The last step: every earlier step is checked again, in case something was changed on the way back.
@@ -134,7 +149,11 @@ export default function RegisterPage() {
     } catch (err) {
       const status = err instanceof ApiError ? err.status : 0;
       if (status === 429) setBanner('Too many sign-up attempts. Please try again in an hour.');
-      else if (status === 400 && err instanceof ApiError) setBanner(err.message || 'Please check the details and try again.');
+      else if (status === 409) {
+        // Someone took the address in the meantime: back to the first step, where it is shown.
+        setTakenEmail(form.email.trim().toLowerCase());
+        setStep(0);
+      } else if (status === 400 && err instanceof ApiError) setBanner(err.message || 'Please check the details and try again.');
       else setBanner('We could not create your account right now. Please try again in a few minutes.');
     } finally {
       setSubmitting(false);
@@ -206,13 +225,27 @@ export default function RegisterPage() {
                   autoComplete="email"
                   placeholder="you@company.com"
                   value={form.email}
-                  aria-invalid={!!errors.email}
-                  aria-describedby={errors.email ? 'register-email-error' : 'register-email-hint'}
-                  className={errors.email ? invalidClass : ''}
+                  aria-describedby={errors.email ? 'register-email-error' : takenEmail === form.email.trim().toLowerCase() ? 'register-email-taken' : 'register-email-hint'}
+                  aria-invalid={!!errors.email || takenEmail === form.email.trim().toLowerCase()}
+                  className={errors.email || takenEmail === form.email.trim().toLowerCase() ? invalidClass : ''}
                   onChange={(e) => set('email', e.target.value)}
+                  onBlur={() => void checkEmail()}
                 />
                 <FieldError id="register-email-error" message={errors.email} />
-                {!errors.email && (
+                {takenEmail === form.email.trim().toLowerCase() && !errors.email && (
+                  <p id="register-email-taken" role="alert" className="mt-1.5 text-xs font-medium leading-relaxed text-error">
+                    An owner account with this email already exists.{' '}
+                    <a href="/login" className={link}>
+                      Sign in
+                    </a>{' '}
+                    or{' '}
+                    <a href="/forgot-password" className={link}>
+                      reset your password
+                    </a>
+                    , or use a different email.
+                  </p>
+                )}
+                {!errors.email && takenEmail !== form.email.trim().toLowerCase() && (
                   <p id="register-email-hint" className="mt-1.5 text-xs text-on-surface-variant">
                     We email you a link to set your password, so use an address you can open.
                   </p>

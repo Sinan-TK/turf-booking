@@ -40,6 +40,8 @@ export function LoginDialog({
 }) {
   const [view, setView] = useState<View>(customer ? 'profile' : 'home');
   const [tab, setTab] = useState<Tab>('signin');
+  // The address the sign-up form found already has an account (checked when the field is left), so it can say so and offer the way in.
+  const [takenEmail, setTakenEmail] = useState<string | null>(null);
   // The customer who is signed in but still has to finish their profile.
   const [signed, setSigned] = useState<Customer | null>(customer ?? null);
   const [name, setName] = useState(customer?.name ?? '');
@@ -484,9 +486,33 @@ export function LoginDialog({
                         onChange={(e) => {
                           setEmail(e.target.value);
                           clearMsg('email');
+                          setTakenEmail(null);
+                        }}
+                        onBlur={async () => {
+                          const value = email.trim();
+                          if (emailError(value)) return;
+                          try {
+                            const res = await api.post<{ available: boolean }>('/customer-auth/email-check', { email: value });
+                            if (!res.available) setTakenEmail(value.toLowerCase());
+                          } catch {
+                            // Not told: the sign-up itself still refuses a taken address.
+                          }
                         }}
                       />
                       <FieldError id="login-email-error" message={msgs.email} />
+                      {takenEmail === email.trim().toLowerCase() && !msgs.email && (
+                        <p role="alert" className="mt-1.5 text-xs font-medium leading-relaxed text-red-600">
+                          This email already has an account.{' '}
+                          <button type="button" onClick={() => setTab('signin')} className="font-bold text-brand-700 underline underline-offset-2">
+                            Sign in
+                          </button>{' '}
+                          or{' '}
+                          <button type="button" onClick={() => go('forgot')} className="font-bold text-brand-700 underline underline-offset-2">
+                            reset your password
+                          </button>
+                          .
+                        </p>
+                      )}
                     </div>
                     <div>
                       <Label htmlFor="login-phone">Phone number</Label>
