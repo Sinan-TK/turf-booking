@@ -64,6 +64,8 @@ services:
     environment:
       # enforce (default for a production build) | report-only | off. See DEPLOYMENT.md.
       CSP_MODE: ${CSP_MODE:-enforce}
+      # Where uploaded photos are served from (the host of STORAGE_PUBLIC_URL); without it the browser blocks them. Set it in the root .env.
+      CSP_IMG_ORIGINS: ${CSP_IMG_ORIGINS:-}
     depends_on:
       api:
         condition: service_healthy
@@ -80,6 +82,8 @@ services:
     environment:
       # enforce (default for a production build) | report-only | off. See DEPLOYMENT.md.
       CSP_MODE: ${CSP_MODE:-enforce}
+      # Where uploaded photos are served from (the host of STORAGE_PUBLIC_URL); without it the browser blocks them. Set it in the root .env.
+      CSP_IMG_ORIGINS: ${CSP_IMG_ORIGINS:-}
     depends_on:
       api:
         condition: service_healthy
@@ -96,6 +100,8 @@ services:
     environment:
       # enforce (default for a production build) | report-only | off. See DEPLOYMENT.md.
       CSP_MODE: ${CSP_MODE:-enforce}
+      # Where uploaded photos are served from (the host of STORAGE_PUBLIC_URL); without it the browser blocks them. Set it in the root .env.
+      CSP_IMG_ORIGINS: ${CSP_IMG_ORIGINS:-}
     depends_on:
       api:
         condition: service_healthy

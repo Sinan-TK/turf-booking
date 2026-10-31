@@ -19,8 +19,18 @@ test.describe("admin: a facility's picture", () => {
     await page.goto(`/venue-types/${id}`);
     await expect(page.getByText('No picture')).toBeVisible();
     await page.getByLabel('Choose a facility picture').setInputFiles({ name: 'ball.png', mimeType: 'image/png', buffer: PNG });
+    // It opens in the cropper first; nothing is uploaded until the framed picture is accepted.
+    const cropper = page.getByRole('dialog', { name: 'Frame the picture' });
+    await expect(cropper).toBeVisible();
+    await expect(cropper.getByRole('slider', { name: 'Zoom' })).toBeVisible();
+    await cropper.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByText('No picture')).toBeVisible();
+    await page.getByLabel('Choose a facility picture').setInputFiles({ name: 'ball.png', mimeType: 'image/png', buffer: PNG });
+    await page.getByRole('dialog', { name: 'Frame the picture' }).getByRole('button', { name: 'Use picture' }).click();
     const img = page.getByRole('img', { name: 'Facility picture' });
     await expect(img).toBeVisible();
+    // The saved picture really loads (a visible but broken image has no width of its own).
+    await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth)).toBeGreaterThan(0);
     await expect(img).toHaveAttribute('src', new RegExp(`/facilities/${id}/`));
     await expect(page.getByRole('button', { name: 'Replace picture' })).toBeVisible();
 
@@ -30,6 +40,7 @@ test.describe("admin: a facility's picture", () => {
 
     const firstSrc = await page.getByRole('img', { name: 'Facility picture' }).getAttribute('src');
     await page.getByLabel('Choose a facility picture').setInputFiles({ name: 'other.png', mimeType: 'image/png', buffer: PNG });
+    await page.getByRole('dialog', { name: 'Frame the picture' }).getByRole('button', { name: 'Use picture' }).click();
     await expect(page.getByRole('img', { name: 'Facility picture' })).not.toHaveAttribute('src', firstSrc!);
 
     await page.getByRole('button', { name: 'Remove', exact: true }).click();

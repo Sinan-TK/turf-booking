@@ -2,23 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
-
-/** The longest side a picture is shrunk to before it is sent (the venue-type picker shows it small, so this is plenty). */
-const MAX_SIDE = 1200;
-
-/** Shrinks a picked image to WebP, at most MAX_SIDE on its longest side, so uploads stay small whatever the camera or screenshot size. */
-async function shrink(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', 0.86));
-  if (!blob) throw new Error('That picture could not be prepared. Try another one.');
-  return blob;
-}
+import { PhotoCropper } from '@/components/photo-cropper';
 
 /**
  * A facility's picture, shown to customers in the "Venue types" picker. It saves straight away (not with the form's Save), and is
@@ -29,6 +13,8 @@ export function FacilityPicture({ categoryId, initialUrl }: { categoryId?: strin
   const [busy, setBusy] = useState<'upload' | 'remove' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  // The picked file, waiting in the cropper.
+  const [cropping, setCropping] = useState<File | null>(null);
 
   async function run(kind: 'upload' | 'remove', action: () => Promise<{ imageUrl: string | null }>) {
     setBusy(kind);
@@ -47,9 +33,16 @@ export function FacilityPicture({ categoryId, initialUrl }: { categoryId?: strin
     e.target.value = ''; // picking the same file again should still fire
     if (!file || !categoryId) return;
     if (!file.type.startsWith('image/')) return setError('Choose a picture (JPEG, PNG or WebP).');
-    void run('upload', async () => {
+    setError(null);
+    setCropping(file);
+  }
+
+  /** The framed picture from the cropper: already the picker's shape, WebP and at most 1200px wide. */
+  function upload(picture: Blob) {
+    setCropping(null);
+    void run('upload', () => {
       const form = new FormData();
-      form.append('file', await shrink(file), 'facility.webp');
+      form.append('file', picture, picture.type === 'image/webp' ? 'facility.webp' : 'facility.jpg');
       return api.upload<{ imageUrl: string | null }>(`/admin/categories/${categoryId}/image`, form);
     });
   }
@@ -58,7 +51,7 @@ export function FacilityPicture({ categoryId, initialUrl }: { categoryId?: strin
     <div>
       <p className="text-sm font-medium text-gray-700">Picture</p>
       <p className="mb-2 text-xs text-gray-500">
-        Shown with this facility in the customer site&apos;s &quot;Venue types&quot; picker. JPEG, PNG or WebP; it is shrunk before it is uploaded.
+        Shown with this facility in the customer site&apos;s &quot;Venue types&quot; picker. JPEG, PNG or WebP; you frame it before it is uploaded.
       </p>
       {!categoryId ? (
         <p className="rounded-lg border border-dashed border-gray-300 px-3 py-4 text-xs text-gray-500">Save the facility first, then add its picture here.</p>
@@ -90,6 +83,7 @@ export function FacilityPicture({ categoryId, initialUrl }: { categoryId?: strin
           </div>
         </div>
       )}
+      {cropping && <PhotoCropper file={cropping} onCancel={() => setCropping(null)} onCropped={upload} />}
       {error && (
         <p role="alert" className="mt-1.5 text-xs text-red-600">
           {error}
