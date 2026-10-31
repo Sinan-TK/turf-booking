@@ -570,10 +570,16 @@ export default function HomePage() {
         </div>
       )}
 
-      <main className="w-full flex-1 px-4 pb-24 sm:px-6 lg:px-10 2xl:px-14">
+      <main className="relative w-full flex-1 px-4 pb-24 sm:px-6 lg:px-10 2xl:px-14">
         {errorMessage && <div className="mb-4"><ErrorBanner message={errorMessage} /></div>}
         {/* Every new search shows the skeleton in place of the cards; only a duration change from an open booking window keeps the cards and shows a slim bar. */}
-        {searching && (results.length === 0 ? <VenueCardsSkeleton count={6} /> : <SearchingBar />)}
+        {searching && results.length === 0 && <VenueCardsSkeleton count={6} />}
+        {/* Cards already on screen (saved ones, or a length change): the bar floats over the top edge, so nothing moves when it comes and goes. */}
+        {searching && results.length > 0 && (
+          <div className="pointer-events-none absolute inset-x-4 -top-1 z-10 sm:inset-x-6 lg:inset-x-10 2xl:inset-x-14 [&>*]:!mb-0">
+            <SearchingBar />
+          </div>
+        )}
         {!searching && searched && visibleResults.length === 0 && (
           <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-sm">
             {choice && choice.mode !== 'district' ? (
