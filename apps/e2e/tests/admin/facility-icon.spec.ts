@@ -26,7 +26,7 @@ test.describe('admin: a facility\'s own SVG icon', () => {
     // A good one shows a preview and is saved (tidied: namespace added).
     await box.fill(SVG);
     await expect(page.getByRole('alert').filter({ hasText: 'script' })).toHaveCount(0);
-    await expect(page.getByLabel('Preview of your icon').locator('span[style*="mask-image"]')).toBeVisible();
+    await expect(page.getByLabel('Preview of your icon').locator('img[src^="data:image/svg+xml"]')).toBeVisible();
     await page.getByRole('button', { name: 'Save changes' }).click();
     await expect(page.getByText('Facility saved.')).toBeVisible();
     expect(await stored()).toContain('xmlns="http://www.w3.org/2000/svg"');

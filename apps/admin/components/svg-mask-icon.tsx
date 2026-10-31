@@ -1,25 +1,15 @@
 /**
- * A facility's custom icon, drawn as a mask in the surrounding text colour (like the icon font), sized by font-size.
- * As an image mask it can never run code, whatever the markup; the API also only stores SVG that passed cleanIconSvg.
+ * A facility's custom icon, drawn in the colours it was made with, sized by font-size.
+ * Shown as an image, so it can never run code, whatever the markup; the API also only stores SVG that passed cleanIconSvg.
  */
 export function SvgMaskIcon({ svg, className = '' }: { svg: string; className?: string }) {
-  const url = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
   return (
-    <span
+    <img
+      alt=""
       aria-hidden="true"
-      className={`inline-block shrink-0 bg-current align-middle ${className}`}
-      style={{
-        width: '1em',
-        height: '1em',
-        WebkitMaskImage: url,
-        maskImage: url,
-        WebkitMaskSize: 'contain',
-        maskSize: 'contain',
-        WebkitMaskRepeat: 'no-repeat',
-        maskRepeat: 'no-repeat',
-        WebkitMaskPosition: 'center',
-        maskPosition: 'center',
-      }}
+      src={`data:image/svg+xml,${encodeURIComponent(svg)}`}
+      className={`inline-block shrink-0 align-middle ${className}`}
+      style={{ width: '1em', height: '1em' }}
     />
   );
 }

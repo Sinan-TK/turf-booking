@@ -118,28 +118,18 @@ export function Icon({ name, className = '' }: { name: string; className?: strin
   return <LucideIconComponent size="1em" className={`shrink-0 ${className}`} />;
 }
 /**
- * A facility's icon: its pasted SVG when it has one (drawn as a mask in the text colour, so it can never run code and follows the
- * chip's colours), else the named icon.
+ * A facility's icon: its pasted SVG when it has one (drawn in its own colours, as an image, so it can never run code), else the
+ * named icon.
  */
 export function CategoryIcon({ iconKey, iconSvg, className = '' }: { iconKey: string; iconSvg?: string | null; className?: string }) {
   if (!iconSvg) return <Icon name={iconKey} className={className} />;
-  const url = `url("data:image/svg+xml,${encodeURIComponent(iconSvg)}")`;
   return (
-    <span
+    <img
+      alt=""
       aria-hidden="true"
-      className={`inline-block shrink-0 bg-current align-middle ${className}`}
-      style={{
-        width: '1em',
-        height: '1em',
-        WebkitMaskImage: url,
-        maskImage: url,
-        WebkitMaskSize: 'contain',
-        maskSize: 'contain',
-        WebkitMaskRepeat: 'no-repeat',
-        maskRepeat: 'no-repeat',
-        WebkitMaskPosition: 'center',
-        maskPosition: 'center',
-      }}
+      src={`data:image/svg+xml,${encodeURIComponent(iconSvg)}`}
+      className={`inline-block shrink-0 align-middle ${className}`}
+      style={{ width: '1em', height: '1em' }}
     />
   );
 }
