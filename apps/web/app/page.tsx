@@ -1185,8 +1185,7 @@ function CardGallery({
         )
       ) : (
         <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-br from-stone-100 via-stone-200 to-stone-300">
-          {/* Faint pitch markings: a halfway line and centre circle. */}
-          <div className="absolute inset-y-0 left-1/2 w-px bg-stone-400/30" />
+          {/* Faint centre circle behind the icon. */}
           <div className="absolute left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full border border-stone-400/30" />
           <div className="absolute inset-0 flex items-center justify-center">
             <CategoryIcon iconKey={iconKey} iconSvg={iconSvg} className="text-[5.5rem] text-stone-500/70 sm:text-[6.5rem]" />
