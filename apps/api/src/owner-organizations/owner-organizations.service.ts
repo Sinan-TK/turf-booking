@@ -3,6 +3,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { IdentityService } from '../identity/identity.service';
+import { MailService } from '../identity/mail.service';
+import { loadEnv } from '@venue/config';
 import { OwnerScopeService } from '../owner-scope/owner-scope.service';
 import type { OwnerOrganizationStatus, OwnerUserRole, OwnerUserStatus } from '@venue/database';
 import { contains } from '../common/list-filters';
@@ -22,6 +24,7 @@ export class OwnerOrganizationsService {
     private readonly audit: AuditService,
     private readonly scope: OwnerScopeService,
     private readonly identity: IdentityService,
+    private readonly mail: MailService,
   ) {}
 
   async createOrganization(dto: CreateOrganizationDto, actor: AuthContext) {
@@ -138,18 +141,39 @@ export class OwnerOrganizationsService {
     const org = await this.getOrganization(id);
     if (org.status === status) return org;
     const updated = await this.prisma.client.ownerOrganization.update({ where: { id }, data: { status } });
-    if (status === 'SUSPENDED') {
+    if (status === 'SUSPENDED' || status === 'REJECTED') {
       const users = await this.prisma.client.venueOwnerUser.findMany({ where: { organizationId: id }, select: { id: true } });
       await Promise.all(users.map((u) => this.identity.revokeAllSessions('OWNER', u.id)));
     }
+    // Approving a sign-up that was waiting is not the same as lifting a suspension: say so in the log, and tell the owner.
+    const approved = status === 'ACTIVE' && (org.status === 'PENDING_APPROVAL' || org.status === 'REJECTED');
+    if (approved) await this.tellOwnerApproved(org);
     await this.audit.record({
       actor,
-      action: status === 'SUSPENDED' ? 'OWNER_ORGANIZATION_SUSPENDED' : 'OWNER_ORGANIZATION_REACTIVATED',
+      action: approved
+        ? 'OWNER_ORGANIZATION_APPROVED'
+        : status === 'REJECTED'
+          ? 'OWNER_ORGANIZATION_REJECTED'
+          : status === 'SUSPENDED'
+            ? 'OWNER_ORGANIZATION_SUSPENDED'
+            : 'OWNER_ORGANIZATION_REACTIVATED',
       entityType: 'OwnerOrganization',
       entityId: id,
       metadata: { reason: reason ?? null, from: org.status },
     });
     return updated;
+  }
+
+  /** Emails the owner that their account was approved and can now be used in full. A mail failure never undoes the approval. */
+  private async tellOwnerApproved(org: { name: string; contactEmail: string }) {
+    const url = `${loadEnv().OWNER_APP_URL.replace(/\/$/, '')}/login`;
+    const text = `Good news: ${org.name} has been approved on TurfX.\n\nYou can now sign in and set up your venues: ${url}\n`;
+    await this.mail.send({
+      to: org.contactEmail,
+      subject: 'Your TurfX owner account is approved',
+      text,
+      html: `<p>Good news: <strong>${org.name.replace(/[<>&]/g, '')}</strong> has been approved on TurfX.</p><p>You can now <a href="${url}">sign in</a> and set up your venues.</p>`,
+    });
   }
 
   async setOwnerUserStatus(

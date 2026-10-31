@@ -229,7 +229,8 @@ export class StaffAuthService {
       email: row.email,
       name: row.name,
       passwordHash: row.passwordHash,
-      active: row.status === 'ACTIVE' && row.organization.status === 'ACTIVE',
+      // A sign-up still waiting for approval may sign in (to see that it is waiting); the API then shows it nothing else.
+      active: row.status === 'ACTIVE' && (row.organization.status === 'ACTIVE' || row.organization.status === 'PENDING_APPROVAL'),
       ctx: {
         role: Role.VENUE_OWNER,
         id: row.id,

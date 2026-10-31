@@ -26,7 +26,8 @@ export class OwnerRegistrationService {
     if (existing) return; // already has an account: say nothing different (they can use "Forgot password")
 
     const organization = await this.prisma.client.ownerOrganization.create({
-      data: { name: dto.businessName.trim(), contactEmail: email, contactPhone: dto.phone },
+      // Waits for the Super Admin's approval before the owner sees anything real.
+      data: { name: dto.businessName.trim(), contactEmail: email, contactPhone: dto.phone, status: 'PENDING_APPROVAL' },
     });
     try {
       await this.identity.inviteOwner({ organizationId: organization.id, email, name: dto.name.trim(), phone: dto.phone, role: 'OWNER_ADMIN' });

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { Sidebar } from '@/components/sidebar';
+import { PendingApproval } from '@/components/pending-approval';
 import { NotificationBell } from '@/components/notification-bell';
 import { Icon, LoadingState } from '@/components/ui';
 import { ROLE_LABEL, canOpen } from '@/lib/access';
@@ -48,6 +49,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
   if (!user) return null; // redirect effect above is about to fire
   if (needsVenue || blocked) return null; // so is this one
+  // A sign-up the Super Admin has not approved yet sees nothing of the portal, only where things stand.
+  if (user.organizationStatus === 'PENDING_APPROVAL') return <PendingApproval user={user} />;
 
   return (
     <div className="bg-background">

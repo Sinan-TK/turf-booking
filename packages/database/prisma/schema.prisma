@@ -73,6 +73,10 @@ model OwnerOrganization {
 enum OwnerOrganizationStatus {
   ACTIVE
   SUSPENDED
+  /// Signed up by the owner themselves: they may sign in, but see nothing real until the Super Admin approves.
+  PENDING_APPROVAL
+  /// The Super Admin refused the sign-up.
+  REJECTED
 }
 
 enum OwnerUserRole {

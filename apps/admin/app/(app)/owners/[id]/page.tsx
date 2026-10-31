@@ -100,6 +100,70 @@ function matchVenues(venues: OrgVenue[], term: string): OrgVenue[] {
   return venues.filter((v) => [v.name, v.facilityCode, ...v.facilities.map((f) => f.name)].some((t) => t.toLowerCase().includes(q)));
 }
 
+/** A sign-up waiting for the Super Admin: approve it (the owner is emailed and sees the real portal), or refuse it. */
+function ApprovalPanel({ org, onChanged }: { org: { id: string; name: string; status: string; contactEmail: string }; onChanged: () => void }) {
+  const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const rejected = org.status === 'REJECTED';
+
+  async function set(status: 'ACTIVE' | 'REJECTED') {
+    setBusy(status === 'ACTIVE' ? 'approve' : 'reject');
+    setError(null);
+    try {
+      await api.patch(`/admin/organizations/${org.id}/status`, { status, reason: reason.trim() || undefined });
+      setRejecting(false);
+      setReason('');
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not change the status.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section aria-label="Approval" className={`rounded-xl border px-5 py-4 ${rejected ? 'border-red-200 bg-red-50' : 'border-amber-300 bg-amber-50'}`}>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 max-w-2xl">
+          <h2 className={`text-sm font-semibold ${rejected ? 'text-red-900' : 'text-amber-900'}`}>{rejected ? 'This sign-up was refused' : 'Waiting for your approval'}</h2>
+          <p className={`mt-1 text-sm ${rejected ? 'text-red-800' : 'text-amber-900/90'}`}>
+            {rejected
+              ? 'Its owners cannot sign in. You can still approve it.'
+              : `${org.name} signed up on its own. Its owner can sign in but sees only a waiting page, and cannot add venues, until you approve it. Check the business and the contact details (${org.contactEmail}) first.`}
+          </p>
+          {error && <p role="alert" className="mt-2 text-sm font-medium text-red-700">{error}</p>}
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Button type="button" onClick={() => set('ACTIVE')} loading={busy === 'approve'}>
+            {busy === 'approve' ? 'Approving…' : 'Approve'}
+          </Button>
+          {!rejected && (
+            <Button type="button" variant="danger" onClick={() => setRejecting(true)} disabled={busy !== null}>
+              Reject
+            </Button>
+          )}
+        </div>
+      </div>
+      {rejecting && (
+        <Modal title="Reject this sign-up?" subtitle={`${org.name} will not be able to sign in. You can approve it later if you change your mind.`} onClose={() => setRejecting(false)} busy={busy === 'reject'}>
+          <div className="flex flex-col gap-4 px-6 py-5">
+            <div>
+              <label htmlFor="reject-reason" className="mb-1 block text-sm font-medium text-gray-700">Reason (kept in the audit log, optional)</label>
+              <textarea id="reject-reason" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15" />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={() => setRejecting(false)} disabled={busy === 'reject'}>Cancel</Button>
+              <Button type="button" variant="danger" onClick={() => set('REJECTED')} loading={busy === 'reject'}>Reject sign-up</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </section>
+  );
+}
+
 export default function OwnerOrgDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: org, error, loading, refetch } = useFetch<Organization>(`/admin/organizations/${id}`);
@@ -144,6 +208,7 @@ export default function OwnerOrgDetailPage() {
             >
               + Add owner
             </Button>
+            {(org.status === 'ACTIVE' || suspended) && (
             <StatusAction
               path={`/admin/organizations/${org.id}/status`}
               restricted={suspended}
@@ -162,11 +227,16 @@ export default function OwnerOrgDetailPage() {
                 setLoginsVersion((v) => v + 1);
               }}
             />
+            )}
           </div>
         }
       />
 
       {notice && <SuccessBanner message={notice} />}
+
+      {(org.status === 'PENDING_APPROVAL' || org.status === 'REJECTED') && (
+        <ApprovalPanel org={org} onChanged={() => { refetch(); setLoginsVersion((v) => v + 1); }} />
+      )}
 
       {suspended && (
         <div

@@ -19,6 +19,7 @@ import { Role } from '@venue/shared';
 import { StaffAuthService, type StaffSession } from './staff-auth.service';
 import { AuthGuard } from './guards/auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
+import { AllowPendingOwner } from './decorators/roles.decorator';
 import type { AuthContext } from './auth.types';
 import { STAFF_COOKIES, STAFF_REFRESH_COOKIE_PATH, staffCookieOptions } from './auth.constants';
 import {
@@ -111,6 +112,7 @@ export class StaffAuthController {
   @HttpCode(200)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @UseGuards(AuthGuard)
+  @AllowPendingOwner()
   async changePassword(
     @Param('portal') rawPortal: string,
     @Body() dto: ChangePasswordDto,

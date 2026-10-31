@@ -145,7 +145,7 @@ export default function RegisterPage() {
     const NEXT = [
       { title: 'Open the email', text: `We sent a link to ${sentTo}.` },
       { title: 'Choose your password', text: 'The link lets you set it and sign in.' },
-      { title: 'Add your venue', text: 'It goes live for customers once our team has had a look at it.' },
+      { title: 'Wait for approval', text: 'Our team checks every new business first, and emails you when you can add your venues.' },
     ];
     return (
       <AuthShell title="Check your email" subtitle="Your account is created. One last step to open it.">

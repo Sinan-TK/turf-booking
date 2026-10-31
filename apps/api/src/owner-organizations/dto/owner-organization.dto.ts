@@ -23,7 +23,8 @@ export const createOwnerUserSchema = z.object({
 export class CreateOwnerUserDto extends createZodDto(createOwnerUserSchema) {}
 
 export const setOrganizationStatusSchema = z.object({
-  status: z.enum(['ACTIVE', 'SUSPENDED']),
+  // ACTIVE also approves a sign-up that is waiting (PENDING_APPROVAL); REJECTED refuses it.
+  status: z.enum(['ACTIVE', 'SUSPENDED', 'REJECTED']),
   reason: z.string().max(500).optional(),
 });
 export class SetOrganizationStatusDto extends createZodDto(setOrganizationStatusSchema) {}

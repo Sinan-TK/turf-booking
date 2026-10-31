@@ -84,25 +84,30 @@ export class StaffTokenService {
    * working until the token ran out. One lookup by primary key per request.
    */
   async isStillActive(ctx: AuthContext): Promise<boolean> {
+    return (await this.accessState(ctx)) !== 'BLOCKED';
+  }
+
+  /**
+   * isStillActive with one more answer for an owner: PENDING when the account may sign in but its organisation has not been approved
+   * yet, so the guard can let it see only that it is waiting.
+   */
+  async accessState(ctx: AuthContext): Promise<'ACTIVE' | 'PENDING' | 'BLOCKED'> {
     if (ctx.role === Role.SUPER_ADMIN) {
       const admin = await this.prisma.client.adminUser.findUnique({ where: { id: ctx.id }, select: { status: true, role: true } });
       // Like the owner check below: the account must be active and still hold the role the token claims.
-      return admin?.status === 'ACTIVE' && admin.role === 'SUPER_ADMIN';
+      return admin?.status === 'ACTIVE' && admin.role === 'SUPER_ADMIN' ? 'ACTIVE' : 'BLOCKED';
     }
     if (ctx.role === Role.VENUE_OWNER) {
       const user = await this.prisma.client.venueOwnerUser.findUnique({
         where: { id: ctx.id },
         select: { status: true, role: true, organizationId: true, organization: { select: { status: true } } },
       });
-      return (
-        !!user &&
-        user.status === 'ACTIVE' &&
-        user.organization.status === 'ACTIVE' &&
-        user.organizationId === ctx.organizationId &&
-        user.role === ctx.ownerRole
-      );
+      const same = !!user && user.status === 'ACTIVE' && user.organizationId === ctx.organizationId && user.role === ctx.ownerRole;
+      if (!same) return 'BLOCKED';
+      if (user.organization.status === 'ACTIVE') return 'ACTIVE';
+      return user.organization.status === 'PENDING_APPROVAL' ? 'PENDING' : 'BLOCKED';
     }
-    return false;
+    return 'BLOCKED';
   }
 
   generateOpaqueToken(): { raw: string; hash: string } {

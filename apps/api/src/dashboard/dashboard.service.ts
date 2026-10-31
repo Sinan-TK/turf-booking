@@ -25,6 +25,7 @@ export class DashboardService {
       bookingsToday,
       openSupportTickets,
       revenueThisMonth,
+      ownersPendingApproval,
     ] = await Promise.all([
       this.prisma.client.ownerOrganization.count(),
       this.prisma.client.venue.count(),
@@ -36,6 +37,7 @@ export class DashboardService {
         where: { status: 'SUCCESS', createdAt: { gte: startOfMonth } },
         _sum: { amount: true },
       }),
+      this.prisma.client.ownerOrganization.count({ where: { status: 'PENDING_APPROVAL' } }),
     ]);
 
     return {
@@ -45,6 +47,7 @@ export class DashboardService {
       totalCustomers,
       bookingsToday,
       openSupportTickets,
+      ownersPendingApproval,
       revenueThisMonth: revenueThisMonth._sum.amount ?? 0,
     };
   }

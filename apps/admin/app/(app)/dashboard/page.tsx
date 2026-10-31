@@ -13,6 +13,7 @@ interface Summary {
   totalCustomers: number;
   bookingsToday: number;
   openSupportTickets: number;
+  ownersPendingApproval: number;
   revenueThisMonth: string;
 }
 
@@ -61,6 +62,17 @@ export default function DashboardPage() {
   return (
     <div>
       <PageHeader title="Dashboard" subtitle="A live look at the whole platform." />
+      {data && data.ownersPendingApproval > 0 && (
+        <Link
+          href="/owners?status=PENDING_APPROVAL"
+          className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 transition hover:bg-amber-100"
+        >
+          <span>
+            {data.ownersPendingApproval} new {data.ownersPendingApproval === 1 ? 'owner is' : 'owners are'} waiting for your approval
+          </span>
+          <Icon name="arrow" className="h-4 w-4" />
+        </Link>
+      )}
       {loading && <SkeletonStatGrid count={CARDS.length} />}
       {error && <ErrorBanner message={error} />}
       {data && (

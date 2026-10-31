@@ -1,11 +1,13 @@
 import type { CanActivate, ExecutionContext } from '@nestjs/common';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { loadEnv } from '@venue/config';
 import { Role } from '@venue/shared';
 import { StaffTokenService } from '../../identity/staff-token.service';
 import { CustomerSessionService } from '../customer-session.service';
 import { CUSTOMER_SESSION_COOKIE, STAFF_COOKIES } from '../auth.constants';
+import { ALLOW_PENDING_OWNER_KEY } from '../decorators/roles.decorator';
 
 /**
  * Single guard for all three identity types (ARCHITECTURE.md §12):
@@ -34,6 +36,7 @@ export class AuthGuard implements CanActivate {
   constructor(
     private readonly staffTokens: StaffTokenService,
     private readonly customerSessions: CustomerSessionService,
+    private readonly reflector: Reflector,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -46,8 +49,11 @@ export class AuthGuard implements CanActivate {
         if (authContext) {
           // A valid token is not enough: a login that was blocked (or whose organisation was suspended, or whose role changed)
           // is refused straight away, not when the token happens to expire. The portals answer a 401 by signing the person out.
-          if (!(await this.staffTokens.isStillActive(authContext))) {
-            throw new UnauthorizedException('This login is no longer active');
+          const state = await this.staffTokens.accessState(authContext);
+          if (state === 'BLOCKED') throw new UnauthorizedException('This login is no longer active');
+          // An owner whose sign-up is waiting for approval may only ask who they are and change their password.
+          if (state === 'PENDING' && !this.reflector.getAllAndOverride<boolean>(ALLOW_PENDING_OWNER_KEY, [context.getHandler(), context.getClass()])) {
+            throw new ForbiddenException({ message: 'Your account is waiting for approval.', code: 'ORGANIZATION_PENDING' });
           }
           request.authContext = authContext;
           return true;

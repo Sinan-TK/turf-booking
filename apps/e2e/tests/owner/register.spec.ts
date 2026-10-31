@@ -86,7 +86,7 @@ test.describe('owner portal: creating an account', () => {
 
     await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible();
     await expect(page.getByText(/We sent a link to asha@example.com/)).toBeVisible();
-    for (const step of ['Open the email', 'Choose your password', 'Add your venue']) await expect(page.getByText(step)).toBeVisible();
+    for (const step of ['Open the email', 'Choose your password', 'Wait for approval']) await expect(page.getByText(step)).toBeVisible();
     expect(sent).toEqual({ businessName: 'PW Sports Hub', name: 'Asha Menon', email: 'asha@example.com', phone: '9847012345', acceptTerms: true });
     await expect(page.getByRole('link', { name: 'Back to sign in' })).toHaveAttribute('href', '/login');
   });

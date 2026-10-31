@@ -100,6 +100,8 @@ const BADGE_COLORS: Record<string, string> = {
   FAILED: 'bg-red-50 text-red-700 ring-red-600/20',
   SUSPENDED: 'bg-red-50 text-red-700 ring-red-600/20',
   SCHEDULED: 'bg-sky-50 text-sky-700 ring-sky-600/20',
+  PENDING_APPROVAL: 'bg-amber-50 text-amber-800 ring-amber-600/20',
+  REJECTED: 'bg-red-50 text-red-700 ring-red-600/20',
   ENDED: 'bg-gray-100 text-gray-600 ring-gray-500/20',
   BLOCKED: 'bg-red-50 text-red-700 ring-red-600/20',
   CLOSED: 'bg-gray-100 text-gray-600 ring-gray-500/20',

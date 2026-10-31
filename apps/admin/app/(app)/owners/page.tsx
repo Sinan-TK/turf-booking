@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useFetch } from '@/lib/use-fetch';
 import { api, ApiError } from '@/lib/api';
@@ -28,6 +28,8 @@ const PAGE_SIZE = 25;
 
 const STATUS_LABELS: Record<string, string> = {
   ACTIVE: 'Active',
+  PENDING_APPROVAL: 'Pending approval',
+  REJECTED: 'Rejected',
   SUSPENDED: 'Suspended',
   INACTIVE: 'Inactive',
   DRAFT: 'Draft',
@@ -54,6 +56,11 @@ export default function OwnersPage() {
 
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
+  // A link such as /owners?status=PENDING_APPROVAL (the dashboard's "waiting for approval" notice) opens with that filter on.
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get('status');
+    if (wanted) setStatus(wanted);
+  }, []);
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'name', dir: 'asc' });
 
   async function onSubmit(e: React.FormEvent) {

@@ -4,7 +4,7 @@ import { OwnerScopeService } from '../owner-scope/owner-scope.service';
 import { Role } from '@venue/shared';
 import { AuthGuard } from './guards/auth.guard';
 import { RolesGuard } from './guards/roles.guard';
-import { Roles } from './decorators/roles.decorator';
+import { AllowPendingOwner, Roles } from './decorators/roles.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { AuthContext } from './auth.types';
 
@@ -22,16 +22,25 @@ export class OwnerAuthController {
   @Get('me')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.VENUE_OWNER)
+  @AllowPendingOwner()
   async me(@CurrentUser() user: AuthContext) {
     const assigned = await this.scope.assignedVenueIds(user);
     const [profile, venues] = await Promise.all([
-      this.prisma.client.venueOwnerUser.findUnique({ where: { id: user.id }, select: { name: true, email: true } }),
+      this.prisma.client.venueOwnerUser.findUnique({ where: { id: user.id }, select: { name: true, email: true, organization: { select: { name: true, status: true } } } }),
       this.prisma.client.venue.findMany({
         where: { organizationId: user.organizationId, ...(assigned ? { id: { in: assigned } } : {}) },
         orderBy: { name: 'asc' },
         select: { id: true, name: true, facilityCode: true, status: true },
       }),
     ]);
-    return { ...user, name: profile?.name ?? null, email: profile?.email ?? null, venues };
+    // organizationStatus is PENDING_APPROVAL for a sign-up not yet approved: the portal then shows only a "waiting" page.
+    return {
+      ...user,
+      name: profile?.name ?? null,
+      email: profile?.email ?? null,
+      organizationName: profile?.organization.name ?? null,
+      organizationStatus: profile?.organization.status ?? 'ACTIVE',
+      venues,
+    };
   }
 }

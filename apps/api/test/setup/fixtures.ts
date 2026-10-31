@@ -80,7 +80,7 @@ function bearerAgent(app: INestApplication, accessToken: string): TestAgent {
  * is rate-limited, which a suite creating many fixtures would blow
  * through; the login flow itself is covered in staff-auth.e2e-spec.ts).
  */
-async function agentForStaffContext(
+export async function agentForStaffContext(
   app: INestApplication,
   ctx: Parameters<StaffTokenService['signAccessToken']>[0],
 ): Promise<TestAgent> {

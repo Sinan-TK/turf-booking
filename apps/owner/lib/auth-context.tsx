@@ -17,6 +17,9 @@ export interface OwnerUser {
   ownerRole: 'OWNER_ADMIN' | 'OWNER_STAFF';
   name: string | null;
   email: string | null;
+  organizationName: string | null;
+  /** PENDING_APPROVAL for a sign-up the Super Admin has not approved yet: the portal then shows only a "waiting" page. */
+  organizationStatus: 'ACTIVE' | 'PENDING_APPROVAL';
   /** The venues this login may work in: every venue of the organization for an owner admin, only the assigned ones for staff. */
   venues: OwnerVenue[];
 }
