@@ -9,6 +9,7 @@ import { AccountMenu } from '@/components/account-menu';
 import { BannerSlider } from '@/components/banner-slider';
 import { CategoryIcon, Icon } from '@/components/ui';
 import { Skeleton } from '@/components/skeleton';
+import { LEGAL, LEGAL_LINKS } from '@/lib/legal';
 
 /** Where owners sign in to list their venues (the owner portal). */
 const OWNER_PORTAL_URL = process.env.NEXT_PUBLIC_OWNER_URL ?? 'http://localhost:3002';
@@ -261,18 +262,30 @@ export default function LandingPage() {
       </main>
 
       <footer className="border-t border-slate-200 bg-white">
-        <div className={`${shell} flex flex-col items-start justify-between gap-3 py-7 text-sm text-slate-500 sm:flex-row sm:items-center`}>
-          <span className="text-lg font-black italic text-slate-900">
-            Turf<span className="text-brand-600">X</span>
-          </span>
-          <nav aria-label="Footer" className="flex gap-5 font-bold">
-            <Link href="/explore" className={`rounded-md hover:text-brand-700 ${focus}`}>
-              Explore venues
-            </Link>
-            <Link href="/support" className={`rounded-md hover:text-brand-700 ${focus}`}>
-              Support
-            </Link>
-          </nav>
+        <div className={`${shell} flex flex-col gap-5 py-8 text-sm text-slate-500`}>
+          <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+            <span className="text-lg font-black italic text-slate-900">
+              Turf<span className="text-brand-600">X</span>
+            </span>
+            <nav aria-label="Footer" className="flex gap-5 font-bold">
+              <Link href="/explore" className={`rounded-md hover:text-brand-700 ${focus}`}>
+                Explore venues
+              </Link>
+              <Link href="/support" className={`rounded-md hover:text-brand-700 ${focus}`}>
+                Support
+              </Link>
+            </nav>
+          </div>
+          <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <nav aria-label="Legal" className="flex flex-wrap gap-x-5 gap-y-2 font-semibold">
+              {LEGAL_LINKS.map((l) => (
+                <Link key={l.href} href={l.href} className={`rounded-md hover:text-brand-700 ${focus}`}>
+                  {l.label}
+                </Link>
+              ))}
+            </nav>
+            <p>&copy; {new Date().getFullYear()} {LEGAL.operator}. All rights reserved.</p>
+          </div>
         </div>
       </footer>
     </div>

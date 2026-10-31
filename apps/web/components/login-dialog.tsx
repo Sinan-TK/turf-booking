@@ -530,6 +530,18 @@ export function LoginDialog({
                 Use a phone code instead
               </button>
             )}
+
+            <p className="text-center text-xs leading-relaxed text-slate-500">
+              By continuing you agree to our{' '}
+              <a href="/terms" target="_blank" rel="noopener" className="font-bold text-brand-700 underline underline-offset-2">
+                Terms of Use
+              </a>{' '}
+              and{' '}
+              <a href="/privacy" target="_blank" rel="noopener" className="font-bold text-brand-700 underline underline-offset-2">
+                Privacy Policy
+              </a>
+              .
+            </p>
           </div>
         )}
 

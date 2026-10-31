@@ -353,6 +353,17 @@ export default function CheckoutPage() {
               <p className="mt-4 text-center text-xs text-gray-400">
                 Pay with money or Coins — never both for the same booking.
               </p>
+              <p className="mt-2 text-center text-xs text-gray-400">
+                By paying you agree to the{' '}
+                <Link href="/terms" className="underline underline-offset-2 hover:text-gray-600">
+                  Terms of Use
+                </Link>{' '}
+                and the{' '}
+                <Link href="/refunds" className="underline underline-offset-2 hover:text-gray-600">
+                  Cancellation &amp; Refund Policy
+                </Link>
+                .
+              </p>
             </>
           )}
 
