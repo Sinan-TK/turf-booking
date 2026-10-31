@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { LEGAL, LEGAL_LINKS, OWNER_PORTAL_URL } from '@/lib/legal';
+import { LEGAL, LEGAL_LINKS } from '@/lib/legal';
 
 const focus = 'rounded-md outline-none focus-visible:ring-4 focus-visible:ring-brand-600/25';
 const item = `inline-block py-1 text-[0.9375rem] font-semibold text-slate-600 transition hover:text-brand-700 ${focus}`;
@@ -13,12 +13,12 @@ function Column({ title, children }: { title: string; children: React.ReactNode 
   );
 }
 
-/** The footer of the customer site's public pages: who we are, where to go, the legal pages, and a way in for venue owners. */
+/** The footer of the customer site's public pages: who we are, where to go, and the legal pages. */
 export function SiteFooter() {
   return (
     <footer className="border-t border-slate-200 bg-slate-50">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-10">
-        <div className="grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))] lg:gap-8">
+        <div className="grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_repeat(2,minmax(0,1fr))] lg:gap-12">
           <div className="max-w-sm">
             <Link href="/" aria-label={`${LEGAL.brand} home`} className={`select-none text-[2rem] font-black italic leading-none tracking-tight text-slate-900 ${focus}`}>
               Turf<span className="text-brand-600">X</span>
@@ -54,24 +54,6 @@ export function SiteFooter() {
                 </Link>
               </li>
             ))}
-          </Column>
-
-          <Column title="For venue owners">
-            <li>
-              <a href={`${OWNER_PORTAL_URL}/register`} className={item}>
-                List your venue
-              </a>
-            </li>
-            <li>
-              <a href={`${OWNER_PORTAL_URL}/login`} className={item}>
-                Owner sign in
-              </a>
-            </li>
-            <li>
-              <a href={`${OWNER_PORTAL_URL}/partner-terms`} className={item}>
-                Venue Partner Terms
-              </a>
-            </li>
           </Column>
         </div>
 

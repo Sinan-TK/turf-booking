@@ -32,16 +32,20 @@ test.describe('customer site: legal pages', () => {
     });
   }
 
-  test('the footer on the landing page and on a legal page also leads venue owners to the owner portal, where the Venue Partner Terms live', async ({ page }) => {
+  test('the footer has no venue-owner section and the Venue Partner Terms are not on the customer site', async ({ page }) => {
     for (const path of ['/', '/terms']) {
       await page.goto(path);
-      const owners = page.getByRole('navigation', { name: 'For venue owners' });
-      await expect(owners.getByRole('link', { name: 'List your venue' })).toHaveAttribute('href', /\/register$/);
-      await expect(owners.getByRole('link', { name: 'Owner sign in' })).toHaveAttribute('href', /\/login$/);
-      await expect(owners.getByRole('link', { name: 'Venue Partner Terms' })).toHaveAttribute('href', /\/partner-terms$/);
+      await expect(page.getByRole('navigation', { name: 'For venue owners' })).toHaveCount(0);
+      await expect(page.locator('footer').getByRole('link', { name: /Venue Partner Terms|Owner sign in/ })).toHaveCount(0);
     }
-    // The customer site no longer carries those terms itself.
+    await expect(page.getByRole('heading', { name: 'Own a venue?' })).toHaveCount(0); // (only the landing page has that section)
     expect((await page.request.get('/partner-terms')).status()).toBe(404);
+  });
+
+  test('the landing page keeps its Own a venue section above the footer', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Own a venue?' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'List your venue' })).toHaveAttribute('href', /\/register$/);
   });
 
   test('the landing page footer links to every legal page', async ({ page }) => {
