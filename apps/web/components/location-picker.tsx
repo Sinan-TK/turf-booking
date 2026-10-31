@@ -4,12 +4,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { nearestTown } from '@venue/shared/dist/location';
 import { api } from '@/lib/api';
 import { getPosition, type LocationChoice, type Town } from '@/lib/location';
-import { Icon, Select } from '@/components/ui';
+import { Icon } from '@/components/ui';
 import { Skeleton } from '@/components/skeleton';
 
-interface Option {
-  id: string;
-  name: string;
+/** One searchable place: an area with the district and state it is in (from GET /places). */
+interface Place extends Town {
+  districtId: string;
+  districtName: string;
+  stateId: string;
+  stateName: string;
 }
 
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
@@ -31,47 +34,30 @@ export function LocationPicker({
   const panel = useRef<HTMLDivElement>(null);
   const searchBox = useRef<HTMLInputElement>(null);
 
-  // The district whose towns are listed; starts at the current one and can be switched.
-  const [states, setStates] = useState<Option[]>([]);
-  const [districts, setDistricts] = useState<Option[]>([]);
-  const [stateId, setStateId] = useState(current?.stateId ?? '');
-  const [districtId, setDistrictId] = useState(current?.districtId ?? '');
-  const [towns, setTowns] = useState<Town[] | null>(null);
-  const [townsError, setTownsError] = useState(false);
+  // Every place a customer can search from, in any state: "Area, District, State".
+  const [places, setPlaces] = useState<Place[] | null>(null);
+  const [placesError, setPlacesError] = useState(false);
   const [query, setQuery] = useState('');
-  const [showOther, setShowOther] = useState(false);
   const [locating, setLocating] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
 
-  const stateName = states.find((s) => s.id === stateId)?.name ?? current?.stateName ?? '';
-  const districtName = districts.find((d) => d.id === districtId)?.name ?? (districtId === current?.districtId ? current?.districtName : '') ?? '';
+  // Kept, so "Use my current location" can wait for the list when it is pressed before the list has arrived.
+  const placesRequest = useRef<Promise<Place[]> | null>(null);
 
   useEffect(() => {
-    api.get<Option[]>('/states').then(setStates).catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    if (!stateId) return setDistricts([]);
-    api.get<Option[]>(`/districts?stateId=${stateId}`).then(setDistricts).catch(() => undefined);
-  }, [stateId]);
-
-  useEffect(() => {
-    if (!districtId) return setTowns([]);
     let cancelled = false;
-    setTowns(null);
-    setTownsError(false);
-    api
-      .get<Array<{ id: string; name: string; lat: number | null; lng: number | null }>>(`/areas?districtId=${districtId}`)
-      .then((rows) => !cancelled && setTowns(rows))
+    placesRequest.current = api.get<Place[]>('/places');
+    placesRequest.current
+      .then((rows) => !cancelled && setPlaces(rows))
       .catch(() => {
         if (cancelled) return;
-        setTowns([]);
-        setTownsError(true);
+        setPlaces([]);
+        setPlacesError(true);
       });
     return () => {
       cancelled = true;
     };
-  }, [districtId]);
+  }, []);
 
   // Focus, scroll lock, Escape and a focus trap, as in the login dialog.
   const closeRef = useRef(onClose);
@@ -108,16 +94,21 @@ export function LocationPicker({
     };
   }, []);
 
-  const shownTowns = useMemo(() => {
+  // The places of the current district come first (they are the likeliest), then the rest by name; typing filters by area, district or state.
+  const shownPlaces = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return (towns ?? []).filter((t) => !q || t.name.toLowerCase().includes(q));
-  }, [towns, query]);
+    const mine = current?.districtId;
+    return (places ?? [])
+      .filter((p) => !q || `${p.name} ${p.districtName} ${p.stateName}`.toLowerCase().includes(q))
+      .sort((a, b) => Number(b.districtId === mine) - Number(a.districtId === mine) || a.name.localeCompare(b.name));
+  }, [places, query, current?.districtId]);
 
-  const base = { stateId, stateName, districtId, districtName };
-  const chooseDistrict = () => onChoose({ ...base, mode: 'district' });
-  const chooseTown = (t: Town) => {
-    if (t.lat === null || t.lng === null) return onChoose({ ...base, mode: 'district' });
-    onChoose({ ...base, mode: 'town', areaId: t.id, townName: t.name, lat: t.lat, lng: t.lng });
+  const placeBase = (p: Place) => ({ stateId: p.stateId, stateName: p.stateName, districtId: p.districtId, districtName: p.districtName });
+  const chooseDistrict = () => current && onChoose({ stateId: current.stateId, stateName: current.stateName, districtId: current.districtId, districtName: current.districtName, mode: 'district' });
+  const choosePlace = (p: Place) => {
+    // An area without a centre cannot be searched "near", so it stands for its whole district.
+    if (p.lat === null || p.lng === null) return onChoose({ ...placeBase(p), mode: 'district' });
+    onChoose({ ...placeBase(p), mode: 'town', areaId: p.id, townName: p.name, lat: p.lat, lng: p.lng });
   };
 
   async function useMyLocation() {
@@ -126,12 +117,15 @@ export function LocationPicker({
     const pos = await getPosition();
     setLocating(false);
     if (!pos.ok) return setGeoError(pos.message);
-    // Name the position by the closest listed town; without one it is simply "Your location".
-    const near = nearestTown(towns ?? [], pos.lat, pos.lng);
-    onChoose({ ...base, mode: 'geo', lat: pos.lat, lng: pos.lng, nearTown: near?.name });
+    // Name the position by the closest listed area (in any state); without one it is simply "Your location".
+    const known = places ?? (await placesRequest.current?.catch(() => [] as Place[])) ?? [];
+    const near = nearestTown(known, pos.lat, pos.lng);
+    // Near no listed area, and with no place chosen yet (the default is still loading), the position stands on its own.
+    const where = near ? placeBase(near) : current ? { stateId: current.stateId, stateName: current.stateName, districtId: current.districtId, districtName: current.districtName } : { stateId: '', stateName: '', districtId: '', districtName: '' };
+    onChoose({ ...where, mode: 'geo', lat: pos.lat, lng: pos.lng, nearTown: near?.name });
   }
 
-  const isDistrictCurrent = current?.mode === 'district' && current.districtId === districtId;
+  const isDistrictCurrent = current?.mode === 'district';
   const row = (selected: boolean) =>
     `flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm transition ${
       selected ? 'bg-brand-50 font-bold text-brand-800' : 'font-medium text-slate-800 hover:bg-slate-50'
@@ -179,8 +173,8 @@ export function LocationPicker({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={`Search a town in ${districtName || 'this district'}…`}
-              aria-label="Search towns"
+              placeholder="Search an area, district or state…"
+              aria-label="Search places"
               className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-800 placeholder-slate-400 focus:border-brand-600 focus:outline-none focus:ring-4 focus:ring-brand-600/10"
             />
           </div>
@@ -200,98 +194,42 @@ export function LocationPicker({
 
           <div className="mx-3.5 my-2 h-px bg-slate-100" />
 
-          {districtName && (
+          {current && (
             <button type="button" onClick={chooseDistrict} className={row(isDistrictCurrent)}>
               <Icon name="location_on" className={`text-[1.125rem] ${isDistrictCurrent ? 'text-brand-700' : 'text-slate-500'}`} />
-              <span className="flex-1">All of {districtName}</span>
+              <span className="flex-1">All of {current.districtName}</span>
               {isDistrictCurrent && <Icon name="check" className="text-[1rem]" />}
             </button>
           )}
 
-          {towns === null && (
+          {places === null && (
             <div role="status" aria-busy="true" className="space-y-1 px-3.5 py-2">
-              <span className="sr-only">Loading towns…</span>
+              <span className="sr-only">Loading places…</span>
               {[0, 1, 2, 3, 4].map((i) => (
                 <Skeleton key={i} className="h-9 w-full rounded-lg" />
               ))}
             </div>
           )}
-          {townsError && <p className="px-3.5 py-3 text-sm text-red-600">Couldn&apos;t load the towns. Choose All of {districtName || 'the district'}.</p>}
-          {towns !== null && !townsError && towns.length === 0 && (
-            <p className="px-3.5 py-3 text-sm text-slate-500">No towns are listed for {districtName || 'this district'} yet.</p>
+          {placesError && <p className="px-3.5 py-3 text-sm text-red-600">Couldn&apos;t load the places.{current ? ` Choose All of ${current.districtName}.` : ''}</p>}
+          {places !== null && !placesError && places.length === 0 && <p className="px-3.5 py-3 text-sm text-slate-500">No places are listed yet.</p>}
+          {places !== null && places.length > 0 && shownPlaces.length === 0 && (
+            <p className="px-3.5 py-3 text-sm text-slate-500">No place matches “{query.trim()}”.</p>
           )}
-          {towns !== null && towns.length > 0 && shownTowns.length === 0 && (
-            <p className="px-3.5 py-3 text-sm text-slate-500">No town matches “{query.trim()}”.</p>
-          )}
-          {shownTowns.map((t) => {
-            const selected = current?.mode === 'town' && current.areaId === t.id;
+          {shownPlaces.map((p) => {
+            const selected = current?.mode === 'town' && current.areaId === p.id;
             return (
-              <button key={t.id} type="button" onClick={() => chooseTown(t)} className={row(selected)}>
+              <button key={p.id} type="button" onClick={() => choosePlace(p)} className={row(selected)}>
                 <Icon name="location_on" className={`text-[1.125rem] ${selected ? 'text-brand-700' : 'text-slate-400'}`} />
-                <span className="flex-1">{t.name}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="font-bold text-slate-900">{p.name}</span>
+                  <span className="text-slate-500">
+                    , {p.districtName}, {p.stateName}
+                  </span>
+                </span>
                 {selected && <Icon name="check" className="text-[1rem]" />}
               </button>
             );
           })}
-
-          <div className="mx-3.5 mt-3 border-t border-slate-100 pt-3">
-            <button
-              type="button"
-              onClick={() => setShowOther((v) => !v)}
-              aria-expanded={showOther}
-              className="flex w-full items-center justify-between text-xs font-bold uppercase tracking-wide text-slate-500"
-            >
-              Other district
-              <Icon name="expand_more" className={`text-[1rem] transition ${showOther ? 'rotate-180' : ''}`} />
-            </button>
-            {showOther && (
-              <div className="mt-3 space-y-3">
-                <div>
-                  <label htmlFor="picker-state" className="mb-1 block text-xs font-semibold text-slate-500">
-                    State
-                  </label>
-                  <Select
-                    id="picker-state"
-                    value={stateId}
-                    onChange={(e) => {
-                      setStateId(e.target.value);
-                      setDistrictId('');
-                    }}
-                    className="w-full"
-                  >
-                    <option value="">Select state…</option>
-                    {states.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div>
-                  <label htmlFor="picker-district" className="mb-1 block text-xs font-semibold text-slate-500">
-                    District
-                  </label>
-                  <Select
-                    id="picker-district"
-                    disabled={!stateId}
-                    value={districtId}
-                    onChange={(e) => {
-                      setDistrictId(e.target.value);
-                      setQuery('');
-                    }}
-                    className="w-full"
-                  >
-                    <option value="">Select district…</option>
-                    {districts.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>

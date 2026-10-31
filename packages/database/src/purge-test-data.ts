@@ -5,6 +5,7 @@ import type { PrismaClient } from '@prisma/client';
  *
  * What counts as test data is decided only by names the tests give their own data (never "everything recent"):
  *  - facilities with a slug starting PW_ or E2E_,
+ *  - states named "PW …" or "E2E …" (and so their districts and areas),
  *  - venues and owner organisations named "PW …" or "E2E …",
  *  - owner logins with an email starting pw- or e2e-, and admin logins with an email starting e2e-,
  *  - customers named "PW …" or "E2E …" or with an email like pw…@example.com.
@@ -17,6 +18,7 @@ import type { PrismaClient } from '@prisma/client';
 const SEEDS: Record<string, string> = {
   // The backslash is doubled so SQL receives \_ (a literal underscore); a single one would be dropped by the template string.
   venue_categories: `"slug" LIKE 'PW\\_%' OR "slug" LIKE 'E2E\\_%'`,
+  states: `"name" LIKE 'PW %' OR "name" LIKE 'E2E %'`,
   venues: `"name" LIKE 'PW %' OR "name" LIKE 'E2E %'`,
   owner_organizations: `"name" LIKE 'PW %' OR "name" LIKE 'E2E %'`,
   venue_owner_users: `"email" LIKE 'pw-%@%' OR "email" LIKE 'e2e-%@%'`,
