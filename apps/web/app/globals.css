@@ -89,8 +89,8 @@ html {
 }
 
 
-/* Home header: the search box glows softly when focused. */
-.nav-search:focus-within {
+/* Home header: the search box glows softly while its text field is focused (not when the Venue types button inside the bar is clicked). */
+.nav-search:has(input:focus) {
   box-shadow:
     0 0 0 4px rgba(16, 107, 81, 0.12),
     0 6px 20px -8px rgba(12, 90, 68, 0.35);

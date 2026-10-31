@@ -488,7 +488,7 @@ export default function HomePage() {
           <div className="ml-auto md:order-last">
             <AccountMenu />
           </div>
-          <div className="nav-search order-last flex h-11 w-full items-center rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 transition-[box-shadow,border-color,background-color] hover:border-slate-300 focus-within:border-brand-500 focus-within:bg-white md:order-none md:h-12 md:w-auto md:max-w-3xl md:flex-1">
+          <div className={`nav-search order-last flex h-11 w-full items-center overflow-hidden rounded-xl border bg-slate-50/70 px-3.5 transition-[box-shadow,border-color,background-color] [&:has(input:focus)]:border-brand-500 [&:has(input:focus)]:bg-white md:order-none md:h-12 md:w-auto md:max-w-3xl md:flex-1 ${form.categorySlugs.length > 0 ? 'border-brand-600' : 'border-slate-200 hover:border-slate-300'}`}>
             <Icon name="search" className="text-[1.125rem] text-slate-500" />
             <input
               ref={searchBox}
