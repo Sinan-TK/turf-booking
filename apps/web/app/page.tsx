@@ -1187,9 +1187,9 @@ function CardGallery({
         <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900">
           {/* Faint pitch markings: a halfway line and centre circle. */}
           <div className="absolute inset-y-0 left-1/2 w-px bg-white/10" />
-          <div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10" />
+          <div className="absolute left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10" />
           <div className="absolute inset-0 flex items-center justify-center">
-            <CategoryIcon iconKey={iconKey} iconSvg={iconSvg} className="text-[3.25rem] text-white/35" />
+            <CategoryIcon iconKey={iconKey} iconSvg={iconSvg} className="text-[5.5rem] text-white/45 sm:text-[6.5rem]" />
           </div>
         </div>
       )}
