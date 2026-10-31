@@ -22,10 +22,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   headers();
   return (
     <html lang="en" className={akshar.variable}>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-      </head>
       <body className="font-sans antialiased text-slate-800 selection:bg-brand-500 selection:text-white">
         <ToastProvider>
           <CustomerProvider>{children}</CustomerProvider>

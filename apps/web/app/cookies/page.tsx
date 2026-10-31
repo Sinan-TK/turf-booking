@@ -34,7 +34,7 @@ const sections: LegalSection[] = [
       <>
         <P>Some features load services from other companies, which may set their own cookies or read information such as your IP address under their own policies:</P>
         <UL>
-          <li><strong>Google:</strong> Sign in with Google, and fonts used on our pages.</li>
+          <li><strong>Google:</strong> the Sign in with Google button, which loads from Google only when you open the sign-in window.</li>
           <li><strong>Razorpay:</strong> the secure payment window when you pay for a booking.</li>
           <li><strong>OpenStreetMap:</strong> map tiles shown to venue owners and administrators when they place a venue on a map.</li>
         </UL>
