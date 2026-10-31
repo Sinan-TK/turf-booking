@@ -1151,7 +1151,7 @@ function CardGallery({
   return (
     <div
       ref={banner}
-      className="group relative aspect-[16/7] overflow-hidden bg-brand-800"
+      className="group relative aspect-[16/7] overflow-hidden bg-stone-200"
       onMouseEnter={() => setHeld(true)}
       onMouseLeave={() => setHeld(false)}
       onFocus={() => setHeld(true)}
@@ -1184,16 +1184,17 @@ function CardGallery({
           ) : null,
         )
       ) : (
-        <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900">
+        <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-br from-stone-100 via-stone-200 to-stone-300">
           {/* Faint pitch markings: a halfway line and centre circle. */}
-          <div className="absolute inset-y-0 left-1/2 w-px bg-white/10" />
-          <div className="absolute left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10" />
+          <div className="absolute inset-y-0 left-1/2 w-px bg-stone-400/30" />
+          <div className="absolute left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full border border-stone-400/30" />
           <div className="absolute inset-0 flex items-center justify-center">
-            <CategoryIcon iconKey={iconKey} iconSvg={iconSvg} className="text-[5.5rem] text-white/45 sm:text-[6.5rem]" />
+            <CategoryIcon iconKey={iconKey} iconSvg={iconSvg} className="text-[5.5rem] text-stone-500/70 sm:text-[6.5rem]" />
           </div>
         </div>
       )}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/35 to-transparent" />
+      {/* A soft shade under the badge, only over real photos. */}
+      {photos.length > 0 && <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/35 to-transparent" />}
 
       <button
         type="button"

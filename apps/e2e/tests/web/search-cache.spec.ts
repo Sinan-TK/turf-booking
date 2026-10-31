@@ -35,7 +35,7 @@ test.describe('customer site: search head start', () => {
     await page.goto('/');
     await expect(page.getByRole('article').first()).toBeVisible();
     await page.waitForTimeout(1500);
-    const imgs = await page.locator('article img').count();
+    const imgs = await page.locator('article img:not([src^="data:"])').count(); // photos only (custom SVG icons are data: images too)
     // Never more photos in the page than cards plus one preloaded neighbour each.
     const cards = await page.getByRole('article').count();
     expect(imgs).toBeLessThanOrEqual(cards * 2);
