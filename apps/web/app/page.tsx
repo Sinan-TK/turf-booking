@@ -520,7 +520,6 @@ export default function HomePage() {
               {form.categorySlugs.length > 0 && (
                 <span className="rounded-md bg-brand-700 px-1.5 text-[0.6875rem] leading-[1.125rem] text-white">{form.categorySlugs.length}</span>
               )}
-              <Icon name="expand_more" className="text-[1rem] text-slate-400" />
             </button>
           </div>
         </div>
