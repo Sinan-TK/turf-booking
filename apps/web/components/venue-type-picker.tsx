@@ -103,13 +103,23 @@ export function VenueTypePicker({
                     role="checkbox"
                     aria-checked={isOn}
                     onClick={() => toggle(c.slug)}
-                    className={`flex items-center gap-2.5 rounded-xl border px-3.5 py-3 text-left text-sm transition ${
+                    className={`flex flex-col overflow-hidden rounded-xl border text-left text-sm transition ${
                       isOn
                         ? 'border-brand-600 bg-brand-50 font-bold text-brand-800'
                         : 'border-slate-200 font-semibold text-slate-700 hover:border-brand-400 hover:bg-slate-50'
                     }`}
                   >
-                    <CategoryIcon iconKey={c.iconKey} iconSvg={c.iconSvg} className={`text-[1.125rem] ${isOn ? 'text-brand-600' : 'text-slate-400'}`} />
+                    {/* The facility's picture; without one, its icon on a soft green field, so every tile has the same shape. */}
+                    <span className="relative block aspect-[4/3] w-full bg-brand-50">
+                      {c.imageUrl ? (
+                        <img src={c.imageUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
+                      ) : (
+                        <span className="absolute inset-0 flex items-center justify-center">
+                          <CategoryIcon iconKey={c.iconKey} iconSvg={c.iconSvg} className={`text-[2rem] ${isOn ? 'text-brand-600' : 'text-slate-400'}`} />
+                        </span>
+                      )}
+                    </span>
+                    <span className="flex w-full items-center gap-2.5 px-3 py-2.5">
                     <span className="min-w-0 flex-1 truncate">{c.name}</span>
                     <span
                       aria-hidden="true"
@@ -118,6 +128,7 @@ export function VenueTypePicker({
                       }`}
                     >
                       {isOn && <Icon name="check" className="text-[0.75rem]" />}
+                    </span>
                     </span>
                   </button>
                 );

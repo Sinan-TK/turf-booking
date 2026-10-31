@@ -4,23 +4,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import type { AuthContext } from '../auth/auth.types';
 import { ResourcesService } from './resources.service';
+import { sniffImageType } from '../storage/image-type';
 
 /** A unit shows at most this many photos on the customer's venue card. */
 export const MAX_PHOTOS_PER_UNIT = 3;
 /** Largest file accepted. The owner app shrinks photos before sending, so real uploads are far smaller. */
 export const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
-
-/** The image types accepted, recognised by their first bytes rather than the name or the type the browser claims. */
-function sniffImageType(bytes: Buffer): { mime: string; ext: string } | null {
-  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return { mime: 'image/jpeg', ext: 'jpg' };
-  if (bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
-    return { mime: 'image/png', ext: 'png' };
-  }
-  if (bytes.length >= 12 && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP') {
-    return { mime: 'image/webp', ext: 'webp' };
-  }
-  return null;
-}
 
 export interface UnitPhoto {
   id: string;

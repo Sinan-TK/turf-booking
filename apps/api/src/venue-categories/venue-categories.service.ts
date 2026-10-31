@@ -2,7 +2,10 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { cleanIconSvg } from '@venue/shared';
 import type { Prisma, BookingPolicy, VenueCategory } from '@venue/database';
 import { PrismaService } from '../prisma/prisma.service';
+import { randomUUID } from 'node:crypto';
 import { AuditService } from '../audit/audit.service';
+import { StorageService } from '../storage/storage.service';
+import { MAX_IMAGE_BYTES, STORAGE_FOLDERS, sniffImageType } from '../storage/image-type';
 import { CommercialTermsService } from '../commercial/commercial-terms.service';
 import type { AuthContext } from '../auth/auth.types';
 import {
@@ -36,6 +39,7 @@ export class VenueCategoriesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly commercialTerms: CommercialTermsService,
+    private readonly storage: StorageService,
   ) {}
 
   /** Public: active categories only, in display order, each with the policy
@@ -175,6 +179,35 @@ export class VenueCategoriesService {
     return this.getAdmin(id);
   }
 
+  /** Sets (or replaces) the facility's picture. The file goes in the facilities/ folder of the bucket; the one it replaces is deleted. */
+  async setImage(id: string, file: { buffer: Buffer; size: number } | undefined, actor: AuthContext) {
+    const category = await this.prisma.client.venueCategory.findUnique({ where: { id }, select: { id: true, slug: true, imageKey: true } });
+    if (!category) throw new NotFoundException('Facility not found');
+    if (!file || file.size === 0) throw new BadRequestException('Choose a picture to upload.');
+    if (file.size > MAX_IMAGE_BYTES) throw new BadRequestException('That picture is too large (5 MB at most).');
+    const type = sniffImageType(file.buffer);
+    if (!type) throw new BadRequestException('Only JPEG, PNG or WebP pictures can be uploaded.');
+
+    // Upload first, then record it: a failed upload leaves nothing behind, and a failed save only a stray file.
+    const key = `${STORAGE_FOLDERS.facilities}/${id}/${randomUUID()}.${type.ext}`;
+    await this.storage.put(key, file.buffer, type.mime);
+    await this.prisma.client.venueCategory.update({ where: { id }, data: { imageKey: key } });
+    if (category.imageKey) await this.storage.remove(category.imageKey);
+    await this.audit.record({ actor, action: 'VENUE_CATEGORY_IMAGE_SET', entityType: 'VenueCategory', entityId: id, metadata: { slug: category.slug } });
+    return this.getAdmin(id);
+  }
+
+  async removeImage(id: string, actor: AuthContext) {
+    const category = await this.prisma.client.venueCategory.findUnique({ where: { id }, select: { id: true, slug: true, imageKey: true } });
+    if (!category) throw new NotFoundException('Facility not found');
+    if (category.imageKey) {
+      await this.prisma.client.venueCategory.update({ where: { id }, data: { imageKey: null } });
+      await this.storage.remove(category.imageKey);
+      await this.audit.record({ actor, action: 'VENUE_CATEGORY_IMAGE_REMOVED', entityType: 'VenueCategory', entityId: id, metadata: { slug: category.slug } });
+    }
+    return this.getAdmin(id);
+  }
+
   /** A pasted icon, checked and tidied; empty or null means "no custom icon". Anything unsafe is a clear 400, never stored. */
   private cleanSvg(raw: string | null | undefined): string | undefined {
     if (raw === null || raw === undefined || raw.trim() === '') return undefined;
@@ -226,6 +259,7 @@ export class VenueCategoriesService {
     }
     // BookingPolicy rows scoped to this category cascade with it.
     await this.prisma.client.venueCategory.delete({ where: { id } });
+    if (category.imageKey) await this.storage.remove(category.imageKey);
     await this.audit.record({
       actor,
       action: 'VENUE_CATEGORY_DELETED',
@@ -336,7 +370,8 @@ export class VenueCategoriesService {
     return categories.map((category) => {
       const own = categoryPolicies.find((p) => p.categoryId === category.id);
       const values = own ? toPolicyValues(own) : fallback;
-      return { ...category, policy: { ...values, durations: allowedDurations(values) } } as T &
+      const { imageKey, ...rest } = category;
+      return { ...rest, imageUrl: imageKey ? this.storage.publicUrl(imageKey) : null, policy: { ...values, durations: allowedDurations(values) } } as unknown as T &
         CategoryWithPolicy;
     });
   }

@@ -127,3 +127,7 @@ Each app's `middleware.ts` sets a policy per request, built by `packages/shared/
 ## API health on the Super Admin pages
 
 `GET /health` is the public probe (200 `{status:'ok'}`, 503 `{status:'down'}` when the database does not answer; the Docker health check uses it). `GET /admin/system/health` (Super Admin only) adds per-part checks, response time and uptime, with fixed messages only (no connection strings or error text; the real error goes to the log). The admin dashboard shows a status card and every admin page a status dot in the sidebar; both refresh every 30 seconds while the tab is visible and when it regains focus, and tell "API up, database down" apart from "API unreachable".
+
+## Facility pictures (storage folder)
+
+A Super Admin can give each facility a picture (admin: Facilities > the facility > Basics > Picture). It saves at once, is shrunk to WebP in the browser (longest side 1200px), checked by its first bytes on the API (JPEG, PNG or WebP, 5 MB at most), and shown in the customer site's "Venue types" picker. Files live in their own top-level folder of the bucket, `facilities/<facilityId>/<uuid>.<ext>` (unit photos stay under `venues/...`); replacing or removing a picture, or deleting the facility, deletes the old file. Migration `20261103000000_category_image` adds `venue_categories.imageKey`; it must be applied before the new API starts. The public URL comes from `STORAGE_PUBLIC_URL`, so that origin must be in `CSP_IMG_ORIGINS` on the customer site (see the CSP section), as for unit photos.

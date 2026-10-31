@@ -1495,6 +1495,8 @@ model VenueCategory {
   iconKey               String         @default("category")
   /// A custom SVG (checked and tidied by cleanIconSvg) that replaces iconKey where set.
   iconSvg               String?
+  /// Storage key of the facility's picture (folder facilities/), shown in the customer's venue-type picker. Null = no picture.
+  imageKey              String?
   /// What one bookable unit is called: "Table", "Court", "Pitch"...
   unitLabel             String         @default("Unit")
   /// What a venue of this type is called: "Chess club", "Venue"...

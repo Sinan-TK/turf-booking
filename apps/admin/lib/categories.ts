@@ -20,6 +20,8 @@ export interface VenueCategory {
   iconKey: string;
   /** A pasted custom SVG that replaces the icon; null = use iconKey. */
   iconSvg?: string | null;
+  /** The facility's picture (public URL), shown in the customer site's venue-type picker; null = none. */
+  imageUrl?: string | null;
   unitLabel: string;
   venueLabel: string;
   /** Allowed resource sub-types; empty = free text. */

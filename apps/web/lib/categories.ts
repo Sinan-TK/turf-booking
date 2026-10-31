@@ -16,6 +16,8 @@ export interface VenueCategory {
   iconKey: string;
   /** A custom SVG icon that replaces iconKey where set. */
   iconSvg?: string | null;
+  /** The facility's picture (public URL), shown in the venue-type picker; null = none (its icon is shown instead). */
+  imageUrl?: string | null;
   /** What one bookable unit is called ("Table", "Pitch"…). */
   unitLabel: string;
   /** What a venue of this type is called ("Chess club", "Venue"…). */

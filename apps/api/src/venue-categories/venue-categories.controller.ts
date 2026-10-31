@@ -1,4 +1,6 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { MAX_IMAGE_BYTES } from '../storage/image-type';
 import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -55,6 +57,22 @@ export class AdminCategoriesController {
   @Post(':id/swap-order')
   swapOrder(@Param('id', ParseUUIDPipe) id: string, @Body() dto: SwapDisplayOrderDto, @CurrentUser() actor: AuthContext) {
     return this.categories.swapDisplayOrder(id, dto.withId, actor);
+  }
+
+  // multipart/form-data with the picture in a "file" field. Answers with the facility as it now is.
+  @Post(':id/image')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_IMAGE_BYTES, files: 1 } }))
+  setImage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFile() file: { buffer: Buffer; size: number } | undefined,
+    @CurrentUser() actor: AuthContext,
+  ) {
+    return this.categories.setImage(id, file, actor);
+  }
+
+  @Delete(':id/image')
+  removeImage(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthContext) {
+    return this.categories.removeImage(id, actor);
   }
 
   @Post(':id/activate')

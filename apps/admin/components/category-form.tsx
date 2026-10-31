@@ -8,6 +8,7 @@ import { hasErrors, intError, textError, type FieldErrors } from '@/lib/validati
 import { Icon } from '@/components/icons';
 import { SaveBar } from '@/components/save-bar';
 import { SvgMaskIcon } from '@/components/svg-mask-icon';
+import { FacilityPicture } from '@/components/facility-picture';
 import { cleanIconSvg } from '@venue/shared/dist/icon-svg';
 
 interface Props {
@@ -431,9 +432,12 @@ export function CategoryForm({ initial, onSaved }: Props) {
               )}
               <p id="cat-icon-svg-hint" className="mt-1.5 text-xs text-gray-500">
                 {customSvg ? 'This icon is used instead of the one picked above. ' : ''}
-                Simple shapes only (path, circle, rect, line, polygon…), no scripts, styles or images. It is drawn in one colour, the colour of the text
-                around it, so use a single-colour icon with a viewBox.
+                Simple shapes only (path, circle, rect, line, polygon…), no scripts, styles or images. It is shown in the colours it was drawn
+                with, so a viewBox is needed to size it.
               </p>
+            </div>
+            <div className="sm:col-span-2">
+              <FacilityPicture categoryId={initial?.id} initialUrl={initial?.imageUrl} />
             </div>
           </div>
         </Section>
