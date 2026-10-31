@@ -14,7 +14,7 @@ test.describe('customer site: venue type pictures', () => {
       const rows = (await res.json()) as Array<Record<string, unknown>>;
       await route.fulfill({ response: res, json: rows.map((c, i) => ({ ...c, imageUrl: i === 0 ? PNG_DATA_URI : null })) });
     });
-    await page.goto('/');
+    await page.goto('/explore');
     await page.getByRole('button', { name: /Venue types/ }).click();
     const dialog = page.getByRole('dialog', { name: 'Venue types' });
     const tiles = dialog.getByRole('checkbox');

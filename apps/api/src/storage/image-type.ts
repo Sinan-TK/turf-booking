@@ -20,4 +20,6 @@ export function sniffImageType(bytes: Buffer): { mime: string; ext: string } | n
 export const STORAGE_FOLDERS = {
   /** The picture of a facility (Football, Pool...) shown in the customer's "Venue types" picker: facilities/<facilityId>/<uuid>.<ext> */
   facilities: 'facilities',
+  /** Advertising banners on the landing page: banners/<bannerId>/<uuid>.<ext> */
+  banners: 'banners',
 } as const;

@@ -19,7 +19,7 @@ test.describe('customer site: results load ten at a time', () => {
     for (let i = 0; i < 12; i++) names.push((await createVenue(ownerApi, adminApi, { lat, lng })).name);
 
     await shareLocation(context, lat, lng);
-    await page.goto('/');
+    await page.goto('/explore');
     await page.getByRole('button', { name: /Change location/ }).click();
     await page.getByRole('dialog', { name: 'Choose your location' }).getByRole('button', { name: 'Use my current location' }).click();
     // Two days ahead, so the cards have open slots at any hour of the day.
@@ -56,7 +56,7 @@ test.describe('customer site: results load ten at a time', () => {
     const last = venues[venues.length - 1]!; // far down the list, past the first ten venues
 
     await shareLocation(context, lat, lng);
-    await page.goto('/');
+    await page.goto('/explore');
     await page.getByRole('button', { name: /Change location/ }).click();
     await page.getByRole('dialog', { name: 'Choose your location' }).getByRole('button', { name: 'Use my current location' }).click();
     await page.getByRole('button', { name: /[0-9]+ [A-Za-z]{3}$/ }).nth(2).click();

@@ -135,3 +135,9 @@ A Super Admin can give each facility a picture (admin: Facilities > the facility
 ## Locations (states, districts, areas)
 
 The Super Admin manages the whole tree under Locations: states (with a code such as KL or TN), the districts in each (code and timezone) and the areas (towns, with an optional centre so customers can search near them). Each can be edited and switched off; the codes cannot be changed because they are part of facility codes already handed out. A switched-off state hides its districts and areas from customers and forms, but nothing is deleted. The customer site's location picker is one searchable list of every active area as "Area, District, State" (`GET /places`), whatever the state; an area without a centre stands for its whole district. Changes are recorded in the audit log (`LOCATION_*` actions).
+
+## Landing page and banners (customer site)
+
+`/` is now a landing page (hero search, advertising banners, browse by venue type, how it works, a "List your venue" call to action); the venue search and listing moved to `/explore` (`/explore?q=…` pre-fills the search, `/explore?type=FOOTBALL_TURF` picks a venue type; the old `/book/:token` redirect lands there too). Set `NEXT_PUBLIC_OWNER_URL` (build-time, customer site) to the owner portal's address for the "List your venue" button (default `http://localhost:3002`).
+
+Banners are managed by the Super Admin under Platform > Banners: title, optional line, optional picture (framed 16:5 in the browser, JPEG/PNG/WebP, stored in their own `banners/` folder of the bucket), where a tap goes (a path on the site or an https address; anything else is refused), start and end dates, order and an on/off switch. The public list (`GET /banners`) returns only what is on and inside its dates. Migration `20261104000000_banners` creates the table and must be applied before the new API starts; banner pictures need the storage origin in `CSP_IMG_ORIGINS`, as for the other photos.

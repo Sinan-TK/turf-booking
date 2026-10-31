@@ -10,7 +10,7 @@ test.describe('customer site: finding a venue', () => {
     void venue; // makes sure at least a football turf and a badminton court are bookable
     const api = await request.newContext({ baseURL: URLS.api });
     const bookable = (await (await api.get('/categories?available=true')).json()) as Array<{ name: string }>;
-    await page.goto('/');
+    await page.goto('/explore');
     const picker = await openVenueTypes(page);
     for (const c of bookable) await expect(picker.getByRole('checkbox', { name: c.name, exact: true })).toBeVisible();
     // A facility nobody can book (the catalogue has many) is not offered.

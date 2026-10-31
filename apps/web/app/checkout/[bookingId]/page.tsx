@@ -314,7 +314,7 @@ export default function CheckoutPage() {
           {holdLost && (
             <div className="space-y-3">
               <ErrorBanner message="This slot is no longer held. Slots are kept for a few minutes while you pay." />
-              <Link href="/" className="block">
+              <Link href="/explore" className="block">
                 <Button className="w-full">Choose another time</Button>
               </Link>
             </div>

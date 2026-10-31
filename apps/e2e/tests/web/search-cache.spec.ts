@@ -6,7 +6,7 @@ test.use({ baseURL: URLS.web });
 /** A repeat search paints its saved cards at once and then swaps in the live answer; photos load after the cards are on screen. */
 test.describe('customer site: search head start', () => {
   test('the second visit shows cards before the live answer arrives, then replaces them with it', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/explore');
     await expect(page.getByRole('article').first()).toBeVisible();
     const names = await page.getByRole('article').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
     expect(names.length).toBeGreaterThan(0);
@@ -32,7 +32,7 @@ test.describe('customer site: search head start', () => {
     page.on('request', (r) => {
       if (r.resourceType() === 'image' && /\/media\//.test(r.url())) photoRequests.push(r.url());
     });
-    await page.goto('/');
+    await page.goto('/explore');
     await expect(page.getByRole('article').first()).toBeVisible();
     await page.waitForTimeout(1500);
     const imgs = await page.locator('article img:not([src^="data:"])').count(); // photos only (custom SVG icons are data: images too)

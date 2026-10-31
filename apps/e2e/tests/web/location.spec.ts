@@ -17,7 +17,7 @@ const venueCard = (page: Page, name: string) => page.locator('article').filter({
 
 test.describe('customer site: location', () => {
   test('opens on Malappuram and lists its venues without asking for a location', async ({ page, manjeriVenue }) => {
-    await page.goto('/');
+    await page.goto('/explore');
     await expect(header(page, 'Malappuram')).toBeVisible();
     await expect(page.getByText('Tap to choose')).toHaveCount(0);
     await settled(page);
@@ -25,7 +25,7 @@ test.describe('customer site: location', () => {
   });
 
   test('the picker lists Malappuram\'s towns, filters them as you type, and closes with Escape', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/explore');
     await header(page, 'Malappuram').click();
     const dialog = picker(page);
     await expect(dialog).toBeVisible();
@@ -52,7 +52,7 @@ test.describe('customer site: location', () => {
 
   test('on a big screen the picker is a centred modal; on a phone it fills the screen', async ({ page }) => {
     await page.setViewportSize({ width: 1360, height: 900 });
-    await page.goto('/');
+    await page.goto('/explore');
     await header(page, 'Malappuram').click();
     const modal = await picker(page).boundingBox();
     expect(modal!.width).toBeLessThan(520);
@@ -71,7 +71,7 @@ test.describe('customer site: location', () => {
   });
 
   test('choosing a town searches around it, and the choice survives a reload', async ({ page, manjeriVenue, nilamburVenue }) => {
-    await page.goto('/');
+    await page.goto('/explore');
     await settled(page);
     await find(page, nilamburVenue.name);
 
@@ -105,7 +105,7 @@ test.describe('customer site: location', () => {
       await route.continue();
     });
     await shareLocation(context, remoteVenue.lat, remoteVenue.lng);
-    await page.goto('/');
+    await page.goto('/explore');
     await page.getByRole('button', { name: /Change location/ }).click();
     await picker(page).getByRole('button', { name: 'Use my current location' }).click();
     await expect(header(page, /Your location|Near/)).toBeVisible();
@@ -124,7 +124,7 @@ test.describe('customer site: location', () => {
     await adminApi.post('/admin/areas', { data: { districtId: district.id, name: `PW Area ${tag}`, lat: 13.08, lng: 80.27 } });
     const label = `PW Area ${tag}, PW District ${tag}`;
 
-    await page.goto('/');
+    await page.goto('/explore');
     await header(page, 'Malappuram').click();
     const dialog = picker(page);
     await dialog.getByLabel('Search places').fill(`PW State ${tag}`);
@@ -134,7 +134,7 @@ test.describe('customer site: location', () => {
 
   test('current location: names the closest town and searches near it', async ({ page, context, manjeriVenue }) => {
     await shareLocation(context, 11.12, 76.12);
-    await page.goto('/');
+    await page.goto('/explore');
     await header(page, 'Malappuram').click();
     await picker(page).getByRole('button', { name: 'Use my current location' }).click();
     await expect(picker(page)).toHaveCount(0);
@@ -144,7 +144,7 @@ test.describe('customer site: location', () => {
   });
 
   test('current location: a blocked permission says so and how to fix it; the picker stays open', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/explore');
     await header(page, 'Malappuram').click();
     await picker(page).getByRole('button', { name: 'Use my current location' }).click();
     const alert = picker(page).getByRole('alert');
@@ -158,7 +158,7 @@ test.describe('customer site: location', () => {
 
   test('current location far from any venue offers to browse the district instead of an empty page', async ({ page, context }) => {
     await shareLocation(context, 12.97, 77.59); // Bengaluru
-    await page.goto('/');
+    await page.goto('/explore');
     await header(page, 'Malappuram').click();
     await picker(page).getByRole('button', { name: 'Use my current location' }).click();
     await expect(header(page, 'Your location')).toBeVisible();
@@ -171,7 +171,7 @@ test.describe('customer site: location', () => {
 
 test.describe('customer site: venue cards and Directions', () => {
   test('no "km away" on a card; Directions uses the venue\'s Google Maps link, else a route to its pin', async ({ page, manjeriVenue, nilamburVenue }) => {
-    await page.goto('/');
+    await page.goto('/explore');
     await settled(page);
     await find(page, nilamburVenue.name);
     await expect(page.getByText(/km away/)).toHaveCount(0);
@@ -187,7 +187,7 @@ test.describe('customer site: venue cards and Directions', () => {
 
   test('the same holds in near-me mode, where the distance used to be shown', async ({ page, context, manjeriVenue }) => {
     await shareLocation(context, 11.12, 76.12);
-    await page.goto('/');
+    await page.goto('/explore');
     await header(page, 'Malappuram').click();
     await picker(page).getByRole('button', { name: 'Use my current location' }).click();
     await settled(page);

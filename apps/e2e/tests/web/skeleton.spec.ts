@@ -11,7 +11,7 @@ const slow = (ms: number) => async (route: Route) => {
 test.describe('customer site: skeleton loading', () => {
   test('the home page shows the shape of the venue cards while the first search runs', async ({ page }) => {
     await page.route('**/search?*', slow(2500));
-    await page.goto('/');
+    await page.goto('/explore');
     const loading = page.getByRole('status').filter({ hasText: 'Checking live availability…' });
     await expect(loading).toBeVisible();
     await expect(loading.locator('.animate-pulse').first()).toBeVisible(); // grey shapes, not a line of text
@@ -20,7 +20,7 @@ test.describe('customer site: skeleton loading', () => {
   });
 
   test('the account tabs show skeletons while their lists load', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/explore');
     await logIn(page, uniquePhone(), 'PW Skeleton Person');
     await page.route('**/me/bookings', slow(2500));
     await page.goto('/account?tab=bookings');

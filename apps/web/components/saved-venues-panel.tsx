@@ -67,7 +67,7 @@ export function SavedVenuesPanel() {
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <Link
-                  href={`/?q=${encodeURIComponent(v.name)}`}
+                  href={`/explore?q=${encodeURIComponent(v.name)}`}
                   className="rounded-xl bg-brand-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-brand-800 active:scale-95"
                 >
                   View slots

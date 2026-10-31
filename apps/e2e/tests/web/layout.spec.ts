@@ -15,7 +15,7 @@ test.describe('customer site: size, width and scrollbars', () => {
     ];
     for (const [w, h, expected] of sizes) {
       await page.setViewportSize({ width: w, height: h });
-      await page.goto('/');
+      await page.goto('/explore');
       expect(await rootSize(page), `at ${w}px wide`).toBe(expected);
     }
   });
@@ -23,7 +23,7 @@ test.describe('customer site: size, width and scrollbars', () => {
   test('the home page and the account page use the whole width on a desktop, not a narrow column', async ({ page }) => {
     for (const width of [1440, 1920, 2560]) {
       await page.setViewportSize({ width, height: 1000 });
-      await page.goto('/');
+      await page.goto('/explore');
       const main = await page.locator('main').first().boundingBox();
       const padding = width >= 1536 ? 14 * (await rootSize(page)) / 4 : 10 * (await rootSize(page)) / 4; // 2xl:px-14 / lg:px-10
       expect(main!.width, `home at ${width}px`).toBeGreaterThan(width - 2 * padding - 40);
@@ -31,7 +31,7 @@ test.describe('customer site: size, width and scrollbars', () => {
   });
 
   test('scrollbars are the thin, rounded kind instead of the default one', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/explore');
     const style = await page.evaluate(() => {
       const root = getComputedStyle(document.documentElement);
       return { width: root.scrollbarWidth, color: root.scrollbarColor };

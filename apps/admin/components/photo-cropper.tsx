@@ -6,7 +6,7 @@ import { Button } from '@/components/ui';
 
 /** The venue-type picker shows a facility's picture at 4:3; it is cropped to exactly that so nothing important gets cut off there. */
 export const FACILITY_PHOTO_ASPECT = 4 / 3;
-const OUTPUT_WIDTH = 1200;
+const DEFAULT_OUTPUT_WIDTH = 1200;
 const MAX_ZOOM = 4;
 
 type Offset = { x: number; y: number };
@@ -21,7 +21,16 @@ export function PhotoCropper({
   file,
   onCancel,
   onCropped,
+  aspect = FACILITY_PHOTO_ASPECT,
+  outputWidth = DEFAULT_OUTPUT_WIDTH,
+  subject = 'picture',
 }: {
+  /** Width over height of the frame; the picture is cropped to exactly this shape. */
+  aspect?: number;
+  /** The widest the result is made, in pixels (never enlarged past the original). */
+  outputWidth?: number;
+  /** What is being framed, for the dialog's words. */
+  subject?: string;
   file: File;
   onCancel: () => void;
   onCropped: (photo: Blob) => void;
@@ -52,7 +61,7 @@ export function PhotoCropper({
     return () => watch.disconnect();
   }, []);
 
-  const frameHeight = frameWidth / FACILITY_PHOTO_ASPECT;
+  const frameHeight = frameWidth / aspect;
   // At zoom 1 the photo just covers the frame; every zoom is relative to that.
   const cover = natural ? Math.max(frameWidth / natural.w, frameHeight / natural.h) : 1;
   const scale = cover * zoom;
@@ -90,8 +99,8 @@ export function PhotoCropper({
       const sy = -top / scale;
       const sw = frameWidth / scale;
       const sh = frameHeight / scale;
-      const outW = Math.round(Math.min(OUTPUT_WIDTH, sw));
-      const outH = Math.round(outW / FACILITY_PHOTO_ASPECT);
+      const outW = Math.max(1, Math.round(Math.min(outputWidth, sw)));
+      const outH = Math.max(1, Math.round(outW / aspect)); // a tiny picture must not round to an empty canvas
       const canvas = document.createElement('canvas');
       canvas.width = outW;
       canvas.height = outH;
@@ -110,7 +119,7 @@ export function PhotoCropper({
   }
 
   return (
-    <Modal title="Frame the picture" subtitle="Drag to move it and zoom to fit. Customers see exactly what is inside the frame." onClose={onCancel} busy={busy}>
+    <Modal title={`Frame the ${subject}`} subtitle="Drag to move it and zoom to fit. Customers see exactly what is inside the frame." onClose={onCancel} busy={busy}>
       <div className="flex flex-col gap-4 px-6 py-5">
         <div
           ref={frame}
@@ -118,7 +127,7 @@ export function PhotoCropper({
           role="application"
           aria-label="Picture frame. Drag, or use the arrow keys, to move the picture; plus and minus zoom."
           className="relative w-full cursor-grab touch-none select-none overflow-hidden rounded-xl bg-gray-100 outline-none ring-brand-500/40 focus-visible:ring-4 active:cursor-grabbing"
-          style={{ aspectRatio: `${FACILITY_PHOTO_ASPECT}` }}
+          style={{ aspectRatio: `${aspect}` }}
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId);
             drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, start: offset };

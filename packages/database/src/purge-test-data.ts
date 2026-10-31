@@ -19,6 +19,7 @@ const SEEDS: Record<string, string> = {
   // The backslash is doubled so SQL receives \_ (a literal underscore); a single one would be dropped by the template string.
   venue_categories: `"slug" LIKE 'PW\\_%' OR "slug" LIKE 'E2E\\_%'`,
   states: `"name" LIKE 'PW %' OR "name" LIKE 'E2E %'`,
+  banners: `"title" LIKE 'PW %' OR "title" LIKE 'E2E %'`,
   venues: `"name" LIKE 'PW %' OR "name" LIKE 'E2E %'`,
   owner_organizations: `"name" LIKE 'PW %' OR "name" LIKE 'E2E %'`,
   venue_owner_users: `"email" LIKE 'pw-%@%' OR "email" LIKE 'e2e-%@%'`,

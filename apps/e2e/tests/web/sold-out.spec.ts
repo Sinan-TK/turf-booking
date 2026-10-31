@@ -15,7 +15,7 @@ test.describe('customer site: nothing left to book', () => {
       const emptied = rows.map((r) => ({ ...r, availableStartTimes: [], price: null, priceVaries: false, startPrices: [], startNormalPrices: [], startBookingPrices: [] }));
       await route.fulfill({ response: res, json: emptied });
     });
-    await page.goto('/');
+    await page.goto('/explore');
     const card = page.locator('article[data-sold-out="true"]').first();
     await expect(card).toBeVisible();
     await expect(card).toContainText('No slots left');

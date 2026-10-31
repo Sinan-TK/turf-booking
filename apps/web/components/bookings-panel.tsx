@@ -41,7 +41,7 @@ export function BookingsPanel() {
       {!error && bookings && bookings.length === 0 && (
         <Card>
           <p className="mb-4 text-center text-sm text-gray-500">No bookings yet.</p>
-          <Link href="/" className="block text-center text-sm font-medium text-brand-700 hover:underline">
+          <Link href="/explore" className="block text-center text-sm font-medium text-brand-700 hover:underline">
             Find a venue
           </Link>
         </Card>

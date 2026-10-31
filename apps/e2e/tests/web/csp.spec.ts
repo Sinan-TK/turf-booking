@@ -30,7 +30,7 @@ test.describe('customer site: content security policy', () => {
   });
 
   test('the public pages run with nothing blocked', async ({ page }) => {
-    const seen = await scanForViolations(page, ['/', '/support', '/account']);
+    const seen = await scanForViolations(page, ['/', '/explore', '/support', '/account']);
     expect(seen, JSON.stringify(seen, null, 1)).toEqual([]);
   });
 

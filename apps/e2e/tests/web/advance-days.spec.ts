@@ -14,7 +14,7 @@ test.describe('customer site: days offered', () => {
     await shareLocation(context, lat, lng);
 
     const choosePlace = async () => {
-      await page.goto('/');
+      await page.goto('/explore');
       await page.getByRole('button', { name: /Change location/ }).click();
       await page.getByRole('dialog', { name: 'Choose your location' }).getByRole('button', { name: 'Use my current location' }).click();
     };
@@ -41,7 +41,7 @@ test.describe('customer site: days offered', () => {
     const venue = await createVenue(ownerApi, adminApi, { lat, lng });
     await ownerApi.patch(`/venues/${venue.id}`, { data: { advanceBookingDays: 2 } });
     await shareLocation(context, lat, lng);
-    await page.goto('/');
+    await page.goto('/explore');
     await page.getByRole('button', { name: /Change location/ }).click();
     await page.getByRole('dialog', { name: 'Choose your location' }).getByRole('button', { name: 'Use my current location' }).click();
     await expect(dayChips(page)).toHaveCount(2); // a venue that takes bookings two days ahead

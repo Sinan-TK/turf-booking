@@ -1631,3 +1631,23 @@ model BlockedPeriod {
   @@index([resourceId, startTime])
   @@map("blocked_periods")
 }
+
+/// An advertising banner on the customer site's landing page. Managed by the Super Admin; shown while it is on and inside its dates.
+model Banner {
+  id        String    @id @default(uuid()) @db.Uuid
+  title     String
+  subtitle  String?
+  /// Storage key of the picture (folder banners/). Null = a text banner on a plain colour.
+  imageKey  String?
+  /// Where a tap goes: a path on the site ("/explore?type=FOOTBALL_TURF") or an https address. Null = not clickable.
+  linkUrl   String?
+  startsAt  DateTime?
+  endsAt    DateTime?
+  isActive  Boolean   @default(true)
+  /// Lower numbers first.
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("banners")
+}

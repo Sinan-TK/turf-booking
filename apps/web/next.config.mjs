@@ -8,7 +8,7 @@ const nextConfig = {
   async redirects() {
     // Old WhatsApp booking links land on the home search instead of a 404.
     return [
-      { source: '/book/:token', destination: '/', permanent: false },
+      { source: '/book/:token', destination: '/explore', permanent: false },
       // My bookings is a tab of the account page. (Support has a page of its own at /support.)
       { source: '/bookings', destination: '/account?tab=bookings', permanent: false },
     ];
