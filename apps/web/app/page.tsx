@@ -197,7 +197,7 @@ export default function LandingPage() {
       <footer className="border-t border-slate-200 bg-white">
         <div className={`${shell} flex flex-col items-start justify-between gap-3 py-6 text-sm text-slate-500 sm:flex-row sm:items-center`}>
           <span className="font-black italic text-slate-900">
-            Turf<span className="text-brand-600">X</span> <span className="font-medium not-italic text-slate-500">by ZK Fitness</span>
+            Turf<span className="text-brand-600">X</span>
           </span>
           <nav aria-label="Footer" className="flex gap-5 font-semibold">
             <Link href="/explore" className="hover:text-brand-700">
