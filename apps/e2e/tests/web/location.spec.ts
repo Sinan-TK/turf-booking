@@ -30,17 +30,17 @@ test.describe('customer site: location', () => {
     const dialog = picker(page);
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Use my current location' })).toBeVisible();
-    await expect(dialog.getByRole('button', { name: 'All of Malappuram' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: /^All of / })).toHaveCount(0); // no whole-district row: pick an area
     for (const town of ['Kottakkal', 'Manjeri', 'Perinthalmanna', 'Tirur', 'Ponnani', 'Kondotty', 'Tanur', 'Nilambur', 'Valanchery', 'Edappal']) {
-      // Each place reads "Area, District, State".
-      await expect(dialog.getByRole('button', { name: `${town}, Malappuram, Kerala`, exact: true })).toBeVisible();
+      // Each place reads "Area, District".
+      await expect(dialog.getByRole('button', { name: `${town}, Malappuram`, exact: true })).toBeVisible();
     }
     await expect(dialog.getByRole('button', { name: /Other district/ })).toHaveCount(0); // every place is in the one list
 
     await dialog.getByLabel('Search places').fill('man');
     await expect(dialog.getByRole('button', { name: /^Manjeri, / })).toBeVisible();
     await expect(dialog.getByRole('button', { name: /^Tirur, / })).toHaveCount(0);
-    await dialog.getByLabel('Search places').fill('kerala'); // the district and state are searched too
+    await dialog.getByLabel('Search places').fill('malappuram'); // the district is searched too
     await expect(dialog.getByRole('button', { name: /^Tirur, / })).toBeVisible();
     await dialog.getByLabel('Search places').fill('zzz');
     await expect(dialog.getByText(/No place matches/)).toBeVisible();
@@ -76,7 +76,7 @@ test.describe('customer site: location', () => {
     await find(page, nilamburVenue.name);
 
     await header(page, 'Malappuram').click();
-    await picker(page).getByRole('button', { name: /^Manjeri, Malappuram, Kerala$/ }).click();
+    await picker(page).getByRole('button', { name: /^Manjeri, Malappuram$/ }).click();
     await expect(picker(page)).toHaveCount(0);
     await expect(header(page, 'Manjeri')).toBeVisible();
     await settled(page);
@@ -89,11 +89,11 @@ test.describe('customer site: location', () => {
     await settled(page);
     await find(page, manjeriVenue.name);
 
-    // The whole district again.
+    // Another area, and the venue near it is found.
     await header(page, 'Manjeri').click();
-    await expect(picker(page).getByRole('button', { name: /^Manjeri, Malappuram, Kerala$/ })).toContainText('Manjeri');
-    await picker(page).getByRole('button', { name: 'All of Malappuram' }).click();
-    await expect(header(page, 'Malappuram')).toBeVisible();
+    await expect(picker(page).getByRole('button', { name: /^Manjeri, Malappuram$/ })).toContainText('Manjeri');
+    await picker(page).getByRole('button', { name: /^Nilambur, Malappuram$/ }).click();
+    await expect(header(page, 'Nilambur')).toBeVisible();
     await settled(page);
     await find(page, nilamburVenue.name);
   });
@@ -122,7 +122,7 @@ test.describe('customer site: location', () => {
     const state = (await (await adminApi.post('/admin/states', { data: { countryId, name: `PW State ${tag}`, code: `P${tag}`.slice(0, 10) } })).json()) as { id: string };
     const district = (await (await adminApi.post('/admin/districts', { data: { stateId: state.id, name: `PW District ${tag}`, code: `D${tag}`.slice(0, 10), timezone: 'Asia/Kolkata' } })).json()) as { id: string };
     await adminApi.post('/admin/areas', { data: { districtId: district.id, name: `PW Area ${tag}`, lat: 13.08, lng: 80.27 } });
-    const label = `PW Area ${tag}, PW District ${tag}, PW State ${tag}`;
+    const label = `PW Area ${tag}, PW District ${tag}`;
 
     await page.goto('/');
     await header(page, 'Malappuram').click();
@@ -152,7 +152,7 @@ test.describe('customer site: location', () => {
     await expect(alert).toContainText('pick a town');
     await expect(picker(page)).toBeVisible();
     // A town still works from there.
-    await picker(page).getByRole('button', { name: /^Tirur, Malappuram, Kerala$/ }).click();
+    await picker(page).getByRole('button', { name: /^Tirur, Malappuram$/ }).click();
     await expect(header(page, 'Tirur')).toBeVisible();
   });
 

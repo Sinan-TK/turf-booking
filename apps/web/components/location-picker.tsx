@@ -104,7 +104,6 @@ export function LocationPicker({
   }, [places, query, current?.districtId]);
 
   const placeBase = (p: Place) => ({ stateId: p.stateId, stateName: p.stateName, districtId: p.districtId, districtName: p.districtName });
-  const chooseDistrict = () => current && onChoose({ stateId: current.stateId, stateName: current.stateName, districtId: current.districtId, districtName: current.districtName, mode: 'district' });
   const choosePlace = (p: Place) => {
     // An area without a centre cannot be searched "near", so it stands for its whole district.
     if (p.lat === null || p.lng === null) return onChoose({ ...placeBase(p), mode: 'district' });
@@ -125,7 +124,6 @@ export function LocationPicker({
     onChoose({ ...where, mode: 'geo', lat: pos.lat, lng: pos.lng, nearTown: near?.name });
   }
 
-  const isDistrictCurrent = current?.mode === 'district';
   const row = (selected: boolean) =>
     `flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm transition ${
       selected ? 'bg-brand-50 font-bold text-brand-800' : 'font-medium text-slate-800 hover:bg-slate-50'
@@ -173,7 +171,7 @@ export function LocationPicker({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search an area, district or state…"
+              placeholder="Search an area or district…"
               aria-label="Search places"
               className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-800 placeholder-slate-400 focus:border-brand-600 focus:outline-none focus:ring-4 focus:ring-brand-600/10"
             />
@@ -194,14 +192,6 @@ export function LocationPicker({
 
           <div className="mx-3.5 my-2 h-px bg-slate-100" />
 
-          {current && (
-            <button type="button" onClick={chooseDistrict} className={row(isDistrictCurrent)}>
-              <Icon name="location_on" className={`text-[1.125rem] ${isDistrictCurrent ? 'text-brand-700' : 'text-slate-500'}`} />
-              <span className="flex-1">All of {current.districtName}</span>
-              {isDistrictCurrent && <Icon name="check" className="text-[1rem]" />}
-            </button>
-          )}
-
           {places === null && (
             <div role="status" aria-busy="true" className="space-y-1 px-3.5 py-2">
               <span className="sr-only">Loading places…</span>
@@ -210,7 +200,7 @@ export function LocationPicker({
               ))}
             </div>
           )}
-          {placesError && <p className="px-3.5 py-3 text-sm text-red-600">Couldn&apos;t load the places.{current ? ` Choose All of ${current.districtName}.` : ''}</p>}
+          {placesError && <p className="px-3.5 py-3 text-sm text-red-600">Couldn&apos;t load the places. Please try again in a moment.</p>}
           {places !== null && !placesError && places.length === 0 && <p className="px-3.5 py-3 text-sm text-slate-500">No places are listed yet.</p>}
           {places !== null && places.length > 0 && shownPlaces.length === 0 && (
             <p className="px-3.5 py-3 text-sm text-slate-500">No place matches “{query.trim()}”.</p>
@@ -223,7 +213,7 @@ export function LocationPicker({
                 <span className="min-w-0 flex-1">
                   <span className="font-bold text-slate-900">{p.name}</span>
                   <span className="text-slate-500">
-                    , {p.districtName}, {p.stateName}
+                    , {p.districtName}
                   </span>
                 </span>
                 {selected && <Icon name="check" className="text-[1rem]" />}
