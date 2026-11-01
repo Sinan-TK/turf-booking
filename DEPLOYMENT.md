@@ -154,3 +154,15 @@ Banners are managed by the Super Admin under Platform > Banners: title, optional
 ## "Email already in use" checks
 
 Account creation says plainly when an address is already taken, **within the kind of account being made**: an address used by a customer does not block an owner login, and the reverse. Owner: `POST /auth/owner/email-check` (public, 20 a minute per address) answers `{available}`; the owner sign-up asks it when the email field is left and on Continue, the owner's staff-invite form and the Super Admin's add-owner form ask it too, and `POST /auth/owner/register` answers 409 for a taken address. Customers: `POST /customer-auth/email-check` (same limit) feeds the sign-up form's inline "This email already has an account" with links to Sign in and Forgot password, and sign-up itself still answers 409. These endpoints tell anyone who asks whether an address has an account, which is a deliberate choice for a clearer form; the rate limit is what holds back bulk look-ups.
+
+## Owner emails (Resend templates)
+
+The owner portal's invite, password-reset and approval emails use Resend templates when their ids are set in the API's settings (empty = the built-in plain email). The templates themselves live in Resend; the API sends these variables, written `{{{NAME}}}` (three braces, upper case) in a template:
+
+| Setting | Email | Variables |
+|---|---|---|
+| `RESEND_OWNER_INVITE_TEMPLATE_ID` | A new owner or staff login: set-password link | `NAME`, `LINK`, `EXPIRY` (for example "72 hours") |
+| `RESEND_OWNER_RESET_TEMPLATE_ID` | Forgot password on the owner portal | `NAME`, `LINK`, `EXPIRY` (for example "30 minutes") |
+| `RESEND_OWNER_APPROVED_TEMPLATE_ID` | A self-signed-up owner is approved | `BUSINESS_NAME`, `LOGIN_URL` |
+
+`NAME` and `BUSINESS_NAME` are typed by people and a `{{{ }}}` value is inserted as it is, so the API HTML-escapes them before sending; `LINK`, `LOGIN_URL` and `EXPIRY` are built by the API. A template must be published in Resend before it can be sent. Do not pass any other user-typed value to a template without the same escaping.
