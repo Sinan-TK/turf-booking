@@ -190,6 +190,43 @@ function BookingPage() {
         <div className="min-w-0 space-y-5">
         <Pictures key={r.resource.id} unit={r} venueName={r.venue.name} />
 
+        {/* The venue's facilities, each as its first picture with its name on it, right under the big picture of the one picked. */}
+        <section aria-label="Facilities at this venue">
+          <h2 className="sr-only">Facilities at this venue</h2>
+          <div role="tablist" aria-label={`${r.venue.name} facilities`} className="scrollbar-hide -m-1 flex gap-2.5 overflow-x-auto p-1">
+            {units.map((u) => {
+              const on = u.resource.id === r.resource.id;
+              const photo = u.resource.photoUrls?.[0] ?? u.venue.photoUrl;
+              const label = u.resource.groundType ? `${u.resource.name} · ${u.resource.groundType}` : u.resource.name;
+              return (
+                <button
+                  key={u.resource.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => go({ resource: u.resource.id })}
+                  className={`relative h-24 w-40 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-stone-100 to-stone-300 text-left outline-none transition focus-visible:ring-4 focus-visible:ring-brand-600/30 sm:h-28 sm:w-48 ${on ? 'ring-[3px] ring-brand-700 ring-offset-2 ring-offset-gray-50' : 'opacity-90 hover:opacity-100'}`}
+                >
+                  {photo ? (
+                    <img src={photo} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
+                  ) : (
+                    <span aria-hidden="true" className="absolute inset-x-0 bottom-9 top-0 flex items-center justify-center">
+                      <CategoryIcon iconKey={u.category?.iconKey ?? 'category'} iconSvg={u.category?.iconSvg} className="text-[2.5rem] text-stone-500/70" />
+                    </span>
+                  )}
+                  {photo && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-black/75 to-transparent" />}
+                  <span className="absolute inset-x-0 bottom-0 px-2.5 pb-2">
+                    <span className={`block truncate text-sm font-extrabold leading-tight ${photo ? 'text-white' : 'text-slate-900'}`}>{label}</span>
+                    <span className={`block text-xs font-semibold ${photo ? 'text-white/85' : 'text-slate-600'}`}>
+                      {u.availableStartTimes.length === 0 ? 'No slots left' : u.price ? formatPrice(u.price) : ''}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
         <header>
           <p className="text-[0.625rem] font-extrabold uppercase tracking-wider text-brand-700">Book your slot</p>
           <h1 className="mt-0.5 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">{r.venue.name}</h1>
@@ -209,34 +246,6 @@ function BookingPage() {
           </a>
         </header>
 
-        <section aria-label="Facilities at this venue">
-          <h2 className="mb-2 text-sm font-extrabold text-slate-900">Facilities at this venue</h2>
-          <div role="tablist" aria-label={`${r.venue.name} facilities`} className="scrollbar-hide -m-0.5 flex gap-2 overflow-x-auto p-0.5">
-            {units.map((u) => {
-              const on = u.resource.id === r.resource.id;
-              return (
-                <button
-                  key={u.resource.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={on}
-                  onClick={() => go({ resource: u.resource.id })}
-                  className={`flex w-44 shrink-0 items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition active:scale-[0.98] ${on ? 'border-brand-700 bg-brand-700 text-white shadow-glow' : 'border-slate-200 bg-white text-slate-800 hover:border-brand-400'}`}
-                >
-                  <CategoryIcon iconKey={u.category?.iconKey ?? 'category'} iconSvg={u.category?.iconSvg} className={`text-[1.25rem] ${on ? 'text-white' : 'text-slate-500'}`} />
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-bold leading-tight">{u.resource.groundType ? `${u.resource.name} · ${u.resource.groundType}` : u.resource.name}</span>
-                    {u.availableStartTimes.length === 0 ? (
-                      <span className={`block text-xs font-semibold ${on ? 'text-white/80' : 'text-slate-400'}`}>No slots left</span>
-                    ) : (
-                      u.price && <span className={`block text-xs font-semibold ${on ? 'text-brand-100' : 'text-brand-700'}`}>{formatPrice(u.price)}</span>
-                    )}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
         </div>
 
         <div className="min-w-0 space-y-5 lg:sticky lg:top-24">
