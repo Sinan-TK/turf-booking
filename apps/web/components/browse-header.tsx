@@ -54,7 +54,7 @@ export function BrowseHeader({ phoneBack = false }: { phoneBack?: boolean }) {
         <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2.5 px-4 py-3 sm:px-6 md:flex-nowrap md:gap-x-4 lg:px-10 2xl:px-14">
           {phoneBack && (
             <div className="md:hidden">
-              <BackButton />
+              <BackButton plain />
             </div>
           )}
           <Link href="/" aria-label="TurfX home" className="mr-2 hidden select-none whitespace-nowrap text-[1.75rem] font-black italic leading-none tracking-tight text-slate-900 lg:block">
