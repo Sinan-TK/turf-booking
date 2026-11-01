@@ -1,7 +1,7 @@
 import type { Config } from 'tailwindcss';
 
 const config: Config = {
-  content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}'],
+  content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}', './lib/**/*.{ts,tsx}'],
   theme: {
     // Boxes have only a slight curve across the customer site; true circles (rounded-full on a square: avatars, dots, spinners) stay round.
     borderRadius: { none: '0', DEFAULT: '3px', sm: '2px', md: '4px', lg: '5px', xl: '6px', '2xl': '8px', '3xl': '8px', full: '9999px' },

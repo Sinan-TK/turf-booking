@@ -1,6 +1,7 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes } from 'react';
 
 import {
+  Tag,
   MapPin,
   ArrowLeft,
   Check,
@@ -88,6 +89,7 @@ const ICON_MAP: Record<string, IconComponent> = {
   category: LayoutGrid,
   apps: LayoutGrid,
   location_on: MapPin,
+  offer: Tag,
   expand_more: ChevronDown,
   search: Search,
   stadium: Map,

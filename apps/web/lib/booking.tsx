@@ -4,6 +4,7 @@ import { api, ApiError } from '@/lib/api';
 import { trustedMapsUrl } from '@/lib/maps';
 import { DISMISSED, useCustomer } from '@/lib/customer';
 import { useToast } from '@/components/toast';
+import { Icon } from '@/components/ui';
 
 export interface SearchResult {
   venue: { id: string; name: string; facilityCode: string; address: string; photoUrl: string | null; lat: number; lng: number; googleMapsUrl?: string | null };
@@ -180,4 +181,31 @@ export function formatDateLabel(dateIso: string): string {
 /** The booking page for one unit of a venue on a day, at a length (the Book Now button of a card goes here). */
 export function bookingHref(facilityCode: string, resourceId: string, dateIso: string, durationMinutes: number): string {
   return `/book/${encodeURIComponent(facilityCode)}/${encodeURIComponent(resourceId)}?date=${dateIso}&duration=${durationMinutes}`;
+}
+
+/**
+ * The offer a unit has on the day it is shown: the biggest percentage off across its start times that have one, and how many
+ * start times that is. Null when none has an offer (a start time has one when it carries a struck-through normal price).
+ */
+export function offerOf(r: Pick<SearchResult, 'availableStartTimes' | 'startPrices' | 'startNormalPrices'>): { percent: number; slots: number } | null {
+  let percent = 0;
+  let slots = 0;
+  r.availableStartTimes.forEach((_, i) => {
+    const normal = Number(r.startNormalPrices?.[i]);
+    const charged = Number(r.startPrices?.[i]);
+    if (!Number.isFinite(normal) || !Number.isFinite(charged) || normal <= 0 || charged >= normal) return;
+    slots += 1;
+    percent = Math.max(percent, Math.round(((normal - charged) / normal) * 100));
+  });
+  return slots > 0 ? { percent, slots } : null;
+}
+
+/** The tag that says an offer is on: "20% OFF" (or just "OFFER" when the discount rounds to nothing). Place it with `className`. */
+export function OfferTag({ offer, className = '' }: { offer: { percent: number }; className?: string }) {
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-md bg-rose-600 px-2.5 py-1 text-[0.6875rem] font-extrabold uppercase tracking-wide text-white shadow-sm ${className}`}>
+      <Icon name="offer" className="text-[0.8125rem]" />
+      {offer.percent > 0 ? `${offer.percent}% off` : 'Offer'}
+    </span>
+  );
 }

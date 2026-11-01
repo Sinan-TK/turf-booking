@@ -6,12 +6,14 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { durationLabel } from '@/lib/categories';
 import {
+  OfferTag,
   formatDateLabel,
   formatPrice,
   formatStart,
   formatTimeRange,
   googleMapsLink,
   localIso,
+  offerOf,
   payNowLabel,
   priceAt,
   todayIso,
@@ -21,6 +23,7 @@ import {
 import { CategoryIcon, ErrorBanner, Icon } from '@/components/ui';
 import { DetailSkeleton } from '@/components/skeleton';
 import { readSearch, writeSearch } from '@/lib/search-cache';
+import { useSavedVenues } from '@/lib/saved-venues';
 import { BrowseHeader } from '@/components/browse-header';
 
 /** The page's frame: the same header as the listing (logo, place, search, venue types, account), then the content (on a phone the header is just a back button and the account). */
@@ -52,7 +55,8 @@ function nextDays(count: number) {
 }
 
 /** The venue's pictures: the unit's own photos first, then the venue's photo; a drawn field with the icon when there are none. */
-function Pictures({ unit, venueName }: { unit: SearchResult; venueName: string }) {
+function Pictures({ unit, venueName, saved, onToggleSave }: { unit: SearchResult; venueName: string; saved: boolean; onToggleSave: () => void }) {
+  const offer = offerOf(unit);
   const photos = useMemo(() => {
     const own = unit.resource.photoUrls ?? [];
     return [...own, ...(unit.venue.photoUrl && !own.includes(unit.venue.photoUrl) ? [unit.venue.photoUrl] : [])];
@@ -70,6 +74,26 @@ function Pictures({ unit, venueName }: { unit: SearchResult; venueName: string }
             <CategoryIcon iconKey={unit.category?.iconKey ?? 'category'} iconSvg={unit.category?.iconSvg} className="text-[6rem] text-stone-500/70" />
           </div>
         )}
+
+        {offer && <OfferTag offer={offer} className="absolute left-3 top-3" />}
+        <button
+          type="button"
+          onClick={onToggleSave}
+          aria-pressed={saved}
+          aria-label={saved ? `Remove ${venueName} from saved venues` : `Save ${venueName}`}
+          className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur transition hover:scale-105 active:scale-95"
+        >
+          <Icon name="bookmark" className={`text-[1.25rem] ${saved ? 'fill-brand-700 text-brand-700' : 'text-slate-700'}`} />
+        </button>
+        <a
+          href={googleMapsLink(unit.venue)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-lg bg-white/95 px-3 py-1.5 text-xs font-bold text-brand-800 shadow-sm backdrop-blur transition hover:bg-white active:scale-95"
+        >
+          <Icon name="navigation" className="text-[0.875rem]" />
+          Directions
+        </a>
       </div>
       {photos.length > 1 && (
         <div className="scrollbar-hide mt-2 flex gap-2 overflow-x-auto">
@@ -116,6 +140,7 @@ function BookingPage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const latest = useRef(0);
+  const saved = useSavedVenues();
 
   const go = (next: { resource?: string; date?: string; duration?: number | null }) => {
     const rid = next.resource ?? resourceId;
@@ -207,12 +232,13 @@ function BookingPage() {
   const reloading = loading;
   const displayPrice = reloading ? null : r.price;
   const picked = selected ? priceAt(r, selected) : null;
+  const offer = offerOf(r);
 
   return (
     <Screen>
       <article aria-label={`Book ${r.venue.name}`} className="grid gap-6 pb-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start lg:gap-10">
         <div className="min-w-0 space-y-5">
-        <Pictures key={r.resource.id} unit={r} venueName={r.venue.name} />
+        <Pictures key={r.resource.id} unit={r} venueName={r.venue.name} saved={saved.isSaved(r.venue.id)} onToggleSave={() => void saved.toggle(r.venue.id)} />
 
         {/* The venue's facilities, each as its first picture with its name on it, right under the big picture of the one picked. */}
         <section aria-label="Facilities at this venue">
@@ -253,18 +279,7 @@ function BookingPage() {
 
         <header>
           <p className="text-[0.625rem] font-extrabold uppercase tracking-wider text-brand-700">Book your slot</p>
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-2">
-            <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">{r.venue.name}</h1>
-            <a
-              href={googleMapsLink(r.venue)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-md border border-brand-500/30 bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700 transition hover:bg-brand-100 active:scale-95"
-            >
-              <Icon name="navigation" className="text-[0.875rem]" />
-              Directions
-            </a>
-          </div>
+          <h1 className="mt-0.5 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">{r.venue.name}</h1>
           <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
             <Icon name="location_on" className="text-[1rem] text-slate-400" />
             {r.venue.address}
@@ -330,6 +345,12 @@ function BookingPage() {
           </div>
 
           <div className={`p-5 transition-opacity ${reloading ? 'pointer-events-none opacity-50' : ''}`}>
+            {!reloading && offer && (
+              <p className="mb-3 flex flex-wrap items-center gap-2 text-sm font-bold text-rose-700">
+                <OfferTag offer={offer} />
+                {offer.slots === r.availableStartTimes.length ? 'Offer on every slot today' : `Offer on ${offer.slots} of ${r.availableStartTimes.length} slots`}
+              </p>
+            )}
             <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">
               {reloading ? 'Updating slots…' : r.availableStartTimes.length === 0 ? 'No slots left for this day' : `${r.availableStartTimes.length} slot${r.availableStartTimes.length === 1 ? '' : 's'} available — tap to select`}
             </p>
@@ -348,7 +369,14 @@ function BookingPage() {
                     }`}
                   >
                     <span className={`text-sm font-extrabold ${active ? 'text-white' : 'text-slate-900'}`}>{formatStart(t, r.timezone)}</span>
-                    {slotPrice && <span className={`shrink-0 text-[0.6875rem] font-black ${active ? 'text-brand-100' : 'text-brand-700'}`}>{formatPrice(slotPrice)}</span>}
+                    {slotPrice && (
+                      <span className="flex shrink-0 flex-col items-end leading-tight">
+                        <span className={`text-[0.6875rem] font-black ${active ? 'text-brand-100' : 'text-brand-700'}`}>{formatPrice(slotPrice)}</span>
+                        {slotPrice.normalAmount && (
+                          <s className={`text-[0.625rem] font-medium ${active ? 'text-white/70' : 'text-slate-400'}`}>{formatPrice({ amount: slotPrice.normalAmount, currency: slotPrice.currency })}</s>
+                        )}
+                      </span>
+                    )}
                   </button>
                 );
               })}

@@ -6,18 +6,17 @@ import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { useDebounced } from '@/lib/use-debounced';
 import { trustedMapsUrl } from '@/lib/maps';
-import { DISMISSED, useCustomer } from '@/lib/customer';
+import { useSavedVenues } from '@/lib/saved-venues';
 import { CategoryIcon, ErrorBanner, Icon } from '@/components/ui';
 import { LoadingNote, SearchingBar, Skeleton, VenueCardSkeleton, VenueCardsSkeleton } from '@/components/skeleton';
 import { AccountMenu } from '@/components/account-menu';
-import { useToast } from '@/components/toast';
 import { LocationPicker } from '@/components/location-picker';
 import { VenueTypePicker } from '@/components/venue-type-picker';
 import { RotatingTypeIcon } from '@/components/rotating-type-icon';
 import { readSearch, writeSearch } from '@/lib/search-cache';
 import { locationParams, useLocationChoice, type LocationChoice } from '@/lib/location';
 import { durationLabel, type VenueCategory } from '@/lib/categories';
-import { bookingHref, formatPrice, formatStart, googleMapsLink, localIso, priceAt, todayIso, useBookSlot, type SearchResult, type SlotPrice } from '@/lib/booking';
+import { OfferTag, bookingHref, formatPrice, formatStart, googleMapsLink, localIso, offerOf, priceAt, todayIso, useBookSlot, type SearchResult, type SlotPrice } from '@/lib/booking';
 
 /** The header's place name on one line: "Malappuram, Kerala", "Kottakkal, Malappuram" or "Near Tirur". */
 function placeLabel(choice: LocationChoice | null): string {
@@ -75,39 +74,7 @@ export default function ExplorePage() {
   }, []);
 
   // The customer's saved venues, for the save buttons on the cards. Saving needs an account: logged out, a tap opens the login.
-  const { customer, requireLogin } = useCustomer();
-  const toast = useToast();
-  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    if (!customer) return setSavedIds(new Set());
-    api
-      .get<Array<{ venueId?: string; venue?: { id: string } }>>('/me/saved-venues')
-      .then((rows) => setSavedIds(new Set(rows.map((r) => r.venue?.id ?? r.venueId ?? '').filter(Boolean))))
-      .catch(() => undefined);
-  }, [customer]);
-  async function toggleSaved(venueId: string) {
-    try {
-      await requireLogin();
-    } catch {
-      return; // the login was dismissed
-    }
-    const wasSaved = savedIds.has(venueId);
-    const flip = (on: boolean) =>
-      setSavedIds((ids) => {
-        const next = new Set(ids);
-        if (on) next.add(venueId);
-        else next.delete(venueId);
-        return next;
-      });
-    flip(!wasSaved);
-    try {
-      if (wasSaved) await api.delete(`/me/saved-venues/${venueId}`);
-      else await api.post('/me/saved-venues', { venueId });
-    } catch {
-      flip(wasSaved);
-      toast.show(wasSaved ? 'Could not remove it from your saved venues.' : 'Could not save that venue. Please try again.');
-    }
-  }
+  const saved = useSavedVenues();
 
   const [form, setForm] = useState({
     // The venue types searched; empty = every type. The chips pick one, the venue-type modal (wide screens) several.
@@ -460,8 +427,8 @@ export default function ExplorePage() {
               // The modals edit the duration, which re-searches: look each unit up in the live results so an open
               // modal refreshes its slots and prices instead of going stale.
               liveFor={(r) => results.find((x) => x.venue.id === r.venue.id && x.resource.id === r.resource.id) ?? r}
-              saved={savedIds.has(group.venue.id)}
-              onToggleSave={() => void toggleSaved(group.venue.id)}
+              saved={saved.isSaved(group.venue.id)}
+              onToggleSave={() => void saved.toggle(group.venue.id)}
               durationMinutes={form.durationMinutes}
               dateIso={resultsDate}
               reloading={searching}
@@ -596,6 +563,7 @@ function VenueGroupCard({
         iconKey={unit.category?.iconKey ?? 'category'}
         iconSvg={unit.category?.iconSvg}
         alt={`${venue.name}, ${unit.resource.name}`}
+        offer={offerOf(unit)}
         badge={soldOut ? 'No slots left' : `${openSlots} slot${openSlots === 1 ? '' : 's'} open`}
         saved={saved}
         onToggleSave={onToggleSave}
@@ -684,6 +652,7 @@ function CardGallery({
   iconKey,
   iconSvg,
   alt,
+  offer,
   badge,
   saved,
   onToggleSave,
@@ -693,6 +662,7 @@ function CardGallery({
   iconKey: string;
   iconSvg?: string | null;
   alt: string;
+  offer: ReturnType<typeof offerOf>;
   badge: string;
   saved: boolean;
   onToggleSave: () => void;
@@ -788,6 +758,8 @@ function CardGallery({
       )}
       {/* A soft shade under the badge, only over real photos. */}
       {photos.length > 0 && <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/35 to-transparent" />}
+
+      {offer && <OfferTag offer={offer} className="absolute left-2.5 top-2.5" />}
 
       <button
         type="button"
