@@ -56,7 +56,10 @@ test.describe('customer site: finding a venue', () => {
     await expect(window.getByRole('button', { name: new RegExp('^9:00 PM ' + turfPrice) })).toBeVisible();
     await expect(window.getByRole('button', { name: /^5:00 AM/ })).toHaveCount(0);
     await expect(window.getByRole('button', { name: /^10:00 PM/ })).toHaveCount(0);
-    await window.getByRole('button', { name: 'Close' }).click();
+    await page.goBack(); // the booking page is a page of its own: back returns to the listing (on today again)
+    await expect(card).toBeVisible();
+    await page.getByRole('button', { name: DAY_BUTTON }).nth(3).click();
+    await settled(page);
 
     await card.getByRole('tab', { name: /^Court 1/ }).click();
     await expect(card.getByRole('group', { name: /^Turf A, / })).toHaveCount(0);
@@ -64,7 +67,7 @@ test.describe('customer site: finding a venue', () => {
     await expect(court.getByRole('button', { name: 'Book 12:00 AM' })).toBeVisible();
     await expect(court.getByRole('button', { name: 'Book 11:00 PM' })).toBeVisible();
     const courtWindow = await openBooking(page, remoteVenue.name);
-    await expect(courtWindow).not.toContainText('5S'); // a unit with no sub-type shows none
+    await expect(courtWindow.getByRole('tab', { name: /^Court 1/ })).not.toContainText('·'); // a unit with no sub-type shows none
     await expect(courtWindow.getByRole('button', { name: /^12:00 AM ₹300/ })).toBeVisible();
     await expect(courtWindow.getByRole('button', { name: /^11:00 PM ₹300/ })).toBeVisible();
   });

@@ -16,9 +16,10 @@ test.describe('customer site: booking lengths', () => {
     const hourly = isoWeekday(day) >= 6 ? 1000 : 800;
     await page.getByRole('button', { name: /\d+ [A-Za-z]{3}$/ }).nth(2).click();
     await settled(page);
-    await page.getByRole('button', { name: 'Book Now' }).first().click();
+    await page.getByRole('link', { name: 'Book Now' }).first().click();
+    await expect(page).toHaveURL(/\/book\//);
 
-    const window = page.getByText('BOOK YOUR SLOT').locator('xpath=ancestor::div[contains(@class,"max-w-md")][1]');
+    const window = page.getByRole('article', { name: /^Book / });
     await expect(window).toContainText('1 hour');
     await expect(window.getByRole('button', { name: new RegExp('^2:00 PM ₹' + hourly) })).toBeVisible();
 

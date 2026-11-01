@@ -19,7 +19,7 @@ test.describe('customer site: nothing left to book', () => {
     const card = page.locator('article[data-sold-out="true"]').first();
     await expect(card).toBeVisible();
     await expect(card).toContainText('No slots left');
-    await expect(card.getByRole('button', { name: 'Book Now' })).toHaveCount(0);
+    await expect(card.getByRole('link', { name: 'Book Now' })).toHaveCount(0);
     await expect(card.getByRole('button', { name: /No slots left for this day/ })).toBeDisabled();
   });
 });

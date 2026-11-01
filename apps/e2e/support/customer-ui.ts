@@ -45,8 +45,9 @@ export async function logIn(page: Page, phone: string, name = 'PW Customer'): Pr
 export async function openBooking(page: Page, venueName: string, unitName?: string) {
   const card = page.locator('article').filter({ hasText: venueName });
   if (unitName) await card.getByRole('tab', { name: new RegExp('^' + unitName) }).click();
-  await card.getByRole('button', { name: 'Book Now' }).click();
-  const window = page.getByRole('dialog', { name: 'Book ' + venueName });
+  await card.getByRole('link', { name: 'Book Now' }).click();
+  await expect(page).toHaveURL(/\/book\//);
+  const window = page.getByRole('article', { name: 'Book ' + venueName });
   await expect(window).toBeVisible();
   return window;
 }
