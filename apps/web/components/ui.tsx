@@ -3,7 +3,6 @@ import type { ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes } 
 import {
   ArrowLeft,
   Check,
-  MapPin,
   ChevronDown,
   Search,
   Map,
@@ -54,7 +53,18 @@ import {
   type LucideIcon
 } from 'lucide-react';
 
-const ICON_MAP: Record<string, LucideIcon> = {
+/** The site's place icon: a bent arrow, drawn in the colour of the text around it (the 'location_on' icon everywhere a place is shown). */
+function LocationArrow({ size = '1em', className }: { size?: string | number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 245 194" fill="currentColor" stroke="currentColor" aria-hidden="true" className={className}>
+      <path d="M0.5 193.198V86.1976C0.5 86.1976 4.86418 75.5097 8.5 72.1976C12.7845 68.2947 23 64.1976 23 64.1976H154V1.19763L244 90.1976L154 180.198V116.198H52V193.198H0.5Z" />
+    </svg>
+  );
+}
+
+type IconComponent = LucideIcon | typeof LocationArrow;
+
+const ICON_MAP: Record<string, IconComponent> = {
   // Facility icons (the keys the Super Admin picks in the facility catalogue).
   sports_soccer: CircleDot,
   sports_cricket: Trophy,
@@ -77,7 +87,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   celebration: PartyPopper,
   category: LayoutGrid,
   apps: LayoutGrid,
-  location_on: MapPin,
+  location_on: LocationArrow,
   expand_more: ChevronDown,
   search: Search,
   stadium: Map,
