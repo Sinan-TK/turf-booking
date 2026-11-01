@@ -1,6 +1,7 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes } from 'react';
 
 import {
+  MapPin,
   ArrowLeft,
   Check,
   ChevronDown,
@@ -46,14 +47,13 @@ import {
   ChevronRight,
   Bookmark,
   Plus,
-  Navigation,
   Layers,
   CalendarCheck,
   CalendarX,
   type LucideIcon
 } from 'lucide-react';
 
-/** The site's place icon: a bent arrow, drawn in the colour of the text around it (the 'location_on' icon everywhere a place is shown). */
+/** The site's place icon: a bent arrow, drawn in the colour of the text around it (the 'navigation' icon, on the Directions buttons). */
 function LocationArrow({ size = '1em', className }: { size?: string | number; className?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 245 194" fill="currentColor" stroke="currentColor" aria-hidden="true" className={className}>
@@ -87,7 +87,7 @@ const ICON_MAP: Record<string, IconComponent> = {
   celebration: PartyPopper,
   category: LayoutGrid,
   apps: LayoutGrid,
-  location_on: LocationArrow,
+  location_on: MapPin,
   expand_more: ChevronDown,
   search: Search,
   stadium: Map,
@@ -116,7 +116,7 @@ const ICON_MAP: Record<string, IconComponent> = {
   chevron_right: ChevronRight,
   bookmark: Bookmark,
   plus: Plus,
-  navigation: Navigation,
+  navigation: LocationArrow,
   layers: Layers,
   calendar: CalendarDays,
   book: CalendarCheck,
