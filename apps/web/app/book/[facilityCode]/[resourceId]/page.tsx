@@ -253,21 +253,23 @@ function BookingPage() {
 
         <header>
           <p className="text-[0.625rem] font-extrabold uppercase tracking-wider text-brand-700">Book your slot</p>
-          <h1 className="mt-0.5 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">{r.venue.name}</h1>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">{r.venue.name}</h1>
+            <a
+              href={googleMapsLink(r.venue)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-md border border-brand-500/30 bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700 transition hover:bg-brand-100 active:scale-95"
+            >
+              <Icon name="navigation" className="text-[0.875rem]" />
+              Directions
+            </a>
+          </div>
           <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
             <Icon name="location_on" className="text-[1rem] text-slate-400" />
             {r.venue.address}
           </p>
           {about && <p className="mt-3 max-w-2xl whitespace-pre-line text-pretty text-sm leading-relaxed text-slate-600">{about}</p>}
-          <a
-            href={googleMapsLink(r.venue)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-3 inline-flex items-center gap-1 rounded-md border border-brand-500/30 bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700 transition hover:bg-brand-100 active:scale-95"
-          >
-            <Icon name="navigation" className="text-[0.875rem]" />
-            Directions
-          </a>
         </header>
 
         </div>
