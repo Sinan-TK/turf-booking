@@ -8,7 +8,7 @@ import { useDebounced } from '@/lib/use-debounced';
 import { trustedMapsUrl } from '@/lib/maps';
 import { useSavedVenues } from '@/lib/saved-venues';
 import { CategoryIcon, ErrorBanner, Icon } from '@/components/ui';
-import { LoadingNote, SearchingBar, Skeleton, VenueCardSkeleton, VenueCardsSkeleton } from '@/components/skeleton';
+import { LoadingNote, Skeleton, VenueCardSkeleton, VenueCardsSkeleton } from '@/components/skeleton';
 import { AccountMenu } from '@/components/account-menu';
 import { LocationPicker } from '@/components/location-picker';
 import { VenueTypePicker } from '@/components/venue-type-picker';
@@ -267,6 +267,8 @@ export default function ExplorePage() {
   const [inBrowser, setInBrowser] = useState(false);
   useEffect(() => setInBrowser(true), []);
   const days = useMemo(() => nextDays(dayCount), [dayCount]);
+  // When none of the cards on screen has a picture (they all show the stone placeholder), the chosen day takes that stone colour too.
+  const noPhotos = results.length > 0 && results.every((r) => !(r.resource.photoUrls?.length ?? 0) && !r.venue.photoUrl);
 
   const locationLabel = placeLabel(choice);
 
@@ -353,11 +355,11 @@ export default function ExplorePage() {
                 type="button"
                 aria-pressed={isActive}
                 onClick={() => setForm((f) => ({ ...f, date: d.iso }))}
-                className={`flex h-[4.5rem] w-[4.25rem] flex-shrink-0 flex-col items-center justify-center rounded-xl border transition active:scale-95 sm:h-[4.75rem] sm:w-[5.25rem] lg:w-auto lg:min-w-[3.75rem] lg:max-w-[5.25rem] lg:flex-1 ${isActive ? 'border-brand-700 bg-brand-700 text-white shadow-glow' : 'border-slate-200 bg-white text-slate-900 hover:border-brand-400'}`}
+                className={`flex h-[4.5rem] w-[4.25rem] flex-shrink-0 flex-col items-center justify-center rounded-xl border transition active:scale-95 sm:h-[4.75rem] sm:w-[5.25rem] lg:w-auto lg:min-w-[3.75rem] lg:max-w-[5.25rem] lg:flex-1 ${isActive ? (noPhotos ? 'border-stone-400 bg-stone-300 text-stone-900 shadow-sm' : 'border-brand-700 bg-brand-700 text-white shadow-glow') : 'border-slate-200 bg-white text-slate-900 hover:border-brand-400'}`}
               >
-                <span className={`text-xs ${isActive ? 'font-bold text-white' : 'font-medium text-slate-500'}`}>{d.weekday}</span>
+                <span className={`text-xs ${isActive ? (noPhotos ? 'font-bold text-stone-900' : 'font-bold text-white') : 'font-medium text-slate-500'}`}>{d.weekday}</span>
                 <span className="text-xl font-extrabold leading-tight">{d.day}</span>
-                <span className={`text-xs ${isActive ? 'font-semibold text-brand-100' : 'font-medium text-slate-500'}`}>{d.month}</span>
+                <span className={`text-xs ${isActive ? (noPhotos ? 'font-semibold text-stone-700' : 'font-semibold text-brand-100') : 'font-medium text-slate-500'}`}>{d.month}</span>
               </button>
             );
           })}
@@ -384,14 +386,9 @@ export default function ExplorePage() {
 
       <main className="relative w-full flex-1 px-4 pb-24 sm:px-6 lg:px-10 2xl:px-14">
         {errorMessage && <div className="mb-4"><ErrorBanner message={errorMessage} /></div>}
-        {/* Every new search shows the skeleton in place of the cards; only a duration change from an open booking window keeps the cards and shows a slim bar. */}
+        {/* Every new search shows the skeleton in place of the cards. */}
         {searching && results.length === 0 && <VenueCardsSkeleton count={6} />}
-        {/* Cards already on screen (saved ones, or a length change): the bar floats over the top edge, so nothing moves when it comes and goes. */}
-        {searching && results.length > 0 && (
-          <div className="pointer-events-none absolute inset-x-4 -top-1 z-10 sm:inset-x-6 lg:inset-x-10 2xl:inset-x-14 [&>*]:!mb-0">
-            <SearchingBar />
-          </div>
-        )}
+        {/* Cards already on screen (saved ones, or a length change) stay as they are while the live answer loads: nothing is drawn between the dates and the cards. */}
         {!searching && searched && visibleResults.length === 0 && (
           <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-sm">
             {choice && choice.mode !== 'district' ? (

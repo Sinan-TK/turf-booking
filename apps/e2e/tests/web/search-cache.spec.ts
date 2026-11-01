@@ -21,7 +21,8 @@ test.describe('customer site: search head start', () => {
     await page.reload();
     await expect(page.getByRole('article').first()).toBeVisible({ timeout: 3000 });
     expect(released).toBe(false);
-    await expect(page.getByText('Checking live availability…').first()).toBeVisible();
+    // Nothing is drawn between the dates and the saved cards while the live answer loads.
+    await expect(page.getByText('Checking live availability…')).toHaveCount(0);
     await expect.poll(() => released, { timeout: 15000 }).toBe(true);
     await expect(page.getByText('Checking live availability…')).toHaveCount(0);
     expect(await page.getByRole('article').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(names);
