@@ -20,6 +20,7 @@ import {
 } from '@/lib/booking';
 import { CategoryIcon, ErrorBanner, Icon } from '@/components/ui';
 import { DetailSkeleton } from '@/components/skeleton';
+import { readSearch, writeSearch } from '@/lib/search-cache';
 import { BrowseHeader } from '@/components/browse-header';
 
 /** The page's frame: the same header as the listing (logo, place, search, venue types, account), then the content (on a phone the header is just a back button and the account). */
@@ -124,15 +125,26 @@ function BookingPage() {
   // The venue's units for that day; only the newest answer may land (a new day or length searches again).
   useEffect(() => {
     const mine = ++latest.current;
-    setLoading(true);
     setError(null);
     const search = new URLSearchParams({ facilityCode, date: dateIso, timeWindow: 'ALL', ...(durationMinutes ? { durationMinutes: String(durationMinutes) } : {}) });
+    const path = `/search?${search.toString()}`;
+    // A repeat of a recent look at this venue paints its saved slots at once; the live answer replaces them a moment later (the API
+    // re-checks the slot when it is held, so a stale one can never be booked). With nothing saved the page waits for the answer.
+    const saved = readSearch<SearchResult>(path);
+    if (saved) {
+      setUnits(saved.data);
+      if (saved.advanceDays) setDayCount(Math.min(MOST_DAYS, Math.max(1, saved.advanceDays)));
+      setLoading(false);
+    } else setLoading(true);
     api
-      .getPage<SearchResult[]>(`/search?${search.toString()}`)
+      .getPage<SearchResult[]>(path)
       .then((page) => {
         if (mine !== latest.current) return;
-        if (page.data.length === 0) setError('This venue is not available to book any more.');
-        else setUnits(page.data);
+        writeSearch<SearchResult>(path, { data: page.data, nextCursor: null, advanceDays: page.advanceDays ?? null });
+        if (page.data.length === 0) {
+          setUnits(null);
+          setError('This venue is not available to book any more.');
+        } else setUnits(page.data);
         if (page.advanceDays) setDayCount(Math.min(MOST_DAYS, Math.max(1, page.advanceDays)));
       })
       .catch((err) => mine === latest.current && setError(err instanceof ApiError ? err.message : 'Could not load this venue.'))
@@ -141,9 +153,16 @@ function BookingPage() {
 
   // The venue's description, when it has one (the page works without it).
   useEffect(() => {
+    const path = `about:${facilityCode}`;
+    const saved = readSearch<{ description: string | null }>(path);
+    if (saved?.data[0]) setAbout(saved.data[0].description);
     api
       .get<{ description?: string | null }>(`/venues/by-code/${encodeURIComponent(facilityCode)}`)
-      .then((v) => setAbout(v.description?.trim() || null))
+      .then((v) => {
+        const description = v.description?.trim() || null;
+        setAbout(description);
+        writeSearch(path, { data: [{ description }], nextCursor: null, advanceDays: null });
+      })
       .catch(() => undefined);
   }, [facilityCode]);
 

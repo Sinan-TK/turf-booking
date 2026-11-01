@@ -1,5 +1,5 @@
 /**
- * The last few venue searches, kept for this browser tab so a repeat visit paints cards at once while the live answer is fetched
+ * The last few venue searches (and the venue pages opened from them), kept for this browser tab so a repeat visit paints cards at once while the live answer is fetched
  * (stale-while-revalidate). Only a head start: the page always asks the API again and replaces what it showed, and the API
  * re-checks every slot when it is held, so a stale card can never book something that is gone.
  *
@@ -8,7 +8,7 @@
  */
 const KEY = 'turfx.search.v1';
 const MAX_AGE_MS = 10 * 60_000;
-const MAX_ENTRIES = 8;
+const MAX_ENTRIES = 16; // the listing's searches and the venue pages opened from them
 
 export interface CachedSearch<T> {
   at: number;

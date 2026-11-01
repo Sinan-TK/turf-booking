@@ -40,4 +40,28 @@ test.describe('customer site: search head start', () => {
     const cards = await page.getByRole('article').count();
     expect(imgs).toBeLessThanOrEqual(cards * 2);
   });
+
+  test('a venue page opened again shows its saved slots before the live answer arrives', async ({ page }) => {
+    await page.goto('/explore');
+    await expect(page.getByRole('article').first()).toBeVisible();
+    await page.getByRole('link', { name: 'Book Now' }).first().click();
+    await expect(page).toHaveURL(/\/book\//);
+    const venue = page.getByRole('article').first();
+    await expect(venue.getByRole('tab').first()).toBeVisible();
+    const address = page.url();
+
+    // The live answer is held back for four seconds; the saved venue page must not wait for it.
+    let released = false;
+    await page.route(`${URLS.api}/search**`, async (route) => {
+      await new Promise((r) => setTimeout(r, 4000));
+      released = true;
+      await route.continue();
+    });
+    await page.goto(address);
+    await expect(page.getByRole('article').first().getByRole('tab').first()).toBeVisible({ timeout: 3000 });
+    expect(released).toBe(false);
+    await expect.poll(() => released, { timeout: 15000 }).toBe(true);
+    await expect(page.getByRole('article').first().getByRole('tab').first()).toBeVisible();
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+  });
 });
