@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { durationLabel } from '@/lib/categories';
 import {
@@ -58,12 +58,13 @@ function Pictures({ unit, venueName }: { unit: SearchResult; venueName: string }
     return [...own, ...(unit.venue.photoUrl && !own.includes(unit.venue.photoUrl) ? [unit.venue.photoUrl] : [])];
   }, [unit]);
   const [index, setIndex] = useState(0);
+  const [ready, setReady] = useState<string | null>(null); // the picture that has finished loading (it fades in over the grey field)
   const shown = photos[Math.min(index, photos.length - 1)];
   return (
     <div>
       <div className="relative aspect-[16/9] overflow-hidden rounded-xl bg-stone-200 sm:aspect-[16/7]">
         {shown ? (
-          <img key={shown} src={shown} alt={`${venueName}, ${unit.resource.name}`} className="absolute inset-0 h-full w-full object-cover" />
+          <img key={shown} src={shown} alt={`${venueName}, ${unit.resource.name}`} onLoad={() => setReady(shown)} className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${ready === shown ? 'opacity-100' : 'opacity-0'}`} />
         ) : (
           <div aria-hidden="true" className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-stone-100 via-stone-200 to-stone-300">
             <CategoryIcon iconKey={unit.category?.iconKey ?? 'category'} iconSvg={unit.category?.iconSvg} className="text-[6rem] text-stone-500/70" />
@@ -97,13 +98,14 @@ function Pictures({ unit, venueName }: { unit: SearchResult; venueName: string }
  * can be shared or reopened.
  */
 function BookingPage() {
-  const router = useRouter();
   const params = useParams<{ facilityCode: string; resourceId: string }>();
   const query = useSearchParams();
   const facilityCode = decodeURIComponent(params.facilityCode);
-  const resourceId = decodeURIComponent(params.resourceId);
+  // The unit and the day are this page's own state, started from the address. A change rewrites the address in place
+  // (history.replaceState) and does not navigate, so only what depends on it changes: the header, the facility tiles and the rest stay.
+  const [resourceId, setResourceId] = useState(() => decodeURIComponent(params.resourceId));
   const dateParam = query.get('date');
-  const dateIso = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : todayIso();
+  const [dateIso, setDateIso] = useState(() => (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : todayIso()));
   const durationParam = Number(query.get('duration'));
   const [durationMinutes, setDurationMinutes] = useState<number | null>(Number.isFinite(durationParam) && durationParam > 0 ? durationParam : null);
 
@@ -119,7 +121,10 @@ function BookingPage() {
     const rid = next.resource ?? resourceId;
     const date = next.date ?? dateIso;
     const duration = next.duration === undefined ? durationMinutes : next.duration;
-    router.replace(`/book/${encodeURIComponent(facilityCode)}/${encodeURIComponent(rid)}?date=${date}${duration ? `&duration=${duration}` : ''}`, { scroll: false });
+    setResourceId(rid);
+    setDateIso(date);
+    setDurationMinutes(duration);
+    window.history.replaceState(window.history.state, '', `/book/${encodeURIComponent(facilityCode)}/${encodeURIComponent(rid)}?date=${date}${duration ? `&duration=${duration}` : ''}`);
   };
 
   // The venue's units for that day; only the newest answer may land (a new day or length searches again).
