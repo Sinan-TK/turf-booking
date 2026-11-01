@@ -76,9 +76,12 @@ export class LocalIdentityAdapter implements IdentityProvider {
       : `${env.RESET_TOKEN_TTL_MINUTES} minutes`;
     const action = isInvite ? 'Set your password' : 'Reset your password';
 
+    // The owner portal's emails can use a Resend template (a name typed by a person is escaped first, since the template puts it in as it is).
+    const templateId = params.portal === StaffPortal.OWNER ? (isInvite ? env.RESEND_OWNER_INVITE_TEMPLATE_ID : env.RESEND_OWNER_RESET_TEMPLATE_ID) : undefined;
     await this.mail.send({
       to: params.email,
       subject,
+      ...(templateId ? { template: { id: templateId, variables: { NAME: escapeHtml(params.name), LINK: link, EXPIRY: expiry } } } : {}),
       text: `Hi ${params.name},\n\n${lead}\n\n${link}\n\nThis link works once and expires in ${expiry}. If you did not expect this email, you can ignore it.`,
       html: `<p>Hi ${escapeHtml(params.name)},</p><p>${lead}</p><p><a href="${link}">${action}</a></p><p>This link works once and expires in ${expiry}. If you did not expect this email, you can ignore it.</p>`,
     });

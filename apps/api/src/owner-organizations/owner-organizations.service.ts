@@ -179,9 +179,11 @@ export class OwnerOrganizationsService {
   private async tellOwnerApproved(org: { name: string; contactEmail: string }) {
     const url = `${loadEnv().OWNER_APP_URL.replace(/\/$/, '')}/login`;
     const text = `Good news: ${org.name} has been approved on TurfX.\n\nYou can now sign in and set up your venues: ${url}\n`;
+    const templateId = loadEnv().RESEND_OWNER_APPROVED_TEMPLATE_ID;
     await this.mail.send({
       to: org.contactEmail,
       subject: 'Your TurfX owner account is approved',
+      ...(templateId ? { template: { id: templateId, variables: { BUSINESS_NAME: org.name.replace(/[<>&"']/g, ''), LOGIN_URL: url } } } : {}),
       text,
       html: `<p>Good news: <strong>${org.name.replace(/[<>&]/g, '')}</strong> has been approved on TurfX.</p><p>You can now <a href="${url}">sign in</a> and set up your venues.</p>`,
     });

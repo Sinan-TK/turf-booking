@@ -40,6 +40,11 @@ const envSchema = z.object({
   // Resend template (its id from the Resend dashboard) for the emailed six-digit codes: sign-up verification and
   // password reset. Variables: HEADING, INTRO, CODE, NAME, EXPIRES_IN_MINUTES. When unset a built-in plain email is sent.
   RESEND_OTP_TEMPLATE_ID: optionalString(z.string().min(1)),
+  // Resend templates (ids from the Resend dashboard) for the owner portal's emails; see apps/api/email-templates. When one is unset, the
+  // built-in plain email for it is sent. Invite and reset variables: NAME, LINK, EXPIRY. Approved variables: BUSINESS_NAME, LOGIN_URL.
+  RESEND_OWNER_INVITE_TEMPLATE_ID: optionalString(z.string().min(1)),
+  RESEND_OWNER_RESET_TEMPLATE_ID: optionalString(z.string().min(1)),
+  RESEND_OWNER_APPROVED_TEMPLATE_ID: optionalString(z.string().min(1)),
   // How long an emailed code works. Attempts and resend limits reuse OTP_MAX_ATTEMPTS, OTP_RESEND_COOLDOWN_SECONDS
   // and OTP_MAX_CODES_PER_HOUR.
   EMAIL_OTP_TTL_MINUTES: z.coerce.number().int().positive().default(10),

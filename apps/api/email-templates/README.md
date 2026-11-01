@@ -18,8 +18,16 @@ What each variable holds:
 - `BUSINESS_NAME`: the owner's business name.
 - `LOGIN_URL`: the owner portal sign-in address.
 
-After creating each template, give the template ID (looks like `4c8ff2b3-...`) for each one. The API already knows how to send a Resend template (`template: { id, variables }` in `src/identity/mail.service.ts`); the last step is to read the three IDs from settings (for example `RESEND_TEMPLATE_OWNER_INVITE`) and pass these variables. Until an ID is set, the current plain HTML emails keep going out unchanged.
+After creating each template, put its ID (looks like `4c8ff2b3-...`) in `apps/api/.env`, then restart the API:
+
+```
+RESEND_OWNER_INVITE_TEMPLATE_ID=<id of owner-invite>
+RESEND_OWNER_RESET_TEMPLATE_ID=<id of owner-password-reset>
+RESEND_OWNER_APPROVED_TEMPLATE_ID=<id of owner-approved>
+```
+
+A template that has no ID set keeps sending the built-in plain email, so you can switch them on one at a time. In production set them where the API's other secrets are set.
 
 ## Safety: what goes into the variables
 
-`NAME` and `BUSINESS_NAME` are typed by people (an owner signing themselves up chooses both), and Resend puts a `{{{...}}}` value into the page as it is. So the API must **HTML-escape those two values (`& < > " '`) before it passes them**, and when the templates are wired up it will (`escapeHtml` in `src/identity/local-identity.adapter.ts` already does this for the plain emails sent today). `LINK`, `LOGIN_URL` and `EXPIRY` are built by the API itself, never from user input; `LINK` and `LOGIN_URL` are the owner portal's own https address plus a one-time token. Do not put any other user-typed value into a template without the same escaping.
+`NAME` and `BUSINESS_NAME` are typed by people (an owner signing themselves up chooses both), and Resend puts a `{{{...}}}` value into the page as it is. So the API must **HTML-escape those two values (`& < > " '`) before it passes them**, and it does (`escapeHtml` in `src/identity/local-identity.adapter.ts` already does this for the plain emails sent today). `LINK`, `LOGIN_URL` and `EXPIRY` are built by the API itself, never from user input; `LINK` and `LOGIN_URL` are the owner portal's own https address plus a one-time token. Do not put any other user-typed value into a template without the same escaping.
