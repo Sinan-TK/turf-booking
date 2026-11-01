@@ -14,21 +14,33 @@ test.describe('owner portal: venue details', () => {
     await expect(page.getByText('Blocked', { exact: true }).first().locator('xpath=..')).toContainText('0');
 
     // One card per facility, the unit under it with its type (the court has none).
-    await expect(page.getByRole('heading', { name: 'Football Turf', level: 2 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Football', level: 2 })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Badminton Court', level: 2 })).toBeVisible();
-    await expect(page.getByText('Pitch type · 5S')).toBeVisible();
+    await expect(page.getByText('Turf type · 5S')).toBeVisible();
     await expect(page.getByText(venue.courtName, { exact: true })).toBeVisible();
   });
 
-  test('the back button before the name goes to the venues list, and manage opens pricing', async ({ page, venue }) => {
+  test('the back button before the name goes to the venues list; pricing and availability are on the same page', async ({ page, venue }) => {
     await page.goto(`/venues/${venue.id}`);
     await page.getByRole('link', { name: 'Back to all venues' }).click();
     await expect(page).toHaveURL(/\/venues$/);
 
     await page.goto(`/venues/${venue.id}`);
-    await page.getByRole('link', { name: /Manage availability/ }).click();
-    await expect(page).toHaveURL(new RegExp(`/venues/${venue.id}/availability$`));
-    await expect(page.getByRole('link', { name: new RegExp(`Back to ${venue.name}`) })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Pricing & availability', level: 2 })).toBeVisible();
+    for (const tab of ['Pricing & hours', 'Closed days', 'Walk-in booking']) await expect(page.getByRole('tab', { name: tab })).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/venues/${venue.id}$`));
+  });
+
+  test('the old pricing address lands on the venue page, at its pricing section', async ({ page, venue }) => {
+    await page.goto(`/venues/${venue.id}/availability`);
+    await expect(page).toHaveURL(new RegExp(`/venues/${venue.id}#pricing$`));
+    await expect(page.getByRole('heading', { name: 'Pricing & availability', level: 2 })).toBeVisible();
+  });
+
+  test('the Google Maps link and the advance booking days are rows of the details with an Edit button each', async ({ page, venue }) => {
+    await page.goto(`/venues/${venue.id}`);
+    await expect(page.getByRole('button', { name: 'Edit Google Maps link' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit advance booking' })).toBeVisible();
   });
 
   test('blocking a unit asks first: cancel changes nothing, confirm blocks, then it can be reopened', async ({ page, venue }) => {
@@ -83,7 +95,7 @@ test.describe('owner portal: venue details', () => {
   test('adding a unit: no type for a typeless facility, a required type where types are preset', async ({ page, makeVenue }) => {
     const venue = await makeVenue();
     await page.goto(`/venues/${venue.id}`);
-    const add = page.getByRole('button', { name: /^Add (court|pitch|unit)$/ });
+    const add = page.getByRole('button', { name: /^Add (court|turf|pitch|unit)$/ });
     await expect(add).toBeEnabled();
     await add.click(); // nothing chosen yet: the form says what is missing, field by field
     await expect(page.getByText('Select a facility.')).toBeVisible();
@@ -100,14 +112,14 @@ test.describe('owner portal: venue details', () => {
     await expect(page.getByText('Court 2', { exact: true })).toBeVisible();
 
     // Football has 5S / 7S, and one must be chosen.
-    await field(page, 'Facility').selectOption({ label: 'Football Turf' });
+    await field(page, 'Facility').selectOption({ label: 'Football' });
     await field(page, /name/).fill('Turf B');
     await add.click();
-    await expect(page.getByText(/Select the pitch type./i)).toBeVisible();
+    await expect(page.getByText(/Select the (turf|pitch) type./i)).toBeVisible();
     await field(page, /type/).selectOption('7S');
-    await expect(page.getByText(/Select the pitch type./i)).toHaveCount(0);
+    await expect(page.getByText(/Select the (turf|pitch) type./i)).toHaveCount(0);
     await add.click();
-    await expect(page.getByText('Pitch type · 7S')).toBeVisible();
+    await expect(page.getByText('Turf type · 7S')).toBeVisible();
   });
 
   test('an owner can pause the venue but not set it back to draft or live', async ({ page, makeVenue }) => {

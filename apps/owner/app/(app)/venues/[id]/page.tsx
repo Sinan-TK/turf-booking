@@ -10,6 +10,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SvgIcon } from '@/components/svg-icons';
 import { VenueMapLink } from '@/components/venue-map-link';
 import { VenueAdvanceBooking } from '@/components/venue-advance-booking';
+import { VenueAvailability } from '@/components/venue-availability';
 import { UnitPhotos, type UnitPhoto } from '@/components/unit-photos';
 import { DurationFields, UnitDurations, defaultDurations, durationsError } from '@/components/unit-durations';
 import {
@@ -204,15 +205,14 @@ export default function VenueDetailPage() {
               </div>
             </div>
           </div>
-          <Link href={`/venues/${id}/availability`}>
-            <Button>Manage availability &amp; pricing →</Button>
-          </Link>
+          <a
+            href="#pricing"
+            className="inline-flex items-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-on-primary transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          >
+            Pricing &amp; availability ↓
+          </a>
         </div>
       </section>
-
-      <VenueMapLink venueId={venue.id} link={venue.googleMapsUrl} onSaved={() => refetch()} />
-
-      <VenueAdvanceBooking venueId={venue.id} days={venue.advanceBookingDays} onSaved={() => refetch()} />
 
       <div className="grid grid-cols-2 gap-card-gap lg:grid-cols-4">
         <Stat label="Facilities" value={venue.facilities.length} />
@@ -478,9 +478,29 @@ export default function VenueDetailPage() {
                 <span className="font-mono text-xs">{venue.facilityCode}</span>
               </Row>
             </dl>
+            <div className="divide-y divide-outline-variant/20 border-t border-outline-variant/20">
+              <VenueMapLink venueId={venue.id} link={venue.googleMapsUrl} onSaved={() => refetch()} />
+              <VenueAdvanceBooking venueId={venue.id} days={venue.advanceBookingDays} onSaved={() => refetch()} />
+            </div>
           </Card>
         </div>
       </div>
+
+      <section id="pricing" aria-labelledby="pricing-heading" className="scroll-mt-6 space-y-4">
+        <div>
+          <h2 id="pricing-heading" className="font-headline-md text-headline-md text-on-surface">
+            Pricing &amp; availability
+          </h2>
+          <p className="mt-0.5 text-body-md text-on-surface-variant">
+            What each unit costs and when it can be booked, the days you are closed, and bookings you take yourself.
+          </p>
+        </div>
+        {categories ? (
+          <VenueAvailability venueId={venue.id} resources={units} categories={categories} />
+        ) : (
+          <LoadingState />
+        )}
+      </section>
 
       {pending && dialog && (
         <ConfirmDialog

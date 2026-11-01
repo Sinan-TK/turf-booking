@@ -8,7 +8,7 @@ test.describe('owner portal: My Venues list', () => {
     // Search by name, then by something that matches nothing.
     await page.getByLabel('Search venues').fill(venue.name);
     await expect(row).toHaveCount(1);
-    await expect(row).toContainText('Football Turf');
+    await expect(row).toContainText('Football');
     await expect(row).toContainText('Badminton Court');
     await expect(row).toContainText('ACTIVE');
 
@@ -26,7 +26,7 @@ test.describe('owner portal: My Venues list', () => {
     await expect(row).toHaveCount(1);
 
     // Facility filter.
-    await page.getByLabel('Facility').selectOption({ label: 'Football Turf' });
+    await page.getByLabel('Facility').selectOption({ label: 'Football' });
     await expect(row).toHaveCount(1);
   });
 

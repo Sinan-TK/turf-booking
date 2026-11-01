@@ -8,7 +8,7 @@ test.describe('owner portal: venue Google Maps link', () => {
     await expect(page.getByRole('heading', { name: 'Google Maps link' })).toBeVisible();
     await expect(page.getByText('None. The Directions button uses your map pin instead.')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Add a link' }).click();
+    await page.getByRole('button', { name: 'Edit Google Maps link' }).click();
     await page.getByLabel('Link').fill('https://evil.example.com/maps/place/x');
     await page.getByRole('button', { name: 'Save link' }).click();
     await expect(page.getByText('Use a Google Maps link: open the place in Google Maps, choose Share, then Copy link.')).toBeVisible();
@@ -26,7 +26,7 @@ test.describe('owner portal: venue Google Maps link', () => {
     await expect(shown).toHaveAttribute('rel', /noopener/);
     expect((await (await ownerApi.get(`/venues/${venue.id}`)).json()).googleMapsUrl).toBe(good);
 
-    await page.getByRole('button', { name: 'Change link' }).click();
+    await page.getByRole('button', { name: 'Edit Google Maps link' }).click();
     await page.getByRole('button', { name: 'Remove link' }).click();
     await expect(page.getByText('None. The Directions button uses your map pin instead.')).toBeVisible();
     expect((await (await ownerApi.get(`/venues/${venue.id}`)).json()).googleMapsUrl).toBeNull();

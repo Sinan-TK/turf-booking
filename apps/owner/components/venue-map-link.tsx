@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { googleMapsUrlProblem } from '@venue/shared/dist/maps-url';
 import { api, ApiError } from '@/lib/api';
-import { Button, Card, ErrorBanner, FieldError, Input, Label, invalidClass } from '@/components/ui';
+import { Button, ErrorBanner, FieldError, Input, Label, invalidClass } from '@/components/ui';
+import { SvgIcon } from '@/components/svg-icons';
 
 /**
- * The venue's Google Maps link: what its Directions button opens for customers. Without one, Directions uses the
+ * The venue's Google Maps link, as a row of the venue's details with an Edit button: what its Directions button opens for customers. Without one, Directions uses the
  * map pin (latitude and longitude) instead.
  */
 export function VenueMapLink({
@@ -43,10 +44,10 @@ export function VenueMapLink({
   }
 
   return (
-    <Card>
+    <div className="py-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-on-surface">Google Maps link</h2>
+          <h3 className="text-sm font-semibold text-on-surface">Google Maps link</h3>
           {!editing && (
             <p className="mt-1 text-body-md text-on-surface-variant">
               {link ? (
@@ -67,13 +68,16 @@ export function VenueMapLink({
           <Button
             type="button"
             variant="secondary"
+            aria-label="Edit Google Maps link"
+            className="inline-flex items-center gap-1.5 !px-3 !py-1.5"
             onClick={() => {
               setValue(link ?? '');
               setFieldError(undefined);
               setEditing(true);
             }}
           >
-            {link ? 'Change link' : 'Add a link'}
+            <SvgIcon name="edit" className="h-4 w-4" />
+            Edit
           </Button>
         )}
       </div>
@@ -123,6 +127,6 @@ export function VenueMapLink({
           </div>
         </form>
       )}
-    </Card>
+    </div>
   );
 }

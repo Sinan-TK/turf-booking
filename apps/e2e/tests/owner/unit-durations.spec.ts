@@ -33,7 +33,7 @@ test.describe('owner portal: booking lengths per unit', () => {
     await page.keyboard.press('Escape');
 
     await page.goto(`/venues/${venue.id}`);
-    await page.getByLabel('Facility').selectOption({ label: 'Football Turf' });
+    await page.getByLabel('Facility').selectOption({ label: 'Football' });
     await expect(field(page, 'Shortest booking (minutes)').last()).toHaveValue('60');
     await field(page, 'Shortest booking (minutes)').last().fill('120');
     await expect(field(page, 'Longest booking').last()).toHaveValue('120'); // 180 does not fit 120-minute blocks: it moves to 120

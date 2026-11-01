@@ -19,7 +19,7 @@ test.describe('owner portal: pricing', () => {
     await expect(rowWith(page, 'Sat, Sun')).toContainText('INR 1,000');
 
     // The other unit has its own prices.
-    await page.getByRole('combobox').first().selectOption({ index: 1 });
+    await page.getByRole('tabpanel').getByRole('combobox').first().selectOption({ index: 1 });
     await expect(rowWith(page, 'Every day')).toContainText('All day');
     await expect(rowWith(page, 'Every day')).toContainText('INR 300');
   });
