@@ -11,6 +11,7 @@ import { Icon } from '@/components/ui';
 import { LocationPicker } from '@/components/location-picker';
 import { VenueTypePicker } from '@/components/venue-type-picker';
 import { RotatingTypeIcon } from '@/components/rotating-type-icon';
+import { BackButton } from '@/components/back-button';
 
 /** The header's place name on one line: "Malappuram, Kerala", "Kottakkal, Malappuram" or "Near Tirur". */
 function placeLabel(choice: LocationChoice | null): string {
@@ -23,9 +24,11 @@ function placeLabel(choice: LocationChoice | null): string {
 /**
  * The listing's header for the pages that sit beside it (a venue's booking page): the logo, the place, the search and the
  * venue types, with the account on the right. A search or a venue-type choice goes to the listing, which shows the results;
- * a new place is saved and used by the listing.
+ * a new place is saved and used by the listing. With phoneBack, a phone shows just a back button and the account.
  */
-export function BrowseHeader() {
+export function BrowseHeader({ phoneBack = false }: { phoneBack?: boolean }) {
+  // On a phone this header can be only a back button and the account (the place and search are left to the listing).
+  const wide = phoneBack ? 'hidden md:flex' : 'flex';
   const router = useRouter();
   const { choice, setChoice } = useLocationChoice();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -49,6 +52,11 @@ export function BrowseHeader() {
     <>
       <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur-md">
         <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2.5 px-4 py-3 sm:px-6 md:flex-nowrap md:gap-x-4 lg:px-10 2xl:px-14">
+          {phoneBack && (
+            <div className="md:hidden">
+              <BackButton />
+            </div>
+          )}
           <Link href="/" aria-label="TurfX home" className="mr-2 hidden select-none whitespace-nowrap text-[1.75rem] font-black italic leading-none tracking-tight text-slate-900 lg:block">
             Turf<span className="text-brand-600">X</span>
           </Link>
@@ -57,7 +65,7 @@ export function BrowseHeader() {
             onClick={() => setPickerOpen(true)}
             aria-label={`Change location, now ${locationLabel}`}
             aria-haspopup="dialog"
-            className="group flex h-11 min-w-0 max-w-[65%] items-center gap-1.5 px-1 text-left transition active:opacity-70 md:h-12 md:w-auto md:max-w-[16rem] md:shrink-0"
+            className={`group ${wide} h-11 min-w-0 max-w-[65%] items-center gap-1.5 px-1 text-left transition active:opacity-70 md:h-12 md:w-auto md:max-w-[16rem] md:shrink-0`}
           >
             <Icon name="location_on" className="text-[1.125rem] text-brand-600" />
             <span className="min-w-0 truncate text-sm font-bold text-slate-900 underline decoration-transparent decoration-2 underline-offset-4 transition group-hover:decoration-brand-600">{locationLabel}</span>
@@ -69,7 +77,7 @@ export function BrowseHeader() {
           <form
             onSubmit={search}
             role="search"
-            className="nav-search order-last flex h-11 w-full items-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 transition-[box-shadow,border-color,background-color] hover:border-slate-300 [&:has(input:focus)]:border-brand-500 [&:has(input:focus)]:bg-white md:order-none md:h-12 md:w-auto md:max-w-3xl md:flex-1"
+            className={`nav-search order-last ${wide} h-11 w-full items-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 transition-[box-shadow,border-color,background-color] hover:border-slate-300 [&:has(input:focus)]:border-brand-500 [&:has(input:focus)]:bg-white md:order-none md:h-12 md:w-auto md:max-w-3xl md:flex-1`}
           >
             <Icon name="search" className="text-[1.125rem] text-slate-500" />
             <input

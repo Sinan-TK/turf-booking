@@ -20,18 +20,14 @@ import {
 } from '@/lib/booking';
 import { CategoryIcon, ErrorBanner, Icon } from '@/components/ui';
 import { DetailSkeleton } from '@/components/skeleton';
-import { BackButton } from '@/components/back-button';
 import { BrowseHeader } from '@/components/browse-header';
 
-/** The page's frame: the same header as the listing (logo, place, search, venue types, account), then a back button and the content. */
+/** The page's frame: the same header as the listing (logo, place, search, venue types, account), then the content (on a phone the header is just a back button and the account). */
 function Screen({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-gray-50">
-      <BrowseHeader />
-      <main className="w-full px-4 pb-10 pt-4 sm:px-6 lg:px-10 2xl:px-14">
-        <div className="mb-4">
-          <BackButton />
-        </div>
+      <BrowseHeader phoneBack />
+      <main className="w-full px-4 pb-10 pt-5 sm:px-6 lg:px-10 2xl:px-14">
         {children}
       </main>
     </div>
