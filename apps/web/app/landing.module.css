@@ -1,0 +1,140 @@
+/*
+ * The landing page's world: a split-flap departures board for game time. Black flap panels, yellow lit characters,
+ * a concrete-grey ground. Everything here is used by app/page.tsx only.
+ */
+.page {
+  --ink: #0f0f0e;
+  --board: #161615;
+  --flap: #242422;
+  --seam: #0a0a09;
+  --lit: #ffcc1a;
+  --lit-deep: #e6b300;
+  --ground: #e8e8e3;
+  --line: #cfcfc8;
+  --muted: #55554f;
+  font-family: var(--font-barlow), system-ui, sans-serif;
+  background: var(--ground);
+  color: var(--ink);
+}
+.page ::selection {
+  background: var(--lit);
+  color: var(--ink);
+}
+
+.display {
+  font-family: var(--font-barlow-condensed), var(--font-barlow), system-ui, sans-serif;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+}
+
+/* A single flap: a dark tile split across the middle, with a slight top-lit gradient. */
+.flap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #2b2b29 0%, var(--flap) 49%, #1d1d1b 51%, #1a1a18 100%);
+  color: var(--lit);
+  border-radius: 3px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 2px 4px rgba(0, 0, 0, 0.5);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+}
+.flap::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: var(--seam);
+}
+
+/* A plain dark tile (pictures and icons, which a seam would cut through). */
+.tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 3px;
+  background: #242422;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* A character turning over: the top half drops away and the new one settles. */
+@keyframes flip {
+  0% {
+    transform: perspective(300px) rotateX(-90deg);
+    opacity: 0.2;
+  }
+  60% {
+    transform: perspective(300px) rotateX(12deg);
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+  }
+}
+.flipChar {
+  display: inline-block;
+  transform-origin: 50% 50%;
+  animation: flip 0.42s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+/* A board row clacking into place, one after another (the delay comes from --d). */
+@keyframes rowIn {
+  0% {
+    transform: perspective(600px) rotateX(-80deg);
+    opacity: 0;
+  }
+  70% {
+    transform: perspective(600px) rotateX(8deg);
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+.row {
+  transform-origin: 50% 0;
+  animation: rowIn 0.55s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise {
+  animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+
+/* The hero's faint board grid behind the headline. */
+.boardGrid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 2.5rem 2.5rem;
+}
+
+/* The search field on the board: the caret is lit like the characters. */
+.search {
+  caret-color: var(--lit);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flipChar,
+  .row,
+  .rise {
+    animation: none;
+  }
+}

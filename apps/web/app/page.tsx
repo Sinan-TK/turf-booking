@@ -1,5 +1,15 @@
 'use client';
 
+/*
+ * THESIS: the landing page is a departures board for game time: venue types listed like departures, a live clock, one search.
+ *   It refuses the category default of a green gradient hero over rounded white cards.
+ * OWN-WORLD: black flap panels split across the middle, lit yellow condensed capitals, a concrete-grey ground, one yellow band.
+ * STORY: a group organiser sees what can be booked, searches or taps a venue type, and lands on live slots in /explore.
+ * FIRST VIEWPORT: black board; headline and search on the left, the "Browse by type" board with a flipping clock on the right
+ *   (stacked on phones, search first). The primary action is Find venues.
+ * FORM: split-flap departures board, grounded list position 6, seed 6eaf877a.
+ */
+
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -11,11 +21,13 @@ import { CategoryIcon, Icon } from '@/components/ui';
 import { Skeleton } from '@/components/skeleton';
 import { OWNER_PORTAL_URL } from '@/lib/legal';
 import { SiteFooter } from '@/components/site-footer';
+import { barlow, barlowCondensed } from './landing-fonts';
+import s from './landing.module.css';
 
 const STEPS = [
-  { icon: 'search', title: 'Find a venue', text: 'Search by area or pick a type: turfs, courts, pools, game rooms and more.' },
-  { icon: 'schedule', title: 'Pick a time', text: 'See which slots are free right now and choose the length that suits you.' },
-  { icon: 'check', title: 'Book and play', text: 'Reserve with a small advance online. Your confirmation arrives on WhatsApp.' },
+  { title: 'Find a venue', text: 'Search by area or pick a type: turfs, courts, pools, game rooms and more.' },
+  { title: 'Pick a time', text: 'See which slots are free right now and choose the length that suits you.' },
+  { title: 'Book and play', text: 'Reserve with a small advance online and get your booking ID straight away.' },
 ] as const;
 
 const REASONS = [
@@ -25,22 +37,97 @@ const REASONS = [
   { icon: 'bookings', title: 'Everything in one place', text: 'Your bookings, your wallet and support, all under your account.' },
 ] as const;
 
-/** Keyboard focus that is as visible here as the rest of the site's controls. */
-const focus = 'outline-none focus-visible:ring-4 focus-visible:ring-brand-600/25';
+/** Keyboard focus on the board: a lit ring. */
+const focusDark = 'outline-none focus-visible:ring-2 focus-visible:ring-[#ffcc1a] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f0f0e]';
 
-/** A facility's tile: its picture, or its icon on a soft field until (and unless) it has one. */
-function TypeArt({ c, iconSize }: { c: VenueCategory; iconSize: string }) {
+/** Characters on flaps; a character that changes turns over (it is keyed by its value, so a new one mounts and flips). */
+function Flaps({ text, className = '' }: { text: string; className?: string }) {
   return (
-    <>
-      <span className="absolute inset-0 flex items-center justify-center">
-        <CategoryIcon iconKey={c.iconKey} iconSvg={c.iconSvg} className={`${iconSize} text-brand-700/50`} />
-      </span>
-      {c.imageUrl && <img src={c.imageUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />}
-    </>
+    <span className="inline-flex gap-[3px]">
+      {text.split('').map((ch, i) =>
+        ch === ':' || ch === ' ' ? (
+          <span key={`${i}-sep`} className="inline-flex w-[0.45em] items-center justify-center text-[#ffcc1a]">
+            {ch}
+          </span>
+        ) : (
+          <span key={`${i}-${ch}`} className={`${s.flap} ${className}`}>
+            <span className={s.flipChar}>{ch}</span>
+          </span>
+        ),
+      )}
+    </span>
   );
 }
 
-/** The landing page: advertising banners, the kinds of venue, how booking works, and a way in for venue owners. */
+/** The board's clock: the visitor's own time, turning over each minute. Drawn only in the browser (the server cannot know it). */
+function BoardClock() {
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+    const timer = setInterval(() => setNow(new Date()), 10_000);
+    return () => clearInterval(timer);
+  }, []);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const time = now ? `${pad(now.getHours())}:${pad(now.getMinutes())}` : '--:--';
+  const day = now ? now.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase() : '';
+  return (
+    <span className="flex items-center gap-3">
+      <span className="sr-only">Time now</span>
+      <Flaps text={time} className="h-8 w-6 text-lg font-bold sm:h-9 sm:w-7 sm:text-xl" />
+      <span aria-hidden="true" className={`${s.display} text-sm font-bold tracking-wide text-white/55`}>
+        {day}
+      </span>
+    </span>
+  );
+}
+
+/** The kinds of venue as departures: picture or icon, name in lit capitals, and the way to its slots. */
+function TypeBoard({ categories }: { categories: VenueCategory[] | null }) {
+  return (
+    <section aria-labelledby="types-heading" className={`${s.rise} overflow-hidden rounded-md bg-[#161615] shadow-[0_30px_60px_-30px_rgba(0,0,0,0.9)] ring-1 ring-white/10`} style={{ '--d': '120ms' } as React.CSSProperties}>
+      <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
+        <h2 id="types-heading" className={`${s.display} text-xl text-[#ffcc1a] sm:text-2xl`}>
+          Browse by type
+        </h2>
+        <BoardClock />
+      </div>
+      <div aria-hidden="true" className={`${s.display} grid grid-cols-[3rem_1fr_auto] gap-3 px-4 pb-1 pt-2.5 text-[0.75rem] font-bold tracking-[0.08em] text-white/45 sm:px-5`}>
+        <span />
+        <span>Venue</span>
+        <span>Slots</span>
+      </div>
+      <ul className="max-h-[26rem] overflow-y-auto px-2 pb-2 sm:px-3">
+        {categories === null &&
+          [0, 1, 2, 3].map((i) => (
+            <li key={i} className="px-2 py-1.5">
+              <Skeleton className="h-12 w-full rounded-md !bg-white/10" />
+            </li>
+          ))}
+        {categories?.map((c, i) => (
+          <li key={c.slug} className={s.row} style={{ '--d': `${200 + i * 70}ms` } as React.CSSProperties}>
+            <Link
+              href={`/explore?type=${encodeURIComponent(c.slug)}`}
+              className={`group grid grid-cols-[3rem_1fr_auto] items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-white/[0.06] ${focusDark}`}
+            >
+              <span className={`${s.tile} relative h-12 w-12 text-white/80`}>
+                <CategoryIcon iconKey={c.iconKey} iconSvg={c.iconSvg} className="text-[1.5rem]" />
+                {c.imageUrl && <img src={c.imageUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />}
+              </span>
+              <span className={`${s.display} truncate text-[1.375rem] leading-none text-white transition-colors group-hover:text-[#ffcc1a] sm:text-[1.625rem]`}>{c.name}</span>
+              <span className={`${s.display} inline-flex items-center gap-1 rounded-sm bg-[#ffcc1a] px-2.5 py-1.5 text-[0.9375rem] leading-none text-[#0f0f0e] transition group-hover:bg-white`}>
+                See
+                <Icon name="chevron_right" className="text-[1rem]" />
+              </span>
+            </Link>
+          </li>
+        ))}
+        {categories && categories.length === 0 && <li className="px-3 py-6 text-sm text-white/70">Venues are being added. Check back soon.</li>}
+      </ul>
+    </section>
+  );
+}
+
+/** The landing page: the board (search and venue types), advertising banners, how booking works, and a way in for venue owners. */
 export default function LandingPage() {
   const router = useRouter();
   const [categories, setCategories] = useState<VenueCategory[] | null>(null);
@@ -64,21 +151,21 @@ export default function LandingPage() {
   }
 
   const shell = 'mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-10';
-  const sectionTitle = 'text-balance text-2xl font-black leading-tight tracking-tight text-slate-900 sm:text-3xl';
-  const mosaic = (categories ?? []).slice(0, 4);
+  const sectionTitle = `${s.display} text-balance text-[2.25rem] leading-[0.95] sm:text-5xl`;
 
   return (
-    <div className="flex min-h-screen flex-col bg-white">
-      <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-md">
+    <div className={`${barlow.variable} ${barlowCondensed.variable} ${s.page} flex min-h-screen flex-col`}>
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0f0f0e]">
         <div className={`${shell} flex items-center gap-4 py-3`}>
-          <Link href="/" aria-label="TurfX home" className={`select-none whitespace-nowrap rounded-md text-[1.75rem] font-black italic leading-none tracking-tight text-slate-900 ${focus}`}>
-            Turf<span className="text-brand-600">X</span>
+          <Link href="/" aria-label="TurfX home" className={`flex select-none items-center gap-1 rounded-sm ${focusDark}`}>
+            <span className={`${s.display} text-[1.875rem] leading-none text-white`}>Turf</span>
+            <span className={`${s.flap} ${s.display} h-9 w-8 text-[1.75rem] leading-none`}>X</span>
           </Link>
-          <nav aria-label="Main" className="ml-4 hidden items-center gap-1 text-sm font-bold text-slate-600 md:flex">
-            <Link href="/explore" className={`rounded-md px-3 py-2 transition hover:bg-slate-100 hover:text-brand-700 ${focus}`}>
+          <nav aria-label="Main" className={`${s.display} ml-4 hidden items-center gap-1 text-lg font-bold text-white/70 md:flex`}>
+            <Link href="/explore" className={`rounded-sm px-3 py-1.5 transition-colors hover:text-[#ffcc1a] ${focusDark}`}>
               Explore venues
             </Link>
-            <Link href="/support" className={`rounded-md px-3 py-2 transition hover:bg-slate-100 hover:text-brand-700 ${focus}`}>
+            <Link href="/support" className={`rounded-sm px-3 py-1.5 transition-colors hover:text-[#ffcc1a] ${focusDark}`}>
               Support
             </Link>
           </nav>
@@ -89,169 +176,104 @@ export default function LandingPage() {
       </header>
 
       <main className="flex-1">
-        {/* ------------------------------------------------------------ Hero */}
-        <section className="relative overflow-hidden bg-gradient-to-b from-brand-50 via-brand-50/60 to-white">
-          <div className={`${shell} grid items-center gap-10 py-12 sm:py-16 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:py-20`}>
-            <div>
-              <h1 className="landing-rise text-balance text-[2.5rem] font-black leading-[1.02] tracking-tight text-slate-900 sm:text-6xl lg:text-[4.25rem]">
-                Book your game, <span className="text-brand-600">in seconds.</span>
+        {/* ------------------------------------------------------------ The board */}
+        <section className={`relative overflow-hidden bg-[#0f0f0e] text-white ${s.boardGrid}`}>
+          <div className={`${shell} grid items-start gap-10 pb-14 pt-10 sm:pb-20 sm:pt-14 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-14 lg:pb-24 lg:pt-20`}>
+            <div className="lg:pt-4">
+              <h1 className={`${s.display} ${s.rise} text-balance text-[3.25rem] leading-[0.88] sm:text-7xl lg:text-[6rem]`}>
+                Book your game, <span className="text-[#ffcc1a]">in seconds.</span>
               </h1>
-              <p className="landing-rise mt-4 max-w-xl text-pretty text-base font-medium leading-relaxed text-slate-600 sm:text-lg" style={{ '--d': '90ms' } as React.CSSProperties}>
-                Turfs, courts, pools, game rooms and activity venues near you. See live slots, reserve with a small advance and get your confirmation on WhatsApp.
+              <p className={`${s.rise} mt-6 max-w-[34rem] text-pretty text-[1.0625rem] leading-relaxed text-white/75 sm:text-lg`} style={{ '--d': '80ms' } as React.CSSProperties}>
+                Turfs, courts, pools, game rooms and activity venues near you. See which slots are free right now, pay a small advance and
+                get your booking ID straight away.
               </p>
 
-              <form onSubmit={search} role="search" className="landing-rise mt-7 flex max-w-xl flex-col gap-2.5 sm:flex-row" style={{ '--d': '180ms' } as React.CSSProperties}>
+              <form onSubmit={search} role="search" className={`${s.rise} mt-8 flex max-w-[36rem] flex-col gap-2 sm:flex-row`} style={{ '--d': '160ms' } as React.CSSProperties}>
                 <label className="relative flex-1">
                   <span className="sr-only">Search venues</span>
-                  <Icon name="search" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[1.25rem] text-slate-400" />
+                  <Icon name="search" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[1.25rem] text-white/50" />
                   <input
                     value={text}
                     onChange={(e) => setText(e.target.value)}
                     placeholder="Search venues, turfs, pools, badminton..."
-                    className="h-14 w-full rounded-xl border border-slate-300 bg-white pl-12 pr-4 text-base font-medium text-slate-800 shadow-sm placeholder-slate-400 transition focus:border-brand-600 focus:outline-none focus:ring-4 focus:ring-brand-600/15"
+                    className={`${s.search} h-14 w-full rounded-md border border-white/15 bg-[#1c1c1b] pl-12 pr-4 text-base font-medium text-white placeholder-white/45 transition-colors focus:border-[#ffcc1a] focus:outline-none`}
                   />
                 </label>
                 <button
                   type="submit"
-                  className={`h-14 rounded-xl bg-brand-700 px-7 text-base font-extrabold text-white shadow-glow transition hover:bg-brand-800 active:scale-[0.98] ${focus}`}
+                  className={`${s.display} h-14 rounded-md bg-[#ffcc1a] px-7 text-xl text-[#0f0f0e] transition hover:bg-white active:scale-[0.98] ${focusDark}`}
                 >
                   Find venues
                 </button>
               </form>
-
-              {/* Straight to a kind of venue. */}
-              <div className="landing-rise mt-5 flex max-w-2xl flex-wrap items-center gap-2" style={{ '--d': '260ms' } as React.CSSProperties}>
-                {categories === null && [0, 1, 2].map((i) => <Skeleton key={i} className="h-9 w-28 rounded-lg" />)}
-                {categories?.map((c) => (
-                  <Link
-                    key={c.slug}
-                    href={`/explore?type=${encodeURIComponent(c.slug)}`}
-                    className={`inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white/80 px-3 text-sm font-bold text-slate-700 transition hover:border-brand-500 hover:bg-white hover:text-brand-800 ${focus}`}
-                  >
-                    <CategoryIcon iconKey={c.iconKey} iconSvg={c.iconSvg} className="text-[1.0625rem] text-brand-700" />
-                    {c.name}
-                  </Link>
-                ))}
-              </div>
             </div>
 
-            {/* The kinds of venue, as a mosaic (wide screens only). */}
-            {mosaic.length > 0 && (
-              <div aria-hidden="true" className="landing-rise hidden grid-cols-2 gap-4 lg:grid" style={{ '--d': '200ms' } as React.CSSProperties}>
-                {mosaic.map((c, i) => (
-                  <div key={c.slug} className={`relative aspect-[4/5] overflow-hidden rounded-xl border-2 border-white bg-brand-100 shadow-[0_18px_40px_-18px_rgba(10,46,29,0.45)] ${i % 2 === 1 ? 'translate-y-8' : ''}`}>
-                    <TypeArt c={c} iconSize="text-[4.5rem]" />
-                    <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-brand-950/80 via-brand-950/35 to-transparent px-3.5 pb-3 pt-12 text-sm font-extrabold text-white">{c.name}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            <TypeBoard categories={categories} />
           </div>
         </section>
 
         {/* ------------------------------------------------------ Advertising */}
-        <section aria-label="Offers" className={`${shell} pt-2 sm:pt-4`}>
+        <section aria-label="Offers" className={`${shell} pt-10 sm:pt-14`}>
           <BannerSlider />
         </section>
 
-        {/* ----------------------------------------------------- Venue types */}
-        <section className={`${shell} py-14 sm:py-20`}>
-          <div className="mb-7 flex items-end justify-between gap-3">
-            <h2 className={sectionTitle}>Browse by type</h2>
-            <Link href="/explore" className={`inline-flex items-center gap-1 rounded-md px-1 py-1 text-sm font-extrabold text-brand-700 hover:underline ${focus}`}>
-              See all venues
-              <Icon name="chevron_right" className="text-[1rem]" />
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))]">
-            {categories === null && [0, 1, 2, 3].map((i) => <Skeleton key={i} className="aspect-[4/3] w-full rounded-xl" />)}
-            {categories?.map((c) => (
-              <Link
-                key={c.slug}
-                href={`/explore?type=${encodeURIComponent(c.slug)}`}
-                className={`group flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition duration-300 hover:-translate-y-1 hover:border-brand-500 hover:shadow-[0_16px_32px_-16px_rgba(10,46,29,0.4)] ${focus}`}
-              >
-                <span className="relative block aspect-[4/3] w-full overflow-hidden bg-brand-50">
-                  <span className="absolute inset-0 transition duration-500 group-hover:scale-105">
-                    <TypeArt c={c} iconSize="text-[3rem]" />
-                  </span>
-                </span>
-                <span className="flex items-center justify-between gap-2 px-3.5 py-3 text-[0.9375rem] font-extrabold text-slate-900">
-                  {c.name}
-                  <Icon name="chevron_right" className="text-[1rem] text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-brand-600" />
-                </span>
-              </Link>
-            ))}
-            {categories && categories.length === 0 && <p className="col-span-full text-sm text-slate-500">Venues are being added. Check back soon.</p>}
-          </div>
-        </section>
-
         {/* ------------------------------------------------------ How it works */}
-        <section className="bg-slate-50">
-          <div className={`${shell} py-14 sm:py-20`}>
-            <h2 className={sectionTitle}>How it works</h2>
-            {/* One line from first step to last, not three boxes. */}
-            <ol className="relative mt-10 grid gap-10 md:grid-cols-3 md:gap-8">
-              <span aria-hidden="true" className="absolute left-[1.375rem] top-3 hidden h-px w-[calc(100%-3rem)] bg-gradient-to-r from-brand-300 via-brand-200 to-transparent md:block" />
-              {STEPS.map((s, i) => (
-                <li key={s.title} className="relative flex gap-4 md:block">
-                  <span className="relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-700 text-white shadow-[0_8px_18px_-8px_rgba(12,90,68,0.7)] ring-4 ring-slate-50">
-                    <Icon name={s.icon} className="text-[1.25rem]" />
-                  </span>
-                  <span className="block md:mt-5">
-                    <span className="block text-lg font-black tracking-tight text-slate-900">
-                      <span className="mr-1.5 text-brand-600">{i + 1}.</span>
-                      {s.title}
-                    </span>
-                    <span className="mt-1 block max-w-xs text-pretty text-[0.9375rem] font-medium leading-relaxed text-slate-600">{s.text}</span>
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </section>
-
-        {/* -------------------------------------------------------------- Why */}
-        <section className={`${shell} grid gap-10 py-14 sm:py-20 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-16`}>
-          <div>
-            <h2 className={sectionTitle}>Why book with TurfX</h2>
-            <p className="mt-3 max-w-md text-pretty text-base font-medium leading-relaxed text-slate-600">Less chasing, more playing. Everything you need to get a slot sorted in a minute.</p>
-          </div>
-          <ul className="grid gap-x-10 gap-y-8 sm:grid-cols-2">
-            {REASONS.map((r) => (
-              <li key={r.title} className="flex gap-3.5">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700 ring-1 ring-brand-100">
-                  <Icon name={r.icon} className="text-[1.25rem]" />
+        <section className={`${shell} py-16 sm:py-24`}>
+          <h2 className={sectionTitle}>How it works</h2>
+          <ol className="mt-10 grid border-t-2 border-[#0f0f0e] md:grid-cols-3">
+            {STEPS.map((step, i) => (
+              <li key={step.title} className="flex gap-5 border-b border-[#cfcfc8] py-7 md:flex-col md:gap-6 md:border-b-0 md:border-r md:px-7 md:py-9 md:first:pl-0 md:last:border-r-0">
+                <span aria-hidden="true" className={`${s.flap} ${s.display} h-16 w-12 shrink-0 text-[2.5rem] leading-none`}>
+                  {i + 1}
                 </span>
                 <span>
-                  <span className="block text-base font-extrabold text-slate-900">{r.title}</span>
-                  <span className="mt-0.5 block text-pretty text-[0.9375rem] font-medium leading-relaxed text-slate-600">{r.text}</span>
+                  <span className={`${s.display} block text-[1.75rem] leading-none`}>{step.title}</span>
+                  <span className="mt-2.5 block max-w-xs text-pretty text-base leading-relaxed text-[#55554f]">{step.text}</span>
                 </span>
               </li>
             ))}
-          </ul>
+          </ol>
+        </section>
+
+        {/* -------------------------------------------------------------- Why */}
+        <section className="bg-[#0f0f0e] text-white">
+          <div className={`${shell} grid gap-10 py-16 sm:py-24 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-16`}>
+            <div>
+              <h2 className={`${sectionTitle} text-white`}>
+                Why book with <span className="text-[#ffcc1a]">TurfX</span>
+              </h2>
+              <p className="mt-4 max-w-md text-pretty text-[1.0625rem] leading-relaxed text-white/70">Less chasing, more playing. Everything you need to get a slot sorted in a minute.</p>
+            </div>
+            <ul className="border-t border-white/15">
+              {REASONS.map((r) => (
+                <li key={r.title} className="grid grid-cols-[2.75rem_1fr] items-start gap-4 border-b border-white/15 py-5 sm:grid-cols-[2.75rem_16rem_1fr] sm:items-center">
+                  <span className={`${s.flap} h-11 w-11 text-[1.25rem]`}>
+                    <Icon name={r.icon} />
+                  </span>
+                  <span className={`${s.display} text-[1.5rem] leading-none text-[#ffcc1a]`}>{r.title}</span>
+                  <span className="col-start-2 text-pretty text-base leading-relaxed text-white/75 sm:col-start-3">{r.text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </section>
 
         {/* ------------------------------------------------------- For owners */}
-        <section className={`${shell} pb-16 sm:pb-24`}>
-          <div className="relative overflow-hidden rounded-xl bg-brand-900 px-6 py-10 sm:px-12 sm:py-12">
-            <span aria-hidden="true" className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full border-[28px] border-white/[0.04]" />
-            <span aria-hidden="true" className="pointer-events-none absolute -bottom-32 right-24 h-64 w-64 rounded-full border-[22px] border-white/[0.04]" />
-            <div className="relative flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
-              <div>
-                <h2 className="text-balance text-2xl font-black tracking-tight text-white sm:text-3xl">Own a venue?</h2>
-                <p className="mt-2 max-w-xl text-pretty text-base font-medium leading-relaxed text-white/80">
-                  List your turf, court or activity space on TurfX, take online bookings and see your earnings in one place.
-                </p>
-              </div>
-              <a
-                href={`${OWNER_PORTAL_URL}/register`}
-                className={`inline-flex shrink-0 items-center gap-2 rounded-xl bg-white px-6 py-3.5 text-base font-extrabold text-brand-800 transition hover:bg-brand-50 active:scale-[0.98] focus-visible:ring-4 focus-visible:ring-white/40 focus-visible:outline-none`}
-              >
-                List your venue
-                <Icon name="chevron_right" className="text-[1.125rem]" />
-              </a>
+        <section className="bg-[#ffcc1a] text-[#0f0f0e]">
+          <div className={`${shell} flex flex-col items-start justify-between gap-7 py-14 sm:flex-row sm:items-center sm:py-16`}>
+            <div>
+              <h2 className={`${s.display} text-balance text-[2.5rem] leading-[0.95] sm:text-6xl`}>Own a venue?</h2>
+              <p className="mt-3 max-w-xl text-pretty text-[1.0625rem] font-medium leading-relaxed text-[#0f0f0e]/80">
+                List your turf, court or activity space on TurfX, take online bookings and see your earnings in one place.
+              </p>
             </div>
+            <a
+              href={`${OWNER_PORTAL_URL}/register`}
+              className={`${s.display} inline-flex shrink-0 items-center gap-2 rounded-md bg-[#0f0f0e] px-7 py-4 text-xl text-white transition hover:bg-[#2a2a28] active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-[#0f0f0e] focus-visible:ring-offset-2 focus-visible:ring-offset-[#ffcc1a]`}
+            >
+              List your venue
+              <Icon name="chevron_right" className="text-[1.25rem] text-[#ffcc1a]" />
+            </a>
           </div>
         </section>
       </main>

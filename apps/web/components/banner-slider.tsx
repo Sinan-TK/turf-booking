@@ -65,7 +65,7 @@ export function BannerSlider() {
     <section
       aria-roledescription="carousel"
       aria-label="Offers and announcements"
-      className="group relative overflow-hidden rounded-xl bg-brand-800 shadow-[0_18px_40px_-24px_rgba(10,46,29,0.55)]"
+      className="group relative overflow-hidden rounded-md bg-[#161615] shadow-[0_24px_48px_-28px_rgba(0,0,0,0.7)]"
       onMouseEnter={() => setHeld(true)}
       onMouseLeave={() => setHeld(false)}
       onFocus={() => setHeld(true)}
@@ -81,14 +81,14 @@ export function BannerSlider() {
               {b.imageUrl ? (
                 <img src={b.imageUrl} alt="" decoding="async" loading={i === 0 ? 'eager' : 'lazy'} className="absolute inset-0 h-full w-full object-cover transition duration-[1200ms] ease-out group-hover/slide:scale-[1.03]" />
               ) : (
-                <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900" />
+                <div aria-hidden="true" className="absolute inset-0 bg-[#161615] bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[length:2.5rem_2.5rem]" />
               )}
               <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-black/65 via-black/25 to-transparent" />
               <div className="absolute inset-y-0 left-0 flex max-w-[85%] flex-col items-start justify-center gap-1.5 px-5 sm:max-w-[70%] sm:gap-2 sm:px-10 lg:px-14">
                 <h3 className="text-balance text-xl font-black leading-tight tracking-tight text-white drop-shadow-sm sm:text-3xl lg:text-4xl">{b.title}</h3>
                 {b.subtitle && <p className="text-pretty text-sm font-medium leading-snug text-white/90 sm:text-lg">{b.subtitle}</p>}
                 {link && (
-                  <span className="mt-1 inline-flex items-center gap-1 rounded-lg bg-white px-3.5 py-1.5 text-xs font-extrabold text-brand-800 shadow-sm transition group-hover/slide:bg-brand-50 sm:mt-2 sm:px-4 sm:py-2 sm:text-sm">
+                  <span className="mt-1 inline-flex items-center gap-1 rounded-md bg-[#ffcc1a] px-3.5 py-1.5 text-xs font-extrabold uppercase tracking-wide text-[#0f0f0e] shadow-sm transition group-hover/slide:bg-white sm:mt-2 sm:px-4 sm:py-2 sm:text-sm">
                     View offer
                     <Icon name="chevron_right" className="text-[1rem]" />
                   </span>
@@ -101,7 +101,7 @@ export function BannerSlider() {
             'aria-label': `${i + 1} of ${count}: ${b.title}`,
             'aria-hidden': i !== index,
             tabIndex: i === index ? 0 : -1,
-            className: `group/slide absolute inset-0 block rounded-xl outline-none transition-opacity duration-700 focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-white/70 ${i === index ? 'opacity-100' : 'pointer-events-none opacity-0'}`,
+            className: `group/slide absolute inset-0 block rounded-md outline-none transition-opacity duration-700 focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[#ffcc1a] ${i === index ? 'opacity-100' : 'pointer-events-none opacity-0'}`,
           } as const;
           if (!link) return <div key={b.id} {...shared}>{body}</div>;
           return link.external ? (
@@ -142,7 +142,7 @@ export function BannerSlider() {
                 onClick={() => setIndex(i)}
                 aria-label={`Banner ${i + 1} of ${count}`}
                 aria-current={i === index}
-                className={`h-1.5 rounded-full transition-all duration-300 ${i === index ? 'w-6 bg-white' : 'w-1.5 bg-white/55 hover:bg-white/90'}`}
+                className={`h-1.5 rounded-full transition-all duration-300 ${i === index ? 'w-6 bg-[#ffcc1a]' : 'w-1.5 bg-white/55 hover:bg-white/90'}`}
               />
             ))}
           </div>
