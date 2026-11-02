@@ -26,9 +26,11 @@ export function durationsFor(categories: VenueCategory[], resource: WalkInResour
   const min = resource?.minDurationMinutes;
   const max = resource?.maxDurationMinutes;
   if (min && max && min > 0 && max >= min && max % min === 0) {
+    // Never longer than the Super Admin allows for the venue type, even for a unit saved with a longer limit.
+    const ceiling = categories.find((c) => c.id === resource?.category.id)?.policy.maxDurationMin ?? max;
     const own: number[] = [];
-    for (let d = min; d <= max; d += min) own.push(d);
-    return own;
+    for (let d = min; d <= Math.min(max, ceiling); d += min) own.push(d);
+    return own.length > 0 ? own : [min];
   }
   const own = categories.find((c) => c.id === resource?.category.id)?.policy.durations;
   return own && own.length > 0 ? own : [60];

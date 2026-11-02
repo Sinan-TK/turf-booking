@@ -15,7 +15,7 @@ import { VenueDescription } from '@/components/venue-description';
 import { UnitTools } from '@/components/venue-availability';
 import { AddPooledItem, GroupCard, type Group } from '@/components/venue-pooled-groups';
 import { UnitPhotos, type UnitPhoto } from '@/components/unit-photos';
-import { DurationFields, UnitDurations, defaultDurations, durationsError } from '@/components/unit-durations';
+import { DurationFields, UnitDurations, defaultDurations, durationsError, type DurationLimits } from '@/components/unit-durations';
 import {
   Badge,
   Button,
@@ -73,6 +73,11 @@ type Pending =
   | { kind: 'status'; status: string }
   | { kind: 'unit'; unit: Resource; open: boolean }
   | { kind: 'facility'; facility: VenueCategorySummary; units: Resource[]; open: boolean };
+
+/** The shortest and longest booking the Super Admin allows for a venue type: a unit's lengths must stay inside it. */
+function limitsOf(category: VenueCategory | undefined): DurationLimits | undefined {
+  return category ? { name: category.name, min: category.policy.minDurationMin, max: category.policy.maxDurationMin } : undefined;
+}
 
 /** The tab that holds the forms for adding a unit or a pooled item. */
 const NEW_TAB = 'new';
@@ -157,7 +162,7 @@ export default function VenueDetailPage() {
       groundType: hasTypes && !resourceForm.groundType.trim() ? `Select the ${selectedCategory.unitLabel.toLowerCase()} type.` : undefined,
     };
     setUnitErrors(found);
-    const durationFound = selectedCategory ? durationsError(newDurations.min, newDurations.max) : {};
+    const durationFound = selectedCategory ? durationsError(newDurations.min, newDurations.max, limitsOf(selectedCategory)) : {};
     setDurationErrors(durationFound);
     if (hasErrors(durationFound)) {
       document.getElementById(durationFound.min ? 'new-unit-min' : 'new-unit-max')?.focus();
@@ -440,7 +445,7 @@ export default function VenueDetailPage() {
                   </div>
                   {selectedCategory && (
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <DurationFields idPrefix="new-unit" min={newDurations.min} max={newDurations.max} onChange={setNewDurations} errors={durationErrors} />
+                      <DurationFields idPrefix="new-unit" min={newDurations.min} max={newDurations.max} onChange={setNewDurations} errors={durationErrors} limits={limitsOf(selectedCategory)} />
                     </div>
                   )}
                 </div>
@@ -585,7 +590,7 @@ function UnitPanel({
             <BookToggle on={unit.isBookable} label={`${unit.isBookable ? 'Block' : 'Reopen'} ${unit.name}`} onToggle={() => onAsk({ kind: 'unit', unit, open: !unit.isBookable })} />
           </div>
           <div className="space-y-3 pl-12">
-            <UnitDurations unitId={unit.id} min={unit.minDurationMinutes} max={unit.maxDurationMinutes} hasPrices onSaved={onChanged} />
+            <UnitDurations unitId={unit.id} min={unit.minDurationMinutes} max={unit.maxDurationMinutes} hasPrices onSaved={onChanged} limits={limitsOf(categories.find((c) => c.id === facility.id))} />
             <UnitPhotos unitId={unit.id} unitName={unit.name} initial={unit.photos ?? []} />
           </div>
         </div>

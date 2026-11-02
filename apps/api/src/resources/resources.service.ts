@@ -148,9 +148,16 @@ export class ResourcesService {
     const policy = (await this.policies.forVenue({ id: venueId }, new Date(), target.categoryId ? [target.categoryId] : undefined)).resolve(target);
     const min = input.minDurationMinutes ?? policy.minDurationMin;
     const max = input.maxDurationMinutes ?? Math.max(min, Math.floor(policy.maxDurationMin / min) * min);
-    const problem = unitDurationProblem({ minMinutes: min, maxMinutes: max, slotIntervalMin: policy.slotIntervalMin });
+    const facility = await this.facilityRange(target.categoryId ?? (await this.prisma.client.resource.findUniqueOrThrow({ where: { id: target.resourceId! }, select: { categoryId: true } })).categoryId, policy);
+    const problem = unitDurationProblem({ minMinutes: min, maxMinutes: max, slotIntervalMin: policy.slotIntervalMin, facility });
     if (problem) throw new BadRequestException(problem);
     return { min, max };
+  }
+
+  /** The range the Super Admin allows for this facility's bookings (the venue type's own shortest and longest). */
+  private async facilityRange(categoryId: string, policy: { minDurationMin: number; maxDurationMin: number }) {
+    const category = await this.prisma.client.venueCategory.findUnique({ where: { id: categoryId }, select: { name: true } });
+    return { name: category?.name ?? 'This venue type', minMinutes: policy.minDurationMin, maxMinutes: policy.maxDurationMin };
   }
 
   /** Changes a unit's shortest and longest booking. Its prices are per block of the shortest. Bookings already made stay as they are. */
@@ -164,6 +171,7 @@ export class ResourcesService {
       minMinutes: dto.minDurationMinutes,
       maxMinutes: dto.maxDurationMinutes,
       slotIntervalMin: policy.slotIntervalMin,
+      facility: await this.facilityRange(resource.categoryId, policy),
     });
     if (problem) throw new BadRequestException(problem);
     return this.prisma.client.resource.update({

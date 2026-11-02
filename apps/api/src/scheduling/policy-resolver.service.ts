@@ -59,9 +59,10 @@ export class PolicySet {
     const policy = this.resolveRules(target, categoryId, pick);
     // A unit's prices are per block of its own minimum, so its policy durations are its own: min, 2 x min ... max.
     const own = target.resourceId ? this.resourceDurations.get(target.resourceId) : undefined;
-    return own
-      ? { ...policy, minDurationMin: own.min, maxDurationMin: own.max, durationIncrementMin: own.min }
-      : policy;
+    if (!own) return policy;
+    // The facility's longest booking (the Super Admin's setting) is a ceiling for every unit, including units saved before it was.
+    const ceiling = Math.max(own.min, Math.floor(Math.min(own.max, policy.maxDurationMin) / own.min) * own.min);
+    return { ...policy, minDurationMin: own.min, maxDurationMin: ceiling, durationIncrementMin: own.min };
   }
 
   private resolveRules(

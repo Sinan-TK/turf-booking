@@ -162,9 +162,9 @@ describe('a unit\'s shortest and longest booking', () => {
 
     const own = await owner
       .post('/resources')
-      .send({ venueId: venue.venueId, categoryId, name: 'Long pitch', groundType: '5S', minDurationMinutes: 120, maxDurationMinutes: 360 })
+      .send({ venueId: venue.venueId, categoryId, name: 'Long pitch', groundType: '5S', minDurationMinutes: 60, maxDurationMinutes: 120 })
       .expect(201);
-    expect(own.body).toMatchObject({ minDurationMinutes: 120, maxDurationMinutes: 360 });
+    expect(own.body).toMatchObject({ minDurationMinutes: 60, maxDurationMinutes: 120 });
   });
 
   it('rejects a longest booking that is not a multiple of the shortest, or a shortest off the start grid', async () => {
@@ -182,13 +182,38 @@ describe('a unit\'s shortest and longest booking', () => {
       .send({ venueId: venue.venueId, categoryId, name: 'Editable pitch', groundType: '5S' })
       .expect(201);
     const id = unit.body.id as string;
-    const ok = await owner.patch(`/resources/${id}/durations`).send({ minDurationMinutes: 60, maxDurationMinutes: 240 }).expect(200);
-    expect(ok.body).toMatchObject({ minDurationMinutes: 60, maxDurationMinutes: 240 });
+    const ok = await owner.patch(`/resources/${id}/durations`).send({ minDurationMinutes: 60, maxDurationMinutes: 120 }).expect(200);
+    expect(ok.body).toMatchObject({ minDurationMinutes: 60, maxDurationMinutes: 120 });
     await owner.patch(`/resources/${id}/durations`).send({ minDurationMinutes: 60, maxDurationMinutes: 100 }).expect(400);
     await owner.patch(`/resources/${id}/durations`).send({ minDurationMinutes: 0, maxDurationMinutes: 60 }).expect(400);
     await other.patch(`/resources/${id}/durations`).send({ minDurationMinutes: 60, maxDurationMinutes: 120 }).expect(403);
     await customer.patch(`/resources/${id}/durations`).send({ minDurationMinutes: 60, maxDurationMinutes: 120 }).expect(403);
-    expect((await prisma.resource.findUniqueOrThrow({ where: { id } })).maxDurationMinutes).toBe(240);
+    expect((await prisma.resource.findUniqueOrThrow({ where: { id } })).maxDurationMinutes).toBe(120);
+  });
+
+  it('the lengths of a unit can never go outside what the Super Admin allows for its venue type (football: 1 to 3 hours)', async () => {
+    const base = { venueId: venue.venueId, categoryId, name: 'Too long pitch', groundType: '5S' };
+    // New unit: a longest booking past the venue type's longest, and a shortest below its shortest.
+    const tooLong = await owner.post('/resources').send({ ...base, minDurationMinutes: 60, maxDurationMinutes: 1440 }).expect(400);
+    expect(tooLong.body.message).toMatch(/bookings can be from 1 hour to 3 hours/);
+    await owner.post('/resources').send({ ...base, minDurationMinutes: 30, maxDurationMinutes: 60 }).expect(400);
+    // Existing unit: the change is refused and nothing is saved.
+    const unit = await owner.post('/resources').send({ ...base, name: 'Limited pitch' }).expect(201);
+    const id = unit.body.id as string;
+    await owner.patch(`/resources/${id}/durations`).send({ minDurationMinutes: 60, maxDurationMinutes: 240 }).expect(400);
+    await owner.patch(`/resources/${id}/durations`).send({ minDurationMinutes: 60, maxDurationMinutes: 1440 }).expect(400);
+    expect((await prisma.resource.findUniqueOrThrow({ where: { id } })).maxDurationMinutes).toBe(180);
+    await owner.patch(`/resources/${id}/durations`).send({ minDurationMinutes: 60, maxDurationMinutes: 180 }).expect(200);
+
+    // A unit saved with a longer limit before the rule existed is still held to the venue type's longest: search and holds both stop at 3 hours.
+    await owner.post('/resources/pricing-rules').send({ resourceId: id, dayType: 'WEEKDAY', price: 800 }).expect(201);
+    await owner.post('/resources/pricing-rules').send({ resourceId: id, dayType: 'WEEKEND', price: 800 }).expect(201);
+    await prisma.resource.update({ where: { id }, data: { maxDurationMinutes: 1440 } });
+    const day = nextDay(3);
+    const card = (await search(day)).find((r) => r.resource.id === id);
+    expect(card?.policy.maxDurationMin).toBe(180);
+    expect(card?.policy.durations).toEqual([60, 120, 180]);
+    await hold(id, at(day, 10), 240).expect(400);
   });
 
   it('a booking of n blocks costs n block prices, is capped at the longest, and keeps its price breakdown', async () => {
@@ -219,17 +244,17 @@ describe('a unit\'s shortest and longest booking', () => {
     expect(a.policy).toMatchObject({ minDurationMin: 60, maxDurationMin: 180, durationIncrementMin: 60, durations: [60, 120, 180] });
     expect(a.price?.amount).toBe('800');
 
-    // A unit booked in 2-hour blocks: its own price per block, and a policy of 120/240.
+    // A unit booked in 2-hour blocks (the facility's longest is 3 hours): its own price per block, and a policy of 120 only.
     const unit = await owner
       .post('/resources')
-      .send({ venueId: venue.venueId, categoryId, name: 'Two-hour pitch', groundType: '5S', minDurationMinutes: 120, maxDurationMinutes: 240 })
+      .send({ venueId: venue.venueId, categoryId, name: 'Two-hour pitch', groundType: '5S', minDurationMinutes: 120, maxDurationMinutes: 120 })
       .expect(201);
     await owner.post('/resources/pricing-rules').send({ resourceId: unit.body.id, dayType: 'WEEKDAY', price: 1500 }).expect(201);
     await owner.post('/resources/pricing-rules').send({ resourceId: unit.body.id, dayType: 'WEEKEND', price: 1500 }).expect(201);
 
     const after = await search(day);
     const b = after.find((r) => r.resource.id === unit.body.id)!;
-    expect(b.policy).toMatchObject({ minDurationMin: 120, maxDurationMin: 240, durationIncrementMin: 120, durations: [120, 240] });
+    expect(b.policy).toMatchObject({ minDurationMin: 120, maxDurationMin: 120, durationIncrementMin: 120, durations: [120] });
     expect(b.price?.amount).toBe('1500');
     expect(b.price?.bookingAmount).toBe('1500');
     expect(after.find((r) => r.resource.id === venue.halfAId)!.price?.amount).toBe('800');
@@ -246,8 +271,9 @@ describe('a unit\'s shortest and longest booking', () => {
     expect(one.find((r) => r.resource.id === unit.body.id)).toMatchObject({ durationMinutes: 120, price: { amount: '1500' } });
     expect(one.find((r) => r.resource.id === venue.halfAId)).toMatchObject({ durationMinutes: 60, price: { amount: '800' } });
 
-    const held = await hold(unit.body.id, at(day, 10), 240).expect(201);
-    expect(Number(held.body.amount)).toBe(3000);
+    const held = await hold(unit.body.id, at(day, 10), 120).expect(201);
+    expect(Number(held.body.amount)).toBe(1500);
+    await hold(unit.body.id, at(day, 13), 240).expect(400); // past this unit's longest (and the facility's)
     await hold(unit.body.id, at(day, 16), 60).expect(400);
   });
 

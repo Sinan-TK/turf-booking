@@ -15,9 +15,12 @@ test.describe('owner portal: booking lengths per unit', () => {
     await expect(row).toContainText('Booked for 1 hour up to 3 hours');
 
     await row.getByRole('button', { name: 'Change length' }).click();
-    await field(row, 'Longest booking').selectOption({ label: '4 hours' });
+    // The longest can't go past what the Super Admin allows for the venue type (football: 1 to 3 hours), so 4 hours is not even offered.
+    await expect(field(row, 'Longest booking').locator('option')).toHaveText(['1 hour', '2 hours', '3 hours']);
+    await expect(row).toContainText('Football bookings can be 1 hour to 3 hours');
+    await field(row, 'Longest booking').selectOption({ label: '2 hours' });
     await row.getByRole('button', { name: 'Save' }).click();
-    await expect(row).toContainText('Booked for 1 hour up to 4 hours');
+    await expect(row).toContainText('Booked for 1 hour up to 2 hours');
 
     // The shortest booking is on the venue type's one-hour grid: 90 minutes is refused by the server's rules.
     await row.getByRole('button', { name: 'Change length' }).click();

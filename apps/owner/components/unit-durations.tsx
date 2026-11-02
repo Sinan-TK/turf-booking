@@ -9,11 +9,18 @@ import { SvgIcon } from '@/components/svg-icons';
 /** The longest booking a unit may have; the API enforces the same limit. */
 const DAY_MINUTES = 24 * 60;
 
-/** The lengths a unit can be booked for: its shortest, twice that, and so on up to the longest it could have. */
-export function maxChoices(min: number): number[] {
+/** The range the Super Admin allows for a venue type's bookings: a unit's lengths must stay inside it. */
+export interface DurationLimits {
+  name: string;
+  min: number;
+  max: number;
+}
+
+/** The lengths a unit can be booked for: its shortest, twice that, and so on up to the longest it could have (never past the venue type's limit). */
+export function maxChoices(min: number, limitMax: number = DAY_MINUTES): number[] {
   if (!Number.isInteger(min) || min <= 0) return [];
   const out: number[] = [];
-  for (let d = min; d <= DAY_MINUTES && out.length < 24; d += min) out.push(d);
+  for (let d = min; d <= Math.min(DAY_MINUTES, limitMax) && out.length < 24; d += min) out.push(d);
   return out;
 }
 
@@ -27,9 +34,13 @@ export function defaultDurations(policy: { minDurationMin: number; maxDurationMi
   return { min: policy.minDurationMin, max: fitMax(policy.minDurationMin, policy.maxDurationMin) };
 }
 
-export function durationsError(min: number, max: number): { min?: string; max?: string } {
+export function durationsError(min: number, max: number, limits?: DurationLimits): { min?: string; max?: string } {
   if (!Number.isInteger(min) || min <= 0) return { min: 'Enter the shortest booking in minutes.' };
   if (min > DAY_MINUTES) return { min: `The shortest booking can't be more than ${DAY_MINUTES} minutes.` };
+  if (limits && (min < limits.min || min > limits.max)) {
+    return { min: `${limits.name} bookings can be from ${durationLabel(limits.min)} to ${durationLabel(limits.max)}.` };
+  }
+  if (limits && max > limits.max) return { max: `The longest booking can't be more than ${durationLabel(limits.max)} for ${limits.name}.` };
   if (!Number.isInteger(max) || max < min || max % min !== 0) return { max: `The longest booking must be a multiple of ${min} minutes.` };
   return {};
 }
@@ -44,14 +55,17 @@ export function DurationFields({
   max,
   onChange,
   errors,
+  limits,
 }: {
   idPrefix: string;
   min: number;
   max: number;
   onChange: (next: { min: number; max: number }) => void;
   errors?: { min?: string; max?: string };
+  /** What the Super Admin allows for this venue type; the longest booking can't go past it. */
+  limits?: DurationLimits;
 }) {
-  const choices = maxChoices(min);
+  const choices = maxChoices(min, limits?.max);
   return (
     <>
       <div>
@@ -67,10 +81,13 @@ export function DurationFields({
           value={Number.isFinite(min) ? min : ''}
           onChange={(e) => {
             const next = Number(e.target.value);
-            onChange({ min: next, max: Number.isInteger(next) && next > 0 ? fitMax(next, max) : max });
+            onChange({ min: next, max: Number.isInteger(next) && next > 0 ? Math.min(fitMax(next, max), limits ? Math.max(next, Math.floor(limits.max / next) * next) : DAY_MINUTES) : max });
           }}
         />
-        <p className="mt-1 text-xs text-on-surface-variant">Prices are per {Number.isFinite(min) && min > 0 ? durationLabel(min) : 'this length'}.</p>
+        <p className="mt-1 text-xs text-on-surface-variant">
+          Prices are per {Number.isFinite(min) && min > 0 ? durationLabel(min) : 'this length'}.
+          {limits && ` ${limits.name} bookings can be ${durationLabel(limits.min)} to ${durationLabel(limits.max)}.`}
+        </p>
         <FieldError id={`${idPrefix}-min-error`} message={errors?.min} />
       </div>
       <div>
@@ -101,7 +118,9 @@ export function UnitDurations({
   max,
   hasPrices,
   onSaved,
+  limits,
 }: {
+  limits?: DurationLimits;
   unitId: string;
   min: number;
   max: number;
@@ -116,7 +135,7 @@ export function UnitDurations({
   const [saving, setSaving] = useState(false);
 
   async function save() {
-    const found = durationsError(form.min, form.max);
+    const found = durationsError(form.min, form.max, limits);
     setErrors(found);
     if (found.min || found.max) return;
     setSaving(true);
@@ -161,7 +180,7 @@ export function UnitDurations({
     <div className="space-y-3 rounded-lg border border-outline-variant/40 bg-surface-container-low p-3">
       {error && <ErrorBanner message={error} />}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <DurationFields idPrefix={`unit-${unitId}`} min={form.min} max={form.max} onChange={setForm} errors={errors} />
+        <DurationFields idPrefix={`unit-${unitId}`} min={form.min} max={form.max} onChange={setForm} errors={errors} limits={limits} />
       </div>
       {hasPrices && form.min !== min && (
         <p className="text-xs text-amber-700">
