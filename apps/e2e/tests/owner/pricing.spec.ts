@@ -125,7 +125,7 @@ test.describe('owner portal: pricing', () => {
     await expect(modal).toContainText('The end time must be after the start time');
   });
 
-  test('a price has a normal price, an optional offer and a booking amount, with the rules between them', async ({
+  test('a price has a price and a booking amount (no offer price), with the rules between them', async ({
     page,
     makeVenue,
   }) => {
@@ -143,27 +143,22 @@ test.describe('owner portal: pricing', () => {
     await expect(field(modal, 'Booking amount')).toHaveValue('1000');
     await expect(modal).toContainText('nothing more to pay at the venue');
 
-    // An offer must be below the normal price; the booking amount can't exceed the full price.
-    await field(modal, 'Offer price').fill('1000');
+    // There is no offer price to type; the booking amount can't exceed the price.
+    await expect(modal.getByText('Offer price')).toHaveCount(0);
+    await field(modal, 'Booking amount').fill('1200');
     await modal.getByRole('button', { name: 'Add price' }).click();
-    await expect(modal.getByText('The offer price must be below the normal price.')).toBeVisible();
-    await field(modal, 'Offer price').fill('800');
-    await expect(modal.getByText('The offer price must be below the normal price.')).toHaveCount(0);
-    await field(modal, 'Booking amount').fill('900');
-    await modal.getByRole('button', { name: 'Add price' }).click();
-    await expect(modal.getByText(/The booking amount can.t be more than the offer price \(800\)\./)).toBeVisible();
+    await expect(modal.getByText(/The booking amount can.t be more than the price \(1000\)\./)).toBeVisible();
     await field(modal, 'Booking amount').fill('300');
-    await expect(modal).toContainText('INR 300 online to hold the slot and INR 500 at the venue');
+    await expect(modal).toContainText('INR 300 online to hold the slot and INR 700 at the venue');
     await modal.getByRole('button', { name: 'Add price' }).click();
     await expect(modal).toHaveCount(0);
 
-    // The list shows the offer as the price, the normal price struck through, and what is paid online.
+    // The list shows the price and what is paid online.
     const row = rowWith(page, '10:00 pm – 11:00 pm');
     await expect(row).toContainText('INR 1,000');
-    await expect(row).toContainText('INR 800');
-    await expect(row).toContainText('Offer');
+    await expect(row).not.toContainText('Offer');
     await expect(row).toContainText('INR 300');
-    await expect(row).toContainText('INR 500 at the venue');
+    await expect(row).toContainText('INR 700 at the venue');
   });
 
   test('the price and closed-day forms flag each field that is missing', async ({ page, makeVenue }) => {

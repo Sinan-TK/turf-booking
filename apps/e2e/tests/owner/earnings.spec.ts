@@ -76,7 +76,7 @@ test.describe('owner portal: earnings', () => {
     await expect(dialog.getByText(/at least \d+(\.\d+)?% of the full price, INR [\d,]+/)).toBeVisible();
     await dialog.getByLabel('Booking amount').fill('1');
     await dialog.getByRole('button', { name: 'Add price' }).click();
-    await expect(dialog.getByText(/The booking amount must be at least \d+(\.\d+)?% of the normal price/)).toBeVisible();
+    await expect(dialog.getByText(/The booking amount must be at least \d+(\.\d+)?% of the price/)).toBeVisible();
   });
 
   test('a venue cancels a booking: the status changes and the booking can\'t be cancelled twice', async ({ page, venue, ownerApi }) => {

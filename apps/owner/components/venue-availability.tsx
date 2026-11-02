@@ -70,7 +70,7 @@ const DAYS = [
   { n: 6, short: 'Sat', long: 'Saturday' },
   { n: 7, short: 'Sun', long: 'Sunday' },
 ];
-type PriceField = 'days' | 'time' | 'normal' | 'offer' | 'booking';
+type PriceField = 'days' | 'time' | 'normal' | 'booking';
 
 const DAY_PRESETS = [
   { label: 'Every day', days: [1, 2, 3, 4, 5, 6, 7] },
@@ -151,7 +151,6 @@ function PriceModal({
     // A time input can't show 24:00, so "end of day" is edited as 23:59 and sent back as 24:00.
     to: rule?.endWindow === '24:00' ? '23:59' : (rule?.endWindow ?? '23:00'),
     normal: rule ? String(Number(rule.normalPrice)) : '',
-    offer: rule?.offerPrice != null ? String(Number(rule.offerPrice)) : '',
     booking: rule ? String(Number(rule.bookingPrice)) : '',
   });
   // The booking amount follows the full price until the owner types their own (a new price starts as pay-in-full).
@@ -159,17 +158,14 @@ function PriceModal({
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldErrors<PriceField>>({});
   const clearError = (k: PriceField) => setErrors((p) => (p[k] ? { ...p, [k]: undefined } : p));
-  const full = form.offer.trim() !== '' && Number(form.offer) < Number(form.normal) ? Number(form.offer) : Number(form.normal);
-  const setPrice = (k: 'normal' | 'offer' | 'booking', value: string) => {
+  const full = Number(form.normal);
+  const setPrice = (k: 'normal' | 'booking', value: string) => {
     clearError(k);
     if (k === 'booking') setBookingTouched(true);
     else clearError('booking');
     setForm((f) => {
       const next = { ...f, [k]: value };
-      if (!bookingTouched && k !== 'booking') {
-        const offer = next.offer.trim() !== '' && Number(next.offer) < Number(next.normal) ? next.offer : '';
-        next.booking = offer || next.normal;
-      }
+      if (!bookingTouched && k !== 'booking') next.booking = next.normal;
       return next;
     });
   };
@@ -194,8 +190,7 @@ function PriceModal({
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const offerGiven = form.offer.trim() !== '';
-    const fullPrice = offerGiven && Number(form.offer) < Number(form.normal) ? Number(form.offer) : Number(form.normal);
+    const fullPrice = Number(form.normal);
     const found: FieldErrors<PriceField> = {
       days: form.days.length === 0 ? 'Choose at least one day.' : undefined,
       time: form.allDay
@@ -206,18 +201,14 @@ function PriceModal({
             ? 'The end time must be after the start time.'
             : undefined,
       normal: numberError(form.normal, 'Normal price', 0, 1_000_000),
-      offer: !offerGiven
-        ? undefined
-        : (numberError(form.offer, 'Offer price', 0, 1_000_000) ??
-          (Number(form.offer) >= Number(form.normal) ? 'The offer price must be below the normal price.' : undefined)),
       booking:
         numberError(form.booking, 'Booking amount', 0, 1_000_000) ??
         (Number(form.booking) <= 0 && fullPrice > 0
           ? 'The booking amount must be more than 0.'
           : Number(form.booking) > fullPrice
-            ? `The booking amount can\u2019t be more than the ${offerGiven ? 'offer' : 'normal'} price (${fullPrice}).`
+            ? `The booking amount can\u2019t be more than the price (${fullPrice}).`
             : minAdvancePercent !== undefined && Number(form.booking) < minAdvanceOf(fullPrice, minAdvancePercent)
-              ? `The booking amount must be at least ${minAdvancePercent}% of the ${offerGiven ? 'offer' : 'normal'} price (${minAdvanceOf(fullPrice, minAdvancePercent)}).`
+              ? `The booking amount must be at least ${minAdvancePercent}% of the price (${minAdvanceOf(fullPrice, minAdvancePercent)}).`
               : undefined),
     };
     setErrors(found);
@@ -226,7 +217,7 @@ function PriceModal({
     const payload = {
       days: form.days,
       normalPrice: Number(form.normal),
-      offerPrice: form.offer.trim() === '' ? null : Number(form.offer),
+      offerPrice: null,
       bookingPrice: Number(form.booking),
     };
     setSaving(true);
@@ -378,7 +369,7 @@ function PriceModal({
             <div className="sm:col-span-2">
               <fieldset className="rounded-lg bg-surface-container-low p-4">
                 <legend className="px-1 text-body-md font-semibold text-on-surface">Prices (INR)</legend>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <Label htmlFor="price-normal">Normal price</Label>
                     <Input
@@ -393,21 +384,6 @@ function PriceModal({
                     />
                     <FieldError id="price-normal-error" message={errors.normal} />
                     <p className="mt-1 text-xs text-on-surface-variant">The full price of a slot.</p>
-                  </div>
-                  <div>
-                    <Label htmlFor="price-offer">Offer price (optional)</Label>
-                    <Input
-                      id="price-offer"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      aria-invalid={!!errors.offer}
-                      className={errors.offer ? invalidClass : ''}
-                      value={form.offer}
-                      onChange={(e) => setPrice('offer', e.target.value)}
-                    />
-                    <FieldError id="price-offer-error" message={errors.offer} />
-                    <p className="mt-1 text-xs text-on-surface-variant">Below the normal price. Replaces it as the full price.</p>
                   </div>
                   <div>
                     <Label htmlFor="price-booking">Booking amount</Label>
