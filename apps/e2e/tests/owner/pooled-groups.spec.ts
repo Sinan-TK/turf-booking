@@ -1,6 +1,6 @@
 import { expect, test } from '../../support/fixtures';
 import { URLS } from '../../support/env';
-import { openUnitTab } from '../../support/ui';
+import { openSection, openUnitTab } from '../../support/ui';
 
 /**
  * A pooled item (a kayak fleet) is added on the venue's page with its count and fixed times, priced per kayak, and then listed to
@@ -100,6 +100,33 @@ test.describe('owner portal: pooled items', () => {
     await article.getByRole('button', { name: 'More kayaks' }).click();
     await expect(article.getByText('₹1,100').first()).toBeVisible(); // 2 x 550
     await customer.close();
+  });
+
+  test('a pooled item has its own closed days: added on its tab, listed there only, and removable', async ({ page, makeVenue, ownerApi }) => {
+    test.setTimeout(120_000);
+    const venue = await makeVenue();
+    const kayak = ((await (await ownerApi.get('/categories')).json()) as Array<{ id: string; slug: string }>).find((c) => c.slug === 'KAYAKING')!;
+    const made = await ownerApi.post('/resources/groups', { data: { venueId: venue.id, categoryId: kayak.id, name: 'PW Closed kayaks', allocationMode: 'POOLED', totalUnits: 4, sortOrder: 0 } });
+    expect(made.ok()).toBeTruthy();
+    await page.goto(`/venues/${venue.id}`);
+    await openUnitTab(page, 'PW Closed kayaks');
+    const closed = page.getByRole('heading', { name: 'Closed Days' }).locator('xpath=ancestor::div[contains(@class,"rounded-xl")][1]');
+    await expect(closed).toContainText('PW Closed kayaks');
+    await closed.getByLabel('Date').fill('2031-06-06');
+    await closed.getByLabel('Reason (optional)').fill('PW Rough water');
+    await closed.getByRole('button', { name: 'Close This Day' }).click();
+    await expect(closed.getByText('PW Rough water')).toBeVisible();
+
+    // It belongs to the pooled item only: not on the venue's own list, nor a unit's.
+    await openSection(page, 'Venue');
+    await expect(page.getByText('PW Rough water')).toHaveCount(0);
+    await openUnitTab(page, venue.turfName);
+    await page.getByRole('tab', { name: 'Closed days' }).click();
+    await expect(page.getByText('PW Rough water')).toHaveCount(0);
+
+    await openUnitTab(page, 'PW Closed kayaks');
+    await closed.getByRole('button', { name: 'Remove' }).click();
+    await expect(closed.getByText('PW Rough water')).toHaveCount(0);
   });
 
   test('a facility with pooled stock is not offered in the unit form', async ({ page, venue }) => {

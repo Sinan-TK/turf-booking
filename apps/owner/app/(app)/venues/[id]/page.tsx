@@ -12,7 +12,7 @@ import { FacilityIcon } from '@/components/facility-icon';
 import { VenueMapLink } from '@/components/venue-map-link';
 import { VenueAdvanceBooking } from '@/components/venue-advance-booking';
 import { VenueDescription } from '@/components/venue-description';
-import { UnitTools } from '@/components/venue-availability';
+import { BlockedDatesSection, UnitTools } from '@/components/venue-availability';
 import { AddPooledItem, GroupCard, type Group } from '@/components/venue-pooled-groups';
 import { UnitPhotos, type UnitPhoto } from '@/components/unit-photos';
 import { DurationFields, UnitDurations, defaultDurations, durationsError, type DurationLimits } from '@/components/unit-durations';
@@ -304,6 +304,9 @@ export default function VenueDetailPage() {
         <Stat label="Open for booking" value={openUnits} tone="good" />
         <Stat label="Blocked" value={units.length - openUnits} tone={units.length - openUnits > 0 ? 'bad' : undefined} />
       </div>
+
+      {/* Closing the whole venue (every unit and pooled item) for some days is a venue setting, not a unit's. */}
+      <BlockedDatesSection venueId={venue.id} scope={{ kind: 'venue' }} />
         </>
       )}
 
@@ -350,7 +353,12 @@ export default function VenueDetailPage() {
           />
         )}
 
-        {activeGroup && <GroupCard group={activeGroup} category={categories?.find((c) => c.id === activeGroup.category.id)} onChanged={refetchGroups} />}
+        {activeGroup && (
+          <>
+            <GroupCard group={activeGroup} category={categories?.find((c) => c.id === activeGroup.category.id)} onChanged={refetchGroups} />
+            <BlockedDatesSection key={activeGroup.id} venueId={venue.id} scope={{ kind: 'group', id: activeGroup.id, name: activeGroup.name }} />
+          </>
+        )}
 
         {activeTab === NEW_TAB && (
           <>

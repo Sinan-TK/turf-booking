@@ -84,11 +84,15 @@ export const updatePricingRuleSchema = z
 export class UpdatePricingRuleDto extends createZodDto(updatePricingRuleSchema) {}
 
 
-export const createBlockedDateSchema = z.object({
-  venueId: z.string().uuid(),
-  resourceId: z.string().uuid().optional(),
-  startTime: z.string().datetime(),
-  endTime: z.string().datetime(),
-  reason: z.string().max(300).optional(),
-});
+export const createBlockedDateSchema = z
+  .object({
+    venueId: z.string().uuid(),
+    // One unit, or one pooled item (a kayak fleet); neither = the whole venue.
+    resourceId: z.string().uuid().optional(),
+    resourceGroupId: z.string().uuid().optional(),
+    startTime: z.string().datetime(),
+    endTime: z.string().datetime(),
+    reason: z.string().max(300).optional(),
+  })
+  .refine((d) => !(d.resourceId && d.resourceGroupId), { message: 'Close either one unit or one pooled item, not both' });
 export class CreateBlockedDateDto extends createZodDto(createBlockedDateSchema) {}

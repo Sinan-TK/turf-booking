@@ -314,6 +314,22 @@ export class VenueConfigService {
 
   async createBlockedDate(dto: CreateBlockedDateDto, actor: AuthContext) {
     await this.assertVenueOwnership(dto.venueId, actor);
+    // A pooled item's closed days live only in the newer blocked-periods table (the legacy table has no group column).
+    if (dto.resourceGroupId) {
+      const group = await this.prisma.client.resourceGroup.findUnique({ where: { id: dto.resourceGroupId } });
+      if (!group || group.venueId !== dto.venueId) throw new NotFoundException('Pooled item not found at this venue');
+      const period = await this.prisma.client.blockedPeriod.create({
+        data: {
+          venueId: dto.venueId,
+          resourceGroupId: dto.resourceGroupId,
+          startTime: new Date(dto.startTime),
+          endTime: new Date(dto.endTime),
+          reason: dto.reason,
+          createdByOwnerUserId: actor.role === 'VENUE_OWNER' ? actor.id : undefined,
+        },
+      });
+      return { ...period, resourceId: null };
+    }
     const data = {
       venueId: dto.venueId,
       resourceId: dto.resourceId,
@@ -333,15 +349,26 @@ export class VenueConfigService {
 
   async listBlockedDates(venueId: string, actor: AuthContext) {
     await this.assertVenueOwnership(venueId, actor);
-    return this.prisma.client.blockedDate.findMany({
-      where: { venueId },
-      orderBy: { startTime: 'desc' },
-    });
+    const [days, groupPeriods] = await Promise.all([
+      this.prisma.client.blockedDate.findMany({ where: { venueId }, orderBy: { startTime: 'desc' } }),
+      this.prisma.client.blockedPeriod.findMany({ where: { venueId, resourceGroupId: { not: null } }, orderBy: { startTime: 'desc' } }),
+    ]);
+    // Closed days of units and of the whole venue, then those of pooled items (marked with their group), newest first.
+    return [...days.map((d) => ({ ...d, resourceGroupId: null as string | null })), ...groupPeriods]
+      .sort((a, b) => b.startTime.getTime() - a.startTime.getTime())
+      .map((d) => ({ id: d.id, venueId: d.venueId, resourceId: d.resourceId, resourceGroupId: d.resourceGroupId, startTime: d.startTime, endTime: d.endTime, reason: d.reason }));
   }
 
   async deleteBlockedDate(id: string, actor: AuthContext) {
     const blocked = await this.prisma.client.blockedDate.findUnique({ where: { id } });
-    if (!blocked) throw new NotFoundException('Blocked date not found');
+    if (!blocked) {
+      // Maybe a pooled item's closed days.
+      const period = await this.prisma.client.blockedPeriod.findFirst({ where: { id, resourceGroupId: { not: null } } });
+      if (!period) throw new NotFoundException('Blocked date not found');
+      await this.assertVenueOwnership(period.venueId, actor);
+      await this.prisma.client.blockedPeriod.delete({ where: { id } });
+      return { status: 'ok' };
+    }
     await this.assertVenueOwnership(blocked.venueId, actor);
     await this.prisma.client.$transaction(async (tx) => {
       await tx.blockedPeriod.deleteMany({ where: { sourceBlockedDateId: id } });

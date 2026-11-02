@@ -57,6 +57,28 @@ test.describe('owner portal: venue details', () => {
     await expect(page.getByText('Floodlit turf with parking and a canteen.')).toBeVisible();
   });
 
+  test('closing the whole venue for a day is done on the Venue tab, not on a unit, and shows only there', async ({ page, makeVenue }) => {
+    const venue = await makeVenue();
+    await page.goto(`/venues/${venue.id}`);
+    const closed = page.getByRole('heading', { name: 'Closed Days' }).locator('xpath=ancestor::div[contains(@class,"rounded-xl")][1]');
+    await expect(closed).toContainText('the whole venue');
+    await expect(closed.getByLabel('Resource (optional)')).toHaveCount(0); // no unit picker: this is for everything
+    await closed.getByLabel('Date').fill('2031-05-05');
+    await closed.getByLabel('Reason (optional)').fill('PW Diwali');
+    await closed.getByRole('button', { name: 'Close This Day' }).click();
+    await expect(closed.getByText('PW Diwali')).toBeVisible();
+
+    // A unit's own Closed days tab does not list it, and has no whole-venue option.
+    await openUnitTab(page, venue.turfName);
+    await page.getByRole('tab', { name: 'Closed days' }).click();
+    await expect(page.getByText('PW Diwali')).toHaveCount(0);
+    await expect(page.getByText('No closed days.')).toBeVisible();
+
+    await openSection(page, 'Venue');
+    await closed.getByRole('button', { name: 'Remove' }).click();
+    await expect(closed.getByText('PW Diwali')).toHaveCount(0);
+  });
+
   test('the Google Maps link and the advance booking days are rows of the details with an Edit button each', async ({ page, venue }) => {
     await page.goto(`/venues/${venue.id}`);
     await expect(page.getByRole('button', { name: 'Edit Google Maps link' })).toBeVisible();

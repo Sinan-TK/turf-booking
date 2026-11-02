@@ -124,17 +124,26 @@ export class ScheduleService {
         select: { startTime: true, endTime: true },
       });
     }
-    // Legacy BlockedDate has no group column: only venue-wide and
-    // resource-scoped blocks exist there.
-    return this.prisma.client.blockedDate.findMany({
-      where: {
-        venueId,
-        startTime: { lt: end },
-        endTime: { gt: start },
-        OR: [{ resourceId: null }, ...(footprintIds.length ? [{ resourceId: { in: footprintIds } }] : [])],
-      },
-      select: { startTime: true, endTime: true },
-    });
+    // Legacy BlockedDate has no group column: only venue-wide and resource-scoped blocks exist there; a pooled item's closed days are
+    // kept only as blocked periods, so they are read from there.
+    const [days, groupPeriods] = await Promise.all([
+      this.prisma.client.blockedDate.findMany({
+        where: {
+          venueId,
+          startTime: { lt: end },
+          endTime: { gt: start },
+          OR: [{ resourceId: null }, ...(footprintIds.length ? [{ resourceId: { in: footprintIds } }] : [])],
+        },
+        select: { startTime: true, endTime: true },
+      }),
+      target.resourceGroupId
+        ? this.prisma.client.blockedPeriod.findMany({
+            where: { venueId, resourceGroupId: target.resourceGroupId, startTime: { lt: end }, endTime: { gt: start } },
+            select: { startTime: true, endTime: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    return [...days, ...groupPeriods];
   }
 
   async isBlocked(venueId: string, target: BlockTarget, start: Date, end: Date): Promise<boolean> {

@@ -255,6 +255,45 @@ describe('Pooled groups: count, slots and search', () => {
     expect(after.body).toHaveLength(2);
   });
 
+  test('closed days of a pooled item: owner-managed, listed with the item, only that item is closed, and holds and search respect them', async () => {
+    const closed = await createGroup({ name: 'Closed Days Fleet', totalUnits: 4 });
+    const other = await createGroup({ name: 'Open Days Fleet', totalUnits: 4 });
+    await priceGroup(closed.body.id, 300);
+    await priceGroup(other.body.id, 300);
+    const day = DateTime.now().setZone('Asia/Kolkata').plus({ days: 23 });
+    const iso = day.toISODate()!;
+    const startTime = day.startOf('day').toUTC().toISO()!;
+    const endTime = day.endOf('day').toUTC().toISO()!;
+
+    // Another venue's pooled item can't be closed through this venue.
+    const foreign = await ownerAgent.post('/venue-config/blocked-dates').send({ venueId, resourceGroupId: '00000000-0000-4000-8000-000000000000', startTime, endTime });
+    expect([403, 404]).toContain(foreign.status);
+    // A unit and a pooled item together are refused.
+    expect((await ownerAgent.post('/venue-config/blocked-dates').send({ venueId, resourceId: '00000000-0000-4000-8000-000000000000', resourceGroupId: closed.body.id, startTime, endTime })).status).toBe(400);
+
+    const created = await ownerAgent.post('/venue-config/blocked-dates').send({ venueId, resourceGroupId: closed.body.id, startTime, endTime, reason: 'Rough water' });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ resourceGroupId: closed.body.id, resourceId: null });
+
+    const list = (await ownerAgent.get('/venue-config/blocked-dates').query({ venueId }).expect(200)).body as Array<{ id: string; resourceGroupId: string | null; reason: string | null }>;
+    expect(list.find((b) => b.id === created.body.id)).toMatchObject({ resourceGroupId: closed.body.id, reason: 'Rough water' });
+
+    // Search: only the closed fleet loses that day.
+    const res = await request(app.getHttpServer()).get(`/search?facilityCode=${facilityCode}&date=${iso}&timeWindow=ALL`).expect(200);
+    const ids = (res.body as Array<{ resource: { id: string }; availableStartTimes: string[] }>).filter((r) => r.availableStartTimes.length > 0).map((r) => r.resource.id);
+    expect(ids).toContain(other.body.id);
+    expect(ids).not.toContain(closed.body.id);
+    // Holds: refused for the closed fleet, accepted for the other.
+    const { agent: customer } = await createCustomerFixture(app);
+    const at = day.set({ hour: 10, minute: 0, second: 0, millisecond: 0 }).toUTC().toISO()!;
+    expect((await customer.post('/bookings/hold').send({ resourceGroupId: closed.body.id, quantity: 1, startTime: at, durationMinutes: 60 })).status).toBe(409);
+    expect((await customer.post('/bookings/hold').send({ resourceGroupId: other.body.id, quantity: 1, startTime: at, durationMinutes: 60 })).status).toBe(201);
+
+    // Removing the closed day opens the fleet again.
+    await ownerAgent.delete(`/venue-config/blocked-dates/${created.body.id}`).expect(200);
+    expect((await customer.post('/bookings/hold').send({ resourceGroupId: closed.body.id, quantity: 1, startTime: at, durationMinutes: 60 })).status).toBe(201);
+  });
+
   test('a group nobody has priced, or that is blocked, is not in the search', async () => {
     const unpriced = await createGroup({ name: 'Unpriced Search Fleet', totalUnits: 3 });
     const closed = await createGroup({ name: 'Closed Search Fleet', totalUnits: 3 });

@@ -55,6 +55,7 @@ interface PricingRule {
 interface BlockedDate {
   id: string;
   resourceId: string | null;
+  resourceGroupId?: string | null;
   startTime: string;
   endTime: string;
   reason: string | null;
@@ -723,16 +724,25 @@ function dayBounds(dateStr: string): { startTime: string; endTime: string } {
   };
 }
 
-function BlockedDatesSection({ venueId, resources, onlyResourceId }: { venueId: string; resources: Resource[]; onlyResourceId?: string }) {
+/** What a set of closed days applies to: the whole venue, one unit, or one pooled item (a kayak fleet). */
+export type ClosedScope = { kind: 'venue' } | { kind: 'unit'; id: string; name: string } | { kind: 'group'; id: string; name: string };
+
+/**
+ * Closed days (holidays, maintenance): block a day or a range of days. On the venue's own tab they close the whole venue, on a unit's tab
+ * only that unit, on a pooled item's tab only that item. Each list shows only what it closes.
+ */
+export function BlockedDatesSection({ venueId, scope }: { venueId: string; scope: ClosedScope }) {
   const { data: blocked, refetch } = useFetch<BlockedDate[]>(
     `/venue-config/blocked-dates?venueId=${venueId}`,
   );
   // Closed days pile up over a year: ten at a time.
-  // On a unit's tab only that unit's closed days and the whole venue's are listed.
-  const shownBlocked = (blocked ?? []).filter((b) => !onlyResourceId || !b.resourceId || b.resourceId === onlyResourceId);
+  const shownBlocked = (blocked ?? []).filter((b) =>
+    scope.kind === 'venue' ? !b.resourceId && !b.resourceGroupId : scope.kind === 'unit' ? b.resourceId === scope.id : b.resourceGroupId === scope.id,
+  );
+  const what = scope.kind === 'venue' ? 'the whole venue' : scope.name;
   const blockedPage = usePageSlice(shownBlocked, 10, '');
   const [mode, setMode] = useState<'single' | 'range'>('single');
-  const [form, setForm] = useState({ resourceId: '', date: '', endDate: '', reason: '' });
+  const [form, setForm] = useState({ date: '', endDate: '', reason: '' });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -765,12 +775,12 @@ function BlockedDatesSection({ venueId, resources, onlyResourceId }: { venueId: 
       const { endTime } = dayBounds(mode === 'range' && form.endDate ? form.endDate : form.date);
       await api.post('/venue-config/blocked-dates', {
         venueId,
-        resourceId: form.resourceId || undefined,
+        ...(scope.kind === 'unit' ? { resourceId: scope.id } : scope.kind === 'group' ? { resourceGroupId: scope.id } : {}),
         startTime,
         endTime,
         reason: form.reason || undefined,
       });
-      setForm({ resourceId: '', date: '', endDate: '', reason: '' });
+      setForm({ date: '', endDate: '', reason: '' });
       refetch();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to create blocked date');
@@ -793,8 +803,8 @@ function BlockedDatesSection({ venueId, resources, onlyResourceId }: { venueId: 
     <Card>
       <h2 className="mb-1 text-sm font-semibold text-on-surface">Closed Days</h2>
       <p className="mb-4 text-xs text-on-surface-variant">
-        Block a single day or a range of days. Leave &quot;Resource&quot; unset to close the entire
-        venue — customers can&apos;t book, and any attempt during this window is rejected.
+        Close {what} for a single day or a range of days. Customers can&apos;t book {scope.kind === 'venue' ? 'any unit or pooled item' : 'it'} then, and any attempt during that time is
+        rejected. Bookings already made are not cancelled.
       </p>
 
       {!blocked && <LoadingState />}
@@ -803,7 +813,6 @@ function BlockedDatesSection({ venueId, resources, onlyResourceId }: { venueId: 
           <table className="w-full text-left text-sm">
             <thead className="border-b border-outline-variant/30 text-xs uppercase text-on-surface-variant">
               <tr>
-                <th className="py-2">Scope</th>
                 <th className="py-2">Dates</th>
                 <th className="py-2">Reason</th>
                 <th className="py-2" />
@@ -816,11 +825,6 @@ function BlockedDatesSection({ venueId, resources, onlyResourceId }: { venueId: 
                 const sameDay = start.toDateString() === end.toDateString();
                 return (
                   <tr key={b.id} className="border-b border-outline-variant/20 last:border-0">
-                    <td className="py-2">
-                      {b.resourceId
-                        ? (resources.find((r) => r.id === b.resourceId)?.name ?? 'Resource')
-                        : 'Whole venue'}
-                    </td>
                     <td className="py-2 text-on-surface-variant">
                       {sameDay
                         ? start.toLocaleDateString()
@@ -897,20 +901,6 @@ function BlockedDatesSection({ venueId, resources, onlyResourceId }: { venueId: 
             </div>
           )}
           <div>
-            <Label>Resource (optional)</Label>
-            <Select
-              value={form.resourceId}
-              onChange={(e) => setForm((f) => ({ ...f, resourceId: e.target.value }))}
-            >
-              <option value="">Whole venue (all units)</option>
-              {resources.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div>
             <Label htmlFor="closed-reason">Reason (optional)</Label>
             <Input
               id="closed-reason"
@@ -986,7 +976,7 @@ export function UnitTools({
       </div>
       <div id={`${unit.id}-tab-panel`} role="tabpanel" aria-labelledby={`${unit.id}-tab-${tab}`}>
         {tab === 'pricing' && <PricingRulesSection resources={resources} categories={categories} minAdvance={minAdvance} />}
-        {tab === 'closed' && <BlockedDatesSection venueId={venueId} resources={resources} onlyResourceId={unit.id} />}
+        {tab === 'closed' && <BlockedDatesSection venueId={venueId} scope={{ kind: 'unit', id: unit.id, name: unit.name }} />}
       </div>
     </div>
   );
