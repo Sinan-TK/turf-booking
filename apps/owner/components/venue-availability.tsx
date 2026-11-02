@@ -436,7 +436,7 @@ function PriceModal({
 }
 
 const ICON_BUTTON =
-  'inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40';
+  'inline-flex h-9 w-9 items-center justify-center rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40';
 
 export function PricingRulesSection({
   resources,
@@ -582,8 +582,8 @@ export function PricingRulesSection({
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        r.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${
+                        r.isActive ? 'border-emerald-600/40 bg-emerald-50 text-emerald-900' : 'border-amber-600/40 bg-amber-50 text-amber-900'
                       }`}
                     >
                       {r.isActive ? 'Active' : 'Blocked'}
@@ -595,7 +595,7 @@ export function PricingRulesSection({
                       aria-label="Edit price"
                       title="Edit"
                       onClick={() => setEditing({ rule: r })}
-                      className={`${ICON_BUTTON} text-on-surface-variant hover:bg-surface-container hover:text-on-surface`}
+                      className={`${ICON_BUTTON} border-primary/40 bg-primary/5 text-primary hover:bg-primary/15`}
                     >
                       <SvgIcon name="edit" className="h-[18px] w-[18px]" />
                     </button>
@@ -606,8 +606,8 @@ export function PricingRulesSection({
                       onClick={() => ask(r.isActive ? 'block' : 'unblock', r)}
                       className={`${ICON_BUTTON} ${
                         r.isActive
-                          ? 'text-amber-700 hover:bg-amber-50'
-                          : 'text-emerald-700 hover:bg-emerald-50'
+                          ? 'border-amber-600/50 bg-amber-50 text-amber-900 hover:bg-amber-100'
+                          : 'border-emerald-600/50 bg-emerald-50 text-emerald-900 hover:bg-emerald-100'
                       }`}
                     >
                       <SvgIcon
@@ -620,7 +620,7 @@ export function PricingRulesSection({
                       aria-label="Remove price"
                       title="Remove"
                       onClick={() => ask('remove', r)}
-                      className={`${ICON_BUTTON} text-red-700 hover:bg-red-50`}
+                      className={`${ICON_BUTTON} border-red-600/40 bg-red-50 text-red-800 hover:bg-red-100`}
                     >
                       <SvgIcon name="trash" className="h-[18px] w-[18px]" />
                     </button>
@@ -973,15 +973,16 @@ export function UnitTools({
               aria-selected={tab === t.key}
               aria-controls={`${unit.id}-tab-panel`}
               onClick={() => setTab(t.key)}
-              className={`whitespace-nowrap rounded-lg px-4 py-2 text-body-md font-medium transition-colors ${
-                tab === t.key ? 'bg-surface-container-lowest text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface'
+              className={`inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-body-md font-semibold transition-colors ${
+                tab === t.key ? 'bg-surface-container-lowest text-primary shadow-sm ring-1 ring-primary/30' : 'text-on-surface/80 hover:bg-surface-container-high hover:text-on-surface'
               }`}
             >
+              <SvgIcon name={t.key === 'pricing' ? 'tag' : 'calendar'} className="h-4 w-4" />
               {t.label}
             </button>
           ))}
         </div>
-        <p className="mt-2 text-xs text-on-surface-variant">{current.hint}</p>
+        <p className="mt-2 text-sm text-on-surface-variant">{current.hint}</p>
       </div>
       <div id={`${unit.id}-tab-panel`} role="tabpanel" aria-labelledby={`${unit.id}-tab-${tab}`}>
         {tab === 'pricing' && <PricingRulesSection resources={resources} categories={categories} minAdvance={minAdvance} />}

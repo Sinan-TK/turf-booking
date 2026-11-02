@@ -8,6 +8,7 @@ import { api, ApiError } from '@/lib/api';
 import type { VenueCategory, VenueCategorySummary } from '@/lib/categories';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SvgIcon } from '@/components/svg-icons';
+import { FacilityIcon } from '@/components/facility-icon';
 import { VenueMapLink } from '@/components/venue-map-link';
 import { VenueAdvanceBooking } from '@/components/venue-advance-booking';
 import { VenueDescription } from '@/components/venue-description';
@@ -240,10 +241,11 @@ export default function VenueDetailPage() {
             aria-selected={section === s}
             aria-controls="section-panel"
             onClick={() => setSection(s)}
-            className={`whitespace-nowrap rounded-lg px-5 py-2 text-body-md font-medium transition-colors ${
-              section === s ? 'bg-surface-container-lowest text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface'
+            className={`inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-5 py-2 text-body-md font-semibold transition-colors ${
+              section === s ? 'bg-surface-container-lowest text-primary shadow-sm ring-1 ring-primary/30' : 'text-on-surface/80 hover:bg-surface-container-high hover:text-on-surface'
             }`}
           >
+            <SvgIcon name={s === 'venue' ? 'pin' : 'ball'} className="h-4 w-4" />
             {s === 'venue' ? 'Venue' : `Units (${units.length + groups.length})`}
           </button>
         ))}
@@ -501,14 +503,14 @@ function UnitTab({ id, active, onPick, title, sub, blocked }: { id: string; acti
       aria-controls="unit-tab-panel"
       onClick={() => onPick(id)}
       className={`flex shrink-0 flex-col items-start whitespace-nowrap rounded-lg px-4 py-1.5 text-left transition-colors ${
-        active ? 'bg-surface-container-lowest text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface'
+        active ? 'bg-surface-container-lowest text-on-surface shadow-sm ring-1 ring-primary/30' : 'text-on-surface/80 hover:bg-surface-container-high hover:text-on-surface'
       }`}
     >
-      <span className="inline-flex items-center gap-1.5 text-body-md font-medium">
+      <span className="inline-flex items-center gap-1.5 text-body-md font-semibold">
         {title}
         {blocked && <span className="h-2 w-2 rounded-full bg-red-500" title="Blocked" aria-label="Blocked" />}
       </span>
-      <span className="text-[0.6875rem] leading-tight text-on-surface-variant">{sub}</span>
+      <span className="text-xs leading-tight text-on-surface/70">{sub}</span>
     </button>
   );
 }
@@ -538,22 +540,30 @@ function UnitPanel({
     <div className="space-y-6">
       <section aria-label={unit.name} className="overflow-hidden rounded-xl bg-surface-container-lowest shadow-sm ring-1 ring-outline-variant/30">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/20 bg-surface-container-low px-container-padding py-4">
-          <div>
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-on-primary">
+              <FacilityIcon iconKey={facility.iconKey} className="text-[24px]" />
+            </span>
+            <div>
             <h2 className="text-body-md font-semibold text-on-surface">{facility.name}</h2>
-            <p className="text-xs text-on-surface-variant">
+            <p className="text-sm text-on-surface-variant">
               {sameFacility.length} {plural(facility.unitLabel.toLowerCase(), sameFacility.length)} ·{' '}
-              <span className={sameFacility.every((u) => !u.isBookable) ? 'font-medium text-red-700' : undefined}>
+              <span className={sameFacility.every((u) => !u.isBookable) ? 'font-semibold text-red-700' : 'font-medium text-emerald-800'}>
                 {sameFacility.every((u) => u.isBookable) ? 'all open' : `${sameFacility.filter((u) => u.isBookable).length} open`}
               </span>
             </p>
+            </div>
           </div>
           <button
             type="button"
             onClick={() => onAsk({ kind: 'facility', facility, units: sameFacility, open: allBlocked })}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium ring-1 ring-inset transition-colors ${
-              allBlocked ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/30 hover:bg-emerald-100' : 'bg-red-50 text-red-700 ring-red-600/30 hover:bg-red-100'
+            className={`inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 ${
+              allBlocked
+                ? 'border-emerald-600/50 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 focus-visible:ring-emerald-500/40'
+                : 'border-red-600/40 bg-red-50 text-red-900 hover:bg-red-100 focus-visible:ring-red-500/40'
             }`}
           >
+            <SvgIcon name={allBlocked ? 'unblock' : 'block'} className="h-4 w-4" />
             {allBlocked ? `Reopen ${facility.name}` : `Block ${facility.name}`}
           </button>
         </header>
@@ -690,7 +700,7 @@ function BookToggle({ on, label, onToggle }: { on: boolean; label: string; onTog
       onClick={onToggle}
       className="inline-flex shrink-0 items-center gap-2.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
     >
-      <span className={`text-xs font-medium ${on ? 'text-emerald-700' : 'text-red-700'}`}>
+      <span className={`text-sm font-semibold ${on ? 'text-emerald-800' : 'text-red-800'}`}>
         {on ? 'Open' : 'Blocked'}
       </span>
       <span

@@ -10,6 +10,16 @@ test.describe('owner portal: pooled items', () => {
   test('add a fleet with fixed slots (from, to, how many, price), change the count; a customer can then pick how many', async ({ page, makeVenue, ownerApi, browser }) => {
     test.setTimeout(150_000);
     const venue = await makeVenue();
+    // The slot lengths must be ones the facility allows, which the Super Admin can change: read them instead of assuming one hour.
+    const kayak = ((await (await ownerApi.get('/categories')).json()) as Array<{ slug: string; policy: { durations: number[] } }>).find((c) => c.slug === 'KAYAKING')!;
+    const [lenA = 60, lenB = lenA] = kayak.policy.durations;
+    const clock12 = (minutes: number) => `${Math.floor(minutes / 60) % 12 || 12}:${String(minutes % 60).padStart(2, '0')} ${Math.floor(minutes / 60) % 24 < 12 ? 'AM' : 'PM'}`;
+    const hhmm = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+    const lengthText = (minutes: number) => (minutes % 60 === 0 ? (minutes === 60 ? '1 hour' : `${minutes / 60} hours`) : `${Math.floor(minutes / 60)} hr ${minutes % 60} min`);
+    const slotA = { start: 8 * 60, end: 8 * 60 + lenA }; // 8:00 am for the shortest length
+    const slotB = { start: 12 * 60, end: 12 * 60 + lenB };
+    const labelA = `${clock12(slotA.start)} – ${clock12(slotA.end)}`;
+    const labelB = `${clock12(slotB.start)} – ${clock12(slotB.end)}`;
     await page.goto(`/venues/${venue.id}`);
 
     // Add the pooled item on the New tab: facility, name, count, fixed slots.
@@ -33,10 +43,10 @@ test.describe('owner portal: pooled items', () => {
       await section.locator(`#pool-new-${row}-advance`).fill(v.advance);
     };
     await section.getByRole('button', { name: 'Add slot' }).click();
-    await fill(0, { start: '08:00', end: '09:00', count: '5', price: '400', advance: '200' });
+    await fill(0, { start: hhmm(slotA.start), end: hhmm(slotA.end), count: '5', price: '400', advance: '200' });
     await section.getByRole('button', { name: 'Add slot' }).click();
-    await fill(1, { start: '10:00', end: '12:00', count: '6', price: '550', advance: '300' });
-    await expect(section.getByText('2 hours')).toBeVisible(); // the row says how long it runs
+    await fill(1, { start: hhmm(slotB.start), end: hhmm(slotB.end), count: '6', price: '550', advance: '300' });
+    await expect(section.getByText(lengthText(lenB)).first()).toBeVisible(); // the row says how long it runs
     await section.getByRole('button', { name: 'Add pooled item' }).click();
 
     // Its own tab opens, with its card.
@@ -71,10 +81,10 @@ test.describe('owner portal: pooled items', () => {
     const article = web.getByRole('article').first();
     await expect(article.getByRole('heading', { level: 1 })).toContainText(venue.name);
     // Each slot is a time range with its own count.
-    await expect(article.getByRole('button', { name: /^8:00 AM – 9:00 AM/ })).toContainText('5 left');
-    await expect(article.getByRole('button', { name: /^10:00 AM – 12:00 PM/ })).toContainText('6 left');
+    await expect(article.getByRole('button', { name: new RegExp('^' + labelA) })).toContainText('5 left');
+    await expect(article.getByRole('button', { name: new RegExp('^' + labelB) })).toContainText('6 left');
     await expect(article.locator('img[alt$="PW Single kayaks"]').first()).toBeAttached(); // its own photo is the big picture
-    await article.getByRole('button', { name: /^8:00 AM – 9:00 AM/ }).click();
+    await article.getByRole('button', { name: new RegExp('^' + labelA) }).click();
     await expect(article.getByText('How many kayaks')).toBeVisible();
     await article.getByRole('button', { name: 'More kayaks' }).click();
     await article.getByRole('button', { name: 'More kayaks' }).click();
@@ -86,7 +96,7 @@ test.describe('owner portal: pooled items', () => {
     while (await more.isEnabled()) await more.click();
     await expect(article.getByRole('button', { name: 'More kayaks' })).toBeDisabled();
     // The other slot has its own price.
-    await article.getByRole('button', { name: /^10:00 AM – 12:00 PM/ }).click();
+    await article.getByRole('button', { name: new RegExp('^' + labelB) }).click();
     await article.getByRole('button', { name: 'More kayaks' }).click();
     await expect(article.getByText('₹1,100').first()).toBeVisible(); // 2 x 550
     await customer.close();

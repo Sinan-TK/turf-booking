@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { durationLabel } from '@/lib/categories';
 import { Button, ErrorBanner, FieldError, Input, Label, Select, invalidClass } from '@/components/ui';
+import { SvgIcon } from '@/components/svg-icons';
 
 /** The longest booking a unit may have; the API enforces the same limit. */
 const DAY_MINUTES = 24 * 60;
@@ -133,14 +134,15 @@ export function UnitDurations({
 
   if (!editing) {
     return (
-      <p className="flex flex-wrap items-center gap-x-3 text-xs text-on-surface-variant">
-        <span>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container px-3 py-1.5 text-sm font-medium text-on-surface">
+          <SvgIcon name="clock" className="h-4 w-4 text-primary" />
           Booked for {durationLabel(min)}
           {max > min ? ` up to ${durationLabel(max)}` : ''}
         </span>
         <button
           type="button"
-          className="font-medium text-primary underline-offset-2 hover:underline"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-surface-container-lowest px-3 py-1.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           onClick={() => {
             setForm({ min, max });
             setErrors({});
@@ -148,9 +150,10 @@ export function UnitDurations({
             setEditing(true);
           }}
         >
+          <SvgIcon name="edit" className="h-4 w-4" />
           Change length
         </button>
-      </p>
+      </div>
     );
   }
 

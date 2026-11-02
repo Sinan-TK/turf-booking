@@ -71,13 +71,16 @@ export function UnitPhotos({ unitId, unitName, initial, basePath }: { unitId: st
     <div className="mt-2.5">
       <div className="flex flex-wrap items-center gap-2">
         {photos.map((photo, i) => (
-          <figure key={photo.id} className="group relative h-14 w-32 overflow-hidden rounded-lg bg-surface-container ring-1 ring-outline-variant/40">
+          <figure key={photo.id} className="group relative h-32 w-52 overflow-hidden rounded-xl bg-surface-container shadow-sm ring-1 ring-outline-variant/50 sm:h-36 sm:w-60">
             <img src={photo.url} alt={`${unitName} photo ${i + 1}`} className="h-full w-full object-cover" />
             {i === 0 && (
-              <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold text-white">Main</span>
+              <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs font-semibold text-on-primary shadow">
+                <SvgIcon name="star" className="h-3 w-3" />
+                Main
+              </span>
             )}
             {busy === photo.id && <span className="absolute inset-0 animate-pulse bg-white/60" aria-hidden="true" />}
-            <div className="absolute inset-x-0 bottom-0 flex justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+            <div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 bg-gradient-to-t from-black/70 to-transparent p-2">
               {i > 0 && (
                 <button
                   type="button"
@@ -85,9 +88,10 @@ export function UnitPhotos({ unitId, unitName, initial, basePath }: { unitId: st
                   disabled={busy !== null}
                   title="Make this the main photo"
                   aria-label={`Make photo ${i + 1} the main photo of ${unitName}`}
-                  className="rounded bg-white/90 p-1 text-amber-600 hover:bg-white disabled:opacity-50"
+                  className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-amber-800 shadow hover:bg-amber-50 disabled:opacity-50"
                 >
-                  <SvgIcon name="star" className="h-3.5 w-3.5" />
+                  <SvgIcon name="star" className="h-4 w-4" />
+                  Make main
                 </button>
               )}
               <button
@@ -96,9 +100,10 @@ export function UnitPhotos({ unitId, unitName, initial, basePath }: { unitId: st
                 disabled={busy !== null}
                 title="Remove photo"
                 aria-label={`Remove photo ${i + 1} of ${unitName}`}
-                className="rounded bg-white/90 p-1 text-red-600 hover:bg-white disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-red-700 shadow hover:bg-red-50 disabled:opacity-50"
               >
-                <SvgIcon name="trash" className="h-3.5 w-3.5" />
+                <SvgIcon name="trash" className="h-4 w-4" />
+                Remove
               </button>
             </div>
           </figure>
@@ -108,12 +113,12 @@ export function UnitPhotos({ unitId, unitName, initial, basePath }: { unitId: st
             type="button"
             onClick={() => input.current?.click()}
             disabled={busy !== null}
-            className="flex h-14 w-32 flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-outline-variant text-[11px] font-medium text-on-surface-variant transition hover:border-primary hover:text-primary disabled:opacity-60"
+            className="flex h-32 w-52 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-primary/50 bg-primary/5 text-sm font-semibold text-primary transition hover:border-primary hover:bg-primary/10 disabled:opacity-60 sm:h-36 sm:w-60"
           >
             {busy === 'upload' ? (
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-outline-variant border-t-primary" aria-hidden="true" />
+              <span className="h-6 w-6 animate-spin rounded-full border-2 border-outline-variant border-t-primary" aria-hidden="true" />
             ) : (
-              <SvgIcon name="image" className="h-4 w-4" />
+              <SvgIcon name="camera" className="h-7 w-7" />
             )}
             {busy === 'upload' ? 'Uploading…' : photos.length === 0 ? 'Add photo' : `Add (${photos.length}/${MAX_UNIT_PHOTOS})`}
           </button>
