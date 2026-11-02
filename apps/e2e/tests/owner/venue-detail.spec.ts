@@ -1,5 +1,5 @@
 import { expect, test } from '../../support/fixtures';
-import { field, openUnitTab } from '../../support/ui';
+import { field, openSection, openUnitTab } from '../../support/ui';
 
 test.describe('owner portal: venue details', () => {
   test('shows the header, stats, and each facility with its units', async ({ page, venue }) => {
@@ -13,7 +13,8 @@ test.describe('owner portal: venue details', () => {
     await expect(page.getByText('Open for booking').locator('xpath=..')).toContainText('2');
     await expect(page.getByText('Blocked', { exact: true }).first().locator('xpath=..')).toContainText('0');
 
-    // One tab per unit (the first is open), then New; each unit's tab shows its facility and its type (the court has none).
+    // The venue's own tab is open first; the Units tab has one tab per unit (the first is open), then New; each unit's tab shows its facility and its type (the court has none).
+    await openSection(page, 'Units');
     const tabs = page.getByRole('tablist', { name: 'Units' }).getByRole('tab');
     await expect(tabs).toHaveCount(3);
     await expect(page.getByRole('heading', { name: 'Football', level: 2 })).toBeVisible();
@@ -29,8 +30,10 @@ test.describe('owner portal: venue details', () => {
     await expect(page).toHaveURL(/\/venues$/);
 
     await page.goto(`/venues/${venue.id}`);
-    // The open unit's tab has its prices, closed days and walk-in booking right there.
-    for (const tab of ['Pricing & hours', 'Closed days', 'Walk-in booking']) await expect(page.getByRole('tab', { name: tab })).toBeVisible();
+    // The open unit's tab has its prices and closed days right there (walk-in bookings have their own page).
+    await openSection(page, 'Units');
+    for (const tab of ['Pricing & hours', 'Closed days']) await expect(page.getByRole('tab', { name: tab })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Walk-in booking' })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Pricing' })).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`/venues/${venue.id}$`));
   });
@@ -62,6 +65,7 @@ test.describe('owner portal: venue details', () => {
 
   test('blocking a unit asks first: cancel changes nothing, confirm blocks, then it can be reopened', async ({ page, venue }) => {
     await page.goto(`/venues/${venue.id}`);
+    await openSection(page, 'Units');
     const toggle = page.getByRole('switch', { name: `Block ${venue.turfName}` });
     await expect(toggle).toBeChecked();
 
@@ -85,7 +89,9 @@ test.describe('owner portal: venue details', () => {
     await expect(dialog).toHaveCount(0);
     const reopen = page.getByRole('switch', { name: `Reopen ${venue.turfName}` });
     await expect(reopen).not.toBeChecked();
+    await openSection(page, 'Venue'); // the count tiles are on the Venue tab
     await expect(page.getByText('Blocked', { exact: true }).first().locator('xpath=..')).toContainText('1');
+    await openSection(page, 'Units');
 
     await reopen.click();
     await expect(dialog.getByRole('heading', { name: `Reopen ${venue.turfName}?` })).toBeVisible();

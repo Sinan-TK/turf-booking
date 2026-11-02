@@ -166,7 +166,7 @@ test.describe('owner portal: pricing', () => {
     await expect(row).toContainText('INR 500 at the venue');
   });
 
-  test('the price, closed-day and walk-in forms flag each field that is missing', async ({ page, makeVenue }) => {
+  test('the price and closed-day forms flag each field that is missing', async ({ page, makeVenue }) => {
     const venue = await makeVenue();
     await page.goto(`/venues/${venue.id}/availability`);
 
@@ -192,23 +192,14 @@ test.describe('owner portal: pricing', () => {
     await expect(page.getByText('Choose the first day.')).toBeVisible();
     await expect(page.getByText('Choose the last day.')).toBeVisible();
 
-    await page.getByRole('tab', { name: 'Walk-in booking' }).click();
-    await page.getByRole('button', { name: 'Book This Slot' }).click();
-    await expect(page.getByText('Choose the date.')).toBeVisible();
-    await expect(page.getByText('Choose the start time.')).toBeVisible();
-    await expect(page.getByText('Enter the customer’s phone number.')).toBeVisible();
-    await page.locator('#walkin-phone').fill('5876543210');
-    await page.getByRole('button', { name: 'Book This Slot' }).click();
-    await expect(page.getByText('Indian mobile numbers start with 6, 7, 8 or 9.')).toBeVisible();
   });
 
-  test('the Closed days and Walk-in booking tabs open', async ({ page, makeVenue }) => {
+  test('the Closed days tab opens, and there is no walk-in tab on the venue page', async ({ page, makeVenue }) => {
     const venue = await makeVenue();
     await page.goto(`/venues/${venue.id}/availability`);
     await page.getByRole('tab', { name: 'Closed days' }).click();
     await expect(page.getByRole('tab', { name: 'Closed days' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByRole('heading', { name: 'Closed Days' })).toBeVisible();
-    await page.getByRole('tab', { name: 'Walk-in booking' }).click();
-    await expect(page.getByRole('heading', { name: /Book a Slot/ })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Walk-in booking' })).toHaveCount(0); // walk-in bookings have their own page
   });
 });

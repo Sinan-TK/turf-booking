@@ -18,7 +18,6 @@ import {
   Select,
   invalidClass,
 } from '@/components/ui';
-import { WalkInForm } from '@/components/walk-in-form';
 import { Pagination, usePageSlice } from '@/components/list-kit';
 import { hasErrors, numberError, type FieldErrors } from '@/lib/validation';
 
@@ -963,13 +962,12 @@ const TABS = [
     hint: 'What each unit costs, and when it can be booked',
   },
   { key: 'closed', label: 'Closed days', hint: 'Holidays and maintenance' },
-  { key: 'walkin', label: 'Walk-in booking', hint: 'Record a booking you took yourself' },
 ] as const;
 type TabKey = (typeof TABS)[number]['key'];
 
 /**
- * Everything a unit needs beyond its settings, as three small tabs inside the unit's own tab on the venue page: its prices (which
- * also set when it can be booked), the days it is closed (or the whole venue), and a walk-in booking taken in person.
+ * Everything a unit needs beyond its settings, as two small tabs inside the unit's own tab on the venue page: its prices (which
+ * also set when it can be booked) and the days it is closed (or the whole venue). Walk-in bookings have their own page.
  */
 export function UnitTools({
   venueId,
@@ -1012,7 +1010,6 @@ export function UnitTools({
       <div id={`${unit.id}-tab-panel`} role="tabpanel" aria-labelledby={`${unit.id}-tab-${tab}`}>
         {tab === 'pricing' && <PricingRulesSection resources={resources} categories={categories} minAdvance={minAdvance} />}
         {tab === 'closed' && <BlockedDatesSection venueId={venueId} resources={resources} onlyResourceId={unit.id} />}
-        {tab === 'walkin' && <WalkInForm resources={resources} categories={categories} />}
       </div>
     </div>
   );

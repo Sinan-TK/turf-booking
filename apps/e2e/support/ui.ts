@@ -23,8 +23,16 @@ export async function pick(page: Page, label: string, option: string | RegExp): 
   await page.getByRole('listbox', { name: label }).getByRole('option', { name: option }).click();
 }
 
+/** The venue page's two sections: opens Units (the tabs of its units and pooled items) or Venue (its details). */
+export async function openSection(page: Page, name: 'Venue' | 'Units'): Promise<void> {
+  const tab = page.getByRole('tablist', { name: 'Venue sections' }).getByRole('tab', { name: new RegExp('^' + name) });
+  if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.click();
+  await expect(tab).toHaveAttribute('aria-selected', 'true');
+}
+
 /** Opens a unit's (or pooled item's) tab on the owner's venue page; "New" opens the tab for adding one. */
 export async function openUnitTab(page: Page, name: string): Promise<void> {
+  await openSection(page, 'Units');
   // Unit names are plain words and numbers ("Turf A", "Court 1"); the tab's name also carries its facility, so match the start.
   const tab = page.getByRole('tablist', { name: 'Units' }).getByRole('tab', { name: name === 'New' ? /^\+?\s*New$/ : new RegExp('^' + name) });
   await tab.click();

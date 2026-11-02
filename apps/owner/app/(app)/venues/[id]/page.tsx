@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useFetch } from '@/lib/use-fetch';
@@ -76,6 +76,9 @@ type Pending =
 /** The tab that holds the forms for adding a unit or a pooled item. */
 const NEW_TAB = 'new';
 
+/** The page's two sections: the venue itself, and its units. */
+type Section = 'venue' | 'units';
+
 export default function VenueDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: venue, error, loading, refetch } = useFetch<Venue>(`/venues/${id}`);
@@ -87,6 +90,11 @@ export default function VenueDetailPage() {
   const { data: terms } = useFetch<Array<{ categoryId: string; terms: { minAdvancePercent: number } }>>(`/owner/commercial-terms?venueId=${id}`);
   const minAdvance = Object.fromEntries((terms ?? []).map((t) => [t.categoryId, t.terms.minAdvancePercent]));
 
+  const [section, setSection] = useState<Section>('venue');
+  // The old pricing address (/venues/:id/availability) lands here as #pricing: it opens the Units tab.
+  useEffect(() => {
+    if (window.location.hash === '#pricing') setSection('units');
+  }, []);
   // The open tab: a unit's or pooled item's id, or NEW_TAB. Empty until the first one is chosen (then the first unit is open).
   const [tab, setTab] = useState('');
   const [pending, setPending] = useState<Pending | null>(null);
@@ -196,7 +204,7 @@ export default function VenueDetailPage() {
 
   return (
     <div className="space-y-6">
-      {/* The venue itself: who and where it is, its status, its description, map link and how far ahead it takes bookings. */}
+      {/* Who and where the venue is stays in view on both tabs. */}
       <section className="rounded-xl bg-white p-container-padding shadow-sm ring-1 ring-outline-variant/30">
         <div className="flex min-w-0 items-start gap-3">
           <Link
@@ -220,7 +228,32 @@ export default function VenueDetailPage() {
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-x-10 border-t border-outline-variant/20 pt-2 lg:grid-cols-2">
+      </section>
+
+      <div role="tablist" aria-label="Venue sections" className="inline-flex max-w-full gap-1 rounded-xl bg-surface-container p-1">
+        {(['venue', 'units'] as const).map((s) => (
+          <button
+            key={s}
+            type="button"
+            role="tab"
+            id={`section-${s}`}
+            aria-selected={section === s}
+            aria-controls="section-panel"
+            onClick={() => setSection(s)}
+            className={`whitespace-nowrap rounded-lg px-5 py-2 text-body-md font-medium transition-colors ${
+              section === s ? 'bg-surface-container-lowest text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface'
+            }`}
+          >
+            {s === 'venue' ? 'Venue' : `Units (${units.length + groups.length})`}
+          </button>
+        ))}
+      </div>
+
+      <div id="section-panel" role="tabpanel" aria-labelledby={`section-${section}`} className="space-y-6">
+      {section === 'venue' && (
+        <>
+      <section className="rounded-xl bg-white p-container-padding shadow-sm ring-1 ring-outline-variant/30">
+        <div className="grid grid-cols-1 gap-x-10 lg:grid-cols-2">
           <div className="divide-y divide-outline-variant/20">
             <VenueDescription venueId={venue.id} description={venue.description} onSaved={() => refetch()} />
             <VenueMapLink venueId={venue.id} link={venue.googleMapsUrl} onSaved={() => refetch()} />
@@ -264,7 +297,11 @@ export default function VenueDetailPage() {
         <Stat label="Open for booking" value={openUnits} tone="good" />
         <Stat label="Blocked" value={units.length - openUnits} tone={units.length - openUnits > 0 ? 'bad' : undefined} />
       </div>
+        </>
+      )}
 
+      {section === 'units' && (
+        <>
       {/* One tab per unit and pooled item, each with everything it needs; the last tab adds a new one. */}
       <div>
         <div role="tablist" aria-label="Units" className="flex max-w-full gap-1 overflow-x-auto rounded-xl bg-surface-container p-1">
@@ -431,6 +468,9 @@ export default function VenueDetailPage() {
             />
           </>
         )}
+      </div>
+        </>
+      )}
       </div>
 
       {pending && dialog && (

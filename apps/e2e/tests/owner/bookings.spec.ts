@@ -17,8 +17,8 @@ async function walkIn(owner: APIRequestContext, resourceId: string, ymd: string,
 
 test.describe('owner portal: bookings', () => {
   test('a walk-in booking made on the form is confirmed, listed, and opens its detail page', async ({ page, venue }) => {
-    await page.goto(`/venues/${venue.id}/availability`);
-    await page.getByRole('tab', { name: 'Walk-in booking' }).click();
+    await page.goto('/walk-in'); // walk-in bookings have their own page, not the venue's
+    await page.locator('#venue-scope').selectOption({ label: venue.name });
     const form = page.locator('form').filter({ hasText: 'Book This Slot' });
 
     const phone = uniquePhone();

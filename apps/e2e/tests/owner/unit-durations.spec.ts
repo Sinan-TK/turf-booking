@@ -1,7 +1,7 @@
 import { nextIstDay, istInstant, uniquePhone } from '../../support/dates';
 import { apiAs } from '../../support/api';
 import { expect, test } from '../../support/fixtures';
-import { field, openUnitTab } from '../../support/ui';
+import { field, openSection, openUnitTab } from '../../support/ui';
 
 /**
  * Each unit has its own shortest and longest booking, and its prices are per block of the shortest: a longer booking
@@ -10,6 +10,7 @@ import { field, openUnitTab } from '../../support/ui';
 test.describe('owner portal: booking lengths per unit', () => {
   test('the owner changes a unit\'s lengths; a longest that is not a multiple of the shortest is refused', async ({ page, venue }) => {
     await page.goto(`/venues/${venue.id}`);
+    await openSection(page, 'Units');
     const row = page.getByRole('region', { name: venue.turfName });
     await expect(row).toContainText('Booked for 1 hour up to 3 hours');
 
