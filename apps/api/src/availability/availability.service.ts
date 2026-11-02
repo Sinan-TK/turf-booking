@@ -13,6 +13,7 @@ import { isDurationAllowed, lastBookableInstantMs } from '../scheduling/policy-v
 import { allowedDurations } from '../common/booking-policy.defaults';
 import { pLimit } from '../common/concurrency';
 import { AVAILABILITY_REPOSITORY, type AvailabilityRepository } from './availability.repository';
+import { localHm } from '../resources/group-slots';
 import { StorageService } from '../storage/storage.service';
 
 /** What a venue's units need for one searched day, read for all of them at once. */
@@ -71,6 +72,7 @@ interface SearchParams {
 
 type CandidateVenue = Awaited<ReturnType<AvailabilityRepository['findActiveVenuesByDistrict']>>[number];
 type BookableResource = Awaited<ReturnType<AvailabilityRepository['findBookableResources']>>[number];
+type BookableGroupRow = Awaited<ReturnType<AvailabilityRepository['findBookableGroups']>>[number];
 /** One search card, exactly as the API returns it. */
 export interface SearchResult {
   venue: {
@@ -104,6 +106,11 @@ export interface SearchResult {
   startPrices: Array<string | null>;
   startNormalPrices: Array<string | null>;
   startBookingPrices: Array<string | null>;
+  /**
+   * Only on a pooled group (a kayak fleet): `resource.id` is then the group's id, prices are per unit, and `remaining` is how many
+   * units are still free at each start time, aligned with availableStartTimes.
+   */
+  pooled?: { totalUnits: number; slotMode: 'FLEXIBLE' | 'FIXED'; remaining: number[] };
 }
 
 @Injectable()
@@ -229,14 +236,17 @@ export class AvailabilityService {
     fromUnit: number,
   ): Promise<Array<{ unitIndex: number; result: SearchResult }>> {
     // The unit list and the venue's booking rules do not depend on each other: read together.
-    const [allResources, policySet] = await Promise.all([
+    const [allResources, policySet, allGroups] = await Promise.all([
       limitReads(() => this.availability.findBookableResources(venue.id, params.groundType, categoryIds)),
       limitReads(() => this.policies.forVenue(venue, now)),
+      // A sub-type filter is about units; pooled groups have no sub-type.
+      params.groundType ? Promise.resolve([]) : limitReads(() => this.availability.findBookableGroups(venue.id, categoryIds)),
     ]);
     // A text filter keeps a venue's units when the venue's name or address matches, else only units whose sub-type does.
     const venueMatches = !needle || venue.name.toLowerCase().includes(needle) || venue.address.toLowerCase().includes(needle);
     const resources = venueMatches ? allResources : allResources.filter((r) => r.groundType.toLowerCase().includes(needle!));
-    if (resources.length === 0 || fromUnit >= resources.length) return [];
+    const groups = venueMatches ? allGroups : allGroups.filter((g) => g.name.toLowerCase().includes(needle!));
+    if (resources.length + groups.length === 0 || fromUnit >= resources.length + groups.length) return [];
 
     // Resolved per-venue, in that venue's own timezone — candidate venues from a geo/district search can
     // legitimately span timezones on a global platform, and "today"/weekday must mean the venue's local
@@ -248,8 +258,8 @@ export class AvailabilityService {
     const shown = resources.filter((_, i) => i >= fromUnit);
     // The commercial terms of each facility are read at the same time, not after.
     const [data] = await Promise.all([
-      this.loadVenueDay(venue, shown, { windowStart, windowEnd }, limitReads),
-      ...[...new Set(shown.map((u) => u.categoryId))].map((categoryId) => limitReads(() => this.termsFor(venue.id, categoryId, termsCache))),
+      shown.length > 0 ? this.loadVenueDay(venue, shown, { windowStart, windowEnd }, limitReads) : Promise.resolve(null),
+      ...[...new Set([...shown, ...groups].map((u) => u.categoryId))].map((categoryId) => limitReads(() => this.termsFor(venue.id, categoryId, termsCache))),
     ]);
 
     const built = await Promise.all(
@@ -264,12 +274,142 @@ export class AvailabilityService {
           now,
           termsCache,
           limitReads,
-          data,
+          data!,
         );
         return result ? { unitIndex, result } : null;
       }),
     );
-    return built.filter((b): b is { unitIndex: number; result: SearchResult } => b !== null);
+    const groupCards = groups.length > 0 ? await this.groupResultsForVenue(venue, groups, policySet, params, { windowStart, windowEnd, localDay }, now, termsCache, limitReads, resources.length) : [];
+    return [...built, ...groupCards].filter((b): b is { unitIndex: number; result: SearchResult } => b !== null);
+  }
+
+  /**
+   * The cards of a venue's pooled groups (kayak fleets): the same card as a unit, but `resource.id` is the group's id, prices are per unit
+   * and each start time says how many are still free. A group's lengths come from its own prices (one price per length); its start times
+   * are the departures the owner listed (FIXED) or any start on the booking grid inside its priced hours (FLEXIBLE). Read in four
+   * queries for all the venue's groups, then worked out from memory, like the units.
+   */
+  private async groupResultsForVenue(
+    venue: CandidateVenue,
+    groups: BookableGroupRow[],
+    policySet: Awaited<ReturnType<PolicyResolverService['forVenue']>>,
+    params: SearchParams,
+    day: { windowStart: Date; windowEnd: Date; localDay: DateTime },
+    now: Date,
+    termsCache: Map<string, Promise<CommercialTerms>>,
+    limitReads: ReturnType<typeof pLimit>,
+    firstIndex: number,
+  ): Promise<Array<{ unitIndex: number; result: SearchResult } | null>> {
+    const ids = groups.map((g) => g.id);
+    const from = new Date(day.windowStart.getTime() - DAY_MS);
+    const to = new Date(day.windowEnd.getTime() + DAY_MS);
+    const [rules, reservations, groupBlocks, venueBlocks] = await Promise.all([
+      limitReads(() => this.availability.findPricingRulesForGroups(ids, new Date(day.windowEnd.getTime() + 7 * DAY_MS))),
+      limitReads(() => this.availability.findGroupReservations(ids, from, to)),
+      limitReads(() => this.availability.findGroupBlocks(ids, from, to)),
+      limitReads(() => this.schedule.findVenueBlocks(venue.id, [], from, to)),
+    ]);
+    const venueWide = venueBlocks.filter((b) => b.resourceId === null && b.resourceGroupId === null);
+
+    return Promise.all(
+      groups.map(async (group, i) => {
+        const groupRules = rules.filter((r) => r.resourceGroupId === group.id && r.durationMinutes !== null);
+        // No price, no booking: a group nobody has priced is not shown.
+        if (groupRules.length === 0) return null;
+        const lengths = [...new Set(groupRules.map((r) => r.durationMinutes!))].sort((a, b) => a - b);
+        const durationMinutes = params.durationMinutes !== undefined && lengths.includes(params.durationMinutes) ? params.durationMinutes : lengths[0]!;
+        const priced = groupRules.filter((r) => r.durationMinutes === durationMinutes);
+        // Same rules a hold applies (buffers do not apply to counted units).
+        const policy = { ...policySet.resolve({ resourceGroupId: group.id }), bufferBeforeMin: 0, bufferAfterMin: 0 };
+        const openWindows = this.schedule.openWindowsFromRules(priced, day.localDay);
+        const terms = await limitReads(() => this.termsFor(venue.id, group.categoryId, termsCache));
+        const blocks = [...venueWide, ...groupBlocks.filter((b) => b.resourceGroupId === group.id)].map((b) => ({ startTime: b.startTime, endTime: b.endTime }));
+
+        let startTimes = await limitReads(() =>
+          this.candidateStartTimes({
+            venueId: venue.id,
+            resourceId: group.id,
+            footprintIds: [],
+            locks: [],
+            blocks,
+            policy,
+            durationMinutes,
+            windowStart: day.windowStart,
+            windowEnd: day.windowEnd,
+            openWindows,
+            timezone: venue.timezone,
+            now,
+            advanceDays: venue.advanceBookingDays,
+          }),
+        );
+        if (group.slotMode === 'FIXED') startTimes = startTimes.filter((t) => group.fixedStartTimes.includes(localHm(t, venue.timezone)));
+
+        // Units still free at each start: the group's count less what is held or confirmed overlapping it.
+        const mine = reservations.filter((r) => r.resourceGroupId === group.id);
+        const total = group.totalUnits ?? 0;
+        const free = startTimes.map((t) => {
+          const end = t.getTime() + durationMinutes * MINUTE_MS;
+          const held = mine.filter((r) => r.startTime.getTime() < end && r.endTime.getTime() > t.getTime()).reduce((n, r) => n + r.quantity, 0);
+          return Math.max(0, total - held);
+        });
+        const open = startTimes.filter((_, k) => free[k]! > 0);
+        const remaining = free.filter((n) => n > 0);
+
+        if (open.length === 0) {
+          const closedThatDay = openWindows.length === 0;
+          const beyondWindow =
+            day.windowStart.getTime() > Math.min(now.getTime() + policy.maxAdvanceDays * 86_400_000, lastBookableInstantMs(now, venue.timezone, venue.advanceBookingDays));
+          if (closedThatDay || beyondWindow) return null;
+        }
+
+        // One price per length: the whole booking of one unit at that start (a rule's price is for its own length).
+        const lastStart = open.length > 0 ? open[open.length - 1]! : null;
+        const pricedRules = lastStart ? priced.filter((r) => r.effectiveFrom <= lastStart) : [];
+        const startPrices = open.map((t) => priceBooking(pricedRules, t, durationMinutes, durationMinutes, venue.timezone));
+        const lowest = startPrices.filter((r): r is NonNullable<typeof r> => r !== null).reduce<NonNullable<(typeof startPrices)[number]> | null>((low, r) => (low === null || r.amount < low.amount ? r : low), null);
+        const advanceOf = (r: NonNullable<(typeof startPrices)[number]>) =>
+          atLeastMinAdvance(new Prisma.Decimal(r.advance), new Prisma.Decimal(r.amount), terms).toString();
+        const normalOf = (r: NonNullable<(typeof startPrices)[number]>) => (r.normalAmount > r.amount ? String(r.normalAmount) : null);
+
+        const result: SearchResult = {
+          venue: {
+            id: venue.id,
+            name: venue.name,
+            facilityCode: venue.facilityCode,
+            address: venue.address,
+            photoUrl: venue.photos[0]?.url ?? null,
+            lat: Number(venue.lat),
+            lng: Number(venue.lng),
+            googleMapsUrl: venue.googleMapsUrl,
+          },
+          category: group.category,
+          resource: { id: group.id, name: group.name, groundType: '', photoUrls: [] },
+          distanceKm:
+            params.lat !== undefined && params.lng !== undefined
+              ? Number(haversineKm(params.lat, params.lng, Number(venue.lat), Number(venue.lng)).toFixed(2))
+              : undefined,
+          durationMinutes,
+          availableStartTimes: open.map((t) => t.toISOString()),
+          policy: {
+            slotIntervalMin: policy.slotIntervalMin,
+            minDurationMin: lengths[0]!,
+            maxDurationMin: lengths[lengths.length - 1]!,
+            durationIncrementMin: policy.durationIncrementMin,
+            // Only the lengths the owner has priced can be booked.
+            durations: lengths,
+          },
+          openWindows,
+          timezone: venue.timezone,
+          price: lowest ? { amount: String(lowest.amount), currency: lowest.currency, normalAmount: normalOf(lowest), bookingAmount: advanceOf(lowest) } : null,
+          priceVaries: new Set(startPrices.map((r) => (r ? r.amount : null))).size > 1,
+          startPrices: startPrices.map((r) => (r ? String(r.amount) : null)),
+          startNormalPrices: startPrices.map((r) => (r ? normalOf(r) : null)),
+          startBookingPrices: startPrices.map((r) => (r ? advanceOf(r) : null)),
+          pooled: { totalUnits: total, slotMode: group.slotMode, remaining },
+        };
+        return { unitIndex: firstIndex + i, result };
+      }),
+    );
   }
 
   /** What a venue's units need for one day, read in a few queries for all of them. */

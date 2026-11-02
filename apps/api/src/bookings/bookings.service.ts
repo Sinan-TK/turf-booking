@@ -34,6 +34,7 @@ import { OwnerScopeService } from '../owner-scope/owner-scope.service';
 import { CommercialTermsService } from '../commercial/commercial-terms.service';
 import { SettlementsService } from '../settlements/settlements.service';
 import { assertPolicyAllowsBooking, paddedRange } from '../scheduling/policy-validation';
+import { groupStartProblem } from '../resources/group-slots';
 
 // Postgres SQLSTATEs that mean "the exclusion constraint on
 // resource_locks rejected this — the slot is genuinely taken," verified
@@ -310,6 +311,9 @@ export class BookingsService {
     if (!venue || venue.status !== 'ACTIVE') {
       throw new NotFoundException('Venue not found or not bookable');
     }
+    // The group's own slot rules: blocked by its owner, or a FIXED group asked for a time that is not one of its departures.
+    const slotProblem = groupStartProblem(group, startTime, venue.timezone);
+    if (slotProblem) throw new BadRequestException(slotProblem);
     // Group-scoped policy (GROUP > VENUE > CATEGORY > default): grid, duration
     // steps, lead time and advance window. Buffers do not apply to counted
     // pooled inventory (there is no per-unit lock to pad).
@@ -440,6 +444,8 @@ export class BookingsService {
     }
     const venue = await this.bookings.findVenueById(group.venueId);
     if (!venue || venue.status !== 'ACTIVE') return { available: false };
+
+    if (groupStartProblem(group, startTime, venue.timezone)) return { available: false };
 
     const endTime = new Date(startTime.getTime() + durationMinutes * 60 * 1000);
     if (await this.schedule.isBlocked(venue.id, { resourceGroupId: group.id }, startTime, endTime)) {

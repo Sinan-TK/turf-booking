@@ -11,6 +11,7 @@ import { SvgIcon } from '@/components/svg-icons';
 import { VenueMapLink } from '@/components/venue-map-link';
 import { VenueAdvanceBooking } from '@/components/venue-advance-booking';
 import { VenueAvailability } from '@/components/venue-availability';
+import { VenuePooledGroups } from '@/components/venue-pooled-groups';
 import { UnitPhotos, type UnitPhoto } from '@/components/unit-photos';
 import { DurationFields, UnitDurations, defaultDurations, durationsError } from '@/components/unit-durations';
 import {
@@ -309,6 +310,8 @@ export default function VenueDetailPage() {
             );
           })}
 
+          <VenuePooledGroups venueId={venue.id} categories={categories} />
+
           {units.length === 0 && (
             <div className="rounded-xl border border-dashed border-outline-variant p-8 text-center text-body-md text-on-surface-variant">
               No units yet. Pick a facility below and add the first one.
@@ -357,7 +360,7 @@ export default function VenueDetailPage() {
                       }}
                     >
                       <option value="">Select facility…</option>
-                      {categories?.map((c) => (
+                      {categories?.filter((c) => c.defaultAllocationMode !== 'POOLED').map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.name}
                         </option>

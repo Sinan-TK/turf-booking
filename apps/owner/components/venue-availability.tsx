@@ -976,7 +976,7 @@ export function VenueAvailability({ venueId, resources, categories }: { venueId:
   const current = TABS.find((t) => t.key === tab)!;
 
   if (resources.length === 0) {
-    return <ErrorBanner message="Add at least one unit above before configuring pricing." />;
+    return <ErrorBanner message="Add a unit above to price it. A pooled item (such as kayaks) is priced inside its own card." />;
   }
 
   return (

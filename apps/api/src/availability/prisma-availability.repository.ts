@@ -88,6 +88,41 @@ export class PrismaAvailabilityRepository implements AvailabilityRepository {
     });
   }
 
+  findBookableGroups(venueId: string, categoryIds?: string[]) {
+    return this.prisma.client.resourceGroup.findMany({
+      include: { category: { select: UNIT_CATEGORY_SELECT } },
+      where: {
+        venueId,
+        allocationMode: 'POOLED',
+        isBookable: true,
+        totalUnits: { gt: 0 },
+        ...(categoryIds ? { categoryId: { in: categoryIds } } : {}),
+      },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }, { id: 'asc' }],
+    });
+  }
+
+  findPricingRulesForGroups(groupIds: string[], upTo: Date) {
+    return this.prisma.client.pricingRule.findMany({
+      where: { resourceGroupId: { in: groupIds }, isActive: true, effectiveFrom: { lte: upTo } },
+    });
+  }
+
+  async findGroupReservations(groupIds: string[], from: Date, to: Date) {
+    const rows = await this.prisma.client.inventoryReservation.findMany({
+      where: { resourceGroupId: { in: groupIds }, status: { in: ['HELD', 'CONFIRMED'] }, startTime: { lt: to }, endTime: { gt: from } },
+      select: { resourceGroupId: true, startTime: true, endTime: true, quantity: true },
+    });
+    return rows.map((r) => ({ ...r, resourceGroupId: r.resourceGroupId! }));
+  }
+
+  findGroupBlocks(groupIds: string[], from: Date, to: Date) {
+    return this.prisma.client.blockedPeriod.findMany({
+      where: { resourceGroupId: { in: groupIds }, startTime: { lt: to }, endTime: { gt: from } },
+      select: { resourceGroupId: true, startTime: true, endTime: true },
+    });
+  }
+
   findPricingRules(resourceId: string, at: Date) {
     return this.prisma.client.pricingRule.findMany({
       where: { resourceId, isActive: true, effectiveFrom: { lte: at } },

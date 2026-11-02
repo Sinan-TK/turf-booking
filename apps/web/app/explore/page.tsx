@@ -880,7 +880,7 @@ const CELL_COLOURS: Record<HourCell['state'], string> = {
 function UnitPanel({ result: r, liveResult, durationMinutes: requestedDuration, dateIso }: UnitCardProps) {
   // What this unit's slots and prices are for (its own shortest unless a length it offers was asked for).
   const durationMinutes = liveResult.durationMinutes ?? r.durationMinutes ?? requestedDuration ?? r.policy?.minDurationMin ?? 60;
-  const { bookSlot, busyStart, error: bookError } = useBookSlot(r.resource.id, durationMinutes);
+  const { bookSlot, busyStart, error: bookError } = useBookSlot(r.resource.id, durationMinutes, !!r.pooled);
   const { cells, first, last } = useMemo(() => buildDayTimeline(r, dateIso), [r, dateIso]);
   const hours = openHoursLabel(r);
   const span = last - first;

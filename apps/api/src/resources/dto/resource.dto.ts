@@ -1,5 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { HM_PATTERN } from '../group-slots';
 
 export const createResourceSchema = z.object({
   venueId: z.string().uuid(),
@@ -56,12 +57,25 @@ export const createResourceGroupSchema = z
     allocationMode: z.enum(['EXCLUSIVE', 'POOLED']),
     totalUnits: z.number().int().positive().max(10000).optional(),
     sortOrder: z.number().int().default(0),
+    slotMode: z.enum(['FLEXIBLE', 'FIXED']).default('FLEXIBLE'),
+    fixedStartTimes: z.array(z.string().regex(HM_PATTERN, 'Use a time like 06:30')).max(48).default([]),
   })
   .refine(
     (d) => d.allocationMode !== 'POOLED' || d.totalUnits !== undefined,
     { message: 'POOLED groups require totalUnits' },
-  );
+  )
+  .refine((d) => d.slotMode !== 'FIXED' || d.fixedStartTimes.length > 0, { message: 'Add at least one departure time for fixed slots' });
 export class CreateResourceGroupDto extends createZodDto(createResourceGroupSchema) {}
+
+// Changes to a pooled group: how many it has, whether it is open, and when its slots are.
+export const updateResourceGroupSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  totalUnits: z.number().int().positive().max(10000).optional(),
+  isBookable: z.boolean().optional(),
+  slotMode: z.enum(['FLEXIBLE', 'FIXED']).optional(),
+  fixedStartTimes: z.array(z.string().regex(HM_PATTERN, 'Use a time like 06:30')).max(48).optional(),
+});
+export class UpdateResourceGroupDto extends createZodDto(updateResourceGroupSchema) {}
 
 // The order of a unit's photos: every one of its photo ids, main photo first.
 export const reorderPhotosSchema = z.object({ photoIds: z.array(z.string().uuid()).min(1).max(3) });

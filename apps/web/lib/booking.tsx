@@ -35,6 +35,8 @@ export interface SearchResult {
   startNormalPrices?: Array<string | null>;
   /** The advance paid online for each start time. */
   startBookingPrices?: Array<string | null>;
+  /** Only on a pooled item (a fleet like kayaks): `resource.id` is then the group's id, prices are per one, and `remaining` is how many are free at each start time. */
+  pooled?: { totalUnits: number; slotMode: 'FLEXIBLE' | 'FIXED'; remaining: number[] };
 }
 
 /**
@@ -136,7 +138,7 @@ export function googleMapsLink(venue: { googleMapsUrl?: string | null; lat?: num
  * taken") is shown as `error`. `busy` stays set after success until the
  * navigation finishes, so a second tap cannot create a second hold.
  */
-export function useBookSlot(resourceId: string, durationMinutes: number) {
+export function useBookSlot(resourceId: string, durationMinutes: number, pooled = false) {
   const router = useRouter();
   const { requireLogin, refresh } = useCustomer();
   const toast = useToast();
@@ -144,14 +146,15 @@ export function useBookSlot(resourceId: string, durationMinutes: number) {
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(false);
 
-  async function bookSlot(startTime: string) {
+  async function bookSlot(startTime: string, quantity = 1) {
     if (inFlight.current) return;
     inFlight.current = true;
     setBusyStart(startTime);
     setError(null);
     try {
       await requireLogin(); // may open the login dialog; rejects if dismissed
-      const hold = await api.post<{ id: string }>('/bookings/hold', { resourceId, startTime, durationMinutes });
+      // A pooled item is held by how many of it (kayaks), a unit by itself.
+      const hold = await api.post<{ id: string }>('/bookings/hold', pooled ? { resourceGroupId: resourceId, quantity, startTime, durationMinutes } : { resourceId, startTime, durationMinutes });
       router.push(`/checkout/${hold.id}`);
     } catch (err) {
       inFlight.current = false;

@@ -95,28 +95,29 @@ test.describe('owner portal: venue details', () => {
   test('adding a unit: no type for a typeless facility, a required type where types are preset', async ({ page, makeVenue }) => {
     const venue = await makeVenue();
     await page.goto(`/venues/${venue.id}`);
+    const unitForm = page.getByRole('heading', { name: 'Add a unit' }).locator('xpath=ancestor::section[1]');
     const add = page.getByRole('button', { name: /^Add (court|turf|pitch|unit)$/ });
     await expect(add).toBeEnabled();
     await add.click(); // nothing chosen yet: the form says what is missing, field by field
     await expect(page.getByText('Select a facility.')).toBeVisible();
 
     // Badminton has no preset types, so the form does not ask for one at all.
-    await field(page, 'Facility').selectOption({ label: 'Badminton Court' });
+    await field(unitForm, 'Facility').selectOption({ label: 'Badminton Court' });
     await expect(page.locator('label').filter({ hasText: /type/i })).toHaveCount(0);
     await expect(page.getByText('Select a facility.')).toHaveCount(0);
     await add.click();
     await expect(page.getByText(/Enter the court name./i)).toBeVisible();
-    await field(page, /name/).fill('Court 2');
+    await field(unitForm, /name/).fill('Court 2');
     await expect(add).toBeEnabled();
     await add.click();
     await expect(page.getByText('Court 2', { exact: true })).toBeVisible();
 
     // Football has 5S / 7S, and one must be chosen.
-    await field(page, 'Facility').selectOption({ label: 'Football' });
-    await field(page, /name/).fill('Turf B');
+    await field(unitForm, 'Facility').selectOption({ label: 'Football' });
+    await field(unitForm, /name/).fill('Turf B');
     await add.click();
     await expect(page.getByText(/Select the (turf|pitch) type./i)).toBeVisible();
-    await field(page, /type/).selectOption('7S');
+    await field(unitForm, /type/).selectOption('7S');
     await expect(page.getByText(/Select the (turf|pitch) type./i)).toHaveCount(0);
     await add.click();
     await expect(page.getByText('Turf type · 7S')).toBeVisible();

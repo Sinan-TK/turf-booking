@@ -1,6 +1,7 @@
 import type {
   PricingRule,
   Resource,
+  ResourceGroup,
   ResourceLock,
   Venue,
 } from '@venue/database';
@@ -24,6 +25,17 @@ export interface UnitCategory {
 
 /** A unit with its facility and its photos (storage keys, main photo first). */
 export type BookableResource = Resource & { category: UnitCategory; photos: Array<{ key: string }> };
+
+/** A pooled group (a kayak fleet) with its facility, as search cards show it. */
+export type BookableGroup = ResourceGroup & { category: UnitCategory };
+
+/** Units of a pooled group held or confirmed for a time range. */
+export interface GroupReservation {
+  resourceGroupId: string;
+  startTime: Date;
+  endTime: Date;
+  quantity: number;
+}
 
 /**
  * Clean-Architecture port: AvailabilityService (read-model use-case)
@@ -51,6 +63,14 @@ export interface AvailabilityRepository {
   findPricingRules(resourceId: string, at: Date): Promise<PricingRule[]>;
   /** Every active price rule of all these units already in effect at `upTo`, in one read (search works a whole venue at once). */
   findPricingRulesForUnits(resourceIds: string[], upTo: Date): Promise<PricingRule[]>;
+  /** The venue's open pooled groups (a count and a price are needed to book one); categoryIds omitted = every facility. */
+  findBookableGroups(venueId: string, categoryIds?: string[]): Promise<BookableGroup[]>;
+  /** Every active price rule of all these groups already in effect at `upTo`, in one read. */
+  findPricingRulesForGroups(groupIds: string[], upTo: Date): Promise<PricingRule[]>;
+  /** The units of these groups held or confirmed anywhere in [from, to). */
+  findGroupReservations(groupIds: string[], from: Date, to: Date): Promise<GroupReservation[]>;
+  /** The owner's blocked periods that are set on these groups, in [from, to). */
+  findGroupBlocks(groupIds: string[], from: Date, to: Date): Promise<Array<{ resourceGroupId: string | null; startTime: Date; endTime: Date }>>;
   findOverlappingLocks(
     footprintIds: string[],
     rangeStart: Date,

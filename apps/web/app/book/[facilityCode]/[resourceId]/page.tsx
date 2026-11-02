@@ -40,6 +40,15 @@ function Screen({ children }: { children: React.ReactNode }) {
 
 const MOST_DAYS = 14;
 
+/** What `count` of a pooled item cost: the prices of a slot are for one. */
+function totalOf(price: NonNullable<ReturnType<typeof priceAt>>, count: number) {
+  return {
+    ...price,
+    amount: String(Number(price.amount) * count),
+    bookingAmount: price.bookingAmount ? String(Number(price.bookingAmount) * count) : price.bookingAmount,
+  };
+}
+
 /** The next `count` days (today first) for the day strip. */
 function nextDays(count: number) {
   return Array.from({ length: count }, (_, i) => {
@@ -202,8 +211,11 @@ function BookingPage() {
   useEffect(() => setSelected(null), [unit?.resource.id, dateIso, durationMinutes]);
 
   const shownDuration = unit?.durationMinutes ?? durationMinutes ?? unit?.policy?.minDurationMin ?? 60;
-  const { bookSlot, busyStart, error: bookError, clearError } = useBookSlot(unit?.resource.id ?? resourceId, shownDuration);
+  const { bookSlot, busyStart, error: bookError, clearError } = useBookSlot(unit?.resource.id ?? resourceId, shownDuration, !!unit?.pooled);
   const booking = busyStart !== null;
+  // How many of a pooled item (kayaks) the customer is booking.
+  const [quantity, setQuantity] = useState(1);
+  useEffect(() => setQuantity(1), [selected, unit?.resource.id]);
   useEffect(() => clearError(), [selected, unit?.resource.id, durationMinutes]);
 
   const days = useMemo(() => nextDays(dayCount), [dayCount]);
@@ -225,9 +237,19 @@ function BookingPage() {
   }
 
   const r = unit;
+  // A unit steps through every length its rules allow; a pooled item only through the lengths its owner has priced.
   const step = r.policy?.durationIncrementMin ?? 60;
   const minDuration = r.policy?.minDurationMin ?? 60;
   const maxDuration = r.policy?.maxDurationMin ?? 180;
+  const lengths = r.pooled ? (r.policy?.durations ?? []) : null;
+  const lengthAt = lengths ? lengths.indexOf(shownDuration) : -1;
+  const shorter = lengths ? (lengthAt > 0 ? lengths[lengthAt - 1]! : null) : shownDuration - step >= minDuration ? shownDuration - step : null;
+  const longer = lengths ? (lengthAt >= 0 && lengthAt < lengths.length - 1 ? lengths[lengthAt + 1]! : null) : shownDuration + step <= maxDuration ? shownDuration + step : null;
+  const thing = (r.category?.unitLabel ?? 'unit').toLowerCase();
+  // Pooled: how many are free at the picked start, and the total for the number chosen (the prices on the page are for one).
+  const slotAt = selected ? r.availableStartTimes.indexOf(selected) : -1;
+  const left = r.pooled && slotAt >= 0 ? (r.pooled.remaining[slotAt] ?? 1) : 1;
+  const qty = r.pooled ? Math.max(1, Math.min(quantity, left)) : 1;
   // While a new day or length is searched the price is unknown, so none is shown rather than a guess.
   const reloading = loading;
   const displayPrice = reloading ? null : r.price;
@@ -319,10 +341,11 @@ function BookingPage() {
               <button
                 type="button"
                 aria-label="Shorter booking"
-                disabled={shownDuration - step < minDuration}
+                disabled={shorter === null}
                 onClick={() => {
-                  setDurationMinutes(shownDuration - step);
-                  go({ duration: shownDuration - step });
+                  if (shorter === null) return;
+                  setDurationMinutes(shorter);
+                  go({ duration: shorter });
                 }}
                 className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-sm font-black text-slate-700 transition hover:bg-slate-200 active:scale-90 disabled:cursor-not-allowed disabled:opacity-40"
               >
@@ -332,10 +355,11 @@ function BookingPage() {
               <button
                 type="button"
                 aria-label="Longer booking"
-                disabled={shownDuration + step > maxDuration}
+                disabled={longer === null}
                 onClick={() => {
-                  setDurationMinutes(shownDuration + step);
-                  go({ duration: shownDuration + step });
+                  if (longer === null) return;
+                  setDurationMinutes(longer);
+                  go({ duration: longer });
                 }}
                 className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-sm font-black text-slate-700 transition hover:bg-slate-200 active:scale-90 disabled:cursor-not-allowed disabled:opacity-40"
               >
@@ -368,7 +392,10 @@ function BookingPage() {
                       active ? 'border-brand-600 bg-brand-600 text-white shadow-md' : 'border-slate-200 bg-white text-slate-800 hover:border-brand-400 hover:bg-brand-50/50'
                     }`}
                   >
-                    <span className={`text-sm font-extrabold ${active ? 'text-white' : 'text-slate-900'}`}>{formatStart(t, r.timezone)}</span>
+                    <span className="flex flex-col leading-tight">
+                      <span className={`text-sm font-extrabold ${active ? 'text-white' : 'text-slate-900'}`}>{formatStart(t, r.timezone)}</span>
+                      {r.pooled && <span className={`text-[0.625rem] font-semibold ${active ? 'text-white/80' : 'text-slate-500'}`}>{r.pooled.remaining[r.availableStartTimes.indexOf(t)] ?? 0} left</span>}
+                    </span>
                     {slotPrice && (
                       <span className="flex shrink-0 flex-col items-end leading-tight">
                         <span className={`text-[0.6875rem] font-black ${active ? 'text-brand-100' : 'text-brand-700'}`}>{formatPrice(slotPrice)}</span>
@@ -384,11 +411,29 @@ function BookingPage() {
           </div>
 
           <div className="border-t border-slate-100 bg-white p-4">
+            {selected && r.pooled && (
+              <div className="mb-3 flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
+                <span className="text-sm font-bold text-slate-800">
+                  How many {thing}s
+                  <span className="ml-2 text-xs font-semibold text-slate-500">{left} left</span>
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-md bg-white py-0.5 pl-1 pr-2 font-bold text-slate-700 ring-1 ring-slate-200">
+                  <button type="button" aria-label={`Fewer ${thing}s`} disabled={qty <= 1} onClick={() => setQuantity(qty - 1)} className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-sm font-black text-slate-700 transition hover:bg-slate-200 active:scale-90 disabled:cursor-not-allowed disabled:opacity-40">
+                    −
+                  </button>
+                  <span aria-live="polite" className="min-w-8 px-1 text-center">{qty}</span>
+                  <button type="button" aria-label={`More ${thing}s`} disabled={qty >= left} onClick={() => setQuantity(qty + 1)} className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-sm font-black text-slate-700 transition hover:bg-slate-200 active:scale-90 disabled:cursor-not-allowed disabled:opacity-40">
+                    +
+                  </button>
+                </span>
+              </div>
+            )}
             {selected && (
               <p className="mb-2 text-center text-xs font-semibold text-slate-600">
-                {formatDateLabel(dateIso)} · {formatTimeRange(selected, shownDuration, r.timezone)} · {displayPrice && picked ? formatPrice(picked) : ''}
-                {displayPrice && picked?.normalAmount && <s className="ml-1 font-medium text-slate-400">{formatPrice({ amount: picked.normalAmount, currency: r.price!.currency })}</s>}
-                {displayPrice && picked && payNowLabel(picked) && <span className="block text-brand-700">{payNowLabel(picked)}, the rest at the venue</span>}
+                {formatDateLabel(dateIso)} · {formatTimeRange(selected, shownDuration, r.timezone)} · {displayPrice && picked ? formatPrice(totalOf(picked, qty)) : ''}
+                {r.pooled && qty > 1 && displayPrice && picked && <span className="text-slate-400"> ({formatPrice(picked)} each × {qty})</span>}
+                {displayPrice && picked?.normalAmount && <s className="ml-1 font-medium text-slate-400">{formatPrice({ amount: String(Number(picked.normalAmount) * qty), currency: r.price!.currency })}</s>}
+                {displayPrice && picked && payNowLabel(totalOf(picked, qty)) && <span className="block text-brand-700">{payNowLabel(totalOf(picked, qty))}, the rest at the venue</span>}
               </p>
             )}
             {bookError && (
@@ -399,11 +444,11 @@ function BookingPage() {
             <button
               type="button"
               disabled={!selected || booking || reloading}
-              onClick={() => selected && bookSlot(selected)}
+              onClick={() => selected && bookSlot(selected, qty)}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-700 px-5 py-3 text-sm font-extrabold text-white shadow-glow transition hover:bg-brand-800 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none disabled:active:scale-100"
             >
               {booking && <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />}
-              {booking ? 'Holding your slot…' : selected ? `Book ${formatStart(selected, r.timezone)}` : 'Select a slot above'}
+              {booking ? 'Holding your slot…' : selected ? `Book ${formatStart(selected, r.timezone)}${r.pooled ? ` · ${qty} ${thing}${qty === 1 ? '' : 's'}` : ''}` : 'Select a slot above'}
             </button>
           </div>
         </section>

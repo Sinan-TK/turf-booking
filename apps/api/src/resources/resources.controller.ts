@@ -26,6 +26,7 @@ import {
   CreateCompositionDto,
   CreateResourceDto,
   CreateResourceGroupDto,
+  UpdateResourceGroupDto,
   SetFacilityBookableDto,
   ReorderPhotosDto,
   SetResourceBookableDto,
@@ -96,6 +97,12 @@ export class ResourcesController {
   @Roles(Role.SUPER_ADMIN, Role.VENUE_OWNER)
   createGroup(@Body() dto: CreateResourceGroupDto, @CurrentUser() actor: AuthContext) {
     return this.resources.createGroup(dto, actor);
+  }
+
+  @Patch('groups/:id')
+  @Roles(Role.SUPER_ADMIN, Role.VENUE_OWNER)
+  updateGroup(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateResourceGroupDto, @CurrentUser() actor: AuthContext) {
+    return this.resources.updateGroup(id, dto, actor);
   }
 
   @Get('groups')

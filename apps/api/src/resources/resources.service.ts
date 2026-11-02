@@ -10,6 +10,7 @@ import { OwnerScopeService } from '../owner-scope/owner-scope.service';
 import { StorageService } from '../storage/storage.service';
 import { PolicyResolverService } from '../scheduling/policy-resolver.service';
 import { unitDurationProblem } from '@venue/shared';
+import { clockLabel, normalizeStartTimes } from './group-slots';
 
 /** The facility fields a unit carries to clients: labels, allowed sub-types, icon. */
 const CATEGORY_SUMMARY = {
@@ -363,6 +364,8 @@ export class ResourcesService {
       allocationMode: 'EXCLUSIVE' | 'POOLED';
       totalUnits?: number;
       sortOrder: number;
+      slotMode?: 'FLEXIBLE' | 'FIXED';
+      fixedStartTimes?: string[];
     },
     actor: AuthContext,
   ) {
@@ -374,6 +377,9 @@ export class ResourcesService {
         throw new BadRequestException('POOLED groups require a positive integer totalUnits');
       }
     }
+    const fixedStartTimes = normalizeStartTimes(dto.fixedStartTimes ?? []);
+    const slotMode = dto.slotMode ?? 'FLEXIBLE';
+    if (slotMode === 'FIXED') await this.assertDeparturesOnGrid(dto.venueId, undefined, category.id, fixedStartTimes);
     return this.prisma.client.resourceGroup.create({
       data: {
         venueId: dto.venueId,
@@ -382,7 +388,66 @@ export class ResourcesService {
         allocationMode: dto.allocationMode,
         totalUnits: dto.totalUnits,
         sortOrder: dto.sortOrder,
+        slotMode,
+        fixedStartTimes: slotMode === 'FIXED' ? fixedStartTimes : [],
       },
+    });
+  }
+
+  /** Fixed departures must fall on the venue's booking grid (for example every 30 minutes), or no customer could book them. */
+  private async assertDeparturesOnGrid(venueId: string, groupId: string | undefined, categoryId: string, times: string[]) {
+    const policy = (await this.policies.forVenue({ id: venueId })).resolve({ categoryId, ...(groupId ? { resourceGroupId: groupId } : {}) });
+    const step = policy.slotIntervalMin;
+    const off = times.find((t) => {
+      const [h = 0, m = 0] = t.split(':').map(Number);
+      return (h * 60 + m) % step !== 0;
+    });
+    if (off) throw new BadRequestException(`${clockLabel(off)} does not fit the booking grid: start times must be a multiple of ${step} minutes.`);
+  }
+
+  /**
+   * Changes a pooled group: its name, how many it has, whether it is open and when its slots are. The count cannot drop below what
+   * is already booked at the busiest moment ahead, so no existing booking is left without its units.
+   */
+  async updateGroup(
+    id: string,
+    dto: { name?: string; totalUnits?: number; isBookable?: boolean; slotMode?: 'FLEXIBLE' | 'FIXED'; fixedStartTimes?: string[] },
+    actor: AuthContext,
+  ) {
+    const group = await this.prisma.client.resourceGroup.findUnique({ where: { id } });
+    if (!group) throw new NotFoundException('Group not found');
+    await this.assertVenueOwnership(group.venueId, actor);
+    if (dto.totalUnits !== undefined) {
+      if (group.allocationMode !== 'POOLED') throw new BadRequestException('Only a pooled group has a count');
+      const [peak] = await this.prisma.client.$queryRaw<Array<{ peak: bigint }>>`
+        SELECT COALESCE(MAX(s.total), 0)::bigint AS peak FROM (
+          SELECT (SELECT COALESCE(SUM(o.quantity), 0) FROM inventory_reservations o
+                  WHERE o."resourceGroupId" = r."resourceGroupId" AND o.status IN ('HELD', 'CONFIRMED')
+                    AND o."startTime" <= r."startTime" AND o."endTime" > r."startTime") AS total
+          FROM inventory_reservations r
+          WHERE r."resourceGroupId" = ${id}::uuid AND r.status IN ('HELD', 'CONFIRMED') AND r."endTime" > now()
+        ) s`;
+      const booked = Number(peak?.peak ?? 0);
+      if (dto.totalUnits < booked) {
+        throw new BadRequestException(`${booked} are already booked at the busiest time ahead, so the count can't go below ${booked}.`);
+      }
+    }
+    const slotMode = dto.slotMode ?? group.slotMode;
+    const times = dto.fixedStartTimes !== undefined ? normalizeStartTimes(dto.fixedStartTimes) : group.fixedStartTimes;
+    if (slotMode === 'FIXED') {
+      if (times.length === 0) throw new BadRequestException('Add at least one departure time for fixed slots');
+      await this.assertDeparturesOnGrid(group.venueId, group.id, group.categoryId, times);
+    }
+    return this.prisma.client.resourceGroup.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.totalUnits !== undefined ? { totalUnits: dto.totalUnits } : {}),
+        ...(dto.isBookable !== undefined ? { isBookable: dto.isBookable } : {}),
+        slotMode,
+        fixedStartTimes: slotMode === 'FIXED' ? times : [],
+      },
+      include: { category: { select: CATEGORY_SUMMARY } },
     });
   }
 
