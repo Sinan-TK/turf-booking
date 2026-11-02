@@ -112,6 +112,41 @@ export class ResourcesController {
     return this.resources.listGroupsForVenue(venueId, actor);
   }
 
+  // Photos of a pooled group (a kayak fleet), the same as a unit's: at most three, the first the main one.
+  @Get('groups/:id/photos')
+  @Roles(Role.SUPER_ADMIN, Role.VENUE_OWNER)
+  @OwnerRoles('OWNER_ADMIN', 'OWNER_STAFF')
+  listGroupPhotos(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthContext) {
+    return this.photos.listGroup(id, actor);
+  }
+
+  @Post('groups/:id/photos')
+  @Roles(Role.SUPER_ADMIN, Role.VENUE_OWNER)
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_PHOTO_BYTES, files: 1 } }))
+  addGroupPhoto(
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFile() file: { buffer: Buffer; size: number } | undefined,
+    @CurrentUser() actor: AuthContext,
+  ) {
+    return this.photos.addGroup(id, file, actor);
+  }
+
+  @Put('groups/:id/photos/order')
+  @Roles(Role.SUPER_ADMIN, Role.VENUE_OWNER)
+  reorderGroupPhotos(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReorderPhotosDto, @CurrentUser() actor: AuthContext) {
+    return this.photos.reorderGroup(id, dto.photoIds, actor);
+  }
+
+  @Delete('groups/:id/photos/:photoId')
+  @Roles(Role.SUPER_ADMIN, Role.VENUE_OWNER)
+  removeGroupPhoto(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('photoId', ParseUUIDPipe) photoId: string,
+    @CurrentUser() actor: AuthContext,
+  ) {
+    return this.photos.removeGroup(id, photoId, actor);
+  }
+
   // Photos of one unit (at most three; the first is the main one on the customer's card).
   @Get(':id/photos')
   @Roles(Role.SUPER_ADMIN, Role.VENUE_OWNER)

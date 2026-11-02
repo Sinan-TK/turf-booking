@@ -43,6 +43,13 @@ test.describe('owner portal: pooled items', () => {
     await card.getByRole('button', { name: 'Save count' }).click();
     await expect(card).toContainText('8 kayaks');
 
+    // The card has its own photo editor, and a photo added there is what customers see.
+    await expect(card.getByRole('button', { name: /Add photo/ })).toBeVisible();
+    const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
+    const groupsNow = (await (await ownerApi.get(`/resources/groups?venueId=${venue.id}`)).json()) as Array<{ id: string; name: string }>;
+    const uploaded = await ownerApi.post(`/resources/groups/${groupsNow.find((g) => g.name === 'PW Single kayaks')!.id}/photos`, { multipart: { file: { name: 'k.png', mimeType: 'image/png', buffer: PNG } } });
+    expect(uploaded.ok()).toBeTruthy();
+
     // What customers get: the fleet is in the search with a free count at each fixed time.
     const groups = (await (await ownerApi.get(`/resources/groups?venueId=${venue.id}`)).json()) as Array<{ id: string; name: string }>;
     const group = groups.find((g) => g.name === 'PW Single kayaks')!;
@@ -54,6 +61,7 @@ test.describe('owner portal: pooled items', () => {
     const article = web.getByRole('article').first();
     await expect(article.getByRole('heading', { level: 1 })).toContainText(venue.name);
     await expect(article.getByText('8 left').first()).toBeVisible();
+    await expect(article.locator('img[alt$="PW Single kayaks"]').first()).toBeAttached(); // its own photo is the big picture
     await article.getByRole('button', { name: /^8:00 AM/ }).click();
     await expect(article.getByText('How many kayaks')).toBeVisible();
     await article.getByRole('button', { name: 'More kayaks' }).click();

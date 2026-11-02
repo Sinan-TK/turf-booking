@@ -90,7 +90,10 @@ export class PrismaAvailabilityRepository implements AvailabilityRepository {
 
   findBookableGroups(venueId: string, categoryIds?: string[]) {
     return this.prisma.client.resourceGroup.findMany({
-      include: { category: { select: UNIT_CATEGORY_SELECT } },
+      include: {
+        category: { select: UNIT_CATEGORY_SELECT },
+        photos: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }], select: { key: true } },
+      },
       where: {
         venueId,
         allocationMode: 'POOLED',

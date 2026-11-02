@@ -5,6 +5,7 @@ import { useFetch } from '@/lib/use-fetch';
 import { api, ApiError } from '@/lib/api';
 import { durationLabel, type VenueCategory, type VenueCategorySummary } from '@/lib/categories';
 import { Button, ErrorBanner, FieldError, Input, Label, Select, invalidClass } from '@/components/ui';
+import { UnitPhotos, type UnitPhoto } from '@/components/unit-photos';
 
 interface Group {
   id: string;
@@ -15,6 +16,8 @@ interface Group {
   slotMode: 'FLEXIBLE' | 'FIXED';
   fixedStartTimes: string[];
   category: VenueCategorySummary;
+  /** Up to three, main photo first: what customers see on the card. */
+  photos: UnitPhoto[];
 }
 
 interface GroupPrice {
@@ -138,6 +141,11 @@ function GroupCard({ group, category, onChanged }: { group: Group; category?: Ve
       <div className="space-y-6 p-container-padding">
         {error && <ErrorBanner message={error} />}
         {saved && <p role="status" className="text-sm font-medium text-emerald-700">{saved} saved.</p>}
+
+        <div>
+          <p className="font-label-md text-label-md text-on-surface-variant">Photos</p>
+          <UnitPhotos unitId={group.id} unitName={group.name} initial={group.photos ?? []} basePath={`/resources/groups/${group.id}`} />
+        </div>
 
         <div className="flex flex-wrap items-end gap-3">
           <div>

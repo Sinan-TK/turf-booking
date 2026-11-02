@@ -383,7 +383,7 @@ export class AvailabilityService {
             googleMapsUrl: venue.googleMapsUrl,
           },
           category: group.category,
-          resource: { id: group.id, name: group.name, groundType: '', photoUrls: [] },
+          resource: { id: group.id, name: group.name, groundType: '', photoUrls: group.photos.map((p) => this.storage.publicUrl(p.key)) },
           distanceKm:
             params.lat !== undefined && params.lng !== undefined
               ? Number(haversineKm(params.lat, params.lng, Number(venue.lat), Number(venue.lng)).toFixed(2))

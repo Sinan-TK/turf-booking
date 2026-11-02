@@ -188,6 +188,32 @@ describe('Pooled groups: count, slots and search', () => {
     expect(full.pooled!.remaining).toEqual([6, 6]);
   });
 
+  test('a pooled group has up to three photos: listed for its owner, shown on its search card, and managed by its owner only', async () => {
+    const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
+    const created = await createGroup({ name: 'Photo Fleet', totalUnits: 4 });
+    const id = created.body.id as string;
+    await priceGroup(id, 300);
+    expect((await ownerAgent.get(`/resources/groups/${id}/photos`).expect(200)).body).toEqual([]);
+
+    for (let i = 0; i < 3; i++) await ownerAgent.post(`/resources/groups/${id}/photos`).attach('file', PNG, `p${i}.png`).expect(201);
+    const fourth = await ownerAgent.post(`/resources/groups/${id}/photos`).attach('file', PNG, 'p4.png').expect(400);
+    expect(JSON.stringify(fourth.body)).toMatch(/3 photos at most/);
+
+    const photos = (await ownerAgent.get(`/resources/groups/${id}/photos`).expect(200)).body as Array<{ id: string; url: string }>;
+    expect(photos).toHaveLength(3);
+    const card = (await searchFor(22)).find((r) => r.resource.id === id) as unknown as { resource: { photoUrls: string[] } };
+    expect(card.resource.photoUrls).toEqual(photos.map((p) => p.url));
+    const listed = (await ownerAgent.get(`/resources/groups`).query({ venueId }).expect(200)).body as Array<{ id: string; photos: unknown[] }>;
+    expect(listed.find((g) => g.id === id)!.photos).toEqual(photos);
+
+    const reversed = [...photos].reverse().map((p) => p.id);
+    expect((await ownerAgent.put(`/resources/groups/${id}/photos/order`).send({ photoIds: reversed }).expect(200)).body.map((p: { id: string }) => p.id)).toEqual(reversed);
+    const other = await createOwnerFixture(app, adminAgent);
+    expect([403, 404]).toContain((await other.ownerAgent.post(`/resources/groups/${id}/photos`).attach('file', PNG, 'x.png')).status);
+    const after = await ownerAgent.delete(`/resources/groups/${id}/photos/${reversed[0]}`).expect(200);
+    expect(after.body).toHaveLength(2);
+  });
+
   test('a group nobody has priced, or that is blocked, is not in the search', async () => {
     const unpriced = await createGroup({ name: 'Unpriced Search Fleet', totalUnits: 3 });
     const closed = await createGroup({ name: 'Closed Search Fleet', totalUnits: 3 });

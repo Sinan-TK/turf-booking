@@ -14,11 +14,13 @@ export interface UnitPhoto {
 export const MAX_UNIT_PHOTOS = 3;
 
 /**
- * The photos of one unit (pitch, court, table…), as customers see them on the venue card: up to three, the first
+ * The photos of one unit (pitch, court, table…) or one pooled item (a kayak fleet), as customers see them on the venue card: up to three, the first
  * being the main picture. The owner adds (framing each one in the cropper first), removes and picks the main one here;
  * every change saves straight away.
  */
-export function UnitPhotos({ unitId, unitName, initial }: { unitId: string; unitName: string; initial: UnitPhoto[] }) {
+export function UnitPhotos({ unitId, unitName, initial, basePath }: { unitId: string; unitName: string; initial: UnitPhoto[]; basePath?: string }) {
+  // A unit's photos live under /resources/:id, a pooled group's under /resources/groups/:id.
+  const base = basePath ?? `/resources/${unitId}`;
   const [photos, setPhotos] = useState<UnitPhoto[]>(initial);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -53,17 +55,17 @@ export function UnitPhotos({ unitId, unitName, initial }: { unitId: string; unit
     void run('upload', () => {
       const form = new FormData();
       form.append('file', photo, photo.type === 'image/webp' ? 'photo.webp' : 'photo.jpg');
-      return api.upload<UnitPhoto[]>(`/resources/${unitId}/photos`, form);
+      return api.upload<UnitPhoto[]>(`${base}/photos`, form);
     });
   }
 
   const makeMain = (photo: UnitPhoto) =>
     run(photo.id, () =>
-      api.put<UnitPhoto[]>(`/resources/${unitId}/photos/order`, {
+      api.put<UnitPhoto[]>(`${base}/photos/order`, {
         photoIds: [photo.id, ...photos.filter((p) => p.id !== photo.id).map((p) => p.id)],
       }),
     );
-  const remove = (photo: UnitPhoto) => run(photo.id, () => api.delete<UnitPhoto[]>(`/resources/${unitId}/photos/${photo.id}`));
+  const remove = (photo: UnitPhoto) => run(photo.id, () => api.delete<UnitPhoto[]>(`${base}/photos/${photo.id}`));
 
   return (
     <div className="mt-2.5">

@@ -568,15 +568,19 @@ model Resource {
 
 /// A photo of one unit (pitch, court, table…). The file lives in object storage under `key`; the API turns the key into
 /// a public URL. Ordered by sortOrder, the first being the card's main picture.
+/// A photo of one unit OR of one pooled group (a kayak fleet): exactly one of resourceId / resourceGroupId is set.
 model ResourcePhoto {
-  id         String   @id @default(uuid()) @db.Uuid
-  resourceId String   @db.Uuid
-  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
-  key        String
-  sortOrder  Int      @default(0)
-  createdAt  DateTime @default(now())
+  id              String         @id @default(uuid()) @db.Uuid
+  resourceId      String?        @db.Uuid
+  resource        Resource?      @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  resourceGroupId String?        @db.Uuid
+  resourceGroup   ResourceGroup? @relation(fields: [resourceGroupId], references: [id], onDelete: Cascade)
+  key             String
+  sortOrder       Int            @default(0)
+  createdAt       DateTime       @default(now())
 
   @@index([resourceId, sortOrder])
+  @@index([resourceGroupId, sortOrder])
   @@map("resource_photos")
 }
 
@@ -1559,6 +1563,7 @@ model ResourceGroup {
   pricingRules          PricingRule[]
   slotHolds             SlotHold[]
   bookings              Booking[]
+  photos                ResourcePhoto[]
 
   @@index([venueId])
   @@index([categoryId])

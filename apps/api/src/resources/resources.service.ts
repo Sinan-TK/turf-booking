@@ -453,10 +453,15 @@ export class ResourcesService {
 
   async listGroupsForVenue(venueId: string, actor: AuthContext) {
     await this.assertVenueOwnership(venueId, actor);
-    return this.prisma.client.resourceGroup.findMany({
+    const groups = await this.prisma.client.resourceGroup.findMany({
       where: { venueId },
       orderBy: { sortOrder: 'asc' },
-      include: { category: { select: CATEGORY_SUMMARY } },
+      include: {
+        category: { select: CATEGORY_SUMMARY },
+        photos: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }], select: { id: true, key: true } },
+      },
     });
+    // Each group carries its photos (main one first) as public URLs, like a unit does.
+    return groups.map(({ photos, ...group }) => ({ ...group, photos: photos.map((p) => ({ id: p.id, url: this.storage.publicUrl(p.key) })) }));
   }
 }

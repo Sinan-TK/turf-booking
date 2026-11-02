@@ -27,7 +27,7 @@ export interface UnitCategory {
 export type BookableResource = Resource & { category: UnitCategory; photos: Array<{ key: string }> };
 
 /** A pooled group (a kayak fleet) with its facility, as search cards show it. */
-export type BookableGroup = ResourceGroup & { category: UnitCategory };
+export type BookableGroup = ResourceGroup & { category: UnitCategory; photos: Array<{ key: string }> };
 
 /** Units of a pooled group held or confirmed for a time range. */
 export interface GroupReservation {
