@@ -1,5 +1,6 @@
 import { expect, test } from '../../support/fixtures';
 import { URLS } from '../../support/env';
+import { openUnitTab } from '../../support/ui';
 
 /**
  * A pooled item (a kayak fleet) is added on the venue's page with its count and fixed times, priced per kayak, and then listed to
@@ -11,7 +12,8 @@ test.describe('owner portal: pooled items', () => {
     const venue = await makeVenue();
     await page.goto(`/venues/${venue.id}`);
 
-    // Add the pooled item: facility, name, count, fixed times.
+    // Add the pooled item on the New tab: facility, name, count, fixed times.
+    await openUnitTab(page, 'New');
     const section = page.getByRole('heading', { name: 'Add a pooled item' }).locator('xpath=ancestor::section[1]');
     await section.getByLabel('Facility').selectOption({ label: 'Kayaking' });
     await section.getByRole('button', { name: 'Add pooled item' }).click();
@@ -28,6 +30,7 @@ test.describe('owner portal: pooled items', () => {
     }
     await section.getByRole('button', { name: 'Add pooled item' }).click();
 
+    // Its own tab opens, with its card.
     const card = page.getByRole('region', { name: 'PW Single kayaks' });
     await expect(card).toBeVisible();
     await expect(card).toContainText('6 kayaks');
@@ -73,6 +76,7 @@ test.describe('owner portal: pooled items', () => {
 
   test('a facility with pooled stock is not offered in the unit form', async ({ page, venue }) => {
     await page.goto(`/venues/${venue.id}`);
+    await openUnitTab(page, 'New');
     const options = await page.locator('#unit-categoryId option').allTextContents();
     expect(options).not.toContain('Kayaking');
   });

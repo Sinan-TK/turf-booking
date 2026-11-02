@@ -10,8 +10,9 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SvgIcon } from '@/components/svg-icons';
 import { VenueMapLink } from '@/components/venue-map-link';
 import { VenueAdvanceBooking } from '@/components/venue-advance-booking';
-import { VenueAvailability } from '@/components/venue-availability';
-import { VenuePooledGroups } from '@/components/venue-pooled-groups';
+import { VenueDescription } from '@/components/venue-description';
+import { UnitTools } from '@/components/venue-availability';
+import { AddPooledItem, GroupCard, type Group } from '@/components/venue-pooled-groups';
 import { UnitPhotos, type UnitPhoto } from '@/components/unit-photos';
 import { DurationFields, UnitDurations, defaultDurations, durationsError } from '@/components/unit-durations';
 import {
@@ -72,14 +73,22 @@ type Pending =
   | { kind: 'unit'; unit: Resource; open: boolean }
   | { kind: 'facility'; facility: VenueCategorySummary; units: Resource[]; open: boolean };
 
+/** The tab that holds the forms for adding a unit or a pooled item. */
+const NEW_TAB = 'new';
+
 export default function VenueDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: venue, error, loading, refetch } = useFetch<Venue>(`/venues/${id}`);
   const { data: resources, refetch: refetchResources } = useFetch<Resource[]>(
     `/resources?venueId=${id}`,
   );
+  const { data: groupRows, refetch: refetchGroups } = useFetch<Group[]>(`/resources/groups?venueId=${id}`);
   const { data: categories } = useFetch<VenueCategory[]>('/categories');
+  const { data: terms } = useFetch<Array<{ categoryId: string; terms: { minAdvancePercent: number } }>>(`/owner/commercial-terms?venueId=${id}`);
+  const minAdvance = Object.fromEntries((terms ?? []).map((t) => [t.categoryId, t.terms.minAdvancePercent]));
 
+  // The open tab: a unit's or pooled item's id, or NEW_TAB. Empty until the first one is chosen (then the first unit is open).
+  const [tab, setTab] = useState('');
   const [pending, setPending] = useState<Pending | null>(null);
   const [dialogBusy, setDialogBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
@@ -152,7 +161,7 @@ export default function VenueDetailPage() {
     }
     setResourceSubmitting(true);
     try {
-      await api.post('/resources', {
+      const created = await api.post<{ id: string }>('/resources', {
         venueId: id,
         ...resourceForm,
         minDurationMinutes: newDurations.min,
@@ -163,6 +172,7 @@ export default function VenueDetailPage() {
       setResourceForm((f) => ({ ...f, name: '', groundType: '' }));
       setUnitErrors({});
       refetchResources();
+      setTab(created.id); // the new unit's own tab opens, ready for its prices
     } catch (err) {
       setResourceError(err instanceof ApiError ? err.message : 'Failed to create resource');
     } finally {
@@ -175,298 +185,61 @@ export default function VenueDetailPage() {
   if (!venue) return null;
 
   const units = resources ?? [];
+  const groups = (groupRows ?? []).filter((g) => g.allocationMode === 'POOLED');
   const openUnits = units.filter((u) => u.isBookable).length;
   const dialog = pending ? describe(pending, venue) : null;
 
+  const tabIds = [...units.map((u) => u.id), ...groups.map((g) => g.id), NEW_TAB];
+  const activeTab = tabIds.includes(tab) ? tab : (tabIds[0] ?? NEW_TAB);
+  const activeUnit = units.find((u) => u.id === activeTab);
+  const activeGroup = groups.find((g) => g.id === activeTab);
+
   return (
     <div className="space-y-6">
+      {/* The venue itself: who and where it is, its status, its description, map link and how far ahead it takes bookings. */}
       <section className="rounded-xl bg-white p-container-padding shadow-sm ring-1 ring-outline-variant/30">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <Link
-              href="/venues"
-              aria-label="Back to all venues"
-              title="Back to all venues"
-              className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-on-surface-variant ring-1 ring-outline-variant/50 transition-colors hover:bg-surface-container hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-            >
-              <SvgIcon name="back" className="h-5 w-5" />
-            </Link>
-            <div className="min-w-0">
-              <h1 className="font-headline-md text-headline-md text-on-surface">{venue.name}</h1>
-              {venue.description && (
-                <p className="mt-0.5 text-body-md text-on-surface-variant">{venue.description}</p>
-              )}
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-body-md text-on-surface-variant">
-                <Badge value={venue.status} />
-                <span className="font-mono text-xs">{venue.facilityCode}</span>
-                <span className="inline-flex items-center gap-1.5">
-                  <SvgIcon name="pin" className="h-4 w-4" />
-                  {venue.address}
-                </span>
-              </div>
+        <div className="flex min-w-0 items-start gap-3">
+          <Link
+            href="/venues"
+            aria-label="Back to all venues"
+            title="Back to all venues"
+            className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-on-surface-variant ring-1 ring-outline-variant/50 transition-colors hover:bg-surface-container hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          >
+            <SvgIcon name="back" className="h-5 w-5" />
+          </Link>
+          <div className="min-w-0">
+            <h1 className="font-headline-md text-headline-md text-on-surface">{venue.name}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-body-md text-on-surface-variant">
+              <Badge value={venue.status} />
+              <span className="font-mono text-xs">{venue.facilityCode}</span>
+              <span className="inline-flex items-center gap-1.5">
+                <SvgIcon name="pin" className="h-4 w-4" />
+                {venue.address}
+              </span>
             </div>
           </div>
-          <a
-            href="#pricing"
-            className="inline-flex items-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-on-primary transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-          >
-            Pricing &amp; availability ↓
-          </a>
         </div>
-      </section>
 
-      <div className="grid grid-cols-2 gap-card-gap lg:grid-cols-4">
-        <Stat label="Facilities" value={venue.facilities.length} />
-        <Stat label="Units" value={units.length} />
-        <Stat label="Open for booking" value={openUnits} tone="good" />
-        <Stat
-          label="Blocked"
-          value={units.length - openUnits}
-          tone={units.length - openUnits > 0 ? 'bad' : undefined}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-3">
-        <div className="space-y-6 xl:col-span-2">
-          {venue.facilities.map((facility) => {
-            const own = units.filter((r) => r.category.id === facility.id);
-            if (own.length === 0) return null;
-            const allBlocked = own.every((u) => !u.isBookable);
-            const open = own.filter((u) => u.isBookable).length;
-            return (
-              <section
-                key={facility.id}
-                className="overflow-hidden rounded-xl bg-surface-container-lowest shadow-sm ring-1 ring-outline-variant/30"
-              >
-                <header className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/20 bg-surface-container-low px-container-padding py-4">
-                  <div>
-                    <h2 className="text-body-md font-semibold text-on-surface">{facility.name}</h2>
-                    <p className="text-xs text-on-surface-variant">
-                      {own.length} {plural(facility.unitLabel.toLowerCase(), own.length)} ·{' '}
-                      <span className={open === 0 ? 'font-medium text-red-700' : undefined}>
-                        {open === own.length ? 'all open' : `${open} open`}
-                      </span>
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      ask({ kind: 'facility', facility, units: own, open: allBlocked })
-                    }
-                    className={`rounded-lg px-3 py-1.5 text-xs font-medium ring-1 ring-inset transition-colors ${
-                      allBlocked
-                        ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/30 hover:bg-emerald-100'
-                        : 'bg-red-50 text-red-700 ring-red-600/30 hover:bg-red-100'
-                    }`}
-                  >
-                    {allBlocked ? `Reopen ${facility.name}` : `Block ${facility.name}`}
-                  </button>
-                </header>
-                <ul className="divide-y divide-outline-variant/20">
-                  {own.map((r) => (
-                    <li key={r.id} className="px-container-padding py-3.5">
-                      <div className="flex items-center justify-between gap-4">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <span
-                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-semibold ${
-                            r.isBookable
-                              ? 'bg-primary-fixed-dim/25 text-on-primary-container'
-                              : 'bg-red-50 text-red-700'
-                          }`}
-                        >
-                          {r.name.charAt(0).toUpperCase()}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="truncate text-body-md font-medium text-on-surface">
-                            {r.name}
-                          </p>
-                          <p className="text-xs text-on-surface-variant">
-                            {r.groundType
-                              ? `${facility.unitLabel} type · ${r.groundType}`
-                              : facility.unitLabel}
-                          </p>
-                        </div>
-                      </div>
-                      <BookToggle
-                        on={r.isBookable}
-                        label={`${r.isBookable ? 'Block' : 'Reopen'} ${r.name}`}
-                        onToggle={() => ask({ kind: 'unit', unit: r, open: !r.isBookable })}
-                      />
-                      </div>
-                      <div className="space-y-3 pl-12">
-                        <UnitDurations
-                          unitId={r.id}
-                          min={r.minDurationMinutes}
-                          max={r.maxDurationMinutes}
-                          hasPrices
-                          onSaved={refetchResources}
-                        />
-                        <UnitPhotos unitId={r.id} unitName={r.name} initial={r.photos ?? []} />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            );
-          })}
-
-          <VenuePooledGroups venueId={venue.id} categories={categories} />
-
-          {units.length === 0 && (
-            <div className="rounded-xl border border-dashed border-outline-variant p-8 text-center text-body-md text-on-surface-variant">
-              No units yet. Pick a facility below and add the first one.
+        <div className="mt-4 grid grid-cols-1 gap-x-10 border-t border-outline-variant/20 pt-2 lg:grid-cols-2">
+          <div className="divide-y divide-outline-variant/20">
+            <VenueDescription venueId={venue.id} description={venue.description} onSaved={() => refetch()} />
+            <VenueMapLink venueId={venue.id} link={venue.googleMapsUrl} onSaved={() => refetch()} />
+            <VenueAdvanceBooking venueId={venue.id} days={venue.advanceBookingDays} onSaved={() => refetch()} />
+          </div>
+          <div className="divide-y divide-outline-variant/20">
+            <div className="py-3">
+              <h3 className="text-sm font-semibold text-on-surface">Venue status</h3>
+              <p className="mb-3 mt-0.5 text-xs text-on-surface-variant">
+                You can pause your venue. Making it live again is done by the platform.
+              </p>
+              <VenueStatusPicker current={venue.status} allowed={OWNER_STATUSES} busy={dialogBusy} onPick={(status) => ask({ kind: 'status', status })} />
             </div>
-          )}
-
-          <section className="overflow-hidden rounded-xl bg-surface-container-lowest shadow-sm ring-1 ring-outline-variant/30">
-            <header className="flex items-center gap-3 border-b border-outline-variant/20 bg-surface-container-low px-container-padding py-4">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-xl font-light leading-none text-on-primary">
-                +
-              </span>
-              <div>
-                <h2 className="text-body-md font-semibold text-on-surface">Add a unit</h2>
-                <p className="text-xs text-on-surface-variant">
-                  A turf, a pool lane, a court… whatever customers can book.
-                </p>
-              </div>
-            </header>
-            <form onSubmit={onCreateResource} noValidate>
-              <div className="space-y-6 p-container-padding">
-                {resourceError && <ErrorBanner message={resourceError} />}
-
-                <div
-                  className={`grid grid-cols-1 gap-4 ${hasTypes ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}
-                >
-                  <div>
-                    <Label htmlFor="unit-categoryId">Facility</Label>
-                    <Select
-                      id="unit-categoryId"
-                      aria-invalid={!!unitErrors.categoryId}
-                      className={unitErrors.categoryId ? invalidClass : ''}
-                      value={resourceForm.categoryId}
-                      onChange={(e) => {
-                        setUnitErrors({});
-                        setDurationErrors({});
-                        const picked = categories?.find((c) => c.id === e.target.value);
-                        if (picked) {
-                          const own = defaultDurations(picked.policy);
-                          setNewDurations(own);
-                        }
-                        setResourceForm((f) => ({
-                          ...f,
-                          categoryId: e.target.value,
-                          groundType: '',
-                        }));
-                      }}
-                    >
-                      <option value="">Select facility…</option>
-                      {categories?.filter((c) => c.defaultAllocationMode !== 'POOLED').map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </Select>
-                    <FieldError id="unit-categoryId-error" message={unitErrors.categoryId} />
-                  </div>
-                  <div>
-                    <Label htmlFor="unit-name">{selectedCategory?.unitLabel ?? 'Unit'} name</Label>
-                    <Input
-                      id="unit-name"
-                      aria-invalid={!!unitErrors.name}
-                      className={unitErrors.name ? invalidClass : ''}
-                      disabled={!selectedCategory}
-                      placeholder={
-                        selectedCategory
-                          ? `e.g. ${selectedCategory.unitLabel} 1`
-                          : 'Choose a facility first'
-                      }
-                      value={resourceForm.name}
-                      onChange={(e) => {
-                        setResourceForm((f) => ({ ...f, name: e.target.value }));
-                        setUnitErrors((p) => ({ ...p, name: undefined }));
-                      }}
-                    />
-                    <FieldError id="unit-name-error" message={unitErrors.name} />
-                  </div>
-                  {hasTypes && (
-                    <div>
-                      <Label htmlFor="unit-groundType">{selectedCategory.unitLabel} type</Label>
-                      <Select
-                        id="unit-groundType"
-                        aria-invalid={!!unitErrors.groundType}
-                        className={unitErrors.groundType ? invalidClass : ''}
-                        value={resourceForm.groundType}
-                        onChange={(e) => {
-                          setResourceForm((f) => ({ ...f, groundType: e.target.value }));
-                          setUnitErrors((p) => ({ ...p, groundType: undefined }));
-                        }}
-                      >
-                        <option value="">Select type…</option>
-                        {selectedCategory.unitTypes.map((t) => (
-                          <option key={t} value={t}>
-                            {t}
-                          </option>
-                        ))}
-                      </Select>
-                      <FieldError id="unit-groundType-error" message={unitErrors.groundType} />
-                    </div>
-                  )}
-                </div>
-                {selectedCategory && (
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <DurationFields idPrefix="new-unit" min={newDurations.min} max={newDurations.max} onChange={setNewDurations} errors={durationErrors} />
-                  </div>
-                )}
-              </div>
-
-              <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/20 bg-surface-container-low px-container-padding py-4">
-                <p className="text-xs text-on-surface-variant">
-                  {selectedCategory
-                    ? `It will be added to ${selectedCategory.name} at this venue, open for booking.`
-                    : 'Pick a facility to get started.'}
-                </p>
-                <Button
-                  type="submit"
-                  disabled={resourceSubmitting}
-                  className="inline-flex items-center gap-2 px-5"
-                >
-                  <span aria-hidden="true" className="text-lg leading-none">
-                    +
-                  </span>
-                  {resourceSubmitting
-                    ? 'Adding…'
-                    : `Add ${(selectedCategory?.unitLabel ?? 'unit').toLowerCase()}`}
-                </Button>
-              </footer>
-            </form>
-          </section>
-        </div>
-
-        <div className="space-y-6">
-          <Card>
-            <h2 className="text-body-md font-semibold text-on-surface">Venue status</h2>
-            <p className="mb-4 mt-0.5 text-xs text-on-surface-variant">
-              You can pause your venue. Making it live again is done by the platform.
-            </p>
-            <VenueStatusPicker
-              current={venue.status}
-              allowed={OWNER_STATUSES}
-              busy={dialogBusy}
-              onPick={(status) => ask({ kind: 'status', status })}
-            />
-          </Card>
-
-          <Card>
-            <h2 className="mb-3 text-body-md font-semibold text-on-surface">Details</h2>
-            <dl className="divide-y divide-outline-variant/20 text-body-md">
+            <dl className="py-1 text-body-md">
               <Row label="Facilities">
                 {venue.facilities.length > 0 ? (
                   <span className="flex flex-wrap justify-end gap-1.5">
                     {venue.facilities.map((f) => (
-                      <span
-                        key={f.id}
-                        className="rounded-full bg-primary-fixed-dim/20 px-2.5 py-0.5 text-xs font-medium text-on-primary-container"
-                      >
+                      <span key={f.id} className="rounded-full bg-primary-fixed-dim/20 px-2.5 py-0.5 text-xs font-medium text-on-primary-container">
                         {f.name}
                       </span>
                     ))}
@@ -481,29 +254,184 @@ export default function VenueDetailPage() {
                 <span className="font-mono text-xs">{venue.facilityCode}</span>
               </Row>
             </dl>
-            <div className="divide-y divide-outline-variant/20 border-t border-outline-variant/20">
-              <VenueMapLink venueId={venue.id} link={venue.googleMapsUrl} onSaved={() => refetch()} />
-              <VenueAdvanceBooking venueId={venue.id} days={venue.advanceBookingDays} onSaved={() => refetch()} />
-            </div>
-          </Card>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-2 gap-card-gap lg:grid-cols-4">
+        <Stat label="Facilities" value={venue.facilities.length} />
+        <Stat label="Units" value={units.length} />
+        <Stat label="Open for booking" value={openUnits} tone="good" />
+        <Stat label="Blocked" value={units.length - openUnits} tone={units.length - openUnits > 0 ? 'bad' : undefined} />
+      </div>
+
+      {/* One tab per unit and pooled item, each with everything it needs; the last tab adds a new one. */}
+      <div>
+        <div role="tablist" aria-label="Units" className="flex max-w-full gap-1 overflow-x-auto rounded-xl bg-surface-container p-1">
+          {units.map((u) => (
+            <UnitTab key={u.id} id={u.id} active={activeTab === u.id} onPick={setTab} title={u.name} sub={u.category.name} blocked={!u.isBookable} />
+          ))}
+          {groups.map((g) => (
+            <UnitTab key={g.id} id={g.id} active={activeTab === g.id} onPick={setTab} title={g.name} sub={`${g.category.name} · ${g.totalUnits ?? 0}`} blocked={!g.isBookable} />
+          ))}
+          <button
+            type="button"
+            role="tab"
+            id={`tab-${NEW_TAB}`}
+            aria-selected={activeTab === NEW_TAB}
+            aria-controls="unit-tab-panel"
+            onClick={() => setTab(NEW_TAB)}
+            className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-4 py-2 text-body-md font-medium transition-colors ${
+              activeTab === NEW_TAB ? 'bg-surface-container-lowest text-primary shadow-sm' : 'text-primary hover:bg-surface-container-high'
+            }`}
+          >
+            <span aria-hidden="true" className="text-lg leading-none">
+              +
+            </span>
+            New
+          </button>
         </div>
       </div>
 
-      <section id="pricing" aria-labelledby="pricing-heading" className="scroll-mt-6 space-y-4">
-        <div>
-          <h2 id="pricing-heading" className="font-headline-md text-headline-md text-on-surface">
-            Pricing &amp; availability
-          </h2>
-          <p className="mt-0.5 text-body-md text-on-surface-variant">
-            What each unit costs and when it can be booked, the days you are closed, and bookings you take yourself.
-          </p>
-        </div>
-        {categories ? (
-          <VenueAvailability venueId={venue.id} resources={units} categories={categories} />
-        ) : (
-          <LoadingState />
+      <div id="unit-tab-panel" role="tabpanel" aria-labelledby={`tab-${activeTab}`} className="space-y-6">
+        {activeUnit && categories && (
+          <UnitPanel
+            unit={activeUnit}
+            venueId={venue.id}
+            categories={categories}
+            minAdvance={minAdvance}
+            sameFacility={units.filter((u) => u.category.id === activeUnit.category.id)}
+            onAsk={ask}
+            onChanged={refetchResources}
+          />
         )}
-      </section>
+
+        {activeGroup && <GroupCard group={activeGroup} category={categories?.find((c) => c.id === activeGroup.category.id)} onChanged={refetchGroups} />}
+
+        {activeTab === NEW_TAB && (
+          <>
+            {units.length + groups.length === 0 && (
+              <div className="rounded-xl border border-dashed border-outline-variant p-8 text-center text-body-md text-on-surface-variant">
+                No units yet. Pick a facility below and add the first one.
+              </div>
+            )}
+            <section className="overflow-hidden rounded-xl bg-surface-container-lowest shadow-sm ring-1 ring-outline-variant/30">
+              <header className="flex items-center gap-3 border-b border-outline-variant/20 bg-surface-container-low px-container-padding py-4">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-xl font-light leading-none text-on-primary">
+                  +
+                </span>
+                <div>
+                  <h2 className="text-body-md font-semibold text-on-surface">Add a unit</h2>
+                  <p className="text-xs text-on-surface-variant">A turf, a pool lane, a court… whatever customers can book.</p>
+                </div>
+              </header>
+              <form onSubmit={onCreateResource} noValidate>
+                <div className="space-y-6 p-container-padding">
+                  {resourceError && <ErrorBanner message={resourceError} />}
+
+                  <div className={`grid grid-cols-1 gap-4 ${hasTypes ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+                    <div>
+                      <Label htmlFor="unit-categoryId">Facility</Label>
+                      <Select
+                        id="unit-categoryId"
+                        aria-invalid={!!unitErrors.categoryId}
+                        className={unitErrors.categoryId ? invalidClass : ''}
+                        value={resourceForm.categoryId}
+                        onChange={(e) => {
+                          setUnitErrors({});
+                          setDurationErrors({});
+                          const picked = categories?.find((c) => c.id === e.target.value);
+                          if (picked) {
+                            const own = defaultDurations(picked.policy);
+                            setNewDurations(own);
+                          }
+                          setResourceForm((f) => ({ ...f, categoryId: e.target.value, groundType: '' }));
+                        }}
+                      >
+                        <option value="">Select facility…</option>
+                        {categories
+                          ?.filter((c) => c.defaultAllocationMode !== 'POOLED')
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                      </Select>
+                      <FieldError id="unit-categoryId-error" message={unitErrors.categoryId} />
+                    </div>
+                    <div>
+                      <Label htmlFor="unit-name">{selectedCategory?.unitLabel ?? 'Unit'} name</Label>
+                      <Input
+                        id="unit-name"
+                        aria-invalid={!!unitErrors.name}
+                        className={unitErrors.name ? invalidClass : ''}
+                        disabled={!selectedCategory}
+                        placeholder={selectedCategory ? `e.g. ${selectedCategory.unitLabel} 1` : 'Choose a facility first'}
+                        value={resourceForm.name}
+                        onChange={(e) => {
+                          setResourceForm((f) => ({ ...f, name: e.target.value }));
+                          setUnitErrors((p) => ({ ...p, name: undefined }));
+                        }}
+                      />
+                      <FieldError id="unit-name-error" message={unitErrors.name} />
+                    </div>
+                    {hasTypes && (
+                      <div>
+                        <Label htmlFor="unit-groundType">{selectedCategory.unitLabel} type</Label>
+                        <Select
+                          id="unit-groundType"
+                          aria-invalid={!!unitErrors.groundType}
+                          className={unitErrors.groundType ? invalidClass : ''}
+                          value={resourceForm.groundType}
+                          onChange={(e) => {
+                            setResourceForm((f) => ({ ...f, groundType: e.target.value }));
+                            setUnitErrors((p) => ({ ...p, groundType: undefined }));
+                          }}
+                        >
+                          <option value="">Select type…</option>
+                          {selectedCategory.unitTypes.map((t) => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
+                        </Select>
+                        <FieldError id="unit-groundType-error" message={unitErrors.groundType} />
+                      </div>
+                    )}
+                  </div>
+                  {selectedCategory && (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <DurationFields idPrefix="new-unit" min={newDurations.min} max={newDurations.max} onChange={setNewDurations} errors={durationErrors} />
+                    </div>
+                  )}
+                </div>
+
+                <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/20 bg-surface-container-low px-container-padding py-4">
+                  <p className="text-xs text-on-surface-variant">
+                    {selectedCategory ? `It will be added to ${selectedCategory.name} at this venue, open for booking.` : 'Pick a facility to get started.'}
+                  </p>
+                  <Button type="submit" disabled={resourceSubmitting} className="inline-flex items-center gap-2 px-5">
+                    <span aria-hidden="true" className="text-lg leading-none">
+                      +
+                    </span>
+                    {resourceSubmitting ? 'Adding…' : `Add ${(selectedCategory?.unitLabel ?? 'unit').toLowerCase()}`}
+                  </Button>
+                </footer>
+              </form>
+            </section>
+
+            <AddPooledItem
+              venueId={venue.id}
+              categories={categories}
+              count={units.length + groups.length}
+              onAdded={(newId) => {
+                refetchGroups();
+                if (newId) setTab(newId);
+              }}
+            />
+          </>
+        )}
+      </div>
 
       {pending && dialog && (
         <ConfirmDialog
@@ -518,6 +446,102 @@ export default function VenueDetailPage() {
           {dialog.body}
         </ConfirmDialog>
       )}
+    </div>
+  );
+}
+
+/** One tab of the strip: the unit's (or pooled item's) name, its facility under it, and a red dot while it is blocked. */
+function UnitTab({ id, active, onPick, title, sub, blocked }: { id: string; active: boolean; onPick: (id: string) => void; title: string; sub: string; blocked: boolean }) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      id={`tab-${id}`}
+      aria-selected={active}
+      aria-controls="unit-tab-panel"
+      onClick={() => onPick(id)}
+      className={`flex shrink-0 flex-col items-start whitespace-nowrap rounded-lg px-4 py-1.5 text-left transition-colors ${
+        active ? 'bg-surface-container-lowest text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface'
+      }`}
+    >
+      <span className="inline-flex items-center gap-1.5 text-body-md font-medium">
+        {title}
+        {blocked && <span className="h-2 w-2 rounded-full bg-red-500" title="Blocked" aria-label="Blocked" />}
+      </span>
+      <span className="text-[0.6875rem] leading-tight text-on-surface-variant">{sub}</span>
+    </button>
+  );
+}
+
+/** A unit's own tab: its switch, booking lengths and photos, then its prices, closed days and walk-in booking. */
+function UnitPanel({
+  unit,
+  venueId,
+  categories,
+  minAdvance,
+  sameFacility,
+  onAsk,
+  onChanged,
+}: {
+  unit: Resource;
+  venueId: string;
+  categories: VenueCategory[];
+  minAdvance: Record<string, number>;
+  /** Every unit of the same facility at this venue (for the block-the-whole-facility button). */
+  sameFacility: Resource[];
+  onAsk: (next: Pending) => void;
+  onChanged: () => void;
+}) {
+  const facility = unit.category;
+  const allBlocked = sameFacility.every((u) => !u.isBookable);
+  return (
+    <div className="space-y-6">
+      <section aria-label={unit.name} className="overflow-hidden rounded-xl bg-surface-container-lowest shadow-sm ring-1 ring-outline-variant/30">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/20 bg-surface-container-low px-container-padding py-4">
+          <div>
+            <h2 className="text-body-md font-semibold text-on-surface">{facility.name}</h2>
+            <p className="text-xs text-on-surface-variant">
+              {sameFacility.length} {plural(facility.unitLabel.toLowerCase(), sameFacility.length)} ·{' '}
+              <span className={sameFacility.every((u) => !u.isBookable) ? 'font-medium text-red-700' : undefined}>
+                {sameFacility.every((u) => u.isBookable) ? 'all open' : `${sameFacility.filter((u) => u.isBookable).length} open`}
+              </span>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onAsk({ kind: 'facility', facility, units: sameFacility, open: allBlocked })}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium ring-1 ring-inset transition-colors ${
+              allBlocked ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/30 hover:bg-emerald-100' : 'bg-red-50 text-red-700 ring-red-600/30 hover:bg-red-100'
+            }`}
+          >
+            {allBlocked ? `Reopen ${facility.name}` : `Block ${facility.name}`}
+          </button>
+        </header>
+        <div className="px-container-padding py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <span
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-semibold ${
+                  unit.isBookable ? 'bg-primary-fixed-dim/25 text-on-primary-container' : 'bg-red-50 text-red-700'
+                }`}
+              >
+                {unit.name.charAt(0).toUpperCase()}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-body-md font-medium text-on-surface">{unit.name}</p>
+                <p className="text-xs text-on-surface-variant">{unit.groundType ? `${facility.unitLabel} type · ${unit.groundType}` : facility.unitLabel}</p>
+              </div>
+            </div>
+            <BookToggle on={unit.isBookable} label={`${unit.isBookable ? 'Block' : 'Reopen'} ${unit.name}`} onToggle={() => onAsk({ kind: 'unit', unit, open: !unit.isBookable })} />
+          </div>
+          <div className="space-y-3 pl-12">
+            <UnitDurations unitId={unit.id} min={unit.minDurationMinutes} max={unit.maxDurationMinutes} hasPrices onSaved={onChanged} />
+            <UnitPhotos unitId={unit.id} unitName={unit.name} initial={unit.photos ?? []} />
+          </div>
+        </div>
+      </section>
+
+      <UnitTools key={unit.id} venueId={venueId} unit={unit} categories={categories} minAdvance={minAdvance} />
     </div>
   );
 }

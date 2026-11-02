@@ -7,7 +7,7 @@ import { durationLabel, type VenueCategory, type VenueCategorySummary } from '@/
 import { Button, ErrorBanner, FieldError, Input, Label, Select, invalidClass } from '@/components/ui';
 import { UnitPhotos, type UnitPhoto } from '@/components/unit-photos';
 
-interface Group {
+export interface Group {
   id: string;
   name: string;
   allocationMode: 'EXCLUSIVE' | 'POOLED';
@@ -85,7 +85,7 @@ function TimesEditor({ times, onChange, idPrefix }: { times: string[]; onChange:
 }
 
 /** One pooled item (a kayak fleet): its count, whether it is open, its slot times and its prices per kayak. */
-function GroupCard({ group, category, onChanged }: { group: Group; category?: VenueCategory; onChanged: () => void }) {
+export function GroupCard({ group, category, onChanged }: { group: Group; category?: VenueCategory; onChanged: () => void }) {
   const [count, setCount] = useState(String(group.totalUnits ?? 1));
   const [mode, setMode] = useState(group.slotMode);
   const [times, setTimes] = useState(group.fixedStartTimes);
@@ -315,19 +315,17 @@ function PricesSection({ group, category, prices, refetch }: { group: Group; cat
 }
 
 /**
- * The venue's pooled items (a fleet of identical kayaks): add one with its count and slot times, change them later, and set what one
- * costs. Shown only when the venue has a pooled item or the platform has a pooled venue type to add one under.
+ * The form that adds a pooled item (a fleet of identical things customers book by number, like 10 kayaks): its facility, name, how many
+ * and when it starts. It sits on the venue page's New tab, and shows nothing when the platform has no pooled venue type.
  */
-export function VenuePooledGroups({ venueId, categories }: { venueId: string; categories: VenueCategory[] | null }) {
-  const { data: groups, refetch } = useFetch<Group[]>(`/resources/groups?venueId=${venueId}`);
+export function AddPooledItem({ venueId, categories, count, onAdded }: { venueId: string; categories: VenueCategory[] | null; count: number; onAdded: (id: string) => void }) {
   const pooledTypes = (categories ?? []).filter((c) => c.defaultAllocationMode === 'POOLED' && c.isActive);
-  const pooled = (groups ?? []).filter((g) => g.allocationMode === 'POOLED');
   const [form, setForm] = useState({ categoryId: '', name: '', count: '', mode: 'FLEXIBLE' as 'FLEXIBLE' | 'FIXED', times: [] as string[] });
   const [errors, setErrors] = useState<{ categoryId?: string; name?: string; count?: string; times?: string }>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (pooled.length === 0 && pooledTypes.length === 0) return null;
+  if (pooledTypes.length === 0) return null;
   const chosen = pooledTypes.find((c) => c.id === form.categoryId);
   const itemWord = chosen ? chosen.unitLabel.toLowerCase() : 'item';
 
@@ -344,19 +342,19 @@ export function VenuePooledGroups({ venueId, categories }: { venueId: string; ca
     if (Object.values(found).some(Boolean)) return;
     setBusy(true);
     try {
-      await api.post('/resources/groups', {
+      const created = await api.post<{ id: string }>('/resources/groups', {
         venueId,
         categoryId: form.categoryId,
         name: form.name.trim(),
         allocationMode: 'POOLED',
         totalUnits: Number(form.count),
-        sortOrder: pooled.length,
+        sortOrder: count,
         slotMode: form.mode,
         ...(form.mode === 'FIXED' ? { fixedStartTimes: form.times } : {}),
       });
       setForm((f) => ({ ...f, name: '', count: '', times: [] }));
       setErrors({});
-      refetch();
+      onAdded(created.id);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not add this');
     } finally {
@@ -365,12 +363,8 @@ export function VenuePooledGroups({ venueId, categories }: { venueId: string; ca
   }
 
   return (
-    <div className="space-y-6" aria-label="Pooled items">
-      {pooled.map((g) => (
-        <GroupCard key={g.id} group={g} category={categories?.find((c) => c.id === g.category.id)} onChanged={refetch} />
-      ))}
-
-      {pooledTypes.length > 0 && (
+    <div className="space-y-6">
+      {
         <section className="overflow-hidden rounded-xl bg-surface-container-lowest shadow-sm ring-1 ring-outline-variant/30">
           <header className="flex items-center gap-3 border-b border-outline-variant/20 bg-surface-container-low px-container-padding py-4">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-xl font-light leading-none text-on-primary">+</span>
@@ -432,7 +426,7 @@ export function VenuePooledGroups({ venueId, categories }: { venueId: string; ca
             </div>
           </form>
         </section>
-      )}
+      }
     </div>
   );
 }

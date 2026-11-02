@@ -1,5 +1,5 @@
 import { expect, test } from '../../support/fixtures';
-import { field, rowWith } from '../../support/ui';
+import { field, openUnitTab, rowWith } from '../../support/ui';
 
 /**
  * Prices decide both what a slot costs and when a unit can be booked, and two active prices for
@@ -19,7 +19,7 @@ test.describe('owner portal: pricing', () => {
     await expect(rowWith(page, 'Sat, Sun')).toContainText('INR 1,000');
 
     // The other unit has its own prices.
-    await page.getByRole('tabpanel').getByRole('combobox').first().selectOption({ index: 1 });
+    await openUnitTab(page, venue.courtName);
     await expect(rowWith(page, 'Every day')).toContainText('All day');
     await expect(rowWith(page, 'Every day')).toContainText('INR 300');
   });

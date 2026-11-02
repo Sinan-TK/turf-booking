@@ -1,5 +1,5 @@
 import { expect, test } from '../../support/fixtures';
-import { field } from '../../support/ui';
+import { field, openUnitTab } from '../../support/ui';
 
 test.describe('owner portal: venue details', () => {
   test('shows the header, stats, and each facility with its units', async ({ page, venue }) => {
@@ -9,15 +9,18 @@ test.describe('owner portal: venue details', () => {
     await expect(page.getByText(venue.facilityCode).first()).toBeVisible();
 
     // Stat tiles: 2 facilities, 2 units, both open, none blocked.
-    await expect(page.getByText('Facilities', { exact: true }).first().locator('xpath=..')).toContainText('2');
+    await expect(page.getByText('Facilities', { exact: true }).last().locator('xpath=..')).toContainText('2'); // the stat tile (the venue's details above it also have a Facilities row)
     await expect(page.getByText('Open for booking').locator('xpath=..')).toContainText('2');
     await expect(page.getByText('Blocked', { exact: true }).first().locator('xpath=..')).toContainText('0');
 
-    // One card per facility, the unit under it with its type (the court has none).
+    // One tab per unit (the first is open), then New; each unit's tab shows its facility and its type (the court has none).
+    const tabs = page.getByRole('tablist', { name: 'Units' }).getByRole('tab');
+    await expect(tabs).toHaveCount(3);
     await expect(page.getByRole('heading', { name: 'Football', level: 2 })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Badminton Court', level: 2 })).toBeVisible();
     await expect(page.getByText('Turf type · 5S')).toBeVisible();
-    await expect(page.getByText(venue.courtName, { exact: true })).toBeVisible();
+    await openUnitTab(page, venue.courtName);
+    await expect(page.getByRole('heading', { name: 'Badminton Court', level: 2 })).toBeVisible();
+    await expect(page.getByText(venue.courtName, { exact: true }).first()).toBeVisible();
   });
 
   test('the back button before the name goes to the venues list; pricing and availability are on the same page', async ({ page, venue }) => {
@@ -26,15 +29,29 @@ test.describe('owner portal: venue details', () => {
     await expect(page).toHaveURL(/\/venues$/);
 
     await page.goto(`/venues/${venue.id}`);
-    await expect(page.getByRole('heading', { name: 'Pricing & availability', level: 2 })).toBeVisible();
+    // The open unit's tab has its prices, closed days and walk-in booking right there.
     for (const tab of ['Pricing & hours', 'Closed days', 'Walk-in booking']) await expect(page.getByRole('tab', { name: tab })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Pricing' })).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`/venues/${venue.id}$`));
   });
 
-  test('the old pricing address lands on the venue page, at its pricing section', async ({ page, venue }) => {
+  test('the old pricing address lands on the venue page, where the first unit shows its prices', async ({ page, venue }) => {
     await page.goto(`/venues/${venue.id}/availability`);
     await expect(page).toHaveURL(new RegExp(`/venues/${venue.id}#pricing$`));
-    await expect(page.getByRole('heading', { name: 'Pricing & availability', level: 2 })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Pricing & hours' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('the venue description is edited from its Edit button at the top, and shows there', async ({ page, makeVenue, ownerApi }) => {
+    const venue = await makeVenue();
+    await page.goto(`/venues/${venue.id}`);
+    await page.getByRole('button', { name: 'Edit description' }).click();
+    await page.getByLabel('About this venue').fill('Floodlit turf with parking and a canteen.');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByLabel('About this venue')).toHaveCount(0); // saved: the editor closes
+    await expect(page.getByText('Floodlit turf with parking and a canteen.')).toBeVisible();
+    expect((await (await ownerApi.get(`/venues/${venue.id}`)).json()).description).toBe('Floodlit turf with parking and a canteen.');
+    await page.reload();
+    await expect(page.getByText('Floodlit turf with parking and a canteen.')).toBeVisible();
   });
 
   test('the Google Maps link and the advance booking days are rows of the details with an Edit button each', async ({ page, venue }) => {
@@ -78,6 +95,7 @@ test.describe('owner portal: venue details', () => {
 
   test('a whole facility can be blocked and reopened without touching the others', async ({ page, venue }) => {
     await page.goto(`/venues/${venue.id}`);
+    await openUnitTab(page, venue.courtName);
     await page.getByRole('button', { name: 'Block Badminton Court' }).click();
     const dialog = page.getByRole('alertdialog');
     await expect(dialog.getByRole('heading', { name: 'Block all of Badminton Court?' })).toBeVisible();
@@ -85,8 +103,10 @@ test.describe('owner portal: venue details', () => {
     await dialog.getByRole('button', { name: /^Block/ }).click();
 
     await expect(page.getByRole('switch', { name: `Reopen ${venue.courtName}` })).not.toBeChecked();
+    await openUnitTab(page, venue.turfName);
     await expect(page.getByRole('switch', { name: `Block ${venue.turfName}` })).toBeChecked(); // the turf is untouched
 
+    await openUnitTab(page, venue.courtName);
     await page.getByRole('button', { name: 'Reopen Badminton Court' }).click();
     await dialog.getByRole('button', { name: 'Reopen all' }).click();
     await expect(page.getByRole('switch', { name: `Block ${venue.courtName}` })).toBeChecked();
@@ -95,6 +115,7 @@ test.describe('owner portal: venue details', () => {
   test('adding a unit: no type for a typeless facility, a required type where types are preset', async ({ page, makeVenue }) => {
     const venue = await makeVenue();
     await page.goto(`/venues/${venue.id}`);
+    await openUnitTab(page, 'New');
     const unitForm = page.getByRole('heading', { name: 'Add a unit' }).locator('xpath=ancestor::section[1]');
     const add = page.getByRole('button', { name: /^Add (court|turf|pitch|unit)$/ });
     await expect(add).toBeEnabled();
@@ -110,9 +131,11 @@ test.describe('owner portal: venue details', () => {
     await field(unitForm, /name/).fill('Court 2');
     await expect(add).toBeEnabled();
     await add.click();
-    await expect(page.getByText('Court 2', { exact: true })).toBeVisible();
+    // The new unit gets its own tab, and it opens.
+    await expect(page.getByRole('tab', { name: /^Court 2/ })).toHaveAttribute('aria-selected', 'true');
 
     // Football has 5S / 7S, and one must be chosen.
+    await openUnitTab(page, 'New');
     await field(unitForm, 'Facility').selectOption({ label: 'Football' });
     await field(unitForm, /name/).fill('Turf B');
     await add.click();
@@ -120,6 +143,7 @@ test.describe('owner portal: venue details', () => {
     await field(unitForm, /type/).selectOption('7S');
     await expect(page.getByText(/Select the (turf|pitch) type./i)).toHaveCount(0);
     await add.click();
+    await expect(page.getByRole('tab', { name: /^Turf B/ })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByText('Turf type · 7S')).toBeVisible();
   });
 

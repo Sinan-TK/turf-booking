@@ -463,7 +463,7 @@ function PriceModal({
 const ICON_BUTTON =
   'inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40';
 
-function PricingRulesSection({
+export function PricingRulesSection({
   resources,
   categories,
   minAdvance,
@@ -535,7 +535,7 @@ function PricingRulesSection({
           Add price
         </Button>
       </div>
-      <div className="mb-5">
+      <div className={resources.length > 1 ? 'mb-5' : 'hidden'}>
         <Label>Unit</Label>
         <Select
           value={resourceId}
@@ -748,12 +748,14 @@ function dayBounds(dateStr: string): { startTime: string; endTime: string } {
   };
 }
 
-function BlockedDatesSection({ venueId, resources }: { venueId: string; resources: Resource[] }) {
+function BlockedDatesSection({ venueId, resources, onlyResourceId }: { venueId: string; resources: Resource[]; onlyResourceId?: string }) {
   const { data: blocked, refetch } = useFetch<BlockedDate[]>(
     `/venue-config/blocked-dates?venueId=${venueId}`,
   );
   // Closed days pile up over a year: ten at a time.
-  const blockedPage = usePageSlice(blocked ?? [], 10, '');
+  // On a unit's tab only that unit's closed days and the whole venue's are listed.
+  const shownBlocked = (blocked ?? []).filter((b) => !onlyResourceId || !b.resourceId || b.resourceId === onlyResourceId);
+  const blockedPage = usePageSlice(shownBlocked, 10, '');
   const [mode, setMode] = useState<'single' | 'range'>('single');
   const [form, setForm] = useState({ resourceId: '', date: '', endDate: '', reason: '' });
   const [error, setError] = useState<string | null>(null);
@@ -821,7 +823,7 @@ function BlockedDatesSection({ venueId, resources }: { venueId: string; resource
       </p>
 
       {!blocked && <LoadingState />}
-      {blocked && blocked.length > 0 && (
+      {blocked && shownBlocked.length > 0 && (
         <div className="mb-6 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="border-b border-outline-variant/30 text-xs uppercase text-on-surface-variant">
@@ -867,7 +869,7 @@ function BlockedDatesSection({ venueId, resources }: { venueId: string; resource
           <Pagination page={blockedPage.page} pageSize={10} total={blockedPage.total} onPage={blockedPage.setPage} />
         </div>
       )}
-      {blocked && blocked.length === 0 && (
+      {blocked && shownBlocked.length === 0 && (
         <p className="mb-6 text-sm text-on-surface-variant">No closed days.</p>
       )}
 
@@ -925,7 +927,7 @@ function BlockedDatesSection({ venueId, resources }: { venueId: string; resource
               value={form.resourceId}
               onChange={(e) => setForm((f) => ({ ...f, resourceId: e.target.value }))}
             >
-              <option value="">Whole venue</option>
+              <option value="">Whole venue (all units)</option>
               {resources.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.name}
@@ -966,31 +968,36 @@ const TABS = [
 type TabKey = (typeof TABS)[number]['key'];
 
 /**
- * The venue's pricing and availability, inside the venue's own page: what each unit costs and when it can be booked, the days
- * the venue is closed, and a booking taken in person (walk-in). The units and facilities come from the page that shows this.
+ * Everything a unit needs beyond its settings, as three small tabs inside the unit's own tab on the venue page: its prices (which
+ * also set when it can be booked), the days it is closed (or the whole venue), and a walk-in booking taken in person.
  */
-export function VenueAvailability({ venueId, resources, categories }: { venueId: string; resources: Resource[]; categories: VenueCategory[] }) {
-  const { data: terms } = useFetch<Array<{ categoryId: string; terms: { minAdvancePercent: number } }>>(`/owner/commercial-terms?venueId=${venueId}`);
-  const minAdvance = Object.fromEntries((terms ?? []).map((t) => [t.categoryId, t.terms.minAdvancePercent]));
+export function UnitTools({
+  venueId,
+  unit,
+  categories,
+  minAdvance,
+}: {
+  venueId: string;
+  unit: Resource;
+  categories: VenueCategory[];
+  /** Minimum online advance (% of the full price) by facility id, from the platform's terms for this venue. */
+  minAdvance: Record<string, number>;
+}) {
   const [tab, setTab] = useState<TabKey>('pricing');
   const current = TABS.find((t) => t.key === tab)!;
-
-  if (resources.length === 0) {
-    return <ErrorBanner message="Add a unit above to price it. A pooled item (such as kayaks) is priced inside its own card." />;
-  }
-
+  const resources = [unit];
   return (
     <div className="space-y-4">
       <div>
-        <div role="tablist" aria-label="Venue settings" className="inline-flex max-w-full gap-1 overflow-x-auto rounded-xl bg-surface-container p-1">
+        <div role="tablist" aria-label={`${unit.name} settings`} className="inline-flex max-w-full gap-1 overflow-x-auto rounded-xl bg-surface-container p-1">
           {TABS.map((t) => (
             <button
               key={t.key}
               type="button"
               role="tab"
-              id={`tab-${t.key}`}
+              id={`${unit.id}-tab-${t.key}`}
               aria-selected={tab === t.key}
-              aria-controls="tab-panel"
+              aria-controls={`${unit.id}-tab-panel`}
               onClick={() => setTab(t.key)}
               className={`whitespace-nowrap rounded-lg px-4 py-2 text-body-md font-medium transition-colors ${
                 tab === t.key ? 'bg-surface-container-lowest text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface'
@@ -1002,9 +1009,9 @@ export function VenueAvailability({ venueId, resources, categories }: { venueId:
         </div>
         <p className="mt-2 text-xs text-on-surface-variant">{current.hint}</p>
       </div>
-      <div id="tab-panel" role="tabpanel" aria-labelledby={`tab-${tab}`}>
+      <div id={`${unit.id}-tab-panel`} role="tabpanel" aria-labelledby={`${unit.id}-tab-${tab}`}>
         {tab === 'pricing' && <PricingRulesSection resources={resources} categories={categories} minAdvance={minAdvance} />}
-        {tab === 'closed' && <BlockedDatesSection venueId={venueId} resources={resources} />}
+        {tab === 'closed' && <BlockedDatesSection venueId={venueId} resources={resources} onlyResourceId={unit.id} />}
         {tab === 'walkin' && <WalkInForm resources={resources} categories={categories} />}
       </div>
     </div>
