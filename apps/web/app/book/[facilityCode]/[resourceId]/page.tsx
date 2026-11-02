@@ -211,7 +211,11 @@ function BookingPage() {
   useEffect(() => setSelected(null), [unit?.resource.id, dateIso, durationMinutes]);
 
   const shownDuration = unit?.durationMinutes ?? durationMinutes ?? unit?.policy?.minDurationMin ?? 60;
-  const { bookSlot, busyStart, error: bookError, clearError } = useBookSlot(unit?.resource.id ?? resourceId, shownDuration, !!unit?.pooled);
+  // A fixed slot has its own length (it runs from its start to its end); the hold is for that length.
+  const fixedSlots = unit?.pooled?.slots;
+  const pickedSlot = fixedSlots && selected ? fixedSlots[unit!.availableStartTimes.indexOf(selected)] : undefined;
+  const holdLength = pickedSlot?.durationMinutes ?? shownDuration;
+  const { bookSlot, busyStart, error: bookError, clearError } = useBookSlot(unit?.resource.id ?? resourceId, holdLength, !!unit?.pooled);
   const booking = busyStart !== null;
   // How many of a pooled item (kayaks) the customer is booking.
   const [quantity, setQuantity] = useState(1);
@@ -337,6 +341,7 @@ function BookingPage() {
             <span className="inline-flex items-center gap-1 rounded-md bg-white px-2.5 py-1 font-bold text-slate-700 ring-1 ring-slate-200">
               {r.resource.groundType ? `${r.resource.name} · ${r.resource.groundType}` : r.resource.name}
             </span>
+            {!r.pooled?.slots && (
             <span className="inline-flex items-center gap-1 rounded-md bg-white py-0.5 pl-1 pr-2 font-bold text-slate-700 ring-1 ring-slate-200">
               <button
                 type="button"
@@ -366,6 +371,7 @@ function BookingPage() {
                 +
               </button>
             </span>
+            )}
           </div>
 
           <div className={`p-5 transition-opacity ${reloading ? 'pointer-events-none opacity-50' : ''}`}>
@@ -378,7 +384,7 @@ function BookingPage() {
             <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">
               {reloading ? 'Updating slots…' : r.availableStartTimes.length === 0 ? 'No slots left for this day' : `${r.availableStartTimes.length} slot${r.availableStartTimes.length === 1 ? '' : 's'} available — tap to select`}
             </p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4">
+            <div className={r.pooled?.slots ? 'grid grid-cols-1 gap-2 sm:grid-cols-2' : 'grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4'}>
               {r.availableStartTimes.map((t) => {
                 const active = selected === t;
                 const slotPrice = reloading ? null : priceAt(r, t);
@@ -393,7 +399,9 @@ function BookingPage() {
                     }`}
                   >
                     <span className="flex flex-col leading-tight">
-                      <span className={`text-sm font-extrabold ${active ? 'text-white' : 'text-slate-900'}`}>{formatStart(t, r.timezone)}</span>
+                      <span className={`whitespace-nowrap text-sm font-extrabold ${active ? 'text-white' : 'text-slate-900'}`}>
+                        {r.pooled?.slots ? `${formatStart(t, r.timezone)} – ${formatStart(r.pooled.slots[r.availableStartTimes.indexOf(t)]?.endTime ?? t, r.timezone)}` : formatStart(t, r.timezone)}
+                      </span>
                       {r.pooled && <span className={`text-[0.625rem] font-semibold ${active ? 'text-white/80' : 'text-slate-500'}`}>{r.pooled.remaining[r.availableStartTimes.indexOf(t)] ?? 0} left</span>}
                     </span>
                     {slotPrice && (
@@ -430,7 +438,7 @@ function BookingPage() {
             )}
             {selected && (
               <p className="mb-2 text-center text-xs font-semibold text-slate-600">
-                {formatDateLabel(dateIso)} · {formatTimeRange(selected, shownDuration, r.timezone)} · {displayPrice && picked ? formatPrice(totalOf(picked, qty)) : ''}
+                {formatDateLabel(dateIso)} · {formatTimeRange(selected, holdLength, r.timezone)} · {displayPrice && picked ? formatPrice(totalOf(picked, qty)) : ''}
                 {r.pooled && qty > 1 && displayPrice && picked && <span className="text-slate-400"> ({formatPrice(picked)} each × {qty})</span>}
                 {displayPrice && picked?.normalAmount && <s className="ml-1 font-medium text-slate-400">{formatPrice({ amount: String(Number(picked.normalAmount) * qty), currency: r.price!.currency })}</s>}
                 {displayPrice && picked && payNowLabel(totalOf(picked, qty)) && <span className="block text-brand-700">{payNowLabel(totalOf(picked, qty))}, the rest at the venue</span>}

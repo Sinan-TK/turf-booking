@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { URLS } from '../../support/env';
+import { exploreLaterDay } from '../../support/customer-ui';
 
 test.use({ baseURL: URLS.web });
 
@@ -43,8 +44,7 @@ test.describe('customer site: search head start', () => {
   });
 
   test('a venue page opened again shows its saved slots before the live answer arrives', async ({ page }) => {
-    await page.goto('/explore');
-    await expect(page.getByRole('article').first()).toBeVisible();
+    await exploreLaterDay(page);
     await page.getByRole('link', { name: 'Book Now' }).first().click();
     await expect(page).toHaveURL(/\/book\//);
     const venue = page.getByRole('article').first();

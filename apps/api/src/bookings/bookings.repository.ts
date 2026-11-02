@@ -120,6 +120,8 @@ export interface PooledHoldAtomicParams {
   startTime: Date;
   endTime: Date;
   holdExpiresAt: Date;
+  /** How many the time asked for can hold: a fixed slot's own count; omitted = the whole group's `totalUnits`. */
+  capacity?: number;
   priceSnapshot: {
     amount: string;
     currency: string;

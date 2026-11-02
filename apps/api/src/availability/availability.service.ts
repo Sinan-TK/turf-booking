@@ -13,7 +13,7 @@ import { isDurationAllowed, lastBookableInstantMs } from '../scheduling/policy-v
 import { allowedDurations } from '../common/booking-policy.defaults';
 import { pLimit } from '../common/concurrency';
 import { AVAILABILITY_REPOSITORY, type AvailabilityRepository } from './availability.repository';
-import { localHm } from '../resources/group-slots';
+import { localHm, minutesOf, parseFixedSlots, slotLength, type FixedSlot } from '../resources/group-slots';
 import { StorageService } from '../storage/storage.service';
 
 /** What a venue's units need for one searched day, read for all of them at once. */
@@ -110,7 +110,13 @@ export interface SearchResult {
    * Only on a pooled group (a kayak fleet): `resource.id` is then the group's id, prices are per unit, and `remaining` is how many
    * units are still free at each start time, aligned with availableStartTimes.
    */
-  pooled?: { totalUnits: number; slotMode: 'FLEXIBLE' | 'FIXED'; remaining: number[] };
+  pooled?: {
+    totalUnits: number;
+    slotMode: 'FLEXIBLE' | 'FIXED';
+    remaining: number[];
+    /** Fixed slots only, aligned with availableStartTimes: where each slot ends, how long it is, and how many it offers in all. */
+    slots?: Array<{ endTime: string; durationMinutes: number; capacity: number }>;
+  };
 }
 
 @Injectable()
@@ -313,6 +319,9 @@ export class AvailabilityService {
 
     return Promise.all(
       groups.map(async (group, i) => {
+        if (group.slotMode === 'FIXED') {
+          return this.fixedGroupResult(venue, group, parseFixedSlots(group.fixedSlots), policySet, params, day, now, termsCache, limitReads, reservations, groupBlocks, venueBlocks, firstIndex + i);
+        }
         const groupRules = rules.filter((r) => r.resourceGroupId === group.id && r.durationMinutes !== null);
         // No price, no booking: a group nobody has priced is not shown.
         if (groupRules.length === 0) return null;
@@ -325,7 +334,7 @@ export class AvailabilityService {
         const terms = await limitReads(() => this.termsFor(venue.id, group.categoryId, termsCache));
         const blocks = [...venueWide, ...groupBlocks.filter((b) => b.resourceGroupId === group.id)].map((b) => ({ startTime: b.startTime, endTime: b.endTime }));
 
-        let startTimes = await limitReads(() =>
+        const startTimes = await limitReads(() =>
           this.candidateStartTimes({
             venueId: venue.id,
             resourceId: group.id,
@@ -342,7 +351,6 @@ export class AvailabilityService {
             advanceDays: venue.advanceBookingDays,
           }),
         );
-        if (group.slotMode === 'FIXED') startTimes = startTimes.filter((t) => group.fixedStartTimes.includes(localHm(t, venue.timezone)));
 
         // Units still free at each start: the group's count less what is held or confirmed overlapping it.
         const mine = reservations.filter((r) => r.resourceGroupId === group.id);
@@ -558,6 +566,106 @@ export class AvailabilityService {
       startNormalPrices: startPrices.map((r) => (r ? normalOf(r) : null)),
       startBookingPrices: startPrices.map((r) => (r ? advanceOf(r) : null)),
     };
+  }
+
+  /**
+   * The card of a pooled group with fixed slots: each slot is a time range on the searched day with its own number of items and its own
+   * price per item. A slot that has passed (or is inside the lead time), is beyond how far ahead the venue takes bookings, is blocked, has
+   * no price yet, or has no items left, is not offered; `remaining` is the slot's count less what is booked inside it.
+   */
+  private async fixedGroupResult(
+    venue: CandidateVenue,
+    group: BookableGroupRow,
+    slots: FixedSlot[],
+    policySet: Awaited<ReturnType<PolicyResolverService['forVenue']>>,
+    params: SearchParams,
+    day: { windowStart: Date; windowEnd: Date; localDay: DateTime },
+    now: Date,
+    termsCache: Map<string, Promise<CommercialTerms>>,
+    limitReads: ReturnType<typeof pLimit>,
+    reservations: Array<{ resourceGroupId: string; startTime: Date; endTime: Date; quantity: number }>,
+    groupBlocks: Array<{ resourceGroupId: string | null; startTime: Date; endTime: Date }>,
+    venueBlocks: Array<{ resourceId: string | null; resourceGroupId: string | null; startTime: Date; endTime: Date }>,
+    unitIndex: number,
+  ): Promise<{ unitIndex: number; result: SearchResult } | null> {
+    if (slots.length === 0) return null;
+    const policy = policySet.resolve({ resourceGroupId: group.id });
+    const terms = await limitReads(() => this.termsFor(venue.id, group.categoryId, termsCache));
+    const earliestStart = now.getTime() + policy.minLeadMinutes * MINUTE_MS;
+    const latestStart = Math.min(now.getTime() + policy.maxAdvanceDays * 86_400_000, lastBookableInstantMs(now, venue.timezone, venue.advanceBookingDays));
+    const midnight = day.localDay.startOf('day');
+    const blocks = [
+      ...venueBlocks.filter((b) => b.resourceId === null && b.resourceGroupId === null),
+      ...groupBlocks.filter((b) => b.resourceGroupId === group.id),
+    ];
+    const mine = reservations.filter((r) => r.resourceGroupId === group.id);
+
+    interface Offered { slot: FixedSlot; start: Date; end: Date; free: number }
+    const offered: Offered[] = [];
+    let slotsInRange = 0;
+    for (const slot of slots) {
+      const start = midnight.plus({ minutes: minutesOf(slot.start) }).toJSDate();
+      const end = midnight.plus({ minutes: minutesOf(slot.end) }).toJSDate();
+      // Only slots whose start falls inside the searched day's window (the time-of-day filter of the search).
+      if (start < day.windowStart || start >= day.windowEnd) continue;
+      slotsInRange++;
+      if (start.getTime() < earliestStart || start.getTime() > latestStart) continue;
+      if (slot.price === null || slot.advance === null) continue;
+      if (blocks.some((b) => b.startTime.getTime() < end.getTime() && b.endTime.getTime() > start.getTime())) continue;
+      const held = mine.filter((r) => r.startTime.getTime() < end.getTime() && r.endTime.getTime() > start.getTime()).reduce((n, r) => n + r.quantity, 0);
+      const free = Math.max(0, slot.count - held);
+      if (free > 0) offered.push({ slot, start, end, free });
+    }
+    // Nothing to book: a day with no slot at all is not listed; a day whose slots have all gone (or passed) is kept, greyed out.
+    if (offered.length === 0 && slotsInRange === 0) return null;
+    if (offered.length === 0 && day.windowStart.getTime() > latestStart) return null;
+
+    const advanceOf = (slot: FixedSlot) =>
+      atLeastMinAdvance(new Prisma.Decimal(slot.advance ?? 0), new Prisma.Decimal(slot.price ?? 0), terms).toString();
+    const lowest = offered.reduce<FixedSlot | null>((low, o) => (low === null || o.slot.price! < low.price! ? o.slot : low), null);
+    const lengths = [...new Set(slots.map(slotLength))].sort((a, b) => a - b);
+
+    const result: SearchResult = {
+      venue: {
+        id: venue.id,
+        name: venue.name,
+        facilityCode: venue.facilityCode,
+        address: venue.address,
+        photoUrl: venue.photos[0]?.url ?? null,
+        lat: Number(venue.lat),
+        lng: Number(venue.lng),
+        googleMapsUrl: venue.googleMapsUrl,
+      },
+      category: group.category,
+      resource: { id: group.id, name: group.name, groundType: '', photoUrls: group.photos.map((p) => this.storage.publicUrl(p.key)) },
+      distanceKm:
+        params.lat !== undefined && params.lng !== undefined
+          ? Number(haversineKm(params.lat, params.lng, Number(venue.lat), Number(venue.lng)).toFixed(2))
+          : undefined,
+      durationMinutes: offered[0] ? slotLength(offered[0].slot) : lengths[0]!,
+      availableStartTimes: offered.map((o) => o.start.toISOString()),
+      policy: {
+        slotIntervalMin: policy.slotIntervalMin,
+        minDurationMin: lengths[0]!,
+        maxDurationMin: lengths[lengths.length - 1]!,
+        durationIncrementMin: policy.durationIncrementMin,
+        durations: lengths,
+      },
+      openWindows: slots.map((s) => ({ openTime: s.start, closeTime: s.end })),
+      timezone: venue.timezone,
+      price: lowest ? { amount: String(lowest.price), currency: 'INR', normalAmount: null, bookingAmount: advanceOf(lowest) } : null,
+      priceVaries: new Set(offered.map((o) => o.slot.price)).size > 1,
+      startPrices: offered.map((o) => String(o.slot.price)),
+      startNormalPrices: offered.map(() => null),
+      startBookingPrices: offered.map((o) => advanceOf(o.slot)),
+      pooled: {
+        totalUnits: group.totalUnits ?? 0,
+        slotMode: 'FIXED',
+        remaining: offered.map((o) => o.free),
+        slots: offered.map((o) => ({ endTime: o.end.toISOString(), durationMinutes: slotLength(o.slot), capacity: o.slot.count })),
+      },
+    };
+    return { unitIndex, result };
   }
 
   private async resolveCandidateVenues(params: SearchParams) {

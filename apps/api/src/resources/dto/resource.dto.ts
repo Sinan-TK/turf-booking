@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { HM_PATTERN } from '../group-slots';
+import { END_PATTERN, HM_PATTERN } from '../group-slots';
 
 export const createResourceSchema = z.object({
   venueId: z.string().uuid(),
@@ -46,6 +46,15 @@ export const createCompositionSchema = z.object({
 });
 export class CreateCompositionDto extends createZodDto(createCompositionSchema) {}
 
+// One fixed slot of a pooled item: a time range with its own number of items and its own price per item.
+export const fixedSlotSchema = z.object({
+  start: z.string().regex(HM_PATTERN, 'Use a time like 08:00'),
+  end: z.string().regex(END_PATTERN, 'Use a time like 09:30'),
+  count: z.number().int().min(1, 'Enter how many are available.').max(10000),
+  price: z.number().nonnegative().max(1_000_000).nullable().optional(),
+  advance: z.number().nonnegative().max(1_000_000).nullable().optional(),
+});
+
 // P2: named inventory pools inside a venue. POOLED groups (kayak fleets)
 // require totalUnits — the counted capacity the atomic writer guards;
 // EXCLUSIVE groups are organizational only and leave it null.
@@ -58,13 +67,13 @@ export const createResourceGroupSchema = z
     totalUnits: z.number().int().positive().max(10000).optional(),
     sortOrder: z.number().int().default(0),
     slotMode: z.enum(['FLEXIBLE', 'FIXED']).default('FLEXIBLE'),
-    fixedStartTimes: z.array(z.string().regex(HM_PATTERN, 'Use a time like 06:30')).max(48).default([]),
+    fixedSlots: z.array(fixedSlotSchema).max(48).default([]),
   })
   .refine(
     (d) => d.allocationMode !== 'POOLED' || d.totalUnits !== undefined,
     { message: 'POOLED groups require totalUnits' },
   )
-  .refine((d) => d.slotMode !== 'FIXED' || d.fixedStartTimes.length > 0, { message: 'Add at least one departure time for fixed slots' });
+  .refine((d) => d.slotMode !== 'FIXED' || d.fixedSlots.length > 0, { message: 'Add at least one slot for fixed times' });
 export class CreateResourceGroupDto extends createZodDto(createResourceGroupSchema) {}
 
 // Changes to a pooled group: how many it has, whether it is open, and when its slots are.
@@ -73,7 +82,7 @@ export const updateResourceGroupSchema = z.object({
   totalUnits: z.number().int().positive().max(10000).optional(),
   isBookable: z.boolean().optional(),
   slotMode: z.enum(['FLEXIBLE', 'FIXED']).optional(),
-  fixedStartTimes: z.array(z.string().regex(HM_PATTERN, 'Use a time like 06:30')).max(48).optional(),
+  fixedSlots: z.array(fixedSlotSchema).max(48).optional(),
 });
 export class UpdateResourceGroupDto extends createZodDto(updateResourceGroupSchema) {}
 

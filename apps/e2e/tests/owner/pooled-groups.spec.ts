@@ -7,12 +7,12 @@ import { openUnitTab } from '../../support/ui';
  * customers with a quantity picker that stops at what is left.
  */
 test.describe('owner portal: pooled items', () => {
-  test('add a fleet with a count and fixed times, price it, change the count; a customer can then pick how many', async ({ page, makeVenue, ownerApi, browser }) => {
+  test('add a fleet with fixed slots (from, to, how many, price), change the count; a customer can then pick how many', async ({ page, makeVenue, ownerApi, browser }) => {
     test.setTimeout(150_000);
     const venue = await makeVenue();
     await page.goto(`/venues/${venue.id}`);
 
-    // Add the pooled item on the New tab: facility, name, count, fixed times.
+    // Add the pooled item on the New tab: facility, name, count, fixed slots.
     await openUnitTab(page, 'New');
     const section = page.getByRole('heading', { name: 'Add a pooled item' }).locator('xpath=ancestor::section[1]');
     await section.getByLabel('Facility').selectOption({ label: 'Kayaking' });
@@ -21,28 +21,35 @@ test.describe('owner portal: pooled items', () => {
     await expect(section.getByText(/Enter how many/)).toBeVisible();
     await section.getByLabel('Name').fill('PW Single kayaks');
     await section.getByLabel(/How many/).fill('6');
-    await section.getByText('Fixed times only').click();
+    await section.getByText('Fixed slots only').click();
     await section.getByRole('button', { name: 'Add pooled item' }).click();
-    await expect(section.getByText('Add at least one departure time.')).toBeVisible();
-    for (const time of ['10:00', '08:00']) {
-      await section.getByLabel('Departure time').fill(time);
-      await section.getByRole('button', { name: 'Add time' }).click();
-    }
+    await expect(section.getByText('Add at least one slot.')).toBeVisible();
+    // Each slot: from, to, how many, price for one, pay online for one.
+    const fill = async (row: number, v: { start: string; end: string; count: string; price: string; advance: string }) => {
+      await section.locator(`#pool-new-${row}-start`).fill(v.start);
+      await section.locator(`#pool-new-${row}-end`).fill(v.end);
+      await section.locator(`#pool-new-${row}-count`).fill(v.count);
+      await section.locator(`#pool-new-${row}-price`).fill(v.price);
+      await section.locator(`#pool-new-${row}-advance`).fill(v.advance);
+    };
+    await section.getByRole('button', { name: 'Add slot' }).click();
+    await fill(0, { start: '08:00', end: '09:00', count: '5', price: '400', advance: '200' });
+    await section.getByRole('button', { name: 'Add slot' }).click();
+    await fill(1, { start: '10:00', end: '12:00', count: '6', price: '550', advance: '300' });
+    await expect(section.getByText('2 hours')).toBeVisible(); // the row says how long it runs
     await section.getByRole('button', { name: 'Add pooled item' }).click();
 
     // Its own tab opens, with its card.
     const card = page.getByRole('region', { name: 'PW Single kayaks' });
     await expect(card).toBeVisible();
     await expect(card).toContainText('6 kayaks');
-    await expect(card).toContainText('fixed times');
-
-    // Price per kayak (one hour, 6 am to 6 pm by default).
-    await card.getByLabel('Price for one').fill('400');
-    await card.getByRole('button', { name: 'Add price' }).click();
-    await expect(card).toContainText('INR 400 per kayak');
+    await expect(card).toContainText('fixed slots');
+    // The slots were saved as typed, each with its own count and price.
+    await expect(card.locator('input[id$="-0-count"]')).toHaveValue('5');
+    await expect(card.locator('input[id$="-1-price"]')).toHaveValue('550');
 
     // Change the count.
-    await card.getByLabel(/How many kayaks/).fill('8');
+    await card.locator('input[id^="count-"]').fill('8');
     await card.getByRole('button', { name: 'Save count' }).click();
     await expect(card).toContainText('8 kayaks');
 
@@ -63,14 +70,25 @@ test.describe('owner portal: pooled items', () => {
     await web.goto(`/book/${venue.facilityCode}/${group.id}?date=${day}`);
     const article = web.getByRole('article').first();
     await expect(article.getByRole('heading', { level: 1 })).toContainText(venue.name);
-    await expect(article.getByText('8 left').first()).toBeVisible();
+    // Each slot is a time range with its own count.
+    await expect(article.getByRole('button', { name: /^8:00 AM – 9:00 AM/ })).toContainText('5 left');
+    await expect(article.getByRole('button', { name: /^10:00 AM – 12:00 PM/ })).toContainText('6 left');
     await expect(article.locator('img[alt$="PW Single kayaks"]').first()).toBeAttached(); // its own photo is the big picture
-    await article.getByRole('button', { name: /^8:00 AM/ }).click();
+    await article.getByRole('button', { name: /^8:00 AM – 9:00 AM/ }).click();
     await expect(article.getByText('How many kayaks')).toBeVisible();
     await article.getByRole('button', { name: 'More kayaks' }).click();
     await article.getByRole('button', { name: 'More kayaks' }).click();
     await expect(article.getByRole('button', { name: /^Book 8:00 AM · 3 kayaks/ })).toBeVisible();
-    await expect(article.getByText('INR 1,200').or(article.getByText('₹1,200')).first()).toBeVisible(); // 3 x 400
+    await expect(article.getByText('₹1,200').first()).toBeVisible(); // 3 x 400, the slot's own price
+    await expect(article.getByRole('button', { name: 'More kayaks' })).toBeEnabled();
+    // The most that can be picked is what the slot offers: 5.
+    const more = article.getByRole('button', { name: 'More kayaks' });
+    while (await more.isEnabled()) await more.click();
+    await expect(article.getByRole('button', { name: 'More kayaks' })).toBeDisabled();
+    // The other slot has its own price.
+    await article.getByRole('button', { name: /^10:00 AM – 12:00 PM/ }).click();
+    await article.getByRole('button', { name: 'More kayaks' }).click();
+    await expect(article.getByText('₹1,100').first()).toBeVisible(); // 2 x 550
     await customer.close();
   });
 

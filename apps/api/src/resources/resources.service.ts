@@ -10,7 +10,10 @@ import { OwnerScopeService } from '../owner-scope/owner-scope.service';
 import { StorageService } from '../storage/storage.service';
 import { PolicyResolverService } from '../scheduling/policy-resolver.service';
 import { unitDurationProblem } from '@venue/shared';
-import { clockLabel, normalizeStartTimes } from './group-slots';
+import type { Prisma } from '@venue/database';
+import { parseFixedSlots, slotProblems, type FixedSlot } from './group-slots';
+import { isDurationAllowed } from '../scheduling/policy-validation';
+import { CommercialTermsService } from '../commercial/commercial-terms.service';
 
 /** The facility fields a unit carries to clients: labels, allowed sub-types, icon. */
 const CATEGORY_SUMMARY = {
@@ -32,6 +35,7 @@ export class ResourcesService {
     private readonly scope: OwnerScopeService,
     private readonly storage: StorageService,
     private readonly policies: PolicyResolverService,
+    private readonly commercialTerms: CommercialTermsService,
   ) {}
 
   /** For the unit-photo endpoints: the same ownership check every write here makes. */
@@ -365,7 +369,7 @@ export class ResourcesService {
       totalUnits?: number;
       sortOrder: number;
       slotMode?: 'FLEXIBLE' | 'FIXED';
-      fixedStartTimes?: string[];
+      fixedSlots?: Array<{ start: string; end: string; count: number; price?: number | null; advance?: number | null }>;
     },
     actor: AuthContext,
   ) {
@@ -377,9 +381,9 @@ export class ResourcesService {
         throw new BadRequestException('POOLED groups require a positive integer totalUnits');
       }
     }
-    const fixedStartTimes = normalizeStartTimes(dto.fixedStartTimes ?? []);
     const slotMode = dto.slotMode ?? 'FLEXIBLE';
-    if (slotMode === 'FIXED') await this.assertDeparturesOnGrid(dto.venueId, undefined, category.id, fixedStartTimes);
+    const fixedSlots = slotMode === 'FIXED' ? this.normalizeSlots(dto.fixedSlots ?? []) : [];
+    if (slotMode === 'FIXED') await this.assertSlots(dto.venueId, undefined, category.id, dto.totalUnits ?? null, fixedSlots);
     return this.prisma.client.resourceGroup.create({
       data: {
         venueId: dto.venueId,
@@ -389,20 +393,27 @@ export class ResourcesService {
         totalUnits: dto.totalUnits,
         sortOrder: dto.sortOrder,
         slotMode,
-        fixedStartTimes: slotMode === 'FIXED' ? fixedStartTimes : [],
+        fixedSlots: fixedSlots as unknown as Prisma.InputJsonValue,
       },
     });
   }
 
-  /** Fixed departures must fall on the venue's booking grid (for example every 30 minutes), or no customer could book them. */
-  private async assertDeparturesOnGrid(venueId: string, groupId: string | undefined, categoryId: string, times: string[]) {
+  /** The slots as saved: the numbers kept, a missing price left null, in clock order. */
+  private normalizeSlots(slots: Array<{ start: string; end: string; count: number; price?: number | null; advance?: number | null }>): FixedSlot[] {
+    return parseFixedSlots(slots.map((s) => ({ ...s, price: s.price ?? null, advance: s.advance ?? null })));
+  }
+
+  /** The slots must be bookable as the owner wrote them (no overlaps, lengths the facility allows, prices within the platform's rules). */
+  private async assertSlots(venueId: string, groupId: string | undefined, categoryId: string, totalUnits: number | null, slots: FixedSlot[]) {
     const policy = (await this.policies.forVenue({ id: venueId })).resolve({ categoryId, ...(groupId ? { resourceGroupId: groupId } : {}) });
-    const step = policy.slotIntervalMin;
-    const off = times.find((t) => {
-      const [h = 0, m = 0] = t.split(':').map(Number);
-      return (h * 60 + m) % step !== 0;
+    const { terms } = await this.commercialTerms.resolve(venueId, categoryId);
+    const problem = slotProblems(slots, {
+      totalUnits,
+      slotIntervalMin: policy.slotIntervalMin,
+      allowedLength: (minutes) => isDurationAllowed(policy, minutes),
+      minAdvancePercent: terms.minAdvancePercent,
     });
-    if (off) throw new BadRequestException(`${clockLabel(off)} does not fit the booking grid: start times must be a multiple of ${step} minutes.`);
+    if (problem) throw new BadRequestException(problem);
   }
 
   /**
@@ -411,7 +422,13 @@ export class ResourcesService {
    */
   async updateGroup(
     id: string,
-    dto: { name?: string; totalUnits?: number; isBookable?: boolean; slotMode?: 'FLEXIBLE' | 'FIXED'; fixedStartTimes?: string[] },
+    dto: {
+      name?: string;
+      totalUnits?: number;
+      isBookable?: boolean;
+      slotMode?: 'FLEXIBLE' | 'FIXED';
+      fixedSlots?: Array<{ start: string; end: string; count: number; price?: number | null; advance?: number | null }>;
+    },
     actor: AuthContext,
   ) {
     const group = await this.prisma.client.resourceGroup.findUnique({ where: { id } });
@@ -433,11 +450,9 @@ export class ResourcesService {
       }
     }
     const slotMode = dto.slotMode ?? group.slotMode;
-    const times = dto.fixedStartTimes !== undefined ? normalizeStartTimes(dto.fixedStartTimes) : group.fixedStartTimes;
-    if (slotMode === 'FIXED') {
-      if (times.length === 0) throw new BadRequestException('Add at least one departure time for fixed slots');
-      await this.assertDeparturesOnGrid(group.venueId, group.id, group.categoryId, times);
-    }
+    const totalUnits = dto.totalUnits ?? group.totalUnits;
+    const slots = dto.fixedSlots !== undefined ? this.normalizeSlots(dto.fixedSlots) : parseFixedSlots(group.fixedSlots);
+    if (slotMode === 'FIXED') await this.assertSlots(group.venueId, group.id, group.categoryId, totalUnits, slots);
     return this.prisma.client.resourceGroup.update({
       where: { id },
       data: {
@@ -445,7 +460,7 @@ export class ResourcesService {
         ...(dto.totalUnits !== undefined ? { totalUnits: dto.totalUnits } : {}),
         ...(dto.isBookable !== undefined ? { isBookable: dto.isBookable } : {}),
         slotMode,
-        fixedStartTimes: slotMode === 'FIXED' ? times : [],
+        fixedSlots: (slotMode === 'FIXED' ? slots : []) as unknown as Prisma.InputJsonValue,
       },
       include: { category: { select: CATEGORY_SUMMARY } },
     });

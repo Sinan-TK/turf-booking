@@ -1478,7 +1478,7 @@ enum AllocationMode {
 }
 
 /// How a pooled group's start times work: FLEXIBLE = any start inside its priced hours (stepped by the booking interval); FIXED = only the
-/// departure times the owner listed in ResourceGroup.fixedStartTimes.
+/// slots the owner listed in ResourceGroup.fixedSlots.
 enum GroupSlotMode {
   FLEXIBLE
   FIXED
@@ -1549,8 +1549,9 @@ model ResourceGroup {
   /// Whether customers can book it (the owner can block it, like a unit).
   isBookable     Boolean        @default(true)
   slotMode       GroupSlotMode  @default(FLEXIBLE)
-  /// FIXED mode: the departures, venue-local "HH:mm", sorted and unique.
-  fixedStartTimes String[]      @default([])
+  /// FIXED mode: the slots customers can book, venue-local and never overlapping:
+  /// [{ "start": "08:00", "end": "09:30", "count": 5, "price": 400, "advance": 200 }] (price and advance are per item; null = not priced yet).
+  fixedSlots     Json           @default("[]")
   sortOrder      Int            @default(0)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt

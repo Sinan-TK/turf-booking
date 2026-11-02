@@ -59,3 +59,13 @@ export async function openVenueTypes(page: Page) {
   await expect(picker).toBeVisible();
   return picker;
 }
+
+/**
+ * The listing on a day two days ahead, so the test never depends on the time of day it runs (late in the evening every card for today is sold out
+ * and has no Book Now). Waits for the cards of that day.
+ */
+export async function exploreLaterDay(page: Page): Promise<void> {
+  await page.goto('/explore');
+  await page.getByRole('button', { name: /^(Today|Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b.*\d/ }).nth(2).click();
+  await expect(page.getByRole('link', { name: 'Book Now' }).first()).toBeVisible({ timeout: 30_000 });
+}

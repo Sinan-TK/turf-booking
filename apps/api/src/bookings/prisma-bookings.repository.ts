@@ -275,7 +275,7 @@ export class PrismaBookingsRepository implements BookingsRepository {
           AND "startTime" < ${params.endTime}
           AND "endTime" > ${params.startTime}
       `;
-      if (Number(held?.total ?? 0) + params.quantity > group.totalUnits) {
+      if (Number(held?.total ?? 0) + params.quantity > Math.min(params.capacity ?? group.totalUnits, group.totalUnits)) {
         throw new ConflictException(
           'Not enough units available for this time. Please reduce the quantity or choose another time.',
         );

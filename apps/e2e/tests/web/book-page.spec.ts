@@ -1,12 +1,13 @@
 import { expect, test } from '@playwright/test';
 import { URLS } from '../../support/env';
+import { exploreLaterDay } from '../../support/customer-ui';
 
 test.use({ baseURL: URLS.web });
 
 /** The venue's booking page: switching facility changes only what depends on it, and never reloads the page. */
 test.describe('customer site: venue booking page', () => {
   test('switching facility keeps the page (header, tiles) in place and rewrites the address', async ({ page }) => {
-    await page.goto('/explore');
+    await exploreLaterDay(page);
     // A venue with more than one facility.
     const cards = page.getByRole('article');
     await expect(cards.first()).toBeVisible();

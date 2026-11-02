@@ -75,37 +75,65 @@ describe('Pooled groups: count, slots and search', () => {
     await app.close();
   });
 
-  test('a fixed group needs its departure times, which must fit the booking grid', async () => {
-    const noTimes = await createGroup({ name: 'No Times', totalUnits: 4, slotMode: 'FIXED', fixedStartTimes: [] });
-    expect(noTimes.status).toBe(400);
-    const badClock = await createGroup({ name: 'Bad Clock', totalUnits: 4, slotMode: 'FIXED', fixedStartTimes: ['25:00'] });
-    expect(badClock.status).toBe(400);
-    const offGrid = await createGroup({ name: 'Off Grid', totalUnits: 4, slotMode: 'FIXED', fixedStartTimes: ['08:10'] });
+  const slot = (start: string, end: string, count: number, price: number | null = 400, advance: number | null = 200) => ({ start, end, count, price, advance });
+
+  test('a fixed group needs slots that make sense: not empty, not overlapping, within the fleet, on the grid, priced within the platform rules', async () => {
+    const mk = (slots: unknown[], total = 8) => createGroup({ name: 'Slot Rules', totalUnits: total, slotMode: 'FIXED', fixedSlots: slots });
+    expect((await mk([])).status).toBe(400);
+    expect((await mk([{ ...slot('25:00', '26:00', 3) }])).status).toBe(400); // not a clock time
+    const overlap = await mk([slot('08:00', '10:00', 3), slot('09:00', '11:00', 3)]);
+    expect(overlap.status).toBe(400);
+    expect(JSON.stringify(overlap.body)).toMatch(/overlap/i);
+    const tooMany = await mk([slot('08:00', '09:00', 9)]);
+    expect(tooMany.status).toBe(400);
+    expect(JSON.stringify(tooMany.body)).toMatch(/more than the 8/);
+    const offGrid = await mk([slot('08:10', '09:10', 3)]);
     expect(offGrid.status).toBe(400);
     expect(JSON.stringify(offGrid.body)).toMatch(/multiple of/);
+    const backwards = await mk([slot('10:00', '09:00', 3)]);
+    expect(backwards.status).toBe(400);
+    const lowAdvance = await mk([slot('08:00', '09:00', 3, 400, 10)]);
+    expect(lowAdvance.status).toBe(400);
+    expect(JSON.stringify(lowAdvance.body)).toMatch(/at least \d+%/);
+    const advanceAbovePrice = await mk([slot('08:00', '09:00', 3, 400, 500)]);
+    expect(advanceAbovePrice.status).toBe(400);
 
-    const ok = await createGroup({ name: 'Morning Paddle', totalUnits: 4, slotMode: 'FIXED', fixedStartTimes: ['10:00', '08:00', '08:00'] });
+    const ok = await mk([slot('10:00', '11:00', 8, 550, 300), slot('08:00', '09:00', 5, 400, 200)]);
     expect(ok.status).toBe(201);
     expect(ok.body.slotMode).toBe('FIXED');
-    expect(ok.body.fixedStartTimes).toEqual(['08:00', '10:00']); // sorted, no repeats
+    expect(ok.body.fixedSlots.map((s: { start: string }) => s.start)).toEqual(['08:00', '10:00']); // kept in clock order
   });
 
-  test('a hold on a fixed group is only accepted at one of its departures', async () => {
-    const created = await createGroup({ name: 'Fixed Fleet', totalUnits: 5, slotMode: 'FIXED', fixedStartTimes: ['08:00', '10:00'] });
+  test('a hold on a fixed group follows its slot: its start and length, its own count, its own price', async () => {
+    const created = await createGroup({ name: 'Fixed Fleet', totalUnits: 8, slotMode: 'FIXED', fixedSlots: [slot('08:00', '09:00', 5, 400, 200), slot('10:00', '11:00', 8, 550, 300)] });
     expect(created.status).toBe(201);
     const id = created.body.id as string;
-    await priceGroup(id, 400);
     const { agent: customer } = await createCustomerFixture(app);
+    const at = (hour: number) => futureStart(13, hour).toISOString();
 
-    const off = await customer.post('/bookings/hold').send({ resourceGroupId: id, quantity: 1, startTime: futureStart(13, 9).toISOString(), durationMinutes: 60 });
+    // Not a slot start, and the wrong length for a slot.
+    const off = await customer.post('/bookings/hold').send({ resourceGroupId: id, quantity: 1, startTime: at(9), durationMinutes: 60 });
     expect(off.status).toBe(400);
-    expect(JSON.stringify(off.body)).toMatch(/fixed times: 8:00 AM, 10:00 AM/);
-    const previewOff = await customer.get(`/bookings/group-availability?resourceGroupId=${id}&startTime=${encodeURIComponent(futureStart(13, 9).toISOString())}&durationMinutes=60&quantity=1`);
+    expect(JSON.stringify(off.body)).toMatch(/fixed times: 8:00 AM – 9:00 AM, 10:00 AM – 11:00 AM/);
+    const wrongLength = await customer.post('/bookings/hold').send({ resourceGroupId: id, quantity: 1, startTime: at(8), durationMinutes: 120 });
+    expect(wrongLength.status).toBe(400);
+    const previewOff = await customer.get(`/bookings/group-availability?resourceGroupId=${id}&startTime=${encodeURIComponent(at(9))}&durationMinutes=60&quantity=1`);
     expect(previewOff.body.available).toBe(false);
 
-    const on = await customer.post('/bookings/hold').send({ resourceGroupId: id, quantity: 2, startTime: futureStart(13, 10).toISOString(), durationMinutes: 60 });
-    expect(on.status).toBe(201);
-    expect(Number(on.body.amount)).toBe(800);
+    // The 8-9 slot offers 5 even though the fleet is 8; 3 are taken, so 2 remain and 3 more are refused.
+    const first = await customer.post('/bookings/hold').send({ resourceGroupId: id, quantity: 3, startTime: at(8), durationMinutes: 60 });
+    expect(first.status).toBe(201);
+    expect(Number(first.body.amount)).toBe(1200); // 3 x 400, the slot's own price
+    const preview = await customer.get(`/bookings/group-availability?resourceGroupId=${id}&startTime=${encodeURIComponent(at(8))}&durationMinutes=60&quantity=1`);
+    expect(preview.body.remaining).toBe(2);
+    expect(Number(preview.body.price.unitPrice)).toBe(400);
+    expect((await customer.post('/bookings/hold').send({ resourceGroupId: id, quantity: 3, startTime: at(8), durationMinutes: 60 })).status).toBe(409);
+    // The other slot has its own 8, untouched, at its own price.
+    const second = await customer.post('/bookings/hold').send({ resourceGroupId: id, quantity: 6, startTime: at(10), durationMinutes: 60 });
+    expect(second.status).toBe(201);
+    expect(Number(second.body.amount)).toBe(3300); // 6 x 550
+    // More than a slot offers is refused outright.
+    expect((await customer.post('/bookings/hold').send({ resourceGroupId: id, quantity: 6, startTime: at(8), durationMinutes: 60 })).status).toBe(400);
   });
 
   test('a flexible group accepts any start on the grid inside its priced hours', async () => {
@@ -139,13 +167,15 @@ describe('Pooled groups: count, slots and search', () => {
     expect(preview.body.remaining).toBe(5);
   });
 
-  test('switching a group to fixed needs times; a blocked group refuses holds', async () => {
+  test('switching a group to fixed needs slots; the count cannot go below a slot; a blocked group refuses holds', async () => {
     const created = await createGroup({ name: 'Switch Fleet', totalUnits: 3 });
     const id = created.body.id as string;
     await priceGroup(id, 250);
     expect((await ownerAgent.patch(`/resources/groups/${id}`).send({ slotMode: 'FIXED' })).status).toBe(400);
-    expect((await ownerAgent.patch(`/resources/groups/${id}`).send({ slotMode: 'FIXED', fixedStartTimes: ['16:00'] })).status).toBe(200);
-    expect((await ownerAgent.patch(`/resources/groups/${id}`).send({ slotMode: 'FLEXIBLE' })).body.fixedStartTimes).toEqual([]);
+    expect((await ownerAgent.patch(`/resources/groups/${id}`).send({ slotMode: 'FIXED', fixedSlots: [slot('16:00', '17:00', 3)] })).status).toBe(200);
+    const low = await ownerAgent.patch(`/resources/groups/${id}`).send({ totalUnits: 2 });
+    expect(low.status).toBe(400); // a slot offers 3
+    expect((await ownerAgent.patch(`/resources/groups/${id}`).send({ slotMode: 'FLEXIBLE' })).body.fixedSlots).toEqual([]);
 
     expect((await ownerAgent.patch(`/resources/groups/${id}`).send({ isBookable: false })).status).toBe(200);
     const { agent: customer } = await createCustomerFixture(app);
@@ -160,32 +190,43 @@ describe('Pooled groups: count, slots and search', () => {
     expect([403, 404]).toContain(res.status);
   });
 
-  test('the search lists a group with how many are free at each start, and a hold takes units off', async () => {
-    const created = await createGroup({ name: 'Search Fleet', totalUnits: 6, slotMode: 'FIXED', fixedStartTimes: ['08:00', '09:00', '15:00'] });
+  test('the search lists fixed slots as time ranges with their own count and price, and a hold takes items off', async () => {
+    const created = await createGroup({ name: 'Search Fleet', totalUnits: 8, slotMode: 'FIXED', fixedSlots: [slot('08:00', '09:00', 5, 400, 200), slot('10:00', '12:00', 8, 700, 350), slot('15:00', '16:00', 4, 300, 150)] });
     expect(created.status).toBe(201);
     const id = created.body.id as string;
-    await priceGroup(id, 350);
 
-    const before = (await searchFor(20)).find((r) => r.resource.id === id);
+    const before = (await searchFor(20)).find((r) => r.resource.id === id) as unknown as {
+      availableStartTimes: string[];
+      startPrices: string[];
+      pooled: { totalUnits: number; slotMode: string; remaining: number[]; slots: Array<{ endTime: string; durationMinutes: number; capacity: number }> };
+    };
     expect(before).toBeDefined();
-    expect(before!.availableStartTimes.map(hm)).toEqual(['08:00', '09:00', '15:00']);
-    expect(before!.pooled).toEqual({ totalUnits: 6, slotMode: 'FIXED', remaining: [6, 6, 6] });
-    expect(before!.startPrices).toEqual(['350', '350', '350']); // per kayak
+    expect(before.availableStartTimes.map(hm)).toEqual(['08:00', '10:00', '15:00']);
+    expect(before.pooled.remaining).toEqual([5, 8, 4]); // each slot's own count
+    expect(before.pooled.slots.map((s) => [hm(s.endTime), s.durationMinutes, s.capacity])).toEqual([['09:00', 60, 5], ['12:00', 120, 8], ['16:00', 60, 4]]);
+    expect(before.startPrices).toEqual(['400', '700', '300']); // per item, typed on the slot
 
     const { agent: customer } = await createCustomerFixture(app);
-    const hold = await customer.post('/bookings/hold').send({ resourceGroupId: id, quantity: 4, startTime: futureStart(20, 9).toISOString(), durationMinutes: 60 });
+    const hold = await customer.post('/bookings/hold').send({ resourceGroupId: id, quantity: 3, startTime: futureStart(20, 10).toISOString(), durationMinutes: 120 });
     expect(hold.status).toBe(201);
-
-    // 09:00 has 2 left; 08:00 (ends at 09:00) and 15:00 are untouched.
+    expect(Number(hold.body.amount)).toBe(2100);
     const after = (await searchFor(20)).find((r) => r.resource.id === id)!;
-    expect(after.pooled!.remaining).toEqual([6, 2, 6]);
+    expect(after.pooled!.remaining).toEqual([5, 5, 4]);
 
-    // Everyone's last kayaks gone at 09:00: that start leaves the list.
-    const rest = await customer.post('/bookings/hold').send({ resourceGroupId: id, quantity: 2, startTime: futureStart(20, 9).toISOString(), durationMinutes: 60 });
+    // Every item of a slot gone: that slot leaves the list.
+    const rest = await customer.post('/bookings/hold').send({ resourceGroupId: id, quantity: 4, startTime: futureStart(20, 15).toISOString(), durationMinutes: 60 });
     expect(rest.status).toBe(201);
     const full = (await searchFor(20)).find((r) => r.resource.id === id)!;
-    expect(full.availableStartTimes.map(hm)).toEqual(['08:00', '15:00']);
-    expect(full.pooled!.remaining).toEqual([6, 6]);
+    expect(full.availableStartTimes.map(hm)).toEqual(['08:00', '10:00']);
+  });
+
+  test('a slot with no price yet is saved but not shown to customers', async () => {
+    const created = await createGroup({ name: 'Unpriced Slot Fleet', totalUnits: 4, slotMode: 'FIXED', fixedSlots: [slot('08:00', '09:00', 4, null, null), slot('10:00', '11:00', 4, 300, 150)] });
+    expect(created.status).toBe(201);
+    const card = (await searchFor(21)).find((r) => r.resource.id === created.body.id)!;
+    expect(card.availableStartTimes.map(hm)).toEqual(['10:00']);
+    const { agent: customer } = await createCustomerFixture(app);
+    expect((await customer.post('/bookings/hold').send({ resourceGroupId: created.body.id, quantity: 1, startTime: futureStart(21, 8).toISOString(), durationMinutes: 60 })).status).toBe(400);
   });
 
   test('a pooled group has up to three photos: listed for its owner, shown on its search card, and managed by its owner only', async () => {

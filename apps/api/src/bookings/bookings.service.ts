@@ -34,7 +34,7 @@ import { OwnerScopeService } from '../owner-scope/owner-scope.service';
 import { CommercialTermsService } from '../commercial/commercial-terms.service';
 import { SettlementsService } from '../settlements/settlements.service';
 import { assertPolicyAllowsBooking, paddedRange } from '../scheduling/policy-validation';
-import { groupStartProblem } from '../resources/group-slots';
+import { findSlot, groupStartProblem } from '../resources/group-slots';
 
 // Postgres SQLSTATEs that mean "the exclusion constraint on
 // resource_locks rejected this — the slot is genuinely taken," verified
@@ -312,8 +312,14 @@ export class BookingsService {
       throw new NotFoundException('Venue not found or not bookable');
     }
     // The group's own slot rules: blocked by its owner, or a FIXED group asked for a time that is not one of its departures.
-    const slotProblem = groupStartProblem(group, startTime, venue.timezone);
+    const slotProblem = groupStartProblem(group, startTime, venue.timezone, dto.durationMinutes);
     if (slotProblem) throw new BadRequestException(slotProblem);
+    // A fixed slot has its own number of items and its own price; the other mode draws on the whole fleet and the price rules.
+    const slot = group.slotMode === 'FIXED' ? findSlot(group, startTime, venue.timezone) : null;
+    const capacity = slot ? slot.count : group.totalUnits;
+    if (dto.quantity > capacity) {
+      throw new BadRequestException('Requested quantity exceeds what this slot offers');
+    }
     // Group-scoped policy (GROUP > VENUE > CATEGORY > default): grid, duration
     // steps, lead time and advance window. Buffers do not apply to counted
     // pooled inventory (there is no per-unit lock to pad).
@@ -325,6 +331,7 @@ export class BookingsService {
       advanceDays: venue.advanceBookingDays,
     });
     if (
+      !slot &&
       !(await this.schedule.isWithinOpeningHours(
         { resourceGroupId: group.id },
         startTime,
@@ -335,13 +342,19 @@ export class BookingsService {
       throw new BadRequestException("This can't be booked at that time: no price covers it.");
     }
 
-    const { rule, amount, advance: ruleAdvance } = await this.resolveGroupPricing(
-      group.id,
-      dto.durationMinutes,
-      dto.quantity,
-      startTime,
-      venue.timezone,
-    );
+    // The price: the slot's own (per item), or the group's price rule for the length.
+    const priced = slot
+      ? {
+          rule: { currency: 'INR', unitPrice: String(slot.price), bookingPrice: String(slot.advance) },
+          amount: new Prisma.Decimal(slot.price!).mul(dto.quantity),
+          advance: new Prisma.Decimal(slot.advance!).mul(dto.quantity),
+        }
+      : await this.resolveGroupPricing(group.id, dto.durationMinutes, dto.quantity, startTime, venue.timezone).then((p) => ({
+          rule: { currency: p.rule.currency, unitPrice: String(effectivePrice(p.rule)), bookingPrice: p.rule.bookingPrice.toString() },
+          amount: p.amount,
+          advance: p.advance,
+        }));
+    const { rule, amount, advance: ruleAdvance } = priced;
     const { terms } = await this.commercialTerms.resolve(venue.id, group.categoryId);
     const advance = atLeastMinAdvance(ruleAdvance, amount, terms);
 
@@ -352,7 +365,7 @@ export class BookingsService {
       throw new ConflictException('This time is blocked by the venue owner.');
     }
     const held = await this.bookings.sumHeldGroupQuantity(group.id, startTime, endTime);
-    if (held + dto.quantity > group.totalUnits) {
+    if (held + dto.quantity > capacity) {
       throw new ConflictException(
         'Not enough units available for this time. Please reduce the quantity or choose another time.',
       );
@@ -369,13 +382,14 @@ export class BookingsService {
         startTime,
         endTime,
         holdExpiresAt,
+        capacity,
         priceSnapshot: {
           amount: amount.toString(),
           currency: rule.currency,
           durationMinutes: dto.durationMinutes,
           quantity: dto.quantity,
-          unitPrice: String(effectivePrice(rule)),
-          bookingPrice: rule.bookingPrice.toString(),
+          unitPrice: rule.unitPrice,
+          bookingPrice: rule.bookingPrice,
         },
         durationMinutes: dto.durationMinutes,
         unitLabel: group.name,
@@ -445,7 +459,9 @@ export class BookingsService {
     const venue = await this.bookings.findVenueById(group.venueId);
     if (!venue || venue.status !== 'ACTIVE') return { available: false };
 
-    if (groupStartProblem(group, startTime, venue.timezone)) return { available: false };
+    if (groupStartProblem(group, startTime, venue.timezone, durationMinutes)) return { available: false };
+    const slot = group.slotMode === 'FIXED' ? findSlot(group, startTime, venue.timezone) : null;
+    const capacity = slot ? slot.count : group.totalUnits;
 
     const endTime = new Date(startTime.getTime() + durationMinutes * 60 * 1000);
     if (await this.schedule.isBlocked(venue.id, { resourceGroupId: group.id }, startTime, endTime)) {
@@ -453,11 +469,27 @@ export class BookingsService {
     }
 
     const held = await this.bookings.sumHeldGroupQuantity(group.id, startTime, endTime);
-    const remaining = Math.max(0, group.totalUnits - held);
+    const remaining = Math.max(0, capacity - held);
     if (remaining < quantity) return { available: false };
 
-    const rule = await this.findGroupPricingRule(group.id, durationMinutes, startTime, venue.timezone);
     const { terms } = await this.commercialTerms.resolve(venue.id, group.categoryId);
+    if (slot) {
+      const amount = new Prisma.Decimal(slot.price!).mul(quantity);
+      return {
+        available: true,
+        venue: { id: venue.id, name: venue.name, facilityCode: venue.facilityCode, timezone: venue.timezone },
+        group: { id: group.id, name: group.name, allocationMode: group.allocationMode, totalUnits: group.totalUnits },
+        remaining,
+        price: {
+          amount: amount.toString(),
+          advanceAmount: atLeastMinAdvance(new Prisma.Decimal(slot.advance!).mul(quantity), amount, terms).toString(),
+          currency: 'INR',
+          unitPrice: String(slot.price),
+          quantity,
+        },
+      };
+    }
+    const rule = await this.findGroupPricingRule(group.id, durationMinutes, startTime, venue.timezone);
     return {
       available: true,
       venue: { id: venue.id, name: venue.name, facilityCode: venue.facilityCode, timezone: venue.timezone },

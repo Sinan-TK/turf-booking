@@ -36,7 +36,13 @@ export interface SearchResult {
   /** The advance paid online for each start time. */
   startBookingPrices?: Array<string | null>;
   /** Only on a pooled item (a fleet like kayaks): `resource.id` is then the group's id, prices are per one, and `remaining` is how many are free at each start time. */
-  pooled?: { totalUnits: number; slotMode: 'FLEXIBLE' | 'FIXED'; remaining: number[] };
+  pooled?: {
+    totalUnits: number;
+    slotMode: 'FLEXIBLE' | 'FIXED';
+    remaining: number[];
+    /** Fixed slots only, aligned with availableStartTimes: where each slot ends, how long it is, and how many it offers in all. */
+    slots?: Array<{ endTime: string; durationMinutes: number; capacity: number }>;
+  };
 }
 
 /**
@@ -146,7 +152,8 @@ export function useBookSlot(resourceId: string, durationMinutes: number, pooled 
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(false);
 
-  async function bookSlot(startTime: string, quantity = 1) {
+  /** Holds `quantity` at `startTime`; `length` overrides the length (a fixed slot has its own). */
+  async function bookSlot(startTime: string, quantity = 1, length = durationMinutes) {
     if (inFlight.current) return;
     inFlight.current = true;
     setBusyStart(startTime);
@@ -154,7 +161,7 @@ export function useBookSlot(resourceId: string, durationMinutes: number, pooled 
     try {
       await requireLogin(); // may open the login dialog; rejects if dismissed
       // A pooled item is held by how many of it (kayaks), a unit by itself.
-      const hold = await api.post<{ id: string }>('/bookings/hold', pooled ? { resourceGroupId: resourceId, quantity, startTime, durationMinutes } : { resourceId, startTime, durationMinutes });
+      const hold = await api.post<{ id: string }>('/bookings/hold', pooled ? { resourceGroupId: resourceId, quantity, startTime, durationMinutes: length } : { resourceId, startTime, durationMinutes: length });
       router.push(`/checkout/${hold.id}`);
     } catch (err) {
       inFlight.current = false;

@@ -7,6 +7,52 @@ import { durationLabel, type VenueCategory, type VenueCategorySummary } from '@/
 import { Button, ErrorBanner, FieldError, Input, Label, Select, invalidClass } from '@/components/ui';
 import { UnitPhotos, type UnitPhoto } from '@/components/unit-photos';
 
+/** A fixed slot as the API keeps it: venue-local times, how many items, and the price and online amount for one item (null = not priced yet). */
+interface ApiSlot {
+  start: string;
+  end: string;
+  count: number;
+  price: number | null;
+  advance: number | null;
+}
+
+/** A slot while it is being typed: every box is text. */
+interface SlotDraft {
+  start: string;
+  end: string;
+  count: string;
+  price: string;
+  advance: string;
+}
+
+const draftsOf = (slots: ApiSlot[]): SlotDraft[] =>
+  slots.map((s) => ({ start: s.start, end: s.end === '24:00' ? '23:59' : s.end, count: String(s.count), price: s.price === null ? '' : String(s.price), advance: s.advance === null ? '' : String(s.advance) }));
+
+/** What the API takes: the online amount defaults to the whole price, and a slot with no price is sent unpriced. */
+const toApi = (drafts: SlotDraft[]): ApiSlot[] =>
+  drafts.map((d) => {
+    const price = d.price.trim() === '' ? null : Number(d.price);
+    return {
+      start: d.start,
+      end: d.end === '23:59' ? '24:00' : d.end,
+      count: Number(d.count),
+      price,
+      advance: price === null ? null : d.advance.trim() === '' ? price : Number(d.advance),
+    };
+  });
+
+/** The first thing missing in a list of slots, in words, or null. (The API checks the rest: overlaps, the fleet size, the booking grid.) */
+function draftsProblem(drafts: SlotDraft[]): string | null {
+  if (drafts.length === 0) return 'Add at least one slot.';
+  for (const d of drafts) {
+    if (!d.start || !d.end) return 'Enter the start and end of every slot.';
+    if (d.start >= d.end) return 'Each slot must end after it starts.';
+    if (!(Number(d.count) >= 1)) return 'Enter how many are available in every slot.';
+    if (d.price.trim() !== '' && !(Number(d.price) >= 0)) return 'Enter a price like 400.';
+  }
+  return null;
+}
+
 export interface Group {
   id: string;
   name: string;
@@ -14,7 +60,7 @@ export interface Group {
   totalUnits: number | null;
   isBookable: boolean;
   slotMode: 'FLEXIBLE' | 'FIXED';
-  fixedStartTimes: string[];
+  fixedSlots: ApiSlot[];
   category: VenueCategorySummary;
   /** Up to three, main photo first: what customers see on the card. */
   photos: UnitPhoto[];
@@ -50,36 +96,60 @@ function clock(hhmm: string): string {
   return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`;
 }
 
-/** The departure times as removable chips, with a time box to add another. */
-function TimesEditor({ times, onChange, idPrefix }: { times: string[]; onChange: (times: string[]) => void; idPrefix: string }) {
-  const [draft, setDraft] = useState('');
+/**
+ * The slots of a fixed-times item: one row each with when it runs (from, to), how many are available in it and what one costs (and how
+ * much one pays online). A slot with no price is kept but customers do not see it yet.
+ */
+function SlotsEditor({ slots, onChange, idPrefix, thing }: { slots: SlotDraft[]; onChange: (slots: SlotDraft[]) => void; idPrefix: string; thing: string }) {
+  const set = (i: number, patch: Partial<SlotDraft>) => onChange(slots.map((s, k) => (k === i ? { ...s, ...patch } : s)));
   function add() {
-    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(draft) || times.includes(draft)) return;
-    onChange([...times, draft].sort());
-    setDraft('');
+    const last = slots[slots.length - 1];
+    onChange([...slots, { start: last?.end && last.end < '23:00' ? last.end : '08:00', end: '', count: last?.count ?? '', price: last?.price ?? '', advance: last?.advance ?? '' }]);
   }
   return (
-    <div>
-      <div className="flex flex-wrap items-center gap-2">
-        {times.length === 0 && <span className="text-xs text-on-surface-variant">No departure times yet.</span>}
-        {times.map((t) => (
-          <span key={t} className="inline-flex items-center gap-1 rounded-full bg-primary-fixed-dim/25 px-3 py-1 text-sm font-medium text-on-primary-container">
-            {clock(t)}
-            <button type="button" aria-label={`Remove ${clock(t)}`} onClick={() => onChange(times.filter((x) => x !== t))} className="rounded-full px-1 text-base leading-none hover:bg-black/10">
-              ×
-            </button>
-          </span>
-        ))}
-      </div>
-      <div className="mt-2 flex items-end gap-2">
-        <div>
-          <Label htmlFor={`${idPrefix}-time`}>Departure time</Label>
-          <Input id={`${idPrefix}-time`} type="time" step={60} value={draft} onChange={(e) => setDraft(e.target.value)} className="w-40" />
-        </div>
-        <Button type="button" variant="secondary" onClick={add} disabled={!draft}>
-          Add time
-        </Button>
-      </div>
+    <div className="space-y-3">
+      {slots.length === 0 && <p className="text-xs text-on-surface-variant">No slots yet. Add the first one.</p>}
+      {slots.map((s, i) => {
+        const minutes = s.start && s.end && s.end > s.start ? (Number(s.end.slice(0, 2)) * 60 + Number(s.end.slice(3))) - (Number(s.start.slice(0, 2)) * 60 + Number(s.start.slice(3))) : 0;
+        return (
+          <div key={i} role="group" aria-label={`Slot ${i + 1}`} className="rounded-lg bg-surface-container-low p-3 ring-1 ring-outline-variant/30">
+            <div className="grid grid-cols-2 items-end gap-3 md:grid-cols-6">
+              <div>
+                <Label htmlFor={`${idPrefix}-${i}-start`}>From</Label>
+                <Input id={`${idPrefix}-${i}-start`} type="time" value={s.start} onChange={(e) => set(i, { start: e.target.value })} />
+              </div>
+              <div>
+                <Label htmlFor={`${idPrefix}-${i}-end`}>To</Label>
+                <Input id={`${idPrefix}-${i}-end`} type="time" value={s.end} onChange={(e) => set(i, { end: e.target.value })} />
+              </div>
+              <div>
+                <Label htmlFor={`${idPrefix}-${i}-count`}>How many {thing}s</Label>
+                <Input id={`${idPrefix}-${i}-count`} type="number" min={1} value={s.count} onChange={(e) => set(i, { count: e.target.value })} />
+              </div>
+              <div>
+                <Label htmlFor={`${idPrefix}-${i}-price`}>Price for one</Label>
+                <Input id={`${idPrefix}-${i}-price`} inputMode="decimal" placeholder="INR" value={s.price} onChange={(e) => set(i, { price: e.target.value })} />
+              </div>
+              <div>
+                <Label htmlFor={`${idPrefix}-${i}-advance`}>Pay online (one)</Label>
+                <Input id={`${idPrefix}-${i}-advance`} inputMode="decimal" placeholder="same as price" value={s.advance} onChange={(e) => set(i, { advance: e.target.value })} />
+              </div>
+              <div className="flex justify-end">
+                <Button type="button" variant="secondary" aria-label={`Remove slot ${i + 1}`} onClick={() => onChange(slots.filter((_, k) => k !== i))}>
+                  Remove
+                </Button>
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-on-surface-variant">
+              {minutes > 0 ? durationLabel(minutes) : 'Set the start and the end.'}
+              {s.price.trim() === '' && ' · no price yet, so customers will not see this slot'}
+            </p>
+          </div>
+        );
+      })}
+      <Button type="button" variant="secondary" onClick={add}>
+        Add slot
+      </Button>
     </div>
   );
 }
@@ -88,14 +158,15 @@ function TimesEditor({ times, onChange, idPrefix }: { times: string[]; onChange:
 export function GroupCard({ group, category, onChanged }: { group: Group; category?: VenueCategory; onChanged: () => void }) {
   const [count, setCount] = useState(String(group.totalUnits ?? 1));
   const [mode, setMode] = useState(group.slotMode);
-  const [times, setTimes] = useState(group.fixedStartTimes);
+  const [slots, setSlots] = useState<SlotDraft[]>(() => draftsOf(group.fixedSlots ?? []));
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const { data: prices, refetch: refetchPrices } = useFetch<GroupPrice[]>(`/resources/pricing-rules?resourceGroupId=${group.id}`);
 
   const countChanged = Number(count) !== group.totalUnits;
-  const slotsChanged = mode !== group.slotMode || (mode === 'FIXED' && times.join() !== group.fixedStartTimes.join());
+  const slotsChanged = mode !== group.slotMode || (mode === 'FIXED' && JSON.stringify(toApi(slots)) !== JSON.stringify(group.fixedSlots ?? []));
+  const slotsProblem = mode === 'FIXED' ? draftsProblem(slots) : null;
 
   async function patch(body: Record<string, unknown>, done: string) {
     setBusy(true);
@@ -119,7 +190,7 @@ export function GroupCard({ group, category, onChanged }: { group: Group; catego
           <h3 className="text-body-md font-semibold text-on-surface">{group.name}</h3>
           <p className="text-xs text-on-surface-variant">
             {group.category.name} · {group.totalUnits} {group.category.unitLabel.toLowerCase()}
-            {group.totalUnits === 1 ? '' : 's'} · {group.slotMode === 'FIXED' ? 'fixed times' : 'any start time'}
+            {group.totalUnits === 1 ? '' : 's'} · {group.slotMode === 'FIXED' ? 'fixed slots' : 'any start time'}
           </p>
         </div>
         <button
@@ -166,26 +237,31 @@ export function GroupCard({ group, category, onChanged }: { group: Group; catego
             </label>
             <label className="inline-flex items-center gap-2">
               <input type="radio" name={`mode-${group.id}`} checked={mode === 'FIXED'} onChange={() => setMode('FIXED')} />
-              Fixed times only
+              Fixed slots only
             </label>
           </div>
           {mode === 'FIXED' && (
             <div className="mt-3">
-              <TimesEditor times={times} onChange={setTimes} idPrefix={`times-${group.id}`} />
+              <SlotsEditor slots={slots} onChange={setSlots} idPrefix={`slots-${group.id}`} thing={group.category.unitLabel.toLowerCase()} />
+              {slotsProblem && slotsChanged && <p role="alert" className="mt-2 text-xs text-red-700">{slotsProblem}</p>}
             </div>
           )}
           <div className="mt-3">
             <Button
               type="button"
-              disabled={busy || !slotsChanged || (mode === 'FIXED' && times.length === 0)}
-              onClick={() => void patch({ slotMode: mode, ...(mode === 'FIXED' ? { fixedStartTimes: times } : {}) }, 'Start times')}
+              disabled={busy || !slotsChanged || !!slotsProblem}
+              onClick={() => void patch({ slotMode: mode, ...(mode === 'FIXED' ? { fixedSlots: toApi(slots) } : {}) }, 'Slots')}
             >
-              Save start times
+              Save slots
             </Button>
           </div>
         </fieldset>
 
-        <PricesSection group={group} category={category} prices={prices ?? []} refetch={refetchPrices} />
+        {mode === 'FLEXIBLE' ? (
+          <PricesSection group={group} category={category} prices={prices ?? []} refetch={refetchPrices} />
+        ) : (
+          <p className="text-xs text-on-surface-variant">With fixed slots, each slot has its own price above. Prices by length and hours are used only when the start can be any time.</p>
+        )}
       </div>
     </section>
   );
@@ -320,7 +396,7 @@ function PricesSection({ group, category, prices, refetch }: { group: Group; cat
  */
 export function AddPooledItem({ venueId, categories, count, onAdded }: { venueId: string; categories: VenueCategory[] | null; count: number; onAdded: (id: string) => void }) {
   const pooledTypes = (categories ?? []).filter((c) => c.defaultAllocationMode === 'POOLED' && c.isActive);
-  const [form, setForm] = useState({ categoryId: '', name: '', count: '', mode: 'FLEXIBLE' as 'FLEXIBLE' | 'FIXED', times: [] as string[] });
+  const [form, setForm] = useState({ categoryId: '', name: '', count: '', mode: 'FLEXIBLE' as 'FLEXIBLE' | 'FIXED', slots: [] as SlotDraft[] });
   const [errors, setErrors] = useState<{ categoryId?: string; name?: string; count?: string; times?: string }>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -336,7 +412,7 @@ export function AddPooledItem({ venueId, categories, count, onAdded }: { venueId
       categoryId: form.categoryId ? undefined : 'Select a facility.',
       name: form.name.trim() ? undefined : 'Enter a name.',
       count: Number.isInteger(Number(form.count)) && Number(form.count) >= 1 ? undefined : `Enter how many ${itemWord}s you have.`,
-      times: form.mode === 'FIXED' && form.times.length === 0 ? 'Add at least one departure time.' : undefined,
+      times: form.mode === 'FIXED' ? (draftsProblem(form.slots) ?? undefined) : undefined,
     };
     setErrors(found);
     if (Object.values(found).some(Boolean)) return;
@@ -350,9 +426,9 @@ export function AddPooledItem({ venueId, categories, count, onAdded }: { venueId
         totalUnits: Number(form.count),
         sortOrder: count,
         slotMode: form.mode,
-        ...(form.mode === 'FIXED' ? { fixedStartTimes: form.times } : {}),
+        ...(form.mode === 'FIXED' ? { fixedSlots: toApi(form.slots) } : {}),
       });
-      setForm((f) => ({ ...f, name: '', count: '', times: [] }));
+      setForm((f) => ({ ...f, name: '', count: '', slots: [] }));
       setErrors({});
       onAdded(created.id);
     } catch (err) {
@@ -408,12 +484,12 @@ export function AddPooledItem({ venueId, categories, count, onAdded }: { venueId
                 </label>
                 <label className="inline-flex items-center gap-2">
                   <input type="radio" name="pool-mode" checked={form.mode === 'FIXED'} onChange={() => setForm((f) => ({ ...f, mode: 'FIXED' }))} />
-                  Fixed times only
+                  Fixed slots only
                 </label>
               </div>
               {form.mode === 'FIXED' && (
                 <div className="mt-3">
-                  <TimesEditor times={form.times} onChange={(times) => setForm((f) => ({ ...f, times }))} idPrefix="pool-new" />
+                  <SlotsEditor slots={form.slots} onChange={(slots) => setForm((f) => ({ ...f, slots }))} idPrefix="pool-new" thing={itemWord} />
                   <FieldError id="pool-times-error" message={errors.times} />
                 </div>
               )}

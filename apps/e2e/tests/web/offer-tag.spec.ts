@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { URLS } from '../../support/env';
+import { exploreLaterDay } from '../../support/customer-ui';
 
 test.use({ baseURL: URLS.web });
 
@@ -21,7 +22,7 @@ async function withOffers(page: Page, on: boolean) {
 test.describe('customer site: offers and the venue picture buttons', () => {
   test('an offer shows as a tag on the card, on the venue picture and above the slots, with the normal price struck through', async ({ page }) => {
     await withOffers(page, true);
-    await page.goto('/explore');
+    await exploreLaterDay(page);
     const card = page.getByRole('article').first();
     await expect(card).toBeVisible();
     await expect(card.getByText('20% off')).toBeVisible();
@@ -45,7 +46,7 @@ test.describe('customer site: offers and the venue picture buttons', () => {
 
   test('no offer, no tag', async ({ page }) => {
     await withOffers(page, false);
-    await page.goto('/explore');
+    await exploreLaterDay(page);
     await expect(page.getByRole('article').first()).toBeVisible();
     await expect(page.getByText(/% off/i)).toHaveCount(0);
     await page.getByRole('article').first().getByRole('link', { name: 'Book Now' }).click();
@@ -56,7 +57,7 @@ test.describe('customer site: offers and the venue picture buttons', () => {
   });
 
   test('Directions sits at the bottom right of the venue picture and Save at the top right', async ({ page }) => {
-    await page.goto('/explore');
+    await exploreLaterDay(page);
     await page.getByRole('article').first().getByRole('link', { name: 'Book Now' }).click();
     await expect(page).toHaveURL(/\/book\//);
     const venue = page.getByRole('article').first();

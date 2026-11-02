@@ -912,7 +912,7 @@ function UnitPanel({ result: r, liveResult, durationMinutes: requestedDuration, 
                 key={c.hour}
                 type="button"
                 disabled={busyStart !== null}
-                onClick={() => bookSlot(c.start!)}
+                onClick={() => bookSlot(c.start!, 1, r.pooled?.slots?.[r.availableStartTimes.indexOf(c.start!)]?.durationMinutes)}
                 title={`${shortHour(c.hour)} · available, tap to book ${durationLabel(durationMinutes).toLowerCase()}`}
                 aria-label={`Book ${formatStart(c.start, r.timezone)}`}
                 className={`h-6 flex-1 rounded-md ${CELL_COLOURS.available} transition hover:brightness-110 active:scale-95 disabled:cursor-wait ${busyStart === c.start ? 'animate-pulse' : ''}`}
