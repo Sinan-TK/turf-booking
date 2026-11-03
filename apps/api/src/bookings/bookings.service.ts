@@ -33,6 +33,7 @@ import { ScheduleService } from '../scheduling/schedule.service';
 import { OwnerScopeService } from '../owner-scope/owner-scope.service';
 import { CommercialTermsService } from '../commercial/commercial-terms.service';
 import { SettlementsService } from '../settlements/settlements.service';
+import { StorageService } from '../storage/storage.service';
 import { assertPolicyAllowsBooking, paddedRange } from '../scheduling/policy-validation';
 import { findSlot, groupStartProblem } from '../resources/group-slots';
 
@@ -79,6 +80,7 @@ export class BookingsService {
     private readonly scope: OwnerScopeService,
     private readonly commercialTerms: CommercialTermsService,
     private readonly settlements: SettlementsService,
+    private readonly storage: StorageService,
   ) {}
 
   /**
@@ -744,9 +746,10 @@ export class BookingsService {
     const booked = resource ?? resourceGroup; // a single unit (a court), or a pooled item (kayaks) with a quantity
     return {
       ...forCustomer(booking),
-      venue: { ...booking.venue, lat: Number(booking.venue.lat), lng: Number(booking.venue.lng) },
+      venue: { ...booking.venue, photos: undefined, photoUrl: booking.venue.photos[0]?.url ?? null, lat: Number(booking.venue.lat), lng: Number(booking.venue.lng) },
       resourceName: booked?.name ?? null,
-      facility: booked ? { name: booked.category.name, unitLabel: booked.category.unitLabel } : null,
+      facility: booked ? { name: booked.category.name, unitLabel: booked.category.unitLabel, iconKey: booked.category.iconKey, iconSvg: booked.category.iconSvg } : null,
+      photoUrl: booked?.photos[0] ? this.storage.publicUrl(booked.photos[0].key) : null,
       holdExpiresAt: slotHold.holdExpiresAt,
     };
   }

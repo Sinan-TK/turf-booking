@@ -185,7 +185,43 @@ export function AccountSkeleton({ label = 'Loading your account…' }: { label?:
   );
 }
 
-/** A booking's details or its checkout: a title, label/value rows and a button. */
+/** One booking's page: the picture and venue, then the slot and payment cards side by side, then the info card. */
+export function BookingDetailSkeleton({ label = 'Loading your booking…' }: { label?: string }) {
+  const card = (rows: number) => (
+    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+      <Skeleton className="mb-4 h-4 w-24" />
+      <div className="space-y-3.5">
+        {Array.from({ length: rows }, (_, i) => (
+          <div key={i} className="flex items-center justify-between gap-6">
+            <Skeleton className="h-3.5 w-20" />
+            <Skeleton className="h-3.5 w-36" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+  return (
+    <Region label={label} className="space-y-4">
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        <Skeleton className="aspect-[16/7] w-full rounded-none" />
+        <div className="flex items-start gap-3 p-5">
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-5 w-1/2" />
+            <Skeleton className="h-3 w-3/4" />
+          </div>
+          <Skeleton className="h-8 w-24 rounded-xl" />
+        </div>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        {card(5)}
+        {card(4)}
+      </div>
+      {card(2)}
+    </Region>
+  );
+}
+
+/** A booking's checkout: a title, label/value rows and a button. */
 export function DetailSkeleton({ rows = 6, label = 'Loading your booking…' }: { rows?: number; label?: string }) {
   return (
     <Region label={label}>

@@ -52,19 +52,19 @@ test.describe('customer site: booking details', () => {
     await expect(page.getByRole('heading', { name: 'Booking Details' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Greenfield Sports Arena' })).toBeVisible();
     await expect(page.getByText('12 Park Road, Manjeri')).toBeVisible();
-    await expect(page.getByText('Order BK12345')).toBeVisible();
+    await expect(page.getByText('BK12345', { exact: true })).toBeVisible();
 
     // Directions: a pin at the venue's coordinates, since it has no map link of its own.
-    await expect(page.getByRole('link', { name: 'Get directions' })).toHaveAttribute('href', /destination=11\.12,76\.12/);
+    await expect(page.getByRole('link', { name: 'Directions' })).toHaveAttribute('href', /destination=11\.12,76\.12/);
 
     // When: the day, the times and how long.
-    const when = page.locator('dl > div').filter({ hasText: /^When/ });
-    await expect(when).toContainText('2 hours');
-    await expect(when).toContainText(/Nov/);
+    await expect(page.locator('dl > div').filter({ hasText: /^Length/ })).toContainText('2 hours');
+    await expect(page.locator('dl > div').filter({ hasText: /^Date/ })).toContainText(/Nov/);
 
     // What was booked: the unit, its type and the kind of venue.
-    const booked = page.locator('dl > div').filter({ hasText: /^Booked/ });
-    await expect(booked).toContainText('5s Ground A · 5S');
+    const booked = page.locator('dl > div').filter({ hasText: /^Booked(?! on)/ });
+    await expect(booked).toContainText('5s Ground A');
+    await expect(page.locator('dl > div').filter({ hasText: /^Type/ })).toContainText('5S');
     await expect(booked).toContainText('Football');
 
     // The money lines that were already there are still there.
@@ -85,17 +85,17 @@ test.describe('customer site: booking details', () => {
       }),
     );
     await expect(page.getByRole('heading', { name: 'Lakeside Kayaking' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Get directions' })).toHaveAttribute('href', 'https://maps.app.goo.gl/PwLakeside');
-    const booked = page.locator('dl > div').filter({ hasText: /^Booked/ });
+    await expect(page.getByRole('link', { name: 'Directions' })).toHaveAttribute('href', 'https://maps.app.goo.gl/PwLakeside');
+    const booked = page.locator('dl > div').filter({ hasText: /^Booked(?! on)/ });
     await expect(booked).toContainText('3 × Kayaks');
     await expect(booked).toContainText('Kayaking');
-    await expect(page.locator('dl > div').filter({ hasText: /^When/ })).toContainText('30 minutes');
+    await expect(page.locator('dl > div').filter({ hasText: /^Length/ })).toContainText('30 minutes');
   });
 
   test('a map link that is not a real Google Maps link is never followed: directions fall back to the venue pin', async ({ page }) => {
     for (const hostile of ['javascript:alert(1)', 'https://evil.example/maps/x', 'http://maps.app.goo.gl/PwInsecure', 'https://user:pw@maps.app.goo.gl/x', 'data:text/html,<script>1</script>']) {
       await open(page, booking({ venue: { id: 'v3', name: 'Odd Venue', address: '1 Odd Street', facilityCode: 'ODD-003', googleMapsUrl: hostile, lat: 11.5, lng: 76.5 } }));
-      const href = await page.getByRole('link', { name: 'Get directions' }).getAttribute('href');
+      const href = await page.getByRole('link', { name: 'Directions' }).getAttribute('href');
       expect(href, hostile).toBe('https://www.google.com/maps/dir/?api=1&destination=11.5,76.5');
       await page.unrouteAll();
     }

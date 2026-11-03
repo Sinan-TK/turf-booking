@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useAccountData } from '@/lib/account-cache';
-import { Badge, Card, CategoryIcon, ErrorBanner, Icon } from '@/components/ui';
+import { Badge, Card, CategoryIcon, ErrorBanner } from '@/components/ui';
+import { formatPrice } from '@/lib/booking';
 import { BookingRowsSkeleton } from '@/components/skeleton';
 
 interface Facility {
@@ -97,13 +98,8 @@ function BookingRow({ booking: b }: { booking: Booking }) {
         <p className="mt-0.5 text-[0.7rem] text-gray-400">{b.orderId}</p>
       </div>
       <div className="flex items-center justify-between border-t border-gray-100 pt-3">
-        <p className="text-sm font-semibold text-gray-900">
-          {b.currency} {b.amount}
-        </p>
-        <span className="flex items-center gap-1 text-xs font-semibold text-brand-700">
-          {pending ? 'Pay now' : 'View'}
-          <Icon name="arrow_forward" className="text-[1rem] transition group-hover:translate-x-0.5" />
-        </span>
+        <p className="text-sm font-semibold text-gray-900">{formatPrice({ amount: b.amount, currency: b.currency })}</p>
+        {pending && <span className="text-xs font-semibold text-brand-700">Pay now</span>}
       </div>
     </Link>
   );
