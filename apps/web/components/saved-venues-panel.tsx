@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
@@ -93,21 +93,12 @@ export function SavedVenuesPanel() {
                   </a>
                 </div>
                 <div className="mt-auto flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void remove(v)}
-                    aria-label={`Remove ${v.name} from saved venues`}
-                    className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-red-700 active:scale-95"
-                  >
-                    <Icon name="close" className="text-[1rem]" />
-                    Remove
-                  </button>
+                  <HoldToRemove label={`Remove ${v.name} from saved venues`} onHold={() => void remove(v)} onTap={() => toast.show('Press and hold Remove to remove this venue.')} />
                   <Link
                     href={`/book/${encodeURIComponent(v.facilityCode)}/any`}
                     className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-brand-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-brand-800 active:scale-95"
                   >
                     Book now
-                    <Icon name="arrow_forward" className="text-[1rem]" />
                   </Link>
                 </div>
               </div>
@@ -163,5 +154,66 @@ function UnitSlideshow({ name, units }: { name: string; units: SavedVenue['units
         </div>
       )}
     </div>
+  );
+}
+
+const HOLD_MS = 1000;
+
+/**
+ * The Remove button: pressed and held, it fills with red from the left, and the venue is removed when it is full.
+ * Let go early and it empties again with nothing removed. Space and Enter hold it too.
+ */
+function HoldToRemove({ label, onHold, onTap }: { label: string; onHold: () => void; onTap: () => void }) {
+  const [holding, setHolding] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const start = () => {
+    if (timer.current) return;
+    setHolding(true);
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      onHold();
+    }, HOLD_MS);
+  };
+  const stop = (early: boolean) => {
+    if (!timer.current) return;
+    clearTimeout(timer.current);
+    timer.current = null;
+    setHolding(false);
+    if (early) onTap();
+  };
+  useEffect(() => () => void (timer.current && clearTimeout(timer.current)), []);
+
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title="Press and hold to remove"
+      onPointerDown={(e) => {
+        if (e.button === 0) start();
+      }}
+      onPointerUp={() => stop(true)}
+      onPointerLeave={() => stop(false)}
+      onPointerCancel={() => stop(false)}
+      onKeyDown={(e) => {
+        if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
+          e.preventDefault();
+          start();
+        }
+      }}
+      onKeyUp={(e) => {
+        if (e.key === ' ' || e.key === 'Enter') stop(true);
+      }}
+      onBlur={() => stop(false)}
+      onContextMenu={(e) => e.preventDefault()}
+      className="relative flex-1 touch-none select-none overflow-hidden rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition-colors hover:bg-red-100"
+    >
+      <span
+        aria-hidden="true"
+        className="absolute inset-y-0 left-0 bg-red-600 ease-linear"
+        style={{ width: holding ? '100%' : '0%', transitionProperty: 'width', transitionDuration: holding ? `${HOLD_MS}ms` : '150ms' }}
+      />
+      <span className={`relative transition-colors ${holding ? 'text-white' : ''}`}>Remove</span>
+    </button>
   );
 }
