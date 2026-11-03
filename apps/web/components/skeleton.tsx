@@ -78,19 +78,51 @@ export function SearchingBar({ label = 'Checking live availability…' }: { labe
   );
 }
 
-/** A list of cards, each a title line, a detail line and a status chip: bookings. */
-export function BookingRowsSkeleton({ count = 3, label = 'Loading your bookings…' }: { count?: number; label?: string }) {
+/** The My bookings cards, in the same grid as the real ones (1, 2, then 4 across): date block and status, venue, unit, time, then amount and action. */
+export function BookingRowsSkeleton({ count = 4, label = 'Loading your bookings…' }: { count?: number; label?: string }) {
   return (
-    <Region label={label} className="space-y-3">
+    <Region label={label} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {Array.from({ length: count }, (_, i) => (
-        <div key={i} className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-4 w-28" />
-            <Skeleton className="h-3 w-3/4 max-w-xs" />
+        <div key={i} className="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-2">
+            <Skeleton className="h-16 w-14 rounded-xl" />
+            <Skeleton className="h-5 w-24 rounded-full" />
           </div>
           <div className="space-y-2">
-            <Skeleton className="ml-auto h-4 w-16" />
-            <Skeleton className="ml-auto h-5 w-24 rounded-full" />
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-3 w-1/2" />
+            <Skeleton className="h-3 w-2/3" />
+            <Skeleton className="h-2.5 w-1/3" />
+          </div>
+          <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-3 w-12" />
+          </div>
+        </div>
+      ))}
+    </Region>
+  );
+}
+
+/** The Saved venues cards, in the same grid as the real ones: picture, name and address with Directions, then the two buttons. */
+export function SavedCardsSkeleton({ count = 4, label = 'Loading your saved venues…' }: { count?: number; label?: string }) {
+  return (
+    <Region label={label} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <Skeleton className="aspect-[16/9] w-full rounded-none" />
+          <div className="flex flex-col gap-4 p-4">
+            <div className="flex items-start gap-2">
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-full" />
+              </div>
+              <Skeleton className="h-8 w-24 rounded-xl" />
+            </div>
+            <div className="flex gap-2">
+              <Skeleton className="h-8 flex-1 rounded-xl" />
+              <Skeleton className="h-8 flex-1 rounded-xl" />
+            </div>
           </div>
         </div>
       ))}

@@ -19,10 +19,12 @@ interface Entry {
   data: unknown;
 }
 
+/** What is kept, minus anything older than it is allowed to be (so old personal data is dropped, not just ignored). */
 function load(): Record<string, Entry> {
   try {
     const raw = window.sessionStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Record<string, Entry>) : {};
+    const all = raw ? (JSON.parse(raw) as Record<string, Entry>) : {};
+    return Object.fromEntries(Object.entries(all).filter(([, e]) => Date.now() - e.at < MAX_AGE_MS));
   } catch {
     return {};
   }
@@ -62,6 +64,13 @@ export function useAccountData<T>(name: string, fetcher: () => Promise<T>, failM
   const key = customer ? `${customer.id}:${name}` : null;
   const [data, setDataState] = useState<T | null>(() => (key ? read<T>(key) : null));
   const [error, setError] = useState<string | null>(null);
+  // A different person (or none) is now signed in: what was shown belongs to the previous key, so start again from this key's own.
+  const shownKey = useRef(key);
+  if (shownKey.current !== key) {
+    shownKey.current = key;
+    setDataState(key ? read<T>(key) : null);
+    setError(null);
+  }
   const latest = useRef({ fetcher, failMessage });
   latest.current = { fetcher, failMessage };
 
@@ -78,7 +87,10 @@ export function useAccountData<T>(name: string, fetcher: () => Promise<T>, failM
       })
       .catch((err) => {
         if (!live) return;
-        if (err instanceof ApiError && err.status === 401) return void refresh();
+        if (err instanceof ApiError && err.status === 401) {
+          clearAccountCache(); // the session is gone: nothing of theirs stays
+          return void refresh();
+        }
         if (read(key) === null) setError(err instanceof ApiError ? err.message : latest.current.failMessage);
       });
     return () => {

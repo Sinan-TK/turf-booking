@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 import { useAccountData } from '@/lib/account-cache';
 import { useToast } from '@/components/toast';
 import { CategoryIcon, ErrorBanner, Icon } from '@/components/ui';
-import { RowsSkeleton } from '@/components/skeleton';
+import { SavedCardsSkeleton } from '@/components/skeleton';
 import { googleMapsLink } from '@/lib/booking';
 
 interface SavedVenue {
@@ -43,7 +43,7 @@ export function SavedVenuesPanel() {
   return (
     <>
       {error && <ErrorBanner message={error} />}
-      {!error && !venues && <RowsSkeleton count={3} label="Loading your saved venues…" />}
+      {!error && !venues && <SavedCardsSkeleton />}
       {venues && venues.length === 0 && (
         <p className="text-sm text-gray-500">
           No saved venues yet. Tap the bookmark on a venue&apos;s photo to save it here.

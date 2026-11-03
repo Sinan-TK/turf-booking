@@ -50,6 +50,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   const initial = useRef<Promise<void> | null>(null);
 
   const apply = useCallback((c: Customer | null) => {
+    if (!c) clearAccountCache(); // signed out, by any route (log out, an expired session): nothing kept for the account pages stays
     customerRef.current = c;
     setCustomer(c);
   }, []);
