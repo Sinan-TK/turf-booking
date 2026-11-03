@@ -102,29 +102,22 @@ test.describe('customer sign-in', () => {
     await expect(dialog.getByText('Indian mobile numbers start with 6, 7, 8 or 9.')).toBeVisible();
   });
 
-  test('the account page has a curved-box back button, no Home text, no header menu, and a Log out with confirmation', async ({ page }) => {
+  test('the account page has the site nav bar, and a Log out with confirmation', async ({ page }) => {
     await page.goto('/');
     await logIn(page, uniquePhone(), 'PW Account Person');
-    // The back button goes back to the page the visitor came from.
     await page.getByRole('button', { name: 'Account menu' }).click();
     await page.getByRole('menuitem', { name: 'Profile' }).click();
     await expect(page.getByRole('heading', { name: 'My account' })).toBeVisible();
-    await page.getByRole('button', { name: 'Go back' }).click();
-    await expect(page).toHaveURL(/localhost:\d+\/$/);
 
     await page.goto('/account');
     await expect(page.getByRole('heading', { name: 'My account' })).toBeVisible();
 
-    const back = page.getByRole('button', { name: 'Go back' });
-    await expect(back).toBeVisible();
-    const box = (await back.boundingBox())!;
-    expect(Math.round(box.width)).toBe(Math.round(box.height)); // square
-    // A curved box, not a circle: the corners are rounded, but far less than half the width.
-    const radius = parseFloat(await back.evaluate((el) => getComputedStyle(el).borderTopLeftRadius));
-    expect(radius).toBeGreaterThan(8);
-    expect(radius).toBeLessThan(box.width / 2 - 4);
-    await expect(page.getByText('Home', { exact: true })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Account menu' })).toHaveCount(0);
+    // The nav bar of the listing: logo, place, search, venue types and the account menu.
+    const nav = page.getByRole('banner');
+    await expect(nav.getByRole('button', { name: /Change location/ })).toBeVisible();
+    await expect(nav.getByRole('searchbox').or(nav.getByLabel('Search venues'))).toBeVisible();
+    await expect(nav.getByRole('button', { name: 'Venue types' })).toBeVisible();
+    await expect(nav.getByRole('button', { name: 'Account menu' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Log in' })).toHaveCount(0);
 
     // Edit stands out: a solid green button, not a plain outline.
@@ -132,13 +125,10 @@ test.describe('customer sign-in', () => {
     expect(editColour).not.toBe('rgb(255, 255, 255)');
     expect(editColour).toBe('rgb(12, 90, 68)'); // the brand green (brand-700)
 
-    // Log out sits in the top right corner, on the back button's row, where the profile icon used to be.
-    const logout = page.getByRole('button', { name: 'Log out' });
+    // Log out sits at the right of the page heading.
+    const logout = page.getByRole('main').getByRole('button', { name: 'Log out' });
     const out = (await logout.boundingBox())!;
-    const bk = (await back.boundingBox())!;
-    const view = page.viewportSize()!;
-    expect(Math.abs(out.y + out.height / 2 - (bk.y + bk.height / 2))).toBeLessThan(6);
-    expect(out.x).toBeGreaterThan(view.width / 2); // on the right, opposite the back button
+    expect(out.x).toBeGreaterThan(page.viewportSize()!.width / 2);
     await logout.click();
     const confirm = page.getByRole('alertdialog', { name: 'Log out?' });
     await expect(confirm).toBeVisible();
@@ -146,7 +136,7 @@ test.describe('customer sign-in', () => {
     await expect(confirm).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible(); // still signed in
 
-    await page.getByRole('button', { name: 'Log out' }).click();
+    await page.getByRole('main').getByRole('button', { name: 'Log out' }).click();
     await page.getByRole('alertdialog', { name: 'Log out?' }).getByRole('button', { name: 'Log out' }).click();
     await expect(page.getByText('Log in to see your account.')).toBeVisible();
   });

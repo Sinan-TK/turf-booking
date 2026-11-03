@@ -17,7 +17,7 @@ import { BookingsPanel } from '@/components/bookings-panel';
 import { LogoutButton } from '@/components/logout-button';
 import { VerifyEmailDialog } from '@/components/verify-email-dialog';
 import { SavedVenuesPanel } from '@/components/saved-venues-panel';
-import { Screen } from '@/components/screen';
+import { BrowseHeader } from '@/components/browse-header';
 
 interface CoinWallet {
   cachedBalance: string;
@@ -607,16 +607,25 @@ function AccountTabs() {
 
 export default function AccountPage() {
   return (
-    <Screen topRight={<LogoutButton />} wide>
-      <h1 className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold text-gray-900">
-        <Icon name="handshake" />
-        My account
-      </h1>
-      <LoginGate message="Log in to see your account.">
-        <Suspense fallback={<AccountSkeleton />}>
-          <AccountTabs />
-        </Suspense>
-      </LoginGate>
-    </Screen>
+    <div className="min-h-screen bg-gray-50">
+      {/* The same nav bar as the listing: logo, place, search, venue types and the account. */}
+      <BrowseHeader />
+      <main className="px-4 pb-8 pt-6 sm:px-6 sm:pb-12 lg:px-10 2xl:px-14">
+        <div className="mx-auto w-full max-w-lg md:max-w-2xl lg:max-w-none">
+          <div className="mb-6 flex items-center justify-between gap-3">
+            <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900">
+              <Icon name="handshake" />
+              My account
+            </h1>
+            <LogoutButton />
+          </div>
+          <LoginGate message="Log in to see your account.">
+            <Suspense fallback={<AccountSkeleton />}>
+              <AccountTabs />
+            </Suspense>
+          </LoginGate>
+        </div>
+      </main>
+    </div>
   );
 }
