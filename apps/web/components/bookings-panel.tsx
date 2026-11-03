@@ -68,9 +68,9 @@ export function BookingsPanel() {
         </Card>
       )}
       {!error && bookings && bookings.length > 0 && (
-        <ul className="space-y-3">
+        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {bookings.map((b) => (
-            <li key={b.id}>
+            <li key={b.id} className="h-full">
               <BookingRow booking={b} />
             </li>
           ))}
@@ -90,12 +90,15 @@ function BookingRow({ booking: b }: { booking: Booking }) {
   return (
     <Link
       href={pending ? `/checkout/${b.id}` : `/bookings/${b.id}`}
-      className="group flex items-center gap-3 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm transition hover:border-gray-300 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700 sm:gap-4 sm:p-4"
+      className="group flex h-full flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-gray-300 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700"
     >
-      <div className="flex h-16 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-gray-100 text-gray-900 sm:h-[4.5rem] sm:w-16">
-        <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-gray-500">{WEEKDAY.format(start)}</span>
-        <span className="text-xl font-bold leading-none">{start.getDate()}</span>
-        <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-gray-500">{MONTH.format(start)}</span>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex h-16 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-gray-100 text-gray-900">
+          <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-gray-500">{WEEKDAY.format(start)}</span>
+          <span className="text-xl font-bold leading-none">{start.getDate()}</span>
+          <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-gray-500">{MONTH.format(start)}</span>
+        </div>
+        <Badge value={b.status} />
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-gray-900">{b.venue?.name ?? b.orderId}</p>
@@ -106,14 +109,15 @@ function BookingRow({ booking: b }: { booking: Booking }) {
         <p className="mt-0.5 text-xs text-gray-500">{timeRange(b.startTime, b.endTime)}</p>
         <p className="mt-0.5 text-[0.7rem] text-gray-400">{b.orderId}</p>
       </div>
-      <div className="flex shrink-0 flex-col items-end gap-1.5">
-        <Badge value={b.status} />
+      <div className="flex items-center justify-between border-t border-gray-100 pt-3">
         <p className="text-sm font-semibold text-gray-900">
           {b.currency} {b.amount}
         </p>
-        {pending && <span className="text-[0.7rem] font-semibold text-brand-700">Pay now</span>}
+        <span className="flex items-center gap-1 text-xs font-semibold text-brand-700">
+          {pending ? 'Pay now' : 'View'}
+          <Icon name="arrow_forward" className="text-[1rem] transition group-hover:translate-x-0.5" />
+        </span>
       </div>
-      <Icon name="chevron_right" className="shrink-0 text-gray-300 transition group-hover:translate-x-0.5 group-hover:text-gray-500" />
     </Link>
   );
 }
