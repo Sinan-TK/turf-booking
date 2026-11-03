@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useAccountData } from '@/lib/account-cache';
 import { api, ApiError } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
 import { LoginGate } from '@/components/login-gate';
@@ -466,25 +467,17 @@ function ChangePassword() {
 }
 
 function Wallet() {
-  const { refresh } = useCustomer();
-  const [wallet, setWallet] = useState<CoinWallet | null>(null);
-  const [txs, setTxs] = useState<CoinTransaction[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    Promise.all([
-      api.get<CoinWallet>('/me/coins'),
-      api.get<CoinTransaction[]>('/me/coins/transactions'),
-    ])
-      .then(([w, t]) => {
-        setWallet(w);
-        setTxs(t.slice(0, 20));
-      })
-      .catch((err) => {
-        if (err instanceof ApiError && err.status === 401) return void refresh();
-        setError(err instanceof ApiError ? err.message : 'Could not load your wallet.');
-      });
-  }, [refresh]);
+  // The last answer paints at once; the live one replaces it.
+  const { data, error } = useAccountData(
+    'wallet',
+    async () => {
+      const [wallet, txs] = await Promise.all([api.get<CoinWallet>('/me/coins'), api.get<CoinTransaction[]>('/me/coins/transactions')]);
+      return { wallet, txs: txs.slice(0, 20) };
+    },
+    'Could not load your wallet.',
+  );
+  const wallet = data?.wallet ?? null;
+  const txs = data?.txs ?? null;
 
   return (
     <Card>

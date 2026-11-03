@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { api, ApiError } from '@/lib/api';
-import { useCustomer } from '@/lib/customer';
+import { api } from '@/lib/api';
+import { useAccountData } from '@/lib/account-cache';
 import { useToast } from '@/components/toast';
 import { CategoryIcon, ErrorBanner, Icon } from '@/components/ui';
 import { RowsSkeleton } from '@/components/skeleton';
@@ -24,20 +24,9 @@ interface SavedVenue {
 
 /** The venues the customer saved with the bookmark on the venue cards. Shown as the Saved tab of the account page. */
 export function SavedVenuesPanel() {
-  const { refresh } = useCustomer();
   const toast = useToast();
-  const [venues, setVenues] = useState<SavedVenue[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    api
-      .get<SavedVenue[]>('/me/saved-venues')
-      .then(setVenues)
-      .catch((err) => {
-        if (err instanceof ApiError && err.status === 401) return void refresh();
-        setError(err instanceof ApiError ? err.message : 'Could not load your saved venues.');
-      });
-  }, [refresh]);
+  // The last answer paints at once; the live one replaces it.
+  const { data: venues, setData: setVenues, error } = useAccountData('saved-venues', () => api.get<SavedVenue[]>('/me/saved-venues'), 'Could not load your saved venues.');
 
   /** The venue leaves the list at once; it comes back (with a message) if the server could not remove it. */
   async function remove(venue: SavedVenue) {

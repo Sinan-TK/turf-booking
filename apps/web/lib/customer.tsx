@@ -1,5 +1,6 @@
 'use client';
 
+import { clearAccountCache } from '@/lib/account-cache';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { LoginDialog } from '@/components/login-dialog';
@@ -92,6 +93,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     try {
       await api.post('/customer-auth/logout');
     } finally {
+      clearAccountCache();
       apply(null);
     }
   }, [apply]);

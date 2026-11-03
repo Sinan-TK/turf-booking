@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { api, ApiError } from '@/lib/api';
-import { useCustomer } from '@/lib/customer';
+import { api } from '@/lib/api';
+import { useAccountData } from '@/lib/account-cache';
 import { Badge, Card, CategoryIcon, ErrorBanner, Icon } from '@/components/ui';
 import { BookingRowsSkeleton } from '@/components/skeleton';
 
@@ -40,20 +39,8 @@ function timeRange(startIso: string, endIso: string): string {
 
 /** The customer's bookings, newest first. Shown as a tab on the account page. */
 export function BookingsPanel() {
-  const { refresh } = useCustomer();
-  const [bookings, setBookings] = useState<Booking[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    api
-      .get<Booking[]>('/me/bookings')
-      .then(setBookings)
-      .catch((err) => {
-        // An expired session sends the visitor back to the login prompt.
-        if (err instanceof ApiError && err.status === 401) return void refresh();
-        setError(err instanceof ApiError ? err.message : 'Something went wrong.');
-      });
-  }, [refresh]);
+  // The last answer paints at once; the live one replaces it.
+  const { data: bookings, error } = useAccountData('bookings', () => api.get<Booking[]>('/me/bookings'), 'Something went wrong.');
 
   return (
     <>
