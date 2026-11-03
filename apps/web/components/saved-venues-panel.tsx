@@ -57,33 +57,34 @@ export function SavedVenuesPanel() {
       {venues && venues.length > 0 && (
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {venues.map((v) => (
-            <li key={v.id} className="relative h-full">
-              {/* The whole row opens the venue; the remove button sits on top of it, not inside the link. */}
-              <Link
-                href={`/book/${encodeURIComponent(v.facilityCode)}/any`}
-                className="group flex h-full flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 transition hover:border-gray-300 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700"
-              >
+            <li key={v.id} className="flex h-full flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
                   <Icon name="location_on" className="text-[1.25rem]" />
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-gray-900">{v.name}</span>
-                  <span className="mt-0.5 line-clamp-2 text-xs text-gray-500">{v.address}</span>
-                </span>
-                <span className="flex items-center gap-1 text-xs font-semibold text-brand-700">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-gray-900">{v.name}</p>
+                  <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">{v.address}</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void remove(v)}
+                  aria-label={`Remove ${v.name} from saved venues`}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 active:scale-95"
+                >
+                  <Icon name="bookmark_remove" className="text-[1rem]" />
+                  Unsave
+                </button>
+                <Link
+                  href={`/book/${encodeURIComponent(v.facilityCode)}/any`}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-brand-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-brand-800 active:scale-95"
+                >
                   Book now
-                  <Icon name="arrow_forward" className="text-[1rem] transition group-hover:translate-x-0.5" />
-                </span>
-              </Link>
-              <button
-                type="button"
-                onClick={() => void remove(v)}
-                aria-label={`Remove ${v.name} from saved venues`}
-                title="Remove from saved"
-                className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-gray-400 transition hover:bg-red-50 hover:text-red-600"
-              >
-                <Icon name="close" className="text-[1rem]" />
-              </button>
+                  <Icon name="arrow_forward" className="text-[1rem]" />
+                </Link>
+              </div>
             </li>
           ))}
         </ul>
