@@ -51,7 +51,7 @@ test.describe('customer site: booking details', () => {
     await open(page, booking());
     await expect(page.getByRole('heading', { name: 'Greenfield Sports Arena' })).toBeVisible();
     await expect(page.getByText('12 Park Road, Manjeri')).toBeVisible();
-    await expect(page.getByText('BK12345', { exact: true })).toBeVisible();
+    await expect(page.getByText('BK12345', { exact: true }).first()).toBeVisible();
 
     // Directions: a pin at the venue's coordinates, since it has no map link of its own.
     await expect(page.getByRole('link', { name: 'Directions' })).toHaveAttribute('href', /destination=11\.12,76\.12/);

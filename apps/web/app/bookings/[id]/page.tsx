@@ -157,6 +157,7 @@ function BookingDetail() {
         ? CANCEL_REASONS[booking.cancellationReasonCode]
         : null;
     const toPayAtVenue = booking.status === 'CONFIRMED' && paid < amount ? amount - paid : 0;
+    const countdown = booking.status === 'CONFIRMED' ? startsIn(start, end) : null;
     const termsShown = !!preview && preview.windows.length > 0 && booking.status === 'CONFIRMED';
 
     return (
@@ -164,50 +165,76 @@ function BookingDetail() {
         {cancelResultMessage && <SuccessBanner message={cancelResultMessage} />}
 
         <div className="grid items-start gap-4 lg:grid-cols-[3fr_2fr]">
-          <Card className="overflow-hidden !p-0 lg:sticky lg:top-24">
-            {/* The photo keeps its own shape (nothing cropped); only the no-photo placeholder has a fixed one. */}
-            <div className={`relative w-full bg-gray-100 ${picture ? '' : 'aspect-[16/7] lg:aspect-[4/3]'}`}>
-              {picture ? (
-                <img src={picture} alt="" className="block h-auto max-h-[75vh] w-full object-contain" />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-brand-50 text-brand-700">
-                  {booking.facility?.iconKey ? (
-                    <CategoryIcon
-                      iconKey={booking.facility.iconKey}
-                      iconSvg={booking.facility.iconSvg}
-                      className="text-[3.5rem]"
-                    />
-                  ) : (
-                    <Icon name="location_on" className="text-[3.5rem]" />
-                  )}
+          <div className="space-y-4 lg:sticky lg:top-24">
+            <Card className="overflow-hidden !p-0">
+              {/* One shape for the photo and for the no-photo placeholder, so the page looks the same either way. */}
+              <div className="relative aspect-[16/9] w-full bg-gray-100">
+                {picture ? (
+                  <img src={picture} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-brand-50 text-brand-700">
+                    {booking.facility?.iconKey ? (
+                      <CategoryIcon
+                        iconKey={booking.facility.iconKey}
+                        iconSvg={booking.facility.iconSvg}
+                        className="text-[3.5rem]"
+                      />
+                    ) : (
+                      <Icon name="location_on" className="text-[3.5rem]" />
+                    )}
+                  </div>
+                )}
+                <div className="absolute right-3 top-3">
+                  <Badge value={booking.status} />
                 </div>
-              )}
-              <div className="absolute right-3 top-3">
-                <Badge value={booking.status} />
               </div>
-            </div>
-            <div className="flex items-start gap-3 p-4 sm:p-5">
-              <div className="min-w-0 flex-1">
-                <h1 className="text-xl font-semibold text-gray-900">{booking.venue.name}</h1>
-                <p className="mt-0.5 flex items-start gap-1 text-xs text-gray-500">
-                  <Icon
-                    name="location_on"
-                    className="mt-0.5 shrink-0 text-[0.875rem] text-gray-400"
-                  />
-                  {booking.venue.address}
-                </p>
+              <div className="flex items-start gap-3 p-4 sm:p-5">
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-xl font-semibold text-gray-900">{booking.venue.name}</h1>
+                  <p className="mt-0.5 flex items-start gap-1 text-xs text-gray-500">
+                    <Icon
+                      name="location_on"
+                      className="mt-0.5 shrink-0 text-[0.875rem] text-gray-400"
+                    />
+                    {booking.venue.address}
+                  </p>
+                </div>
+                <a
+                  href={directionsLink(booking.venue)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-brand-50 px-3 py-2 text-xs font-bold text-brand-700 transition hover:bg-brand-100 active:scale-95"
+                >
+                  <Icon name="navigation" className="text-[0.875rem]" />
+                  Directions
+                </a>
               </div>
-              <a
-                href={directionsLink(booking.venue)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-brand-50 px-3 py-2 text-xs font-bold text-brand-700 transition hover:bg-brand-100 active:scale-95"
-              >
-                <Icon name="navigation" className="text-[0.875rem]" />
-                Directions
-              </a>
-            </div>
-          </Card>
+            </Card>
+
+            <Card>
+              <h3 className="mb-3 text-sm font-semibold text-gray-900">At the venue</h3>
+              <div className="flex items-center justify-between gap-4 rounded-xl bg-gray-50 px-4 py-3">
+                <div>
+                  <p className="text-xs text-gray-500">Show this order number</p>
+                  <p className="text-lg font-bold tracking-wide text-gray-900">{booking.orderId}</p>
+                </div>
+                {countdown && (
+                  <p className="text-right text-sm font-semibold text-brand-700">{countdown}</p>
+                )}
+              </div>
+              <ul className="mt-3 space-y-1.5 text-xs text-gray-600">
+                <li>Arrive a few minutes early so your slot starts on time.</li>
+                {toPayAtVenue > 0 && (
+                  <li>Pay the remaining {money(toPayAtVenue.toFixed(2))} at the venue.</li>
+                )}
+                <li>
+                  Your slot ends at{' '}
+                  {end.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}, so
+                  the next players can start on time.
+                </li>
+              </ul>
+            </Card>
+          </div>
 
           <div className="space-y-4">
             <Card>
@@ -353,6 +380,18 @@ function BookingDetail() {
       </div>
     );
   }
+}
+
+/** "Starts in 2 days" / "Starts in 3 h 20 min" / "Happening now" / "Finished", for a confirmed booking. */
+function startsIn(start: Date, end: Date): string {
+  const now = Date.now();
+  if (now >= end.getTime()) return 'Finished';
+  if (now >= start.getTime()) return 'Happening now';
+  const minutes = Math.round((start.getTime() - now) / 60_000);
+  if (minutes < 60) return `Starts in ${minutes} min`;
+  if (minutes < 24 * 60) return `Starts in ${Math.floor(minutes / 60)} h ${minutes % 60} min`;
+  const days = Math.round(minutes / (24 * 60));
+  return `Starts in ${days} day${days === 1 ? '' : 's'}`;
 }
 
 const CANCEL_REASONS: Record<string, string> = {
