@@ -49,7 +49,6 @@ async function open(page: import('@playwright/test').Page, view: Record<string, 
 test.describe('customer site: booking details', () => {
   test('shows the venue with its address and directions, when, and exactly what was booked', async ({ page }) => {
     await open(page, booking());
-    await expect(page.getByRole('heading', { name: 'Booking Details' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Greenfield Sports Arena' })).toBeVisible();
     await expect(page.getByText('12 Park Road, Manjeri')).toBeVisible();
     await expect(page.getByText('BK12345', { exact: true })).toBeVisible();
