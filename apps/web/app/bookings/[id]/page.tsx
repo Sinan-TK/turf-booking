@@ -169,9 +169,9 @@ function BookingDetail() {
             <Card>
               <div className="flex items-start gap-4">
                 {/* A small picture (the venue-type icon when there is no photo), not a banner. */}
-                <div className="h-28 shrink-0 overflow-hidden rounded-xl bg-gray-100 sm:h-36">
+                <div className="h-28 shrink-0 overflow-hidden rounded-xl sm:h-36">
                   {picture ? (
-                    <img src={picture} alt="" className="h-full w-auto max-w-[11rem] object-contain sm:max-w-[16rem]" />
+                    <Thumb src={picture} />
                   ) : (
                     <div className="flex aspect-square h-full items-center justify-center bg-brand-50 text-brand-700">
                       {booking.facility?.iconKey ? (
@@ -392,6 +392,26 @@ function startsIn(start: Date, end: Date): string {
   if (minutes < 24 * 60) return `Starts in ${Math.floor(minutes / 60)} h ${minutes % 60} min`;
   const days = Math.round(minutes / (24 * 60));
   return `Starts in ${days} day${days === 1 ? '' : 's'}`;
+}
+
+/**
+ * The venue's small picture: as tall as the box, as wide as the photo's own shape makes it (a very wide or very tall photo is
+ * held to a sensible shape), so the photo fills the box with nothing left empty around it.
+ */
+function Thumb({ src }: { src: string }) {
+  const [ratio, setRatio] = useState(1.5);
+  return (
+    <img
+      src={src}
+      alt=""
+      onLoad={(e) => {
+        const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+        if (w > 0 && h > 0) setRatio(Math.min(2.2, Math.max(0.7, w / h)));
+      }}
+      style={{ aspectRatio: ratio }}
+      className="block h-full w-auto object-cover"
+    />
+  );
 }
 
 const CANCEL_REASONS: Record<string, string> = {
