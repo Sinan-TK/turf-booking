@@ -98,8 +98,8 @@ function BookingRow({ booking: b }: { booking: Booking }) {
         <p className="mt-0.5 text-[0.7rem] text-gray-400">{b.orderId}</p>
       </div>
       <div className="flex items-center justify-between border-t border-gray-100 pt-3">
-        <p className="text-sm font-semibold text-gray-900">{formatPrice({ amount: b.amount, currency: b.currency })}</p>
         {pending && <span className="text-xs font-semibold text-brand-700">Pay now</span>}
+        <p className="ml-auto text-sm font-semibold text-gray-900">{formatPrice({ amount: b.amount, currency: b.currency })}</p>
       </div>
     </Link>
   );
