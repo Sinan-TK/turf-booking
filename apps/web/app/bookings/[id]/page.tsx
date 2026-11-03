@@ -169,11 +169,11 @@ function BookingDetail() {
             <Card>
               <div className="flex items-start gap-4">
                 {/* A small picture (the venue-type icon when there is no photo), not a banner. */}
-                <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-gray-100 sm:h-24 sm:w-24">
+                <div className="h-20 shrink-0 overflow-hidden rounded-xl bg-gray-100 sm:h-24">
                   {picture ? (
-                    <img src={picture} alt="" className="h-full w-full object-cover" />
+                    <img src={picture} alt="" className="h-full w-auto max-w-[9rem] object-contain sm:max-w-[12rem]" />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-brand-50 text-brand-700">
+                    <div className="flex aspect-square h-full items-center justify-center bg-brand-50 text-brand-700">
                       {booking.facility?.iconKey ? (
                         <CategoryIcon
                           iconKey={booking.facility.iconKey}
