@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
 import { useToast } from '@/components/toast';
-import { Card, ErrorBanner, Icon } from '@/components/ui';
+import { ErrorBanner, Icon } from '@/components/ui';
 import { RowsSkeleton } from '@/components/skeleton';
 
 interface SavedVenue {
@@ -45,8 +45,7 @@ export function SavedVenuesPanel() {
   }
 
   return (
-    <Card>
-      <h2 className="mb-3 text-sm font-semibold text-gray-900">Saved venues</h2>
+    <>
       {error && <ErrorBanner message={error} />}
       {!error && !venues && <RowsSkeleton count={3} label="Loading your saved venues…" />}
       {venues && venues.length === 0 && (
@@ -89,6 +88,6 @@ export function SavedVenuesPanel() {
           ))}
         </ul>
       )}
-    </Card>
+    </>
   );
 }
