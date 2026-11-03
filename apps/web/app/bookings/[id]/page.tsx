@@ -166,31 +166,31 @@ function BookingDetail() {
 
         <div className="grid items-start gap-4 lg:grid-cols-[3fr_2fr]">
           <div className="space-y-4 lg:sticky lg:top-24">
-            <Card className="overflow-hidden !p-0">
-              {/* One shape for the photo and for the no-photo placeholder, so the page looks the same either way. */}
-              <div className="relative aspect-[16/9] w-full bg-gray-100">
-                {picture ? (
-                  <img src={picture} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-brand-50 text-brand-700">
-                    {booking.facility?.iconKey ? (
-                      <CategoryIcon
-                        iconKey={booking.facility.iconKey}
-                        iconSvg={booking.facility.iconSvg}
-                        className="text-[3.5rem]"
-                      />
-                    ) : (
-                      <Icon name="location_on" className="text-[3.5rem]" />
-                    )}
-                  </div>
-                )}
-                <div className="absolute right-3 top-3">
-                  <Badge value={booking.status} />
+            <Card>
+              <div className="flex items-start gap-4">
+                {/* A small picture (the venue-type icon when there is no photo), not a banner. */}
+                <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-gray-100 sm:h-24 sm:w-24">
+                  {picture ? (
+                    <img src={picture} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-brand-50 text-brand-700">
+                      {booking.facility?.iconKey ? (
+                        <CategoryIcon
+                          iconKey={booking.facility.iconKey}
+                          iconSvg={booking.facility.iconSvg}
+                          className="text-[2rem]"
+                        />
+                      ) : (
+                        <Icon name="location_on" className="text-[2rem]" />
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-              <div className="flex items-start gap-3 p-4 sm:p-5">
                 <div className="min-w-0 flex-1">
-                  <h1 className="text-xl font-semibold text-gray-900">{booking.venue.name}</h1>
+                  <div className="flex items-start justify-between gap-2">
+                    <h1 className="text-xl font-semibold text-gray-900">{booking.venue.name}</h1>
+                    <Badge value={booking.status} />
+                  </div>
                   <p className="mt-0.5 flex items-start gap-1 text-xs text-gray-500">
                     <Icon
                       name="location_on"
@@ -198,16 +198,16 @@ function BookingDetail() {
                     />
                     {booking.venue.address}
                   </p>
+                  <a
+                    href={directionsLink(booking.venue)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-brand-50 px-3 py-2 text-xs font-bold text-brand-700 transition hover:bg-brand-100 active:scale-95"
+                  >
+                    <Icon name="navigation" className="text-[0.875rem]" />
+                    Directions
+                  </a>
                 </div>
-                <a
-                  href={directionsLink(booking.venue)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-brand-50 px-3 py-2 text-xs font-bold text-brand-700 transition hover:bg-brand-100 active:scale-95"
-                >
-                  <Icon name="navigation" className="text-[0.875rem]" />
-                  Directions
-                </a>
               </div>
             </Card>
 

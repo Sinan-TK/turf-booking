@@ -202,14 +202,12 @@ export function BookingDetailSkeleton({ label = 'Loading your booking…' }: { l
   );
   return (
     <Region label={label} className="grid items-start gap-4 lg:grid-cols-[3fr_2fr]">
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-        <Skeleton className="aspect-[16/9] w-full rounded-none" />
-        <div className="flex items-start gap-3 p-5">
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-5 w-1/2" />
-            <Skeleton className="h-3 w-3/4" />
-          </div>
-          <Skeleton className="h-8 w-24 rounded-xl" />
+      <div className="flex items-start gap-4 rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+        <Skeleton className="h-20 w-20 shrink-0 rounded-xl sm:h-24 sm:w-24" />
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-5 w-1/2" />
+          <Skeleton className="h-3 w-3/4" />
+          <Skeleton className="mt-3 h-8 w-24 rounded-xl" />
         </div>
       </div>
       <div className="space-y-4">
