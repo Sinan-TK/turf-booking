@@ -102,7 +102,7 @@ test.describe('customer sign-in', () => {
     await expect(dialog.getByText('Indian mobile numbers start with 6, 7, 8 or 9.')).toBeVisible();
   });
 
-  test('the account page has the site nav bar, and a Log out with confirmation', async ({ page }) => {
+  test('the account page has a nav bar with a back button and Log out, and Log out asks first', async ({ page }) => {
     await page.goto('/');
     await logIn(page, uniquePhone(), 'PW Account Person');
     await page.getByRole('button', { name: 'Account menu' }).click();
@@ -112,21 +112,24 @@ test.describe('customer sign-in', () => {
     await page.goto('/account');
     await expect(page.getByRole('heading', { name: 'My account' })).toBeVisible();
 
-    // The nav bar of the listing: logo, place, search, venue types and the account menu.
+    // A slim nav bar with only a back button on the left and Log out on the right.
     const nav = page.getByRole('banner');
-    await expect(nav.getByRole('button', { name: /Change location/ })).toBeVisible();
-    await expect(nav.getByRole('searchbox').or(nav.getByLabel('Search venues'))).toBeVisible();
-    await expect(nav.getByRole('button', { name: 'Venue types' })).toBeVisible();
-    await expect(nav.getByRole('button', { name: 'Account menu' })).toBeVisible();
+    await expect(nav.getByRole('button', { name: 'Go back' })).toBeVisible();
+    await expect(nav.getByRole('button', { name: 'Log out' })).toBeVisible();
+    await expect(nav.getByRole('button', { name: 'Account menu' })).toHaveCount(0);
+    await expect(nav.getByLabel('Search venues')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Log in' })).toHaveCount(0);
+    await nav.getByRole('button', { name: 'Go back' }).click();
+    await expect(page).not.toHaveURL(//account/);
+    await page.goto('/account');
 
     // Edit stands out: a solid green button, not a plain outline.
     const editColour = await page.getByRole('button', { name: 'Edit' }).evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(editColour).not.toBe('rgb(255, 255, 255)');
     expect(editColour).toBe('rgb(12, 90, 68)'); // the brand green (brand-700)
 
-    // Log out sits at the right of the page heading.
-    const logout = page.getByRole('main').getByRole('button', { name: 'Log out' });
+    // Log out sits at the right end of the nav bar.
+    const logout = nav.getByRole('button', { name: 'Log out' });
     const out = (await logout.boundingBox())!;
     expect(out.x).toBeGreaterThan(page.viewportSize()!.width / 2);
     await logout.click();
@@ -136,7 +139,7 @@ test.describe('customer sign-in', () => {
     await expect(confirm).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible(); // still signed in
 
-    await page.getByRole('main').getByRole('button', { name: 'Log out' }).click();
+    await nav.getByRole('button', { name: 'Log out' }).click();
     await page.getByRole('alertdialog', { name: 'Log out?' }).getByRole('button', { name: 'Log out' }).click();
     await expect(page.getByText('Log in to see your account.')).toBeVisible();
   });

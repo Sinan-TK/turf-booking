@@ -17,7 +17,7 @@ import { BookingsPanel } from '@/components/bookings-panel';
 import { LogoutButton } from '@/components/logout-button';
 import { VerifyEmailDialog } from '@/components/verify-email-dialog';
 import { SavedVenuesPanel } from '@/components/saved-venues-panel';
-import { BrowseHeader } from '@/components/browse-header';
+import { BackButton } from '@/components/back-button';
 
 interface CoinWallet {
   cachedBalance: string;
@@ -608,17 +608,21 @@ function AccountTabs() {
 export default function AccountPage() {
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* The same nav bar as the listing: logo, place, search, venue types and the account. */}
-      <BrowseHeader />
+      {/* A slim nav bar like the listing's, with just the back button and Log out. */}
+      <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur-md">
+        <div className="flex h-[4.25rem] w-full items-center justify-between gap-3 px-4 sm:px-6 lg:px-10 2xl:px-14">
+          <div className="-ml-2">
+            <BackButton plain />
+          </div>
+          <LogoutButton />
+        </div>
+      </header>
       <main className="px-4 pb-8 pt-6 sm:px-6 sm:pb-12 lg:px-10 2xl:px-14">
         <div className="mx-auto w-full max-w-lg md:max-w-2xl lg:max-w-none">
-          <div className="mb-6 flex items-center justify-between gap-3">
-            <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900">
-              <Icon name="handshake" />
-              My account
-            </h1>
-            <LogoutButton />
-          </div>
+          <h1 className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold text-gray-900">
+            <Icon name="handshake" />
+            My account
+          </h1>
           <LoginGate message="Log in to see your account.">
             <Suspense fallback={<AccountSkeleton />}>
               <AccountTabs />
