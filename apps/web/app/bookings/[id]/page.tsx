@@ -165,9 +165,10 @@ function BookingDetail() {
 
         <div className="grid items-start gap-4 lg:grid-cols-[3fr_2fr]">
           <Card className="overflow-hidden !p-0 lg:sticky lg:top-24">
-            <div className="relative aspect-[16/7] w-full bg-gray-100 md:aspect-[16/7] lg:aspect-[4/3]">
+            {/* The photo keeps its own shape (nothing cropped); only the no-photo placeholder has a fixed one. */}
+            <div className={`relative w-full bg-gray-100 ${picture ? '' : 'aspect-[16/7] lg:aspect-[4/3]'}`}>
               {picture ? (
-                <img src={picture} alt="" className="h-full w-full object-cover" />
+                <img src={picture} alt="" className="block h-auto max-h-[75vh] w-full object-contain" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center bg-brand-50 text-brand-700">
                   {booking.facility?.iconKey ? (
