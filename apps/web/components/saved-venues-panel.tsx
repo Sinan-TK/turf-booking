@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
 import { useToast } from '@/components/toast';
-import { ErrorBanner, Icon } from '@/components/ui';
+import { CategoryIcon, ErrorBanner, Icon } from '@/components/ui';
 import { RowsSkeleton } from '@/components/skeleton';
 import { googleMapsLink } from '@/lib/booking';
 
@@ -19,7 +19,7 @@ interface SavedVenue {
   googleMapsUrl: string | null;
   photoUrl: string | null;
   /** Every unit that can be booked now, with its main photo. */
-  units: { id: string; name: string; photoUrl: string | null }[];
+  units: { id: string; name: string; photoUrl: string | null; iconKey: string; iconSvg: string | null }[];
 }
 
 /** The venues the customer saved with the bookmark on the venue cards. Shown as the Saved tab of the account page. */
@@ -64,8 +64,24 @@ export function SavedVenuesPanel() {
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {venues.map((v) => (
             <li key={v.id} className="flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-              <div className="relative aspect-[16/9] w-full bg-gray-100">
-                {v.photoUrl ? (
+              {/* One picture per bookable unit (its venue-type icon when it has none); a venue with no units shows its own photo. */}
+              <div className="aspect-[16/9] w-full bg-gray-100">
+                {v.units.length > 0 ? (
+                  <ul aria-label={`${v.name} units`} className="scrollbar-hide flex h-full snap-x snap-mandatory overflow-x-auto">
+                    {v.units.map((u) => (
+                      <li key={u.id} className={`relative h-full shrink-0 snap-start border-r border-white/70 last:border-r-0 ${v.units.length === 1 ? 'w-full' : 'w-1/2'}`}>
+                        {u.photoUrl ? (
+                          <img src={u.photoUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-brand-50 text-brand-700">
+                            <CategoryIcon iconKey={u.iconKey} iconSvg={u.iconSvg} className="text-[2.5rem]" />
+                          </div>
+                        )}
+                        <span className="absolute bottom-1.5 left-1.5 max-w-[calc(100%-0.75rem)] truncate rounded-md bg-black/55 px-1.5 py-0.5 text-[0.65rem] font-semibold text-white">{u.name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : v.photoUrl ? (
                   <img src={v.photoUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-gray-300">
@@ -73,7 +89,7 @@ export function SavedVenuesPanel() {
                   </div>
                 )}
               </div>
-              <div className="flex flex-1 flex-col gap-3 p-4">
+              <div className="flex flex-1 flex-col gap-4 p-4">
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-gray-900">{v.name}</p>
@@ -89,33 +105,15 @@ export function SavedVenuesPanel() {
                     Directions
                   </a>
                 </div>
-                {v.units.length > 0 && (
-                  <ul aria-label={`${v.name} units`} className="scrollbar-hide -mx-1 flex flex-1 gap-2 overflow-x-auto px-1 pb-1">
-                    {v.units.map((u) => (
-                      <li key={u.id} className="w-20 shrink-0">
-                        <div className="aspect-square w-full overflow-hidden rounded-xl bg-gray-100">
-                          {u.photoUrl ? (
-                            <img src={u.photoUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center text-gray-300">
-                              <Icon name="photo_camera" className="text-[1.5rem]" />
-                            </div>
-                          )}
-                        </div>
-                        <p className="mt-1 truncate text-center text-[0.7rem] font-medium text-gray-600">{u.name}</p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
                 <div className="mt-auto flex gap-2">
                   <button
                     type="button"
                     onClick={() => void remove(v)}
                     aria-label={`Remove ${v.name} from saved venues`}
-                    className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 active:scale-95"
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-red-700 active:scale-95"
                   >
                     <Icon name="close" className="text-[1rem]" />
-                    Unsave
+                    Remove
                   </button>
                   <Link
                     href={`/book/${encodeURIComponent(v.facilityCode)}/any`}

@@ -55,12 +55,12 @@ export class SavedVenuesService {
             resources: {
               where: { isBookable: true, status: 'ACTIVE' },
               orderBy: { createdAt: 'asc' },
-              select: { id: true, name: true, photos: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }], take: 1, select: { key: true } } },
+              select: { id: true, name: true, category: { select: { iconKey: true, iconSvg: true } }, photos: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }], take: 1, select: { key: true } } },
             },
             resourceGroups: {
               where: { isBookable: true, totalUnits: { gt: 0 } },
               orderBy: { createdAt: 'asc' },
-              select: { id: true, name: true, photos: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }], take: 1, select: { key: true } } },
+              select: { id: true, name: true, category: { select: { iconKey: true, iconSvg: true } }, photos: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }], take: 1, select: { key: true } } },
             },
           },
         },
@@ -86,6 +86,8 @@ export class SavedVenuesService {
           id: u.id,
           name: u.name,
           photoUrl: u.photos[0] ? this.storage.publicUrl(u.photos[0].key) : null,
+          iconKey: u.category.iconKey,
+          iconSvg: u.category.iconSvg,
         })),
       }));
   }
