@@ -51,7 +51,7 @@ test.describe('customer site: booking a slot', () => {
     await page.goto('/bookings');
     await expect(page).toHaveURL(/\/account\?tab=bookings$/); // the old address lands on the tab
     await expect(page.getByRole('tab', { name: 'Bookings' })).toHaveAttribute('aria-selected', 'true');
-    const row = page.getByRole('link').filter({ hasText: /BK\d+/ }); // (the list shows the order, time, type and amount, not the venue)
+    const row = page.getByRole('link').filter({ hasText: /BK\d+/ }); // (each row shows the venue, unit, time, order id, status and amount)
     await expect(row).toHaveCount(1);
     await expect(row).toContainText('PENDING_PAYMENT');
     await row.click();

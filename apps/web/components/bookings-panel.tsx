@@ -4,8 +4,15 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
-import { Badge, Card, ErrorBanner } from '@/components/ui';
+import { Badge, Card, CategoryIcon, ErrorBanner, Icon } from '@/components/ui';
 import { BookingRowsSkeleton } from '@/components/skeleton';
+
+interface Facility {
+  name: string;
+  iconKey: string;
+  iconSvg: string | null;
+  unitLabel: string;
+}
 
 interface Booking {
   id: string;
@@ -14,7 +21,21 @@ interface Booking {
   amount: string;
   currency: string;
   startTime: string;
+  endTime: string;
+  quantity: number;
   groundType: string;
+  venue?: { name: string; address: string };
+  resource?: { name: string; category: Facility } | null;
+  resourceGroup?: { name: string; category: Facility } | null;
+}
+
+const WEEKDAY = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+const MONTH = new Intl.DateTimeFormat(undefined, { month: 'short' });
+const CLOCK = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+
+/** "6:00 – 7:30 PM" style range, in the visitor's own time. */
+function timeRange(startIso: string, endIso: string): string {
+  return `${CLOCK.format(new Date(startIso))} – ${CLOCK.format(new Date(endIso))}`;
 }
 
 /** The customer's bookings, newest first. Shown as a tab on the account page. */
@@ -47,29 +68,52 @@ export function BookingsPanel() {
         </Card>
       )}
       {!error && bookings && bookings.length > 0 && (
-        <div className="space-y-3">
+        <ul className="space-y-3">
           {bookings.map((b) => (
-            <Link key={b.id} href={b.status === 'PENDING_PAYMENT' ? `/checkout/${b.id}` : `/bookings/${b.id}`}>
-              <Card className="transition-shadow hover:shadow-md">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-gray-900">{b.orderId}</p>
-                    <p className="text-xs text-gray-500">
-                      {new Date(b.startTime).toLocaleString()} · {b.groundType}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium">
-                      {b.currency} {b.amount}
-                    </p>
-                    <Badge value={b.status} />
-                  </div>
-                </div>
-              </Card>
-            </Link>
+            <li key={b.id}>
+              <BookingRow booking={b} />
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </>
+  );
+}
+
+/** One booking: the whole row opens it (checkout while payment is pending, the booking page otherwise). */
+function BookingRow({ booking: b }: { booking: Booking }) {
+  const start = new Date(b.startTime);
+  const item = b.resource ?? b.resourceGroup ?? null;
+  const facility = item?.category;
+  const what = item ? (b.resourceGroup && b.quantity > 1 ? `${b.quantity} × ${item.name}` : item.name) : b.groundType;
+  const pending = b.status === 'PENDING_PAYMENT';
+  return (
+    <Link
+      href={pending ? `/checkout/${b.id}` : `/bookings/${b.id}`}
+      className="group flex items-center gap-3 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm transition hover:border-gray-300 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700 sm:gap-4 sm:p-4"
+    >
+      <div className="flex h-16 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-gray-100 text-gray-900 sm:h-[4.5rem] sm:w-16">
+        <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-gray-500">{WEEKDAY.format(start)}</span>
+        <span className="text-xl font-bold leading-none">{start.getDate()}</span>
+        <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-gray-500">{MONTH.format(start)}</span>
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-gray-900">{b.venue?.name ?? b.orderId}</p>
+        <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-gray-600">
+          {facility && <CategoryIcon iconKey={facility.iconKey} iconSvg={facility.iconSvg} className="shrink-0 text-[0.95rem] text-gray-500" />}
+          <span className="truncate">{what}</span>
+        </p>
+        <p className="mt-0.5 text-xs text-gray-500">{timeRange(b.startTime, b.endTime)}</p>
+        <p className="mt-0.5 text-[0.7rem] text-gray-400">{b.orderId}</p>
+      </div>
+      <div className="flex shrink-0 flex-col items-end gap-1.5">
+        <Badge value={b.status} />
+        <p className="text-sm font-semibold text-gray-900">
+          {b.currency} {b.amount}
+        </p>
+        {pending && <span className="text-[0.7rem] font-semibold text-brand-700">Pay now</span>}
+      </div>
+      <Icon name="chevron_right" className="shrink-0 text-gray-300 transition group-hover:translate-x-0.5 group-hover:text-gray-500" />
+    </Link>
   );
 }

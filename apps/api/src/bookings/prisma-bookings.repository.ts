@@ -137,6 +137,12 @@ export class PrismaBookingsRepository implements BookingsRepository {
     return this.prisma.client.booking.findMany({
       where: { customerId },
       orderBy: { startTime: 'desc' },
+      // What the My bookings list shows: the venue, and the unit or pooled item with its facility icon.
+      include: {
+        venue: { select: { name: true, address: true } },
+        resource: { select: { name: true, category: { select: { name: true, iconKey: true, iconSvg: true, unitLabel: true } } } },
+        resourceGroup: { select: { name: true, category: { select: { name: true, iconKey: true, iconSvg: true, unitLabel: true } } } },
+      },
     });
   }
 

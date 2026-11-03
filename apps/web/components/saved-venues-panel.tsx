@@ -54,33 +54,32 @@ export function SavedVenuesPanel() {
         </p>
       )}
       {venues && venues.length > 0 && (
-        <ul className="divide-y divide-gray-100">
+        <ul className="space-y-2">
           {venues.map((v) => (
-            <li key={v.id} className="flex items-center justify-between gap-3 py-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-gray-900">{v.name}</p>
-                <p className="flex items-center gap-1 truncate text-xs text-gray-500">
-                  <Icon name="location_on" className="shrink-0 text-[0.875rem] text-gray-400" />
-                  <span className="truncate">{v.address}</span>
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <Link
-                  href={`/explore?q=${encodeURIComponent(v.name)}`}
-                  className="rounded-xl bg-brand-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-brand-800 active:scale-95"
-                >
-                  View slots
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => void remove(v)}
-                  aria-label={`Remove ${v.name} from saved venues`}
-                  title="Remove from saved"
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                >
-                  <Icon name="close" className="text-[1rem]" />
-                </button>
-              </div>
+            <li key={v.id} className="relative">
+              {/* The whole row opens the venue; the remove button sits on top of it, not inside the link. */}
+              <Link
+                href={`/explore?q=${encodeURIComponent(v.name)}`}
+                className="group flex items-center gap-3 rounded-xl border border-gray-200 bg-white py-3 pl-3 pr-12 transition hover:border-gray-300 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700"
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+                  <Icon name="location_on" className="text-[1.25rem]" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-gray-900">{v.name}</span>
+                  <span className="block truncate text-xs text-gray-500">{v.address}</span>
+                </span>
+                <Icon name="chevron_right" className="shrink-0 text-gray-300 transition group-hover:translate-x-0.5 group-hover:text-gray-500" />
+              </Link>
+              <button
+                type="button"
+                onClick={() => void remove(v)}
+                aria-label={`Remove ${v.name} from saved venues`}
+                title="Remove from saved"
+                className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full text-gray-400 transition hover:bg-red-50 hover:text-red-600"
+              >
+                <Icon name="close" className="text-[1rem]" />
+              </button>
             </li>
           ))}
         </ul>
