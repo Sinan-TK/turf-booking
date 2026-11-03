@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useListFilters } from '@/lib/use-list-filters';
 import { PAGE_SIZE, usePagedFetch } from '@/lib/use-paged-fetch';
+import { optimisticRows } from '@/lib/optimistic';
 import { useAuth } from '@/lib/auth-context';
 import { api, ApiError } from '@/lib/api';
 import { isOwnerEmailTaken, OWNER_EMAIL_TAKEN_MESSAGE } from '@/lib/email-check';
@@ -309,7 +310,9 @@ function initials(name: string): string {
 export default function StaffPage() {
   const { user } = useAuth();
   const f = useListFilters({ search: '', status: '' });
-  const { rows: staff, total, error, loading, refetch } = usePagedFetch<Staff>('/owner/staff', f.query, f.page);
+  const { rows: staff, total, error, loading, refetch, mutateRows } = usePagedFetch<Staff>('/owner/staff', f.query, f.page);
+  // A deletion or an enable/disable the server refused after it was shown: the row goes back and this says why.
+  const [actionError, setActionError] = useState<string | null>(null);
   const venues: VenueOption[] = user?.venues ?? [];
 
   const [inviting, setInviting] = useState(false);
@@ -321,37 +324,27 @@ export default function StaffPage() {
   const [deleting, setDeleting] = useState<Staff | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  /** The login leaves the list at once; it comes back with a message if the server could not delete it. */
   async function confirmDelete() {
     if (!deleting) return;
-    setBusy(true);
-    setDeleteError(null);
-    try {
-      await api.delete(`/owner/staff/${deleting.id}`);
-      setNotice(`${deleting.name} was deleted.`);
-      setDeleting(null);
-      refetch();
-    } catch (err) {
-      setDeleteError(err instanceof ApiError ? err.message : 'Could not delete this login');
-    } finally {
-      setBusy(false);
-    }
+    const gone = deleting;
+    setDeleting(null);
+    setActionError(null);
+    setNotice(null);
+    const ok = await optimisticRows<Staff>(mutateRows, (rows) => rows.filter((s) => s.id !== gone.id), -1, () => api.delete(`/owner/staff/${gone.id}`), setActionError);
+    if (ok) setNotice(`${gone.name} was deleted.`);
+    refetch();
   }
 
+  /** The status chip flips at once; it goes back with a message if the server refused. */
   async function confirmToggle() {
     if (!toggling) return;
-    setBusy(true);
-    setToggleError(null);
-    try {
-      await api.patch(`/owner/staff/${toggling.id}/status`, {
-        status: toggling.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE',
-      });
-      setToggling(null);
-      refetch();
-    } catch (err) {
-      setToggleError(err instanceof ApiError ? err.message : 'Could not change this login');
-    } finally {
-      setBusy(false);
-    }
+    const target = toggling;
+    const status = target.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE';
+    setToggling(null);
+    setActionError(null);
+    await optimisticRows<Staff>(mutateRows, (rows) => rows.map((s) => (s.id === target.id ? { ...s, status } : s)), 0, () => api.patch(`/owner/staff/${target.id}/status`, { status }), setActionError);
+    refetch();
   }
 
   return (
@@ -364,6 +357,11 @@ export default function StaffPage() {
       {notice && (
         <div className="mb-4">
           <SuccessBanner message={notice} />
+        </div>
+      )}
+      {actionError && (
+        <div role="alert" className="mb-4">
+          <ErrorBanner message={actionError} />
         </div>
       )}
       {!f.active && <div className="mb-6"><AccessCard audience="owner" /></div>}

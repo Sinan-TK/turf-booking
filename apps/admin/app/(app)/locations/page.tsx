@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useFetch } from '@/lib/use-fetch';
+import { optimistic, type Mutate } from '@/lib/optimistic';
 import { api, ApiError } from '@/lib/api';
 import { Badge, Button, Card, EmptyState, ErrorBanner, FieldError, Input, Label, PageHeader, Select, SkeletonText, invalidClass } from '@/components/ui';
 import { Modal } from '@/components/modal';
@@ -36,21 +37,14 @@ interface Area {
 
 const PAGE = 10;
 
-/** "Deactivate" / "Activate" in a row: one request, then the list is read again. */
-function useSwitch(path: string, refetch: () => void, onError: (m: string) => void) {
-  const [busy, setBusy] = useState<string | null>(null);
+/** "Deactivate" / "Activate" in a row: the row changes at once, then the list is read again; if the server refuses, the row goes back with a message. */
+function useSwitch<T extends { id: string; status: Status }>(path: string, mutate: Mutate<T[]>, refetch: () => void, onError: (m: string) => void) {
   return {
-    busy,
+    busy: null as string | null,
     async toggle(id: string, status: Status) {
-      setBusy(id);
-      try {
-        await api.patch(`${path}/${id}`, { status: status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE' });
-        refetch();
-      } catch (err) {
-        onError(err instanceof ApiError ? err.message : 'Could not change it.');
-      } finally {
-        setBusy(null);
-      }
+      const next: Status = status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+      await optimistic(mutate, (all) => all.map((x) => (x.id === id ? { ...x, status: next } : x)), () => api.patch(`${path}/${id}`, { status: next }), onError);
+      refetch();
     },
   };
 }
@@ -167,18 +161,18 @@ const th = 'py-2';
 
 export default function LocationsPage() {
   const { data: countries } = useFetch<Country[]>('/countries');
-  const { data: states, loading: statesLoading, refetch: refetchStates } = useFetch<State[]>('/admin/states');
+  const { data: states, loading: statesLoading, refetch: refetchStates, mutate: mutateStates } = useFetch<State[]>('/admin/states');
   const [stateId, setStateId] = useState('');
-  const { data: districts, refetch: refetchDistricts } = useFetch<District[]>(stateId ? `/admin/districts?stateId=${stateId}` : null);
+  const { data: districts, refetch: refetchDistricts, mutate: mutateDistricts } = useFetch<District[]>(stateId ? `/admin/districts?stateId=${stateId}` : null);
   const [districtId, setDistrictId] = useState('');
-  const { data: areas, refetch: refetchAreas } = useFetch<Area[]>(districtId ? `/admin/areas?districtId=${districtId}` : null);
+  const { data: areas, refetch: refetchAreas, mutate: mutateAreas } = useFetch<Area[]>(districtId ? `/admin/areas?districtId=${districtId}` : null);
 
   const [pageError, setPageError] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ title: string; path: string; initial: { name: string; timezone?: string; lat?: number | null; lng?: number | null }; with: 'name' | 'timezone' | 'centre'; done: () => void } | null>(null);
 
-  const stateSwitch = useSwitch('/admin/states', refetchStates, setPageError);
-  const districtSwitch = useSwitch('/admin/districts', refetchDistricts, setPageError);
-  const areaSwitch = useSwitch('/admin/areas', refetchAreas, setPageError);
+  const stateSwitch = useSwitch<State>('/admin/states', mutateStates, refetchStates, setPageError);
+  const districtSwitch = useSwitch<District>('/admin/districts', mutateDistricts, refetchDistricts, setPageError);
+  const areaSwitch = useSwitch<Area>('/admin/areas', mutateAreas, refetchAreas, setPageError);
 
   const statePage = usePageSlice(states ?? [], PAGE, 'states');
   const districtPage = usePageSlice(districts ?? [], PAGE, stateId);

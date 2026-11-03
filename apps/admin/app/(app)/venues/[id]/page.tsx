@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Modal } from '@/components/modal';
@@ -233,11 +233,16 @@ export default function VenueDetailPage() {
 }
 
 /** The venue's units grouped by facility, searchable, with "Add unit" opening a dialog. */
-function UnitsPanel({ venue, units, onChanged }: { venue: Venue; units: Resource[]; onChanged: () => void }) {
+function UnitsPanel({ venue, units: allUnits, onChanged }: { venue: Venue; units: Resource[]; onChanged: () => void }) {
   const [search, setSearch] = useState('');
   const [adding, setAdding] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [unitError, setUnitError] = useState<string | null>(null);
+
+  // A switch shows at once: this holds what was just flipped until the list is read again, and is dropped if the server refuses.
+  const [flipped, setFlipped] = useState<Record<string, boolean>>({});
+  useEffect(() => setFlipped({}), [allUnits]);
+  const units = useMemo(() => allUnits.map((u) => (u.id in flipped ? { ...u, isBookable: flipped[u.id]! } : u)), [allUnits, flipped]);
 
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -246,27 +251,29 @@ function UnitsPanel({ venue, units, onChanged }: { venue: Venue; units: Resource
 
   async function setUnitBookable(resourceId: string, isBookable: boolean) {
     setUnitError(null);
-    setBusyKey(resourceId);
+    setFlipped((f) => ({ ...f, [resourceId]: isBookable }));
     try {
       await api.patch(`/resources/${resourceId}`, { isBookable });
       onChanged();
     } catch (err) {
+      setFlipped((f) => {
+        const { [resourceId]: _gone, ...rest } = f;
+        return rest;
+      });
       setUnitError(err instanceof ApiError ? err.message : 'Failed to update the unit');
-    } finally {
-      setBusyKey(null);
     }
   }
 
   async function setFacilityBookable(categoryId: string, isBookable: boolean) {
     setUnitError(null);
-    setBusyKey(`facility:${categoryId}`);
+    const ids = allUnits.filter((u) => u.category.id === categoryId).map((u) => u.id);
+    setFlipped((f) => ({ ...f, ...Object.fromEntries(ids.map((i) => [i, isBookable])) }));
     try {
       await api.patch('/resources/facility-bookable', { venueId: venue.id, categoryId, isBookable });
       onChanged();
     } catch (err) {
+      setFlipped((f) => Object.fromEntries(Object.entries(f).filter(([k]) => !ids.includes(k))));
       setUnitError(err instanceof ApiError ? err.message : 'Failed to update the facility');
-    } finally {
-      setBusyKey(null);
     }
   }
 

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useFetch } from '@/lib/use-fetch';
 import { api, ApiError } from '@/lib/api';
+import { optimistic } from '@/lib/optimistic';
 import { Badge, Button, Card, EmptyState, ErrorBanner, FieldError, Input, Label, PageHeader, SkeletonText, invalidClass } from '@/components/ui';
 import { Modal } from '@/components/modal';
 import { PhotoCropper } from '@/components/photo-cropper';
@@ -209,23 +210,22 @@ function BannerDialog({ banner, onClose, onSaved }: { banner: Banner | null; onC
 }
 
 export default function BannersPage() {
-  const { data: banners, error, loading, refetch } = useFetch<Banner[]>('/admin/banners');
+  const { data: banners, error, loading, refetch, mutate } = useFetch<Banner[]>('/admin/banners');
   const [editing, setEditing] = useState<Banner | 'new' | null>(null);
   const [deleting, setDeleting] = useState<Banner | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  async function run(id: string, action: () => Promise<unknown>) {
-    setBusyId(id);
+  /** Switching a banner on or off, or deleting it, shows at once; if the server refuses, the banner goes back and this says why. */
+  async function switchBanner(b: Banner) {
     setRowError(null);
-    try {
-      await action();
-      refetch();
-    } catch (err) {
-      setRowError(err instanceof ApiError ? err.message : 'Something went wrong.');
-    } finally {
-      setBusyId(null);
-    }
+    await optimistic(mutate, (all) => all.map((x) => (x.id === b.id ? { ...x, isActive: !b.isActive } : x)), () => api.patch(`/admin/banners/${b.id}`, { isActive: !b.isActive }), setRowError);
+    refetch();
+  }
+  async function deleteBanner(id: string) {
+    setRowError(null);
+    await optimistic(mutate, (all) => all.filter((x) => x.id !== id), () => api.delete(`/admin/banners/${id}`), setRowError);
+    refetch();
   }
 
   return (
@@ -261,8 +261,7 @@ export default function BannersPage() {
                   </button>
                   <button
                     type="button"
-                    disabled={busyId === b.id}
-                    onClick={() => run(b.id, () => api.patch(`/admin/banners/${b.id}`, { isActive: !b.isActive }))}
+                    onClick={() => void switchBanner(b)}
                     aria-label={`${b.isActive ? 'Switch off' : 'Switch on'} banner ${b.title}`}
                     className="text-gray-600 hover:text-gray-900 hover:underline disabled:opacity-50"
                   >
@@ -290,7 +289,7 @@ export default function BannersPage() {
               onClick={async () => {
                 const id = deleting.id;
                 setDeleting(null);
-                await run(id, () => api.delete(`/admin/banners/${id}`));
+                await deleteBanner(id);
               }}
             >
               Delete banner

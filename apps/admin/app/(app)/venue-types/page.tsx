@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useFetch } from '@/lib/use-fetch';
 import { api, ApiError } from '@/lib/api';
+import { optimistic } from '@/lib/optimistic';
 import { durationLabel, type AdminVenueCategory } from '@/lib/categories';
 import { Icon } from '@/components/icons';
 import { Dropdown } from '@/components/dropdown';
@@ -56,7 +57,7 @@ function SortHeader({
 }
 
 export default function VenueTypesPage() {
-  const { data, error, loading, refetch } = useFetch<AdminVenueCategory[]>('/admin/categories');
+  const { data, error, loading, refetch, mutate } = useFetch<AdminVenueCategory[]>('/admin/categories');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -64,6 +65,14 @@ export default function VenueTypesPage() {
   const [status, setStatus] = useState<StatusFilter>('all');
   const [style, setStyle] = useState<StyleFilter>('all');
   const [sort, setSort] = useState<SortState>({ key: 'order', dir: 'asc' });
+
+  /** Activating, deactivating or deleting a venue type shows at once; if the server refuses (a type in use, say), it goes back with the reason. */
+  async function runNow(update: (all: AdminVenueCategory[]) => AdminVenueCategory[], action: () => Promise<unknown>) {
+    setActionError(null);
+    setConfirmDeleteId(null);
+    await optimistic(mutate, update, action, setActionError);
+    refetch();
+  }
 
   async function run(id: string, action: () => Promise<unknown>) {
     setActionError(null);
@@ -304,7 +313,7 @@ export default function VenueTypesPage() {
                           loading={busy}
                           disabled={busyId !== null}
                           onClick={() =>
-                            run(c.id, () => api.post(`/admin/categories/${c.id}/${c.isActive ? 'deactivate' : 'activate'}`))
+                            runNow((all) => all.map((x) => (x.id === c.id ? { ...x, isActive: !c.isActive } : x)), () => api.post(`/admin/categories/${c.id}/${c.isActive ? 'deactivate' : 'activate'}`))
                           }
                         >
                           {c.isActive ? 'Deactivate' : 'Activate'}
@@ -317,7 +326,7 @@ export default function VenueTypesPage() {
                                 className="px-3 py-1.5"
                                 loading={busy}
                                 disabled={busyId !== null}
-                                onClick={() => run(c.id, () => api.delete(`/admin/categories/${c.id}`))}
+                                onClick={() => runNow((all) => all.filter((x) => x.id !== c.id), () => api.delete(`/admin/categories/${c.id}`))}
                               >
                                 Confirm
                               </Button>

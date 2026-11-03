@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useFetch } from '@/lib/use-fetch';
 import { api, ApiError } from '@/lib/api';
+import { optimistic } from '@/lib/optimistic';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Modal } from '@/components/modal';
 import { SvgIcon } from '@/components/svg-icons';
@@ -452,9 +453,11 @@ export function PricingRulesSection({
   const [resourceId, setResourceId] = useState(resources[0]?.id ?? '');
   const unit = resources.find((r) => r.id === resourceId);
   const blockMinutes = unit?.minDurationMinutes ?? 60;
-  const { data: rules, refetch } = useFetch<PricingRule[]>(
+  const { data: rules, refetch, mutate: mutateRules } = useFetch<PricingRule[]>(
     resourceId ? `/resources/pricing-rules?resourceId=${resourceId}` : null,
   );
+  // A removal or a block the server refused after it was shown: the row comes back and this says why.
+  const [listError, setListError] = useState<string | null>(null);
   // The add/edit modal: { rule } = edit that price, {} = add a new one, null = closed.
   const [editing, setEditing] = useState<{ rule?: PricingRule } | null>(null);
   const [pending, setPending] = useState<{
@@ -471,16 +474,25 @@ export function PricingRulesSection({
 
   async function confirmAction() {
     if (!pending) return;
+    // Removing or blocking a price shows at once (the dialog closes and the row goes or turns blocked); the server almost never refuses it.
+    if (pending.kind !== 'unblock') {
+      const change = pending;
+      setPending(null);
+      setListError(null);
+      await optimistic(
+        mutateRules,
+        (all) => (change.kind === 'remove' ? all.filter((r) => r.id !== change.rule.id) : all.map((r) => (r.id === change.rule.id ? { ...r, isActive: false } : r))),
+        () => (change.kind === 'remove' ? api.delete(`/resources/pricing-rules/${change.rule.id}`) : api.patch(`/resources/pricing-rules/${change.rule.id}`, { isActive: false })),
+        setListError,
+      );
+      refetch();
+      return;
+    }
+    // Unblocking waits for the answer: the server refuses it when the price would now overlap another, and says which.
     setActionBusy(true);
     setActionError(null);
     try {
-      if (pending.kind === 'remove') {
-        await api.delete(`/resources/pricing-rules/${pending.rule.id}`);
-      } else {
-        await api.patch(`/resources/pricing-rules/${pending.rule.id}`, {
-          isActive: pending.kind === 'unblock',
-        });
-      }
+      await api.patch(`/resources/pricing-rules/${pending.rule.id}`, { isActive: true });
       setPending(null);
       refetch();
     } catch (err) {
@@ -527,6 +539,11 @@ export function PricingRulesSection({
         </Select>
       </div>
 
+      {listError && (
+        <div role="alert" className="mb-4">
+          <ErrorBanner message={listError} />
+        </div>
+      )}
       {rules && rules.length > 0 && (
         <div className="overflow-x-auto rounded-xl ring-1 ring-outline-variant/30">
           <table className="w-full text-left text-sm">
@@ -732,9 +749,10 @@ export type ClosedScope = { kind: 'venue' } | { kind: 'unit'; id: string; name: 
  * only that unit, on a pooled item's tab only that item. Each list shows only what it closes.
  */
 export function BlockedDatesSection({ venueId, scope }: { venueId: string; scope: ClosedScope }) {
-  const { data: blocked, refetch } = useFetch<BlockedDate[]>(
+  const { data: blocked, refetch, mutate: mutateBlocked } = useFetch<BlockedDate[]>(
     `/venue-config/blocked-dates?venueId=${venueId}`,
   );
+  const [removeError, setRemoveError] = useState<string | null>(null);
   // Closed days pile up over a year: ten at a time.
   const shownBlocked = (blocked ?? []).filter((b) =>
     scope.kind === 'venue' ? !b.resourceId && !b.resourceGroupId : scope.kind === 'unit' ? b.resourceId === scope.id : b.resourceGroupId === scope.id,
@@ -745,7 +763,6 @@ export function BlockedDatesSection({ venueId, scope }: { venueId: string; scope
   const [form, setForm] = useState({ date: '', endDate: '', reason: '' });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldErrors<'date' | 'endDate' | 'reason'>>({});
   const edit = (patch: Partial<typeof form>, clear: 'date' | 'endDate' | 'reason') => {
     setForm((f) => ({ ...f, ...patch }));
@@ -789,14 +806,11 @@ export function BlockedDatesSection({ venueId, scope }: { venueId: string; scope
     }
   }
 
+  /** The closed day leaves the list at once; it comes back with a message if the server could not remove it. */
   async function onDelete(id: string) {
-    setDeletingId(id);
-    try {
-      await api.delete(`/venue-config/blocked-dates/${id}`);
-      refetch();
-    } finally {
-      setDeletingId(null);
-    }
+    setRemoveError(null);
+    await optimistic(mutateBlocked, (all) => all.filter((b) => b.id !== id), () => api.delete(`/venue-config/blocked-dates/${id}`), setRemoveError);
+    refetch();
   }
 
   return (
@@ -807,6 +821,11 @@ export function BlockedDatesSection({ venueId, scope }: { venueId: string; scope
         rejected. Bookings already made are not cancelled.
       </p>
 
+      {removeError && (
+        <div role="alert" className="mb-4">
+          <ErrorBanner message={removeError} />
+        </div>
+      )}
       {!blocked && <LoadingState />}
       {blocked && shownBlocked.length > 0 && (
         <div className="mb-6 overflow-x-auto">
@@ -834,10 +853,9 @@ export function BlockedDatesSection({ venueId, scope }: { venueId: string; scope
                     <td className="py-2 text-right">
                       <button
                         className="text-xs font-medium text-error hover:underline disabled:opacity-50"
-                        disabled={deletingId === b.id}
                         onClick={() => onDelete(b.id)}
                       >
-                        {deletingId === b.id ? 'Removing…' : 'Remove'}
+                        Remove
                       </button>
                     </td>
                   </tr>

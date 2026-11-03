@@ -20,7 +20,6 @@ export function SavedVenuesPanel() {
   const toast = useToast();
   const [venues, setVenues] = useState<SavedVenue[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [removing, setRemoving] = useState<string | null>(null);
 
   useEffect(() => {
     api
@@ -32,15 +31,15 @@ export function SavedVenuesPanel() {
       });
   }, [refresh]);
 
+  /** The venue leaves the list at once; it comes back (with a message) if the server could not remove it. */
   async function remove(venue: SavedVenue) {
-    setRemoving(venue.id);
+    const before = venues;
+    setVenues((list) => (list ? list.filter((v) => v.id !== venue.id) : list));
     try {
       await api.delete(`/me/saved-venues/${venue.id}`);
-      setVenues((list) => (list ? list.filter((v) => v.id !== venue.id) : list));
     } catch {
+      setVenues(before);
       toast.show('Could not remove that venue. Please try again.');
-    } finally {
-      setRemoving(null);
     }
   }
 
@@ -75,7 +74,6 @@ export function SavedVenuesPanel() {
                 <button
                   type="button"
                   onClick={() => void remove(v)}
-                  disabled={removing === v.id}
                   aria-label={`Remove ${v.name} from saved venues`}
                   title="Remove from saved"
                   className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"

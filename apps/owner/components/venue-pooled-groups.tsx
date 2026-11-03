@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useFetch } from '@/lib/use-fetch';
 import { api, ApiError } from '@/lib/api';
+import { optimistic, type Mutate } from '@/lib/optimistic';
 import { durationLabel, type VenueCategory, type VenueCategorySummary } from '@/lib/categories';
 import { Button, ErrorBanner, FieldError, Input, Label, Select, invalidClass } from '@/components/ui';
 import { UnitPhotos, type UnitPhoto } from '@/components/unit-photos';
@@ -162,7 +163,25 @@ export function GroupCard({ group, category, onChanged }: { group: Group; catego
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const { data: prices, refetch: refetchPrices } = useFetch<GroupPrice[]>(`/resources/pricing-rules?resourceGroupId=${group.id}`);
+  const { data: prices, refetch: refetchPrices, mutate: mutatePrices } = useFetch<GroupPrice[]>(`/resources/pricing-rules?resourceGroupId=${group.id}`);
+  // The switch flips at once and goes back (with a message) if the server refuses.
+  const [bookable, setBookable] = useState(group.isBookable);
+  useEffect(() => setBookable(group.isBookable), [group.isBookable]);
+
+  async function toggleBookable() {
+    const next = !bookable;
+    setBookable(next);
+    setError(null);
+    setSaved(null);
+    try {
+      await api.patch(`/resources/groups/${group.id}`, { isBookable: next });
+      setSaved(next ? 'Open for booking' : 'Blocked');
+      onChanged();
+    } catch (err) {
+      setBookable(!next);
+      setError(err instanceof ApiError ? err.message : 'Could not save this');
+    }
+  }
 
   const countChanged = Number(count) !== group.totalUnits;
   const slotsChanged = mode !== group.slotMode || (mode === 'FIXED' && JSON.stringify(toApi(slots)) !== JSON.stringify(group.fixedSlots ?? []));
@@ -196,15 +215,14 @@ export function GroupCard({ group, category, onChanged }: { group: Group; catego
         <button
           type="button"
           role="switch"
-          aria-checked={group.isBookable}
-          aria-label={`${group.isBookable ? 'Block' : 'Reopen'} ${group.name}`}
-          disabled={busy}
-          onClick={() => void patch({ isBookable: !group.isBookable }, group.isBookable ? 'Blocked' : 'Open for booking')}
+          aria-checked={bookable}
+          aria-label={`${bookable ? 'Block' : 'Reopen'} ${group.name}`}
+          onClick={() => void toggleBookable()}
           className="inline-flex shrink-0 items-center gap-2.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         >
-          <span className={`text-xs font-medium ${group.isBookable ? 'text-emerald-700' : 'text-red-700'}`}>{group.isBookable ? 'Open' : 'Blocked'}</span>
-          <span className={`relative h-6 w-11 rounded-full transition-colors ${group.isBookable ? 'bg-emerald-500' : 'bg-red-400'}`}>
-            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${group.isBookable ? 'left-[22px]' : 'left-0.5'}`} />
+          <span className={`text-xs font-medium ${bookable ? 'text-emerald-700' : 'text-red-700'}`}>{bookable ? 'Open' : 'Blocked'}</span>
+          <span className={`relative h-6 w-11 rounded-full transition-colors ${bookable ? 'bg-emerald-500' : 'bg-red-400'}`}>
+            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${bookable ? 'left-[22px]' : 'left-0.5'}`} />
           </span>
         </button>
       </header>
@@ -258,7 +276,7 @@ export function GroupCard({ group, category, onChanged }: { group: Group; catego
         </fieldset>
 
         {mode === 'FLEXIBLE' ? (
-          <PricesSection group={group} category={category} prices={prices ?? []} refetch={refetchPrices} />
+          <PricesSection group={group} category={category} prices={prices ?? []} refetch={refetchPrices} mutate={mutatePrices} />
         ) : (
           <p className="text-xs text-on-surface-variant">With fixed slots, each slot has its own price above. Prices by length and hours are used only when the start can be any time.</p>
         )}
@@ -268,7 +286,7 @@ export function GroupCard({ group, category, onChanged }: { group: Group; catego
 }
 
 /** What one kayak costs for a length and the hours/days it can be booked; the open hours of the group come from these. */
-function PricesSection({ group, category, prices, refetch }: { group: Group; category?: VenueCategory; prices: GroupPrice[]; refetch: () => void }) {
+function PricesSection({ group, category, prices, refetch, mutate }: { group: Group; category?: VenueCategory; prices: GroupPrice[]; refetch: () => void; mutate: Mutate<GroupPrice[]> }) {
   const lengths = category?.policy.durations?.length ? category.policy.durations : [60, 120, 180];
   const [form, setForm] = useState({ length: String(lengths[0] ?? 60), days: 0, from: '06:00', to: '18:00', price: '', advance: '' });
   const [errors, setErrors] = useState<{ price?: string; time?: string }>({});
@@ -306,14 +324,11 @@ function PricesSection({ group, category, prices, refetch }: { group: Group; cat
     }
   }
 
+  /** The price leaves the list at once; it comes back with a message if the server could not remove it. */
   async function remove(id: string) {
     setError(null);
-    try {
-      await api.delete(`/resources/pricing-rules/${id}`);
-      refetch();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not remove this price');
-    }
+    await optimistic(mutate, (all) => all.filter((p) => p.id !== id), () => api.delete(`/resources/pricing-rules/${id}`), setError);
+    refetch();
   }
 
   const unit = group.category.unitLabel.toLowerCase();

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useFetch } from '@/lib/use-fetch';
 import { api, ApiError } from '@/lib/api';
+import { optimistic } from '@/lib/optimistic';
 import type { VenueCategory, VenueCategorySummary } from '@/lib/categories';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SvgIcon } from '@/components/svg-icons';
@@ -85,8 +86,8 @@ type Section = 'venue' | 'units';
 
 export default function VenueDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { data: venue, error, loading, refetch } = useFetch<Venue>(`/venues/${id}`);
-  const { data: resources, refetch: refetchResources } = useFetch<Resource[]>(
+  const { data: venue, error, loading, refetch, mutate: mutateVenue } = useFetch<Venue>(`/venues/${id}`);
+  const { data: resources, refetch: refetchResources, mutate: mutateResources } = useFetch<Resource[]>(
     `/resources?venueId=${id}`,
   );
   const { data: groupRows, refetch: refetchGroups } = useFetch<Group[]>(`/resources/groups?venueId=${id}`);
@@ -104,6 +105,8 @@ export default function VenueDetailPage() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [dialogBusy, setDialogBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
+  // A change the server refused after it was already shown: the screen is put back and this says why.
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const [resourceForm, setResourceForm] = useState({ categoryId: '', name: '', groundType: '' });
   // The new unit's shortest and longest booking; they start from the chosen facility's own values.
@@ -122,32 +125,29 @@ export default function VenueDetailPage() {
     setPending(next);
   }
 
+  /**
+   * The owner confirmed: the dialog closes and the change shows at once (the switch flips, the status chip moves); if the server refuses
+   * it the screen goes back and the reason is shown above.
+   */
   async function confirm() {
     if (!pending) return;
-    setDialogBusy(true);
-    setDialogError(null);
-    try {
-      if (pending.kind === 'status') {
-        await api.patch(`/venues/${id}`, { status: pending.status });
-        refetch();
-      } else if (pending.kind === 'unit') {
-        await api.patch(`/resources/${pending.unit.id}`, { isBookable: pending.open });
-        refetchResources();
-      } else {
-        await api.patch('/resources/facility-bookable', {
-          venueId: id,
-          categoryId: pending.facility.id,
-          isBookable: pending.open,
-        });
-        refetchResources();
-      }
-      setPending(null);
-    } catch (err) {
-      setDialogError(
-        err instanceof ApiError ? err.message : 'Something went wrong. Nothing was changed.',
+    const change = pending;
+    setPending(null);
+    setActionError(null);
+    if (change.kind === 'status') {
+      await optimistic(mutateVenue, (v) => ({ ...v, status: change.status }), () => api.patch(`/venues/${id}`, { status: change.status }), setActionError);
+      refetch();
+    } else if (change.kind === 'unit') {
+      await optimistic(mutateResources, (rs) => rs.map((r) => (r.id === change.unit.id ? { ...r, isBookable: change.open } : r)), () => api.patch(`/resources/${change.unit.id}`, { isBookable: change.open }), setActionError);
+      refetchResources();
+    } else {
+      await optimistic(
+        mutateResources,
+        (rs) => rs.map((r) => (r.category.id === change.facility.id ? { ...r, isBookable: change.open } : r)),
+        () => api.patch('/resources/facility-bookable', { venueId: id, categoryId: change.facility.id, isBookable: change.open }),
+        setActionError,
       );
-    } finally {
-      setDialogBusy(false);
+      refetchResources();
     }
   }
 
@@ -208,6 +208,12 @@ export default function VenueDetailPage() {
 
   return (
     <div className="space-y-6">
+      {actionError && (
+        <div role="alert">
+          <ErrorBanner message={actionError} />
+        </div>
+      )}
+
       {/* Who and where the venue is stays in view on both tabs. */}
       <section className="rounded-xl bg-white p-container-padding shadow-sm ring-1 ring-outline-variant/30">
         <div className="flex min-w-0 items-start gap-3">

@@ -59,13 +59,30 @@ export function UnitPhotos({ unitId, unitName, initial, basePath }: { unitId: st
     });
   }
 
+  /** Shows the new order or the removal at once, then takes the server's list; if the server refuses, the photos go back as they were. */
+  async function change(next: UnitPhoto[], action: () => Promise<UnitPhoto[]>) {
+    const before = photos;
+    setPhotos(next);
+    setError(null);
+    try {
+      setPhotos(await action());
+    } catch (err) {
+      setPhotos(before);
+      setError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Something went wrong.');
+    }
+  }
+
   const makeMain = (photo: UnitPhoto) =>
-    run(photo.id, () =>
+    change([photo, ...photos.filter((p) => p.id !== photo.id)], () =>
       api.put<UnitPhoto[]>(`${base}/photos/order`, {
         photoIds: [photo.id, ...photos.filter((p) => p.id !== photo.id).map((p) => p.id)],
       }),
     );
-  const remove = (photo: UnitPhoto) => run(photo.id, () => api.delete<UnitPhoto[]>(`${base}/photos/${photo.id}`));
+  const remove = (photo: UnitPhoto) =>
+    change(
+      photos.filter((p) => p.id !== photo.id),
+      () => api.delete<UnitPhoto[]>(`${base}/photos/${photo.id}`),
+    );
 
   return (
     <div className="mt-2.5">

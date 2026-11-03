@@ -11,6 +11,8 @@ interface PagedState<T> {
   error: string | null;
   loading: boolean;
   refetch: () => void;
+  /** Changes the rows on screen right now, with no request (for optimistic updates); `totalDelta` moves the count with them. */
+  mutateRows: (updater: (rows: T[]) => T[], totalDelta?: number) => void;
 }
 
 /**
@@ -32,6 +34,10 @@ export function usePagedFetch<T>(
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
   const refetch = useCallback(() => setTick((t) => t + 1), []);
+  const mutateRows = useCallback((updater: (rows: T[]) => T[], totalDelta = 0) => {
+    setRows((current) => updater(current));
+    if (totalDelta !== 0) setTotal((n) => Math.max(0, n + totalDelta));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,5 +65,5 @@ export function usePagedFetch<T>(
     };
   }, [basePath, query, page, pageSize, tick]);
 
-  return { rows, total, error, loading, refetch };
+  return { rows, total, error, loading, refetch, mutateRows };
 }
