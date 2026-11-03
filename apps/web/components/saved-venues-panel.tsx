@@ -65,22 +65,9 @@ export function SavedVenuesPanel() {
           {venues.map((v) => (
             <li key={v.id} className="flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
               {/* One picture per bookable unit (its venue-type icon when it has none); a venue with no units shows its own photo. */}
-              <div className="aspect-[16/9] w-full bg-gray-100">
+              <div className="aspect-[16/9] w-full overflow-hidden bg-gray-100">
                 {v.units.length > 0 ? (
-                  <ul aria-label={`${v.name} units`} className="scrollbar-hide flex h-full snap-x snap-mandatory overflow-x-auto">
-                    {v.units.map((u) => (
-                      <li key={u.id} className={`relative h-full shrink-0 snap-start border-r border-white/70 last:border-r-0 ${v.units.length === 1 ? 'w-full' : 'w-1/2'}`}>
-                        {u.photoUrl ? (
-                          <img src={u.photoUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-brand-50 text-brand-700">
-                            <CategoryIcon iconKey={u.iconKey} iconSvg={u.iconSvg} className="text-[2.5rem]" />
-                          </div>
-                        )}
-                        <span className="absolute bottom-1.5 left-1.5 max-w-[calc(100%-0.75rem)] truncate rounded-md bg-black/55 px-1.5 py-0.5 text-[0.65rem] font-semibold text-white">{u.name}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <UnitSlideshow name={v.name} units={v.units} />
                 ) : v.photoUrl ? (
                   <img src={v.photoUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
                 ) : (
@@ -129,5 +116,52 @@ export function SavedVenuesPanel() {
         </ul>
       )}
     </>
+  );
+}
+
+const SLIDE_MS = 2000;
+
+/** The venue's bookable units, one picture at a time, changing every 2 seconds (still, with no motion, if the visitor asked for less). */
+function UnitSlideshow({ name, units }: { name: string; units: SavedVenue['units'] }) {
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  useEffect(() => {
+    if (units.length < 2 || paused || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const timer = setInterval(() => setIndex((i) => (i + 1) % units.length), SLIDE_MS);
+    return () => clearInterval(timer);
+  }, [units.length, paused]);
+
+  return (
+    <div
+      role="group"
+      aria-label={`${name} units`}
+      className="relative h-full w-full"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      {units.map((u, n) => (
+        <div
+          key={u.id}
+          aria-hidden={n !== index}
+          className={`absolute inset-0 transition-opacity duration-500 ${n === index ? 'opacity-100' : 'opacity-0'}`}
+        >
+          {u.photoUrl ? (
+            <img src={u.photoUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-brand-50 text-brand-700">
+              <CategoryIcon iconKey={u.iconKey} iconSvg={u.iconSvg} className="text-[3rem]" />
+            </div>
+          )}
+          <span className="absolute bottom-2 left-2 max-w-[calc(100%-1rem)] truncate rounded-md bg-black/55 px-2 py-0.5 text-xs font-semibold text-white">{u.name}</span>
+        </div>
+      ))}
+      {units.length > 1 && (
+        <div className="absolute bottom-2 right-2 flex gap-1">
+          {units.map((u, n) => (
+            <span key={u.id} className={`h-1.5 rounded-full bg-white transition-all ${n === index ? 'w-4 opacity-100' : 'w-1.5 opacity-60'}`} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
