@@ -175,7 +175,7 @@ test.describe('owner portal: venue details', () => {
     await expect(page.getByText('Turf type · 7S')).toBeVisible();
   });
 
-  test('an owner can pause the venue but not set it back to draft or live', async ({ page, makeVenue }) => {
+  test('an owner can pause the venue and make it live again, but never touches draft or suspended', async ({ page, makeVenue }) => {
     const venue = await makeVenue();
     await page.goto(`/venues/${venue.id}`);
     // Only Active and Inactive are shown; Draft and Suspended belong to the platform.
@@ -188,6 +188,12 @@ test.describe('owner portal: venue details', () => {
     await expect(dialog.getByRole('heading', { name: `Pause ${venue.name}?` })).toBeVisible();
     await dialog.getByRole('button', { name: 'Pause venue' }).click();
     await expect(page.getByRole('button', { name: 'INACTIVE', exact: true })).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByRole('button', { name: 'ACTIVE', exact: true })).toBeDisabled(); // only the platform can reopen it
+    // Both buttons stay: the owner makes it live again whenever they like.
+    await expect(page.getByRole('button', { name: 'ACTIVE', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: 'ACTIVE', exact: true }).click();
+    await expect(dialog.getByRole('heading', { name: `Make ${venue.name} live?` })).toBeVisible();
+    await dialog.getByRole('button', { name: 'Make venue live' }).click();
+    await expect(page.getByRole('button', { name: 'ACTIVE', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: 'INACTIVE', exact: true })).toBeEnabled();
   });
 });

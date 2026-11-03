@@ -12,12 +12,11 @@ import type { AuthContext } from '../auth/auth.types';
 import { OwnerScopeService } from '../owner-scope/owner-scope.service';
 import type { CreateVenueDto, UpdateVenueDto } from './dto/venue.dto';
 
-// Status transitions a Venue Owner may make unassisted. Going live
-// (ACTIVE) or being suspended (SUSPENDED) are platform moderation
-// actions reserved for Super Admin — not specified explicitly in the
-// brief, but a reasonable default for a marketplace where facility
-// quality/legitimacy needs a review gate before customers can book it.
-const OWNER_ALLOWED_STATUSES = new Set(['INACTIVE']);
+// Status changes a Venue Owner may make unassisted: pausing a venue (INACTIVE) and making it live again (ACTIVE). Draft (being set up)
+// and Suspended are platform moderation states reserved for Super Admin, and an owner cannot move a venue out of either of them: a
+// marketplace needs a review gate before a new or suspended venue can take bookings.
+const OWNER_ALLOWED_STATUSES = new Set(['ACTIVE', 'INACTIVE']);
+const OWNER_CAN_LEAVE = new Set(['ACTIVE', 'INACTIVE']);
 
 // A venue offers whatever facilities (football turf, swimming pool...) its
 // units belong to. Responses carry them as `facilities`, derived from the
@@ -146,10 +145,13 @@ export class VenuesService {
   }
 
   async update(id: string, dto: UpdateVenueDto, actor: AuthContext) {
-    await this.findOwned(id, actor);
+    const current = await this.findOwned(id, actor);
 
     if (dto.status && actor.role === Role.VENUE_OWNER && !OWNER_ALLOWED_STATUSES.has(dto.status)) {
       throw new ForbiddenException(`Venue Owners cannot set status to ${dto.status}`);
+    }
+    if (dto.status && dto.status !== current.status && actor.role === Role.VENUE_OWNER && !OWNER_CAN_LEAVE.has(current.status)) {
+      throw new ForbiddenException(`Only the platform can change the status of a venue that is ${current.status}`);
     }
 
     const updated = await this.prisma.client.venue.update({

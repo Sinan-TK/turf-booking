@@ -58,12 +58,10 @@ interface Resource {
   photos: UnitPhoto[];
 }
 
-// Going live (ACTIVE), being suspended (SUSPENDED) and DRAFT are platform
-// actions reserved for Super Admin — see VenuesService.OWNER_ALLOWED_STATUSES.
-// An owner can only pause their venue (INACTIVE); the backend would reject
-// anything else from a VENUE_OWNER anyway, this just avoids showing a
-// control that would always 403.
-const OWNER_STATUSES = ['INACTIVE'];
+// An owner can pause their venue (INACTIVE) and make it live again (ACTIVE); DRAFT and SUSPENDED are platform actions reserved for Super Admin,
+// and a venue in either of them can't be changed by its owner. See VenuesService.OWNER_ALLOWED_STATUSES: the backend rejects anything else,
+// this just avoids showing a control that would always 403.
+const OWNER_STATUSES = ['ACTIVE', 'INACTIVE'];
 
 // Draft and Suspended are the platform's own states, so owners only see them when a venue is in one.
 const OWNER_VISIBLE_STATUSES = ['ACTIVE', 'INACTIVE'];
@@ -270,7 +268,7 @@ export default function VenueDetailPage() {
             <div className="py-3">
               <h3 className="text-sm font-semibold text-on-surface">Venue status</h3>
               <p className="mb-3 mt-0.5 text-xs text-on-surface-variant">
-                You can pause your venue. Making it live again is done by the platform.
+                Pause your venue to hide it from customers, and make it live again whenever you like.
               </p>
               <VenueStatusPicker current={venue.status} allowed={OWNER_STATUSES} busy={dialogBusy} onPick={(status) => ask({ kind: 'status', status })} />
             </div>
@@ -614,6 +612,14 @@ function describe(
   p: Pending,
   venue: Venue,
 ): { title: string; body: React.ReactNode; confirm: string; tone: 'primary' | 'warn' | 'danger' } {
+  if (p.kind === 'status' && p.status === 'ACTIVE') {
+    return {
+      title: `Make ${venue.name} live?`,
+      tone: 'primary',
+      confirm: 'Make venue live',
+      body: <p>Customers will be able to find and book this venue again.</p>,
+    };
+  }
   if (p.kind === 'status') {
     return {
       title: `Pause ${venue.name}?`,
@@ -622,10 +628,7 @@ function describe(
       body: (
         <>
           <p>Customers will no longer be able to find or book this venue.</p>
-          <p>
-            Bookings that are already made are not affected. Only the platform can make it live
-            again.
-          </p>
+          <p>Bookings that are already made are not affected. You can make it live again at any time.</p>
         </>
       ),
     };
@@ -769,7 +772,8 @@ function VenueStatusPicker({
           .filter(([status]) => status === current || OWNER_VISIBLE_STATUSES.includes(status))
           .map(([status, st]) => {
             const isCurrent = status === current;
-            const canPick = !isCurrent && allowed.includes(status);
+            // An owner can switch between Active and Inactive, but not a venue the platform has in Draft or Suspended.
+            const canPick = !isCurrent && allowed.includes(status) && allowed.includes(current);
             return (
               <button
                 key={status}
@@ -781,7 +785,7 @@ function VenueStatusPicker({
                     ? 'Current status'
                     : canPick
                       ? `Set to ${status}`
-                      : 'Only the platform can set this'
+                      : 'Only the platform can change this venue’s status right now'
                 }
                 onClick={() => onPick(status)}
                 className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition ${
