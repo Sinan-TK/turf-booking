@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { SvgIcon } from '@/components/svg-icons';
 import { PhotoCropper } from '@/components/photo-cropper';
@@ -22,6 +22,15 @@ export function UnitPhotos({ unitId, unitName, initial, basePath, onChanged }: {
   // A unit's photos live under /resources/:id, a pooled group's under /resources/groups/:id.
   const base = basePath ?? `/resources/${unitId}`;
   const [photos, setPhotos] = useState<UnitPhoto[]>(initial);
+  // The page reads this unit again after every change (and when it first arrives): whenever what it holds differs from what was last
+  // taken over, take it over, so a unit mounted before its photos had loaded, or changed elsewhere, never stays out of date.
+  const initialKey = initial.map((p) => `${p.id}:${p.url}`).join('|');
+  const taken = useRef(initialKey);
+  useEffect(() => {
+    if (taken.current === initialKey) return;
+    taken.current = initialKey;
+    setPhotos(initial);
+  }, [initialKey]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // The picked file, waiting in the cropper.

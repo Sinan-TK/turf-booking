@@ -19,6 +19,12 @@ test.describe('owner portal: unit photos', () => {
     await openUnitTab(page, venue.turfName);
     await expect(page.locator(`img[alt="${venue.turfName} photo 1"]`)).toBeVisible();
 
+    // Leaving the Units section for the Venue section and coming straight back shows it too.
+    await openSection(page, 'Venue');
+    await openSection(page, 'Units');
+    await openUnitTab(page, venue.turfName);
+    await expect(page.locator(`img[alt="${venue.turfName} photo 1"]`)).toBeVisible();
+
     // And removing one is remembered the same way.
     await page.getByRole('button', { name: new RegExp(`^Remove photo 1 of ${venue.turfName}`) }).click();
     await expect(page.locator(`img[alt^="${venue.turfName} photo"]`)).toHaveCount(0);
