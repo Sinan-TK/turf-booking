@@ -169,7 +169,7 @@ function BookingDetail() {
             <Card>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
                 {/* A small picture (the venue-type icon when there is no photo), not a banner. */}
-                <div className="h-24 max-w-full shrink-0 self-start overflow-hidden rounded-xl sm:h-36">
+                <div className="w-full shrink-0 overflow-hidden rounded-xl sm:h-36 sm:w-auto sm:max-w-full sm:self-start">
                   {picture ? (
                     <Thumb src={picture} />
                   ) : (
@@ -395,8 +395,9 @@ function startsIn(start: Date, end: Date): string {
 }
 
 /**
- * The venue's small picture: as tall as the box, as wide as the photo's own shape makes it (a very wide or very tall photo is
- * held to a sensible shape), so the photo fills the box with nothing left empty around it.
+ * The venue's picture. On a phone it is as wide as the card and shows the whole photo at its own shape. From tablet width up it is a
+ * small picture, as tall as the box and as wide as the photo's shape makes it (a very wide or tall photo is held to a sensible shape),
+ * so it fills the box with nothing left empty around it.
  */
 function Thumb({ src }: { src: string }) {
   const [ratio, setRatio] = useState(1.5);
@@ -408,8 +409,8 @@ function Thumb({ src }: { src: string }) {
         const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
         if (w > 0 && h > 0) setRatio(Math.min(2.2, Math.max(0.7, w / h)));
       }}
-      style={{ aspectRatio: ratio }}
-      className="block h-full w-auto object-cover"
+      style={{ '--ratio': ratio } as React.CSSProperties}
+      className="block h-auto max-h-[70vh] w-full object-contain sm:h-full sm:max-h-none sm:w-auto sm:object-cover sm:[aspect-ratio:var(--ratio)]"
     />
   );
 }
