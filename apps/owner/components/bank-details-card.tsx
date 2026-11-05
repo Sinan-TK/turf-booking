@@ -124,12 +124,12 @@ export function BankDetailsCard() {
   );
 
   return (
-    <Card className="max-w-md">
+    <Card>
       <div className="mb-1 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-on-surface">Bank details for payouts</h2>
         {has && <Badge value={data.status} />}
       </div>
-      <p className="mb-4 text-xs text-on-surface-variant">One account for your whole business. Your weekly earnings are paid here.</p>
+      <p className="mb-5 text-xs text-on-surface-variant">One account for your whole business. Your weekly earnings are paid here.</p>
 
       {loading && !data && <p className="text-sm text-on-surface-variant">Loading…</p>}
       {loadError && <ErrorBanner message={loadError} />}
@@ -139,7 +139,7 @@ export function BankDetailsCard() {
         <>
           {has ? (
             <>
-              <dl className="space-y-2 text-sm">
+              <dl className="grid gap-x-8 gap-y-4 rounded-xl bg-surface-container-low p-4 text-sm sm:grid-cols-2">
                 <Row label="Account holder" value={data.accountHolderName} />
                 <Row label="Account number" value={data.accountNumber} mono />
                 <Row label="IFSC" value={data.ifsc} mono />
@@ -164,9 +164,9 @@ export function BankDetailsCard() {
       )}
 
       {editing && (
-        <form onSubmit={save} className="space-y-3" noValidate>
-          {error && <ErrorBanner message={error} />}
-          {has && <p className="rounded-lg bg-tertiary-container/30 px-3 py-2 text-xs text-on-tertiary-container">Saving changes marks your details as not verified until Bookyo checks them again.</p>}
+        <form onSubmit={save} className="grid gap-4 sm:grid-cols-2" noValidate>
+          {error && <div className="sm:col-span-2"><ErrorBanner message={error} /></div>}
+          {has && <p className="sm:col-span-2 rounded-lg bg-tertiary-container/30 px-3 py-2 text-xs text-on-tertiary-container">Saving changes marks your details as not verified until Bookyo checks them again.</p>}
           {field('holder', 'Account holder name', { value: form.holder, autoComplete: 'off', onChange: (e) => set('holder', e.target.value) })}
           {field('number', 'Account number', { value: form.number, inputMode: 'numeric', autoComplete: 'off', onChange: (e) => set('number', e.target.value) })}
           {field('confirm', 'Confirm account number', { value: form.confirm, inputMode: 'numeric', autoComplete: 'off', onChange: (e) => set('confirm', e.target.value) })}
@@ -184,7 +184,7 @@ export function BankDetailsCard() {
             </Select>
           </div>
           {field('upi', 'UPI id (optional)', { value: form.upi, autoComplete: 'off', placeholder: 'name@bank', onChange: (e) => set('upi', e.target.value) })}
-          <div>
+          <div className="sm:col-span-2">
             <Label htmlFor="bank-password">Your password</Label>
             <PasswordInput
               id="bank-password"
@@ -198,7 +198,7 @@ export function BankDetailsCard() {
             <FieldError id="bank-password-error" message={errors.password} />
             <p className="mt-1 text-xs text-on-surface-variant">We ask for it again so nobody else can change where your money goes.</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 sm:col-span-2">
             <Button type="submit" disabled={saving}>
               {saving ? 'Saving…' : 'Save bank details'}
             </Button>
@@ -214,9 +214,9 @@ export function BankDetailsCard() {
 
 function Row({ label, value, mono }: { label: string; value?: string | null; mono?: boolean }) {
   return (
-    <div className="flex justify-between gap-4">
-      <dt className="text-on-surface-variant">{label}</dt>
-      <dd className={`text-right font-medium text-on-surface ${mono ? 'font-mono tracking-wide' : ''}`}>{value || '—'}</dd>
+    <div className="min-w-0">
+      <dt className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">{label}</dt>
+      <dd className={`mt-0.5 break-words font-medium text-on-surface ${mono ? 'font-mono tracking-wide' : ''}`}>{value || '—'}</dd>
     </div>
   );
 }
