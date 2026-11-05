@@ -48,6 +48,7 @@ export default function DeletedFilesPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [confirmingClear, setConfirmingClear] = useState(false);
 
   const reload = () => {
     refetch();
@@ -87,12 +88,21 @@ export default function DeletedFilesPage() {
 
   const checkBucket = () =>
     run('check', async () => {
-      const r = await api.post<{ checked: number; nowGone: number; stillThere: number; failed: number; remaining: number }>('/admin/deleted-files/check');
-      if (r.checked === 0) return 'Nothing is waiting to be checked.';
-      const parts = [`Checked ${r.checked}: ${r.nowGone} already gone`, `${r.stillThere} still in the bucket`];
-      if (r.failed > 0) parts.push(`${r.failed} could not be checked, try again`);
-      if (r.remaining > r.stillThere + r.failed) parts.push('more are waiting, press Check bucket again');
-      return `${parts.join(', ')}.`;
+      const r = await api.post<{ checked: number; nowGone: number; stillThere: number; failed: number; reopened: number; recheckFailed: number; remaining: number }>('/admin/deleted-files/check', { recheckRemoved: true });
+      // The files marked removed are looked at too: any that can still be reached were not really deleted, and are waiting again.
+      const parts: string[] = [];
+      if (r.checked > 0) parts.push(`Checked ${r.checked} waiting: ${r.nowGone} already gone, ${r.stillThere} still in the bucket`);
+      if (r.reopened > 0) parts.push(`${r.reopened} marked removed ${r.reopened === 1 ? 'is' : 'are'} still in the bucket and ${r.reopened === 1 ? 'was' : 'were'} put back on the waiting list`);
+      if (r.failed + r.recheckFailed > 0) parts.push(`${r.failed + r.recheckFailed} could not be checked, try again`);
+      if (r.remaining > r.stillThere + r.failed + r.reopened) parts.push('more are waiting, press Check bucket again');
+      return parts.length > 0 ? `${parts.join('. ')}.` : 'Nothing is waiting, and the removed files are all really gone.';
+    });
+
+  const clearHistory = () =>
+    run('clear', async () => {
+      const r = await api.delete<{ cleared: number }>('/admin/deleted-files/removed');
+      setConfirmingClear(false);
+      return r.cleared === 0 ? 'There was no history to clear.' : `Deleted ${r.cleared} record${r.cleared === 1 ? '' : 's'} of removed files.`;
     });
 
   /**
@@ -139,7 +149,8 @@ export default function DeletedFilesPage() {
           <p className="font-medium text-gray-900">How to clear these out of R2</p>
           <ol className="mt-1.5 list-decimal space-y-0.5 pl-5">
             <li>Press <strong>Copy all waiting keys</strong> and delete those files in the Cloudflare dashboard (or with a tool such as rclone).</li>
-            <li>Come back to this page. It looks at the files by itself and clears the ones that are gone (press <strong>Check bucket</strong> to look right now).</li>
+            <li>Come back to this page. It looks at the files by itself and clears the ones that are gone (press <strong>Check bucket</strong> to look right now; it also looks at the files marked removed, and puts any that can still be reached back on the waiting list).</li>
+            <li>In the <strong>Removed</strong> view, <strong>Clear removed history</strong> deletes those records from the database.</li>
           </ol>
         </Card>
         <ListToolbar
@@ -158,6 +169,22 @@ export default function DeletedFilesPage() {
           <Button variant="secondary" onClick={() => void checkBucket()} loading={busy === 'check'}>
             Check bucket
           </Button>
+          {values.status !== 'waiting' && (summary.data?.removed ?? 0) > 0 && !confirmingClear && (
+            <Button variant="secondary" onClick={() => setConfirmingClear(true)}>
+              Clear removed history
+            </Button>
+          )}
+          {confirmingClear && (
+            <span className="inline-flex flex-wrap items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm text-red-800">
+              Delete the {summary.data?.removed ?? 0} removed record{(summary.data?.removed ?? 0) === 1 ? '' : 's'} from the database?
+              <Button variant="danger" className="!px-3 !py-1" onClick={() => void clearHistory()} loading={busy === 'clear'}>
+                Yes, delete
+              </Button>
+              <Button variant="secondary" className="!px-3 !py-1" onClick={() => setConfirmingClear(false)}>
+                Cancel
+              </Button>
+            </span>
+          )}
         </div>
       </ListSection>
 

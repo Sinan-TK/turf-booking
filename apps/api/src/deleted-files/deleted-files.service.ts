@@ -64,7 +64,7 @@ export class DeletedFilesService {
    * Looks at up to 50 waiting files (the oldest first) and marks the ones that are no longer in the bucket as removed, so after deleting
    * in Cloudflare the admin presses one button instead of ticking each row. A file that cannot be checked right now stays waiting.
    */
-  async check(actor: AuthContext) {
+  async check(actor: AuthContext, options: { recheckRemoved?: boolean } = {}) {
     const waiting = await this.prisma.client.deletedFile.findMany({ where: { removedAt: null }, orderBy: [{ deletedAt: 'asc' }, { id: 'asc' }], take: 50 });
     const gone: string[] = [];
     let stillThere = 0;
@@ -79,6 +79,35 @@ export class DeletedFilesService {
       }
     }
     const { marked } = gone.length > 0 ? await this.markRemoved(gone, actor) : { marked: 0 };
-    return { checked: waiting.length, nowGone: marked, stillThere, failed, remaining: (await this.count('waiting')) };
+
+    // A file marked removed may not really be gone (the delete in the bucket failed or was undone): when asked, look at the most recently
+    // removed ones too, and put any that can still be reached back on the waiting list.
+    let reopened = 0;
+    let recheckFailed = 0;
+    if (options.recheckRemoved) {
+      const removed = await this.prisma.client.deletedFile.findMany({ where: { removedAt: { not: null } }, orderBy: [{ removedAt: 'desc' }, { id: 'asc' }], take: 50 });
+      const back: string[] = [];
+      for (let i = 0; i < removed.length; i += 5) {
+        const chunk = removed.slice(i, i + 5);
+        const answers = await Promise.all(chunk.map((f) => this.storage.exists(f.key).then((here) => ({ f, here }), () => ({ f, here: null as boolean | null }))));
+        for (const { f, here } of answers) {
+          if (here === null) recheckFailed++;
+          else if (here) back.push(f.id);
+        }
+      }
+      if (back.length > 0) {
+        const res = await this.prisma.client.deletedFile.updateMany({ where: { id: { in: back }, removedAt: { not: null } }, data: { removedAt: null, removedByAdminId: null } });
+        reopened = res.count;
+        await this.audit.record({ actor, action: 'DELETED_FILES_REOPENED', entityType: 'DeletedFile', entityId: back[0]!, metadata: { count: reopened, ids: back } });
+      }
+    }
+    return { checked: waiting.length, nowGone: marked, stillThere, failed, reopened, recheckFailed, remaining: await this.count('waiting') };
+  }
+
+  /** Deletes the history: the list entries of files already confirmed gone. Waiting files stay. */
+  async clearRemoved(actor: AuthContext) {
+    const { count } = await this.prisma.client.deletedFile.deleteMany({ where: { removedAt: { not: null } } });
+    if (count > 0) await this.audit.record({ actor, action: 'DELETED_FILES_HISTORY_CLEARED', entityType: 'DeletedFile', entityId: actor.id, metadata: { count } });
+    return { cleared: count };
   }
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, HttpCode, Param, ParseUUIDPipe, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, HttpCode, Param, ParseUUIDPipe, Post, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { z } from 'zod';
 import { createZodDto } from 'nestjs-zod';
@@ -14,6 +14,9 @@ import { DeletedFilesService, type DeletedFileStatus } from './deleted-files.ser
 
 const markRemovedSchema = z.object({ ids: z.array(z.string().uuid()).min(1).max(500) });
 class MarkRemovedDto extends createZodDto(markRemovedSchema) {}
+
+const checkSchema = z.object({ recheckRemoved: z.boolean().optional() });
+class CheckDto extends createZodDto(checkSchema) {}
 
 /**
  * The Super Admin's list of files the app stopped using. The bucket's key cannot delete, so they are deleted there by hand: this list shows
@@ -54,8 +57,14 @@ export class DeletedFilesController {
 
   @Post('check')
   @HttpCode(200)
-  check(@CurrentUser() actor: AuthContext) {
-    return this.files.check(actor);
+  check(@CurrentUser() actor: AuthContext, @Body() dto: CheckDto) {
+    return this.files.check(actor, { recheckRemoved: dto?.recheckRemoved });
+  }
+
+  /** Deletes the history of files already confirmed gone. */
+  @Delete('removed')
+  clearRemoved(@CurrentUser() actor: AuthContext) {
+    return this.files.clearRemoved(actor);
   }
 
   @Post('mark-removed')

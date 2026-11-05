@@ -145,11 +145,60 @@ describe('Deleted files', () => {
     });
   });
 
+  describe('files marked removed that are still there, and clearing the history', () => {
+    beforeAll(async () => {
+      await prisma.deletedFile.updateMany({ where: { removedAt: null }, data: { removedAt: new Date() } });
+    });
+
+    const mistakeLabel = `Marked by mistake ${uniqueSuffix()}`;
+    it('Check bucket (with the removed ones included) puts a file that can still be reached back on the waiting list', async () => {
+      const path = `/resources/${venue.fullGroundId}/photos`;
+      const photos = await addPhoto(path);
+      const key = keyOf(photos[photos.length - 1]!.url); // really stored
+      await prisma.deletedFile.create({ data: { key, source: 'UNIT_PHOTO', label: mistakeLabel, deletedByType: 'OWNER', removedAt: new Date() } });
+
+      // The automatic look (waiting files only) leaves a removed entry alone.
+      const plain = await admin.post('/admin/deleted-files/check').send({}).expect(200);
+      expect(plain.body).toMatchObject({ reopened: 0 });
+      expect((await row(key))?.removedAt).not.toBeNull();
+
+      // The button also looks at the removed ones: this file is still there, so it is waiting again.
+      const full = await admin.post('/admin/deleted-files/check').send({ recheckRemoved: true }).expect(200);
+      expect(full.body.reopened).toBeGreaterThanOrEqual(1); // (earlier tests may have left other files that are really still stored)
+      expect(full.body.recheckFailed).toBe(0);
+      expect((await row(key))?.removedAt).toBeNull();
+      expect((await admin.get('/admin/deleted-files').query({ search: mistakeLabel }).expect(200)).body).toHaveLength(1);
+    });
+
+    it('a removed entry whose file really is gone stays removed when re-checked', async () => {
+      const key = `venues/e2e/${uniqueSuffix()}-gone.png`;
+      await prisma.deletedFile.create({ data: { key, source: 'UNIT_PHOTO', label: 'Really gone', deletedByType: 'OWNER', removedAt: new Date() } });
+      const res = await admin.post('/admin/deleted-files/check').send({ recheckRemoved: true }).expect(200);
+      expect(res.body.reopened).toBe(0);
+      expect((await row(key))?.removedAt).not.toBeNull();
+    });
+
+    it('"clear history" deletes the removed entries from the database and keeps the waiting ones', async () => {
+      const waitingKey = `venues/e2e/${uniqueSuffix()}-waiting.png`;
+      await prisma.deletedFile.create({ data: { key: waitingKey, source: 'UNIT_PHOTO', label: 'Still waiting', deletedByType: 'OWNER' } });
+      const removedCount = await prisma.deletedFile.count({ where: { removedAt: { not: null } } });
+      expect(removedCount).toBeGreaterThan(0);
+
+      const res = await admin.delete('/admin/deleted-files/removed').expect(200);
+      expect(res.body).toEqual({ cleared: removedCount });
+      expect(await prisma.deletedFile.count({ where: { removedAt: { not: null } } })).toBe(0);
+      expect(await row(waitingKey)).not.toBeNull();
+      expect((await admin.delete('/admin/deleted-files/removed').expect(200)).body).toEqual({ cleared: 0 });
+      expect((await admin.get('/admin/deleted-files').query({ status: 'removed' }).expect(200)).headers['x-total-count']).toBe('0');
+    });
+  });
+
   it('only the Super Admin can see or change the list', async () => {
     const { agent: customer } = await createCustomerFixture(app);
     for (const agent of [owner, customer]) {
       expect((await agent.get('/admin/deleted-files')).status).toBeGreaterThanOrEqual(401);
       expect((await agent.post('/admin/deleted-files/check')).status).toBeGreaterThanOrEqual(401);
+      expect((await agent.delete('/admin/deleted-files/removed')).status).toBeGreaterThanOrEqual(401);
     }
     expect((await http().get('/admin/deleted-files')).status).toBe(401);
   });
