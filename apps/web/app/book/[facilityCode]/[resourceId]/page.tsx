@@ -299,7 +299,7 @@ function BookingPage() {
             <ul aria-label={`About ${r.resource.name}`} className="mt-3 max-w-2xl space-y-1.5">
               {descriptionPoints(r.resource.description).map((point, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm leading-relaxed text-slate-600">
-                  <span aria-hidden="true" className="mt-[0.55rem] h-1.5 w-1.5 shrink-0 rounded-full bg-brand-400 ring-1 ring-brand-700/30" />
+                  <span aria-hidden="true" className="mt-[0.55rem] h-1.5 w-1.5 shrink-0 rounded-full bg-black" />
                   <span className="min-w-0">{point}</span>
                 </li>
               ))}
