@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useFetch } from '@/lib/use-fetch';
 import { Badge, Button, Card, ErrorBanner, FieldError, Input, Label, PasswordInput, Select, SuccessBanner, invalidClass } from '@/components/ui';
+import { SvgIcon } from '@/components/svg-icons';
 import { hasErrors, type FieldErrors } from '@/lib/validation';
 
 interface BankAccount {
@@ -171,7 +172,7 @@ export function BankDetailsCard() {
                   <dd className="mt-1">
                     <button
                       type="button"
-                      className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+                      className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-2.5 py-1 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                       onClick={() => {
                         if (revealed) setRevealed(null);
                         else {
@@ -180,6 +181,7 @@ export function BankDetailsCard() {
                         }
                       }}
                     >
+                      <SvgIcon name={revealed ? 'eyeOff' : 'eye'} className="h-3.5 w-3.5" />
                       {revealed ? 'Hide account number' : 'View account number'}
                     </button>
                   </dd>
