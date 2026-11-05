@@ -36,7 +36,7 @@ test.describe('customer site: finding a venue', () => {
     await expect(card.getByRole('heading', { name: remoteVenue.name })).toHaveCount(1);
     await expect(card.getByRole('link', { name: 'Directions' })).toHaveCount(1);
     // The turf is priced 6 AM-10 PM (Mon-Fri 800, Sat-Sun 1000); the court is priced all day at 300.
-    const turfPrice = weekend ? '₹1000' : '₹800';
+    const turfPrice = weekend ? '₹1,000' : '₹800'; // prices read with a thousands separator
     // One tab per unit, each with its lowest price; one unit is shown at a time.
     await expect(card.getByRole('tab')).toHaveCount(2);
     await expect(card.getByRole('tab', { name: new RegExp('^Turf A ' + turfPrice) })).toHaveAttribute('aria-selected', 'true');
