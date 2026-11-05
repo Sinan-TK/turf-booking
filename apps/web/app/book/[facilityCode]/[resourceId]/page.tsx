@@ -104,23 +104,24 @@ function Pictures({ unit, venueName, saved, onToggleSave }: { unit: SearchResult
           <Icon name="navigation" className="text-[0.875rem]" />
           Directions
         </a>
+        {photos.length > 1 && (
+          // More than one photo: dots at the bottom left of the big picture; tapping one shows that photo (no strip of previews below).
+          <div role="group" aria-label="Photos" className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-black/40 px-1.5 py-1 backdrop-blur-sm">
+            {photos.map((src, i) => (
+              <button
+                key={src}
+                type="button"
+                onClick={() => setIndex(i)}
+                aria-label={`Photo ${i + 1} of ${photos.length}`}
+                aria-current={i === Math.min(index, photos.length - 1)}
+                className="group flex h-5 items-center px-1"
+              >
+                <span className={`block h-2 rounded-full transition-all ${i === Math.min(index, photos.length - 1) ? 'w-5 bg-white' : 'w-2 bg-white/60 group-hover:bg-white/90'}`} />
+              </button>
+            ))}
+          </div>
+        )}
       </div>
-      {photos.length > 1 && (
-        <div className="scrollbar-hide mt-2 flex gap-2 overflow-x-auto">
-          {photos.map((src, i) => (
-            <button
-              key={src}
-              type="button"
-              onClick={() => setIndex(i)}
-              aria-label={`Photo ${i + 1} of ${photos.length}`}
-              aria-current={i === index}
-              className={`h-16 w-24 shrink-0 overflow-hidden rounded-lg border-2 transition ${i === index ? 'border-brand-600' : 'border-transparent opacity-70 hover:opacity-100'}`}
-            >
-              <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
