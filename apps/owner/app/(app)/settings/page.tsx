@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { ROLE_LABEL, ROLE_SUMMARY } from '@/lib/access';
 import { AccessCard } from '@/components/access-card';
 import { BankDetailsCard } from '@/components/bank-details-card';
-import { Button, Card, ErrorBanner, FieldError, Input, Label, PageHeader, SuccessBanner, invalidClass } from '@/components/ui';
+import { Button, Card, ErrorBanner, FieldError, Label, PageHeader, PasswordInput, SuccessBanner, invalidClass } from '@/components/ui';
 import { hasErrors, newPasswordError, type FieldErrors } from '@/lib/validation';
 
 export default function SettingsPage() {
@@ -110,12 +110,11 @@ export default function SettingsPage() {
               <div className="grid gap-4 sm:grid-cols-3">
                 <div>
                   <Label htmlFor="settings-current">Current Password</Label>
-                  <Input
+                  <PasswordInput
                     id="settings-current"
                     aria-invalid={!!errors.current}
                     aria-describedby={errors.current ? 'settings-current-error' : undefined}
                     className={errors.current ? invalidClass : ''}
-                    type="password"
                     autoComplete="current-password"
                     value={currentPassword}
                     onChange={(e) => {
@@ -127,12 +126,11 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <Label htmlFor="settings-new">New Password</Label>
-                  <Input
+                  <PasswordInput
                     id="settings-new"
                     aria-invalid={!!errors.next}
                     aria-describedby={errors.next ? 'settings-new-error' : undefined}
                     className={errors.next ? invalidClass : ''}
-                    type="password"
                     autoComplete="new-password"
                     value={newPassword}
                     onChange={(e) => {
@@ -144,12 +142,11 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <Label htmlFor="settings-confirm">Confirm New Password</Label>
-                  <Input
+                  <PasswordInput
                     id="settings-confirm"
                     aria-invalid={!!errors.confirm}
                     aria-describedby={errors.confirm ? 'settings-confirm-error' : undefined}
                     className={errors.confirm ? invalidClass : ''}
-                    type="password"
                     autoComplete="new-password"
                     value={confirmPassword}
                     onChange={(e) => {
