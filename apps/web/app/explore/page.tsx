@@ -287,9 +287,9 @@ export default function ExplorePage() {
             className="group flex h-11 min-w-0 max-w-[65%] items-center gap-1.5 px-1 text-left transition active:opacity-70 md:h-12 md:w-auto md:max-w-[16rem] md:shrink-0"
           >
             <Icon name="location_on" className="text-[1.75rem] text-brand-700" />
-            <span className="min-w-0 leading-tight">
-              <span className="block truncate text-sm font-bold text-slate-900">{lines.primary}</span>
-              {lines.secondary && <span className="block truncate text-xs font-medium text-slate-500">{lines.secondary}</span>}
+            <span className="min-w-0 truncate">
+              <span className="text-base font-extrabold text-slate-900">{lines.primary}</span>
+              {lines.secondary && <span className="text-sm font-medium text-slate-500">, {lines.secondary}</span>}
             </span>
           </button>
           <div className="ml-auto md:ml-0 md:order-last">
@@ -606,23 +606,6 @@ function VenueGroupCard({
   );
 }
 
-/** "6:00 AM – 12:00 AM": the unit's opening hours on the searched day, or null when none are set. */
-function openHoursLabel(r: SearchResult): string | null {
-  const windows = r.openWindows;
-  if (!windows || windows.length === 0) return null;
-  const toMinutes = (hhmm: string) => {
-    const [h, m] = hhmm.split(':').map(Number);
-    return (h ?? 0) * 60 + (m ?? 0);
-  };
-  const open = Math.min(...windows.map((w) => toMinutes(w.openTime)));
-  const close = Math.max(...windows.map((w) => toMinutes(w.closeTime) || 24 * 60));
-  const fmt = (minutes: number) => {
-    const d = new Date(2000, 0, 1, Math.floor(minutes / 60) % 24, minutes % 60);
-    return d.toLocaleTimeString('en-US', d.getMinutes() ? { hour: 'numeric', minute: '2-digit' } : { hour: 'numeric' });
-  };
-  return `${fmt(open)} – ${fmt(close)}`;
-}
-
 /** How long each photo stays before the banner moves to the next on its own. */
 const AUTO_PHOTO_MS = 2000;
 
@@ -861,7 +844,7 @@ const CELL_COLOURS: Record<HourCell['state'], string> = {
 };
 
 /**
- * The picked unit's day: the date and opening hours, an hour-by-hour bar (tap a green hour to book it at the chosen
+ * The picked unit's day: an hour-by-hour bar (tap a green hour to book it at the chosen
  * length) with its legend, and Book Now for the full booking window (duration, every start time).
  */
 function UnitPanel({ result: r, liveResult, durationMinutes: requestedDuration, dateIso }: UnitCardProps) {
@@ -869,17 +852,11 @@ function UnitPanel({ result: r, liveResult, durationMinutes: requestedDuration, 
   const durationMinutes = liveResult.durationMinutes ?? r.durationMinutes ?? requestedDuration ?? r.policy?.minDurationMin ?? 60;
   const { bookSlot, busyStart, error: bookError } = useBookSlot(r.resource.id, durationMinutes, !!r.pooled);
   const { cells, first, last } = useMemo(() => buildDayTimeline(r, dateIso), [r, dateIso]);
-  const hours = openHoursLabel(r);
   const span = last - first;
   const labels = Array.from({ length: Math.floor(span / 3) + 1 }, (_, i) => first + i * 3).filter((h) => h <= last);
 
   return (
     <div className="mt-auto flex flex-col gap-3">
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="text-[0.9375rem] font-bold text-slate-900">{dayHeading(dateIso)}</span>
-        {hours && <span className="text-sm text-slate-500">{hours}</span>}
-      </div>
-
       <div>
         <div aria-hidden="true" className="relative mb-1.5 h-3.5 text-[0.625rem] font-medium text-slate-500">
           {labels.map((h, i) => (
