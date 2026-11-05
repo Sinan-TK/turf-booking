@@ -39,7 +39,7 @@ export const GEO_RADIUS_KM = 15;
 export function placeLabel(choice: LocationChoice | null): string {
   if (!choice) return 'Select location';
   if (choice.mode === 'town') return `${choice.townName ?? choice.districtName}, ${choice.districtName}`;
-  if (choice.mode === 'geo') return choice.nearTown ? `Near ${choice.nearTown}` : 'Your location';
+  if (choice.mode === 'geo') return choice.nearTown ?? 'Your location';
   return choice.stateName ? `${choice.districtName}, ${choice.stateName}` : choice.districtName;
 }
 
@@ -47,7 +47,7 @@ export function placeLabel(choice: LocationChoice | null): string {
 export function placeLines(choice: LocationChoice | null): { primary: string; secondary: string | null } {
   if (!choice) return { primary: 'Select location', secondary: null };
   if (choice.mode === 'town') return { primary: choice.townName ?? choice.districtName, secondary: choice.townName ? choice.districtName : choice.stateName || null };
-  if (choice.mode === 'geo') return { primary: choice.nearTown ? `Near ${choice.nearTown}` : 'Your location', secondary: choice.districtName || null };
+  if (choice.mode === 'geo') return { primary: choice.nearTown ?? 'Your location', secondary: choice.districtName || null };
   return { primary: choice.districtName, secondary: choice.stateName || null };
 }
 
@@ -136,7 +136,7 @@ export function headerLines(choice: LocationChoice | null): { title: string; sub
   if (choice.mode === 'town') return { title: choice.townName ?? choice.districtName, subtitle: `${choice.districtName}, ${choice.stateName}` };
   if (choice.mode === 'geo') {
     return {
-      title: choice.nearTown ? `Near ${choice.nearTown}` : 'Your location',
+      title: choice.nearTown ?? 'Your location',
       subtitle: 'Using your current location',
     };
   }

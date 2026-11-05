@@ -156,7 +156,7 @@ test.describe('customer site: location', () => {
     await header(page, 'Malappuram').click();
     await picker(page).getByRole('button', { name: 'Use my current location' }).click();
     await expect(picker(page)).toHaveCount(0);
-    await expect(header(page, 'Near Manjeri')).toBeVisible();
+    await expect(header(page, 'Manjeri')).toBeVisible();
     await settled(page);
     await find(page, manjeriVenue.name);
   });

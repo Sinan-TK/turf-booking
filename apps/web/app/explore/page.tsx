@@ -287,10 +287,11 @@ export default function ExplorePage() {
             aria-haspopup="dialog"
             className="group flex h-11 min-w-0 max-w-[65%] items-center gap-1.5 px-1 text-left transition active:opacity-70 md:h-12 md:w-auto md:max-w-[16rem] md:shrink-0"
           >
-            <Icon name="location_on" className="text-[1.75rem] text-brand-700" />
-            <span className="min-w-0 truncate">
-              <span className="text-base font-extrabold text-slate-900">{lines.primary}</span>
-              {lines.secondary && <span className="text-sm font-medium text-slate-500">, {lines.secondary}</span>}
+            {/* A solid pin, filled with its own colour (the dot in the middle is left white). */}
+            <Icon name="location_on" className="fill-brand-700 text-[1.75rem] text-brand-700 [&_circle]:fill-white" />
+            <span className="min-w-0 leading-tight">
+              <span className="block truncate text-base font-extrabold text-slate-900">{lines.primary}</span>
+              {lines.secondary && <span className="block truncate text-[0.6875rem] font-medium text-slate-500">{lines.secondary}</span>}
             </span>
           </button>
           <div className="ml-auto md:ml-0 md:order-last">
