@@ -13,8 +13,9 @@ export default function SettingsPage() {
   const { user } = useAuth();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [errors, setErrors] = useState<FieldErrors<'current' | 'next'>>({});
+  const [errors, setErrors] = useState<FieldErrors<'current' | 'next' | 'confirm'>>({});
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -22,13 +23,14 @@ export default function SettingsPage() {
     e.preventDefault();
     setError(null);
     setSuccess(false);
-    const found: FieldErrors<'current' | 'next'> = {
+    const found: FieldErrors<'current' | 'next' | 'confirm'> = {
       current: currentPassword ? undefined : 'Enter your current password.',
       next: newPasswordError(newPassword) ?? (newPassword === currentPassword ? 'The new password must be different from the current one.' : undefined),
+      confirm: confirmPassword === newPassword ? undefined : 'The two new passwords do not match.',
     };
     setErrors(found);
     if (hasErrors(found)) {
-      document.getElementById(found.current ? 'settings-current' : 'settings-new')?.focus();
+      document.getElementById(found.current ? 'settings-current' : found.next ? 'settings-new' : 'settings-confirm')?.focus();
       return;
     }
     setSubmitting(true);
@@ -37,6 +39,7 @@ export default function SettingsPage() {
       setSuccess(true);
       setCurrentPassword('');
       setNewPassword('');
+      setConfirmPassword('');
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 400
@@ -104,7 +107,7 @@ export default function SettingsPage() {
             <form onSubmit={onSubmit} className="space-y-4" noValidate>
               {error && <ErrorBanner message={error} />}
               {success && <SuccessBanner message="Password changed." />}
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <div>
                   <Label htmlFor="settings-current">Current Password</Label>
                   <Input
@@ -138,6 +141,23 @@ export default function SettingsPage() {
                     }}
                   />
                   <FieldError id="settings-new-error" message={errors.next} />
+                </div>
+                <div>
+                  <Label htmlFor="settings-confirm">Confirm New Password</Label>
+                  <Input
+                    id="settings-confirm"
+                    aria-invalid={!!errors.confirm}
+                    aria-describedby={errors.confirm ? 'settings-confirm-error' : undefined}
+                    className={errors.confirm ? invalidClass : ''}
+                    type="password"
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      setErrors((p) => ({ ...p, confirm: undefined }));
+                    }}
+                  />
+                  <FieldError id="settings-confirm-error" message={errors.confirm} />
                 </div>
               </div>
               <Button type="submit" disabled={submitting}>
