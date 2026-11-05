@@ -562,7 +562,7 @@ function UnitPanel({
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/20 bg-surface-container-low px-container-padding py-4">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-on-primary">
-              <FacilityIcon iconKey={facility.iconKey} className="text-[24px]" />
+              <FacilityIcon iconKey={facility.iconKey} iconSvg={facility.iconSvg} className="text-[24px]" />
             </span>
             <div>
             <h2 className="text-body-md font-semibold text-on-surface">{facility.name}</h2>

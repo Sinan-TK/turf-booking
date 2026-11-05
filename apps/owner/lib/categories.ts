@@ -18,6 +18,8 @@ export interface VenueCategory {
   slug: string;
   name: string;
   iconKey: string;
+  /** The facility's own drawing (a custom SVG set by the admin); when present it is shown instead of the named icon. */
+  iconSvg?: string | null;
   unitLabel: string;
   venueLabel: string;
   /** Allowed resource sub-types; empty = free text. */
@@ -39,6 +41,7 @@ export interface VenueCategorySummary {
   slug: string;
   name: string;
   iconKey: string;
+  iconSvg?: string | null;
   unitLabel: string;
   venueLabel: string;
   unitTypes: string[];
