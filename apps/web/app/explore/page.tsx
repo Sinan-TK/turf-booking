@@ -544,9 +544,10 @@ function VenueGroupCard({
   const [pickedId, setPickedId] = useState(units[0]!.resource.id);
   // A re-search can drop the picked unit (a filter, a new day): fall back to the first one.
   const unit = units.find((u) => u.resource.id === pickedId) ?? units[0]!;
-  const openSlots = units.reduce((n, u) => n + u.availableStartTimes.length, 0);
   // Everything is taken, or the day's time has passed: the card stays in the list but greyed out.
-  const soldOut = openSlots === 0;
+  const soldOut = units.every((u) => u.availableStartTimes.length === 0);
+  // The badge counts the slots of the unit that is picked, so it changes as another unit is chosen.
+  const openSlots = liveFor(unit).availableStartTimes.length;
   const unitPhotos = unit.resource.photoUrls ?? [];
   const photos = unitPhotos.length > 0 ? unitPhotos : venue.photoUrl ? [venue.photoUrl] : [];
 
@@ -563,7 +564,7 @@ function VenueGroupCard({
         iconSvg={unit.category?.iconSvg}
         alt={`${venue.name}, ${unit.resource.name}`}
         offer={offerOf(unit)}
-        badge={soldOut ? 'No slots left' : `${openSlots} slot${openSlots === 1 ? '' : 's'} open`}
+        badge={openSlots === 0 ? 'No slots left' : `${openSlots} slot${openSlots === 1 ? '' : 's'} open`}
         saved={saved}
         onToggleSave={onToggleSave}
         venueName={venue.name}
