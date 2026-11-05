@@ -39,6 +39,9 @@ export function AccountMenu() {
     };
   }, [open]);
 
+  // The first letter of the customer's name (or email, when there is no name yet) stands in for the profile picture.
+  const initial = Array.from((customer?.name ?? customer?.email ?? '').trim().replace(/^[^\p{L}\p{N}]+/u, ''))[0] ?? null;
+
   if (loading) return <Skeleton className="h-10 w-10 rounded-xl" />;
 
   if (!customer) {
@@ -64,9 +67,9 @@ export function AccountMenu() {
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         title={customer.name ?? 'Your account'}
-        className="flex h-10 w-10 items-center justify-center rounded-full border border-brand-100 bg-brand-50 text-brand-700 transition hover:border-brand-300 hover:bg-brand-100 active:scale-95 md:h-11 md:w-11"
+        className="flex h-10 w-10 items-center justify-center rounded-full border border-brand-300 bg-brand-400 text-base font-extrabold uppercase leading-none text-brand-700 transition hover:bg-brand-300 active:scale-95 md:h-11 md:w-11 md:text-lg"
       >
-        <Icon name="person" className="text-[1.25rem] md:text-[1.375rem]" />
+        {initial ? <span aria-hidden="true">{initial}</span> : <Icon name="person" className="text-[1.25rem] md:text-[1.375rem]" />}
       </button>
       {open && (
         <div
