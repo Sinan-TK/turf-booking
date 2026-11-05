@@ -85,8 +85,8 @@ const envSchema = z.object({
   // After the customer's payment goes through on their side, how long the slot stays locked waiting for the gateway to confirm it.
   PAYMENT_PROCESSING_MINUTES: z.coerce.number().int().positive().default(5),
   // Wallet recharge limits (in the currency's units).
-  WALLET_TOPUP_MIN: z.coerce.number().positive().default(50),
-  WALLET_TOPUP_MAX: z.coerce.number().positive().default(10000),
+  WALLET_TOPUP_MIN: z.coerce.number().positive().default(100),
+  WALLET_TOPUP_MAX: z.coerce.number().positive().default(2000),
 
   // Razorpay
   RAZORPAY_KEY_ID: optionalString(z.string().min(1)),

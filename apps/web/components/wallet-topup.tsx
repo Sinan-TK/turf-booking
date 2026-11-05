@@ -8,7 +8,7 @@ import type { RazorpayCheckoutOptions } from '@/lib/razorpay';
 import { Button, ErrorBanner, Icon } from '@/components/ui';
 import { PaymentSuccess } from '@/components/payment-success';
 
-const PRESETS = [200, 500, 1000, 2000];
+const PRESETS = [100, 200, 500, 1000, 2000];
 
 /**
  * "Add money": buys Coins with real money. A sheet to pick the amount, then Razorpay's popup. The Coins are credited by the server (the

@@ -60,8 +60,9 @@ describe('Wallet top-up', () => {
   test.each([
     [0, 'zero'],
     [-100, 'negative'],
-    [10, 'below the minimum'],
-    [10_000_000, 'above the maximum'],
+    [99, 'below the minimum'],
+    [2001, 'above the maximum'],
+    [10_000_000, 'far above the maximum'],
     [100.555, 'more than two decimals'],
   ])('%p (%s) is refused', async (amount) => {
     const { res } = await start(amount);

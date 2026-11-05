@@ -485,46 +485,60 @@ function Wallet() {
   }
 
   return (
-    <Card>
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-gray-900">Coins wallet</h2>
-        {wallet && (
-          <button
-            type="button"
-            onClick={() => {
-              setInitialAmount(undefined);
-              setAdding(true);
-            }}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-brand-700 px-3.5 py-2 text-xs font-bold text-white transition hover:bg-brand-800 active:scale-95"
-          >
-            <Icon name="add" className="text-[1rem]" />
-            Add money
-          </button>
-        )}
-      </div>
+    <div className="space-y-4">
       {adding && wallet && (
         <WalletTopupSheet
-          min={wallet.topupMin ?? 50}
-          max={wallet.topupMax ?? 10000}
+          min={wallet.topupMin ?? 100}
+          max={wallet.topupMax ?? 2000}
           initialAmount={initialAmount}
           onClose={() => setAdding(false)}
           onCredited={() => void credited()}
         />
       )}
       {error && <ErrorBanner message={error} />}
-      {!error && !wallet && <WalletSkeleton />}
+      {!error && !wallet && (
+        <Card>
+          <WalletSkeleton />
+        </Card>
+      )}
       {wallet && (
         <>
-          <p className="flex items-center gap-3 text-4xl font-semibold text-gray-900">
-            <Icon name="coin" className="text-[3.25rem]" />
-            {formatPrice({ amount: wallet.cachedBalance, currency: wallet.currency })}
-          </p>
-          <p className="mb-4 text-xs text-gray-500">1 Coin is worth 1 rupee. Add money here or get Coins back from cancelled bookings, and use them to pay for a booking.</p>
-          <h3 className="mb-2 text-sm font-semibold text-gray-900">History</h3>
-          <WalletHistory currency={wallet.currency} refreshKey={historyKey} />
+          <section aria-label="Wallet balance" className="rounded-2xl bg-brand-700 p-5 text-white shadow-sm sm:p-6">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-4">
+                <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-cream sm:h-20 sm:w-20">
+                  <Icon name="coin" className="text-[3rem] sm:text-[3.75rem]" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-white/70">Wallet balance</p>
+                  <p className="text-4xl font-black leading-tight sm:text-5xl">{formatPrice({ amount: wallet.cachedBalance, currency: wallet.currency })}</p>
+                  <p className="text-xs text-white/70">1 Coin is worth ₹1</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setInitialAmount(undefined);
+                  setAdding(true);
+                }}
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-400 px-5 text-sm font-extrabold leading-none text-brand-700 transition hover:bg-brand-300 active:scale-95 sm:w-auto"
+              >
+                <Icon name="add" className="text-[1.125rem]" />
+                <span>Add money</span>
+              </button>
+            </div>
+            <p className="mt-4 border-t border-white/15 pt-3 text-xs leading-relaxed text-white/70">
+              Add money here, or get Coins back from cancelled bookings, and spend them on any booking. Added money is used only for bookings; it is not returned to your card.
+            </p>
+          </section>
+
+          <Card>
+            <h3 className="mb-3 text-sm font-semibold text-gray-900">History</h3>
+            <WalletHistory currency={wallet.currency} refreshKey={historyKey} />
+          </Card>
         </>
       )}
-    </Card>
+    </div>
   );
 }
 

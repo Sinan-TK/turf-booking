@@ -32,7 +32,7 @@ async function open(page: import('@playwright/test').Page) {
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
     const json = (body: unknown) => route.fulfill({ status: 200, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify(body) });
     if (url.pathname === '/customer-auth/me') return json(customer);
-    if (url.pathname === '/me/coins') return json({ cachedBalance: '120.00', currency: 'INR', topupMin: 50, topupMax: 10000 });
+    if (url.pathname === '/me/coins') return json({ cachedBalance: '120.00', currency: 'INR', topupMin: 100, topupMax: 2000 });
     if (url.pathname === '/me/coins/transactions') {
       const limit = Number(url.searchParams.get('limit') ?? 50);
       const offset = Number(url.searchParams.get('offset') ?? 0);
@@ -94,12 +94,12 @@ test.describe('customer site: wallet Add money', () => {
     await expect(sheet.getByLabel('Amount')).toHaveValue('1000');
     await expect(sheet.getByRole('button', { name: 'Pay ₹1,000' })).toBeEnabled();
 
-    await sheet.getByLabel('Amount').fill('10');
-    await expect(sheet.getByText('The least you can add is ₹50.')).toBeVisible();
+    await sheet.getByLabel('Amount').fill('50');
+    await expect(sheet.getByText('The least you can add is ₹100.')).toBeVisible();
     await expect(sheet.getByRole('button', { name: 'Add money' })).toBeDisabled();
 
-    await sheet.getByLabel('Amount').fill('20000');
-    await expect(sheet.getByText('The most you can add at a time is ₹10,000.')).toBeVisible();
+    await sheet.getByLabel('Amount').fill('2500');
+    await expect(sheet.getByText('The most you can add at a time is ₹2,000.')).toBeVisible();
 
     await sheet.getByLabel('Amount').fill('50.555');
     await expect(sheet.getByText('Use at most two decimals.')).toBeVisible();
