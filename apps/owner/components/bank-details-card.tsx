@@ -169,11 +169,15 @@ export function BankDetailsCard() {
                 <Row label="Account holder" value={data.accountHolderName} />
                 <div className="min-w-0">
                   <dt className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">Account number</dt>
-                  <dd data-testid="account-number" className="mt-0.5 break-words font-mono font-medium tracking-wide text-on-surface">{revealed ?? data.accountNumber}</dd>
-                  <dd className="mt-1">
+                  <dd className="mt-0.5 flex items-center gap-2">
+                    <span data-testid="account-number" className="min-w-0 break-words font-mono font-medium tracking-wide text-on-surface">
+                      {revealed ?? data.accountNumber}
+                    </span>
                     <button
                       type="button"
-                      className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-2.5 py-1 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      aria-label={revealed ? 'Hide account number' : 'View account number'}
+                      title={revealed ? 'Hide account number' : 'View account number'}
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                       onClick={() => {
                         if (revealed) setRevealed(null);
                         else {
@@ -182,8 +186,7 @@ export function BankDetailsCard() {
                         }
                       }}
                     >
-                      <SvgIcon name={revealed ? 'eyeOff' : 'eye'} className="h-3.5 w-3.5" />
-                      {revealed ? 'Hide account number' : 'View account number'}
+                      <SvgIcon name={revealed ? 'eyeOff' : 'eye'} className="h-4 w-4" />
                     </button>
                   </dd>
                 </div>
