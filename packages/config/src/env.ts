@@ -99,6 +99,12 @@ const envSchema = z.object({
 
   // Object storage (S3-compatible)
   STORAGE_ENDPOINT: optionalString(z.string().url()),
+  // Whether the API may delete files from the bucket. Off while the bucket's key has no delete access: removed files are then listed for the
+  // Super Admin to delete by hand (Deleted files). Turn on once delete access is granted.
+  STORAGE_DELETE_FILES: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
   STORAGE_REGION: z.string().default('auto'),
   STORAGE_BUCKET: optionalString(z.string().min(1)),
   STORAGE_ACCESS_KEY_ID: optionalString(z.string().min(1)),

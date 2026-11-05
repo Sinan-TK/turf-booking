@@ -66,7 +66,7 @@ export class BannersService {
   async remove(id: string, actor: AuthContext) {
     const current = await this.must(id);
     await this.prisma.client.banner.delete({ where: { id } });
-    if (current.imageKey) await this.storage.remove(current.imageKey);
+    if (current.imageKey) await this.storage.remove(current.imageKey, { source: 'BANNER', label: `Banner · ${current.title}`, by: { type: 'ADMIN', id: actor.id } });
     await this.audit.record({ actor, action: 'BANNER_DELETED', entityType: 'Banner', entityId: id, metadata: { title: current.title } });
     return { deleted: true };
   }
@@ -81,7 +81,7 @@ export class BannersService {
     const key = `${STORAGE_FOLDERS.banners}/${id}/${randomUUID()}.${type.ext}`;
     await this.storage.put(key, file.buffer, type.mime);
     const updated = await this.prisma.client.banner.update({ where: { id }, data: { imageKey: key } });
-    if (current.imageKey) await this.storage.remove(current.imageKey);
+    if (current.imageKey) await this.storage.remove(current.imageKey, { source: 'BANNER', label: `Banner · ${current.title}`, by: { type: 'ADMIN', id: actor.id } });
     await this.audit.record({ actor, action: 'BANNER_IMAGE_SET', entityType: 'Banner', entityId: id, metadata: { title: current.title } });
     return shape(updated, this.url(updated));
   }
@@ -90,7 +90,7 @@ export class BannersService {
     const current = await this.must(id);
     if (!current.imageKey) return shape(current, null);
     const updated = await this.prisma.client.banner.update({ where: { id }, data: { imageKey: null } });
-    await this.storage.remove(current.imageKey);
+    await this.storage.remove(current.imageKey, { source: 'BANNER', label: `Banner · ${current.title}`, by: { type: 'ADMIN', id: actor.id } });
     await this.audit.record({ actor, action: 'BANNER_IMAGE_REMOVED', entityType: 'Banner', entityId: id, metadata: { title: current.title } });
     return shape(updated, null);
   }

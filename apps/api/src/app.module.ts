@@ -29,11 +29,13 @@ import { JobsModule } from './jobs/jobs.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { HealthModule } from './health/health.module';
 import { StorageModule } from './storage/storage.module';
+import { DeletedFilesModule } from './deleted-files/deleted-files.module';
 
 @Module({
   imports: [
     PrismaModule,
     StorageModule,
+    DeletedFilesModule,
     OwnerScopeModule,
     AuditModule,
     BannersModule,

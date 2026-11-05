@@ -1736,3 +1736,42 @@ model Banner {
 
   @@map("banners")
 }
+
+// =====================================================================
+// Files removed from the app but still in the bucket (no delete access on R2): the admin deletes them by hand
+// =====================================================================
+
+enum DeletedFileSource {
+  UNIT_PHOTO
+  GROUP_PHOTO
+  BANNER
+  CATEGORY_IMAGE
+  OTHER
+}
+
+enum DeletedFileActor {
+  OWNER
+  ADMIN
+  SYSTEM
+}
+
+/// A stored file the app no longer uses. The row of the photo (or banner, facility image) is deleted as usual; its bucket key lands here so the
+/// Super Admin can see what is left in the bucket, delete it there by hand and mark it removed.
+model DeletedFile {
+  id              String            @id @default(uuid()) @db.Uuid
+  /// The file's path in the bucket.
+  key             String            @unique
+  source          DeletedFileSource @default(OTHER)
+  /// What it belonged to, written when it was deleted (for example "Greenfield Arena · Turf A").
+  label           String?
+  venueId         String?           @db.Uuid
+  deletedAt       DateTime          @default(now())
+  deletedByType   DeletedFileActor  @default(SYSTEM)
+  deletedById     String?
+  /// When the file was confirmed gone from the bucket.
+  removedAt       DateTime?
+  removedByAdminId String?          @db.Uuid
+
+  @@index([removedAt, deletedAt])
+  @@map("deleted_files")
+}
