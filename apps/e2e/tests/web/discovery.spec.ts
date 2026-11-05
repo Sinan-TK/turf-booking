@@ -118,9 +118,9 @@ test.describe('customer site: finding a venue', () => {
   test('the search box narrows by venue name', async ({ page, context, remoteVenue }) => {
     await shareLocation(context, remoteVenue.lat, remoteVenue.lng);
     await searchNear(page, remoteVenue.name);
-    await page.getByPlaceholder('Search venues, turfs, pools, badminton, activities...').fill('zzz-no-such-venue-zzz');
+    await page.getByPlaceholder('Search venues, turfs, pools').fill('zzz-no-such-venue-zzz');
     await expect(page.locator('article')).toHaveCount(0);
-    await page.getByPlaceholder('Search venues, turfs, pools, badminton, activities...').fill(remoteVenue.name);
+    await page.getByPlaceholder('Search venues, turfs, pools').fill(remoteVenue.name);
     await expect(page.locator('article').filter({ hasText: remoteVenue.name }).first()).toBeVisible();
   });
 });

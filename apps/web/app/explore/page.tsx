@@ -303,7 +303,7 @@ export default function ExplorePage() {
               onChange={(e) => setNameFilter(e.target.value)}
               aria-label="Search venues"
               className="peer h-full w-full min-w-0 bg-transparent pl-6 pr-2 text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none [&:not(:placeholder-shown)]:pl-0"
-              placeholder="Search venues, turfs, pools, badminton, activities..."
+              placeholder="Search venues, turfs, pools"
               type="text"
             />
               <Icon name="search" className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 text-[1rem] text-slate-400 peer-[:not(:placeholder-shown)]:hidden" />

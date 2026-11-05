@@ -15,7 +15,7 @@ test.describe('customer site: landing page', () => {
     await expect(page.locator('article')).toHaveCount(0); // no venue cards on the landing page
 
     await page.goto('/explore');
-    await expect(page.getByPlaceholder('Search venues, turfs, pools, badminton, activities...')).toBeVisible();
+    await expect(page.getByPlaceholder('Search venues, turfs, pools')).toBeVisible();
     await expect(page.getByRole('article').first()).toBeVisible({ timeout: 30_000 });
   });
 
@@ -24,7 +24,7 @@ test.describe('customer site: landing page', () => {
     await page.getByRole('search').getByRole('textbox').fill('Manjeri');
     await page.getByRole('button', { name: 'Find venues' }).click();
     await expect(page).toHaveURL(/\/explore\?q=Manjeri$/);
-    await expect(page.getByPlaceholder('Search venues, turfs, pools, badminton, activities...')).toHaveValue('Manjeri');
+    await expect(page.getByPlaceholder('Search venues, turfs, pools')).toHaveValue('Manjeri');
 
     await page.goto('/');
     const link = page.locator('a[href^="/explore?type="]').first();

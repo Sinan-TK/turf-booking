@@ -62,7 +62,7 @@ test.describe('customer site: results load ten at a time', () => {
     await page.getByRole('button', { name: /[0-9]+ [A-Za-z]{3}$/ }).nth(2).click();
     await expect(page.getByRole('heading', { name: /^PW Venue / })).toHaveCount(10);
 
-    await page.getByPlaceholder('Search venues, turfs, pools, badminton, activities...').fill(last.name);
+    await page.getByPlaceholder('Search venues, turfs, pools').fill(last.name);
     await expect(page.getByRole('heading', { name: last.name })).toBeVisible(); // found although it was not among the first ten
     await expect(page.getByRole('heading', { name: /^PW Venue / })).toHaveCount(1); // one card for it
     await expect(page.getByRole('group', { name: /^(Turf A|Court 1), / })).toHaveCount(1); // showing one of its two units

@@ -10,7 +10,7 @@ const header = (page: Page, now: string | RegExp) => page.getByRole('button', { 
 const picker = (page: Page) => page.getByRole('dialog', { name: 'Choose your location' });
 /** The results come ten at a time, so a test venue among hundreds is found by typing its name (the server filters the whole list). */
 const find = async (page: Page, name: string) => {
-  await page.getByPlaceholder('Search venues, turfs, pools, badminton, activities...').fill(name);
+  await page.getByPlaceholder('Search venues, turfs, pools').fill(name);
   await expect(page.getByRole('heading', { name }).first()).toBeVisible({ timeout: 30_000 });
 };
 const venueCard = (page: Page, name: string) => page.locator('article').filter({ hasText: name }).filter({ visible: true }).first();
@@ -99,7 +99,7 @@ test.describe('customer site: location', () => {
     await expect(header(page, 'Manjeri')).toBeVisible();
     await settled(page);
     await find(page, manjeriVenue.name);
-    await page.getByPlaceholder('Search venues, turfs, pools, badminton, activities...').fill(nilamburVenue.name);
+    await page.getByPlaceholder('Search venues, turfs, pools').fill(nilamburVenue.name);
     await expect(page.getByRole('heading', { name: nilamburVenue.name })).toHaveCount(0); // about 20 km away
 
     await page.reload();
