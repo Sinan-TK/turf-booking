@@ -22,6 +22,7 @@ import { Skeleton } from '@/components/skeleton';
 import { OWNER_PORTAL_URL } from '@/lib/legal';
 import { SiteFooter } from '@/components/site-footer';
 import { barlow, barlowCondensed } from './landing-fonts';
+import { Logo } from '@/components/logo';
 import s from './landing.module.css';
 
 const STEPS = [
@@ -158,8 +159,7 @@ export default function LandingPage() {
       <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0f0f0e]">
         <div className={`${shell} flex items-center gap-4 py-3`}>
           <Link href="/" aria-label="TurfX home" className={`flex select-none items-center gap-1 rounded-sm ${focusDark}`}>
-            <span className={`${s.display} text-[1.875rem] leading-none text-white`}>Turf</span>
-            <span className={`${s.flap} ${s.display} h-9 w-8 text-[1.75rem] leading-none`}>X</span>
+            <Logo ink="#fff" hole="#0f0f0e" className="h-9 w-auto" />
           </Link>
           <nav aria-label="Main" className={`${s.display} ml-4 hidden items-center gap-1 text-lg font-bold text-white/70 md:flex`}>
             <Link href="/explore" className={`rounded-sm px-3 py-1.5 transition-colors hover:text-[#ffcc1a] ${focusDark}`}>

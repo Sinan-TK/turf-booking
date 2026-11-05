@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Logo } from '@/components/logo';
 import { LEGAL, LEGAL_LINKS } from '@/lib/legal';
 
 const focus = 'rounded-md outline-none focus-visible:ring-4 focus-visible:ring-brand-600/25';
@@ -20,8 +21,8 @@ export function SiteFooter() {
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-10">
         <div className="grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_repeat(2,minmax(0,1fr))] lg:gap-12">
           <div className="max-w-sm">
-            <Link href="/" aria-label={`${LEGAL.brand} home`} className={`select-none text-[2rem] font-black italic leading-none tracking-tight text-slate-900 ${focus}`}>
-              Turf<span className="text-brand-600">X</span>
+            <Link href="/" aria-label={`${LEGAL.brand} home`} className={`inline-block select-none rounded-md ${focus}`}>
+              <Logo hole="#f8fafc" className="h-10 w-auto" />
             </Link>
             <p className="mt-4 text-pretty text-[0.9375rem] font-medium leading-relaxed text-slate-600">
               Turfs, courts, pools, game rooms and activity venues near you. Live slots, a small advance, and your confirmation on WhatsApp.

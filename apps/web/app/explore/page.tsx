@@ -17,6 +17,7 @@ import { readSearch, writeSearch } from '@/lib/search-cache';
 import { locationParams, useLocationChoice, type LocationChoice } from '@/lib/location';
 import { durationLabel, type VenueCategory } from '@/lib/categories';
 import { OfferTag, bookingHref, formatPrice, formatStart, googleMapsLink, localIso, offerOf, priceAt, todayIso, useBookSlot, type SearchResult, type SlotPrice } from '@/lib/booking';
+import { Logo } from '@/components/logo';
 
 /** The header's place name on one line: "Malappuram, Kerala", "Kottakkal, Malappuram" or "Near Tirur". */
 function placeLabel(choice: LocationChoice | null): string {
@@ -281,8 +282,8 @@ export default function ExplorePage() {
         className={`sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur-md transition-shadow duration-300 ${scrolled ? 'shadow-[0_8px_24px_-16px_rgba(15,23,42,0.35)]' : ''}`}
       >
         <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2.5 px-4 py-3 sm:px-6 md:flex-nowrap md:gap-x-4 lg:px-10 2xl:px-14">
-          <Link href="/" aria-label="TurfX home" className="mr-2 hidden select-none whitespace-nowrap text-[1.75rem] font-black italic leading-none tracking-tight text-slate-900 lg:block">
-            Turf<span className="text-brand-600">X</span>
+          <Link href="/" aria-label="TurfX home" className="mr-2 hidden select-none lg:block">
+            <Logo className="h-9 w-auto" />
           </Link>
           <button
             type="button"

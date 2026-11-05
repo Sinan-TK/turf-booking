@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Logo } from '@/components/logo';
 import { LEGAL } from '@/lib/legal';
 import { SiteFooter } from '@/components/site-footer';
 
@@ -36,8 +37,8 @@ export function LegalPage({ title, intro, sections }: { title: string; intro: Re
     <div className="flex min-h-screen flex-col bg-white">
       <header className="border-b border-slate-200/80 bg-white">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-3 sm:px-6">
-          <Link href="/" aria-label={`${LEGAL.brand} home`} className={`select-none rounded-md text-[1.75rem] font-black italic leading-none tracking-tight text-slate-900 ${focus}`}>
-            Turf<span className="text-brand-600">X</span>
+          <Link href="/" aria-label={`${LEGAL.brand} home`} className={`block select-none rounded-md ${focus}`}>
+            <Logo className="h-9 w-auto" />
           </Link>
           <Link href="/explore" className={`rounded-md px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 hover:text-brand-700 ${focus}`}>
             Explore venues

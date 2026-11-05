@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Logo } from '@/components/logo';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useLocationChoice, type LocationChoice } from '@/lib/location';
@@ -57,8 +58,8 @@ export function BrowseHeader({ phoneBack = false }: { phoneBack?: boolean }) {
               <BackButton plain />
             </div>
           )}
-          <Link href="/" aria-label="TurfX home" className="mr-2 hidden select-none whitespace-nowrap text-[1.75rem] font-black italic leading-none tracking-tight text-slate-900 lg:block">
-            Turf<span className="text-brand-600">X</span>
+          <Link href="/" aria-label="TurfX home" className="mr-2 hidden select-none lg:block">
+            <Logo className="h-9 w-auto" />
           </Link>
           <button
             type="button"
