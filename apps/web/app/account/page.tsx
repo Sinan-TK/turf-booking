@@ -541,7 +541,10 @@ function Wallet() {
       {!error && !wallet && <WalletSkeleton />}
       {wallet && (
         <>
-          <p className="text-3xl font-semibold text-gray-900">{formatPrice({ amount: wallet.cachedBalance, currency: wallet.currency })}</p>
+          <p className="flex items-center gap-2 text-3xl font-semibold text-gray-900">
+            <Icon name="coin" className="text-[2rem]" />
+            {formatPrice({ amount: wallet.cachedBalance, currency: wallet.currency })}
+          </p>
           <p className="mb-4 text-xs text-gray-500">1 Coin is worth 1 rupee. Add money here or get Coins back from cancelled bookings, and use them to pay for a booking.</p>
           {txs && txs.length === 0 && <p className="text-sm text-gray-500">No transactions yet.</p>}
           {txs && txs.length > 0 && (
@@ -571,7 +574,7 @@ function Wallet() {
 
 const TABS = [
   { id: 'profile', label: 'Profile', icon: 'person' },
-  { id: 'wallet', label: 'Wallet', icon: 'wallet' },
+  { id: 'wallet', label: 'Wallet', icon: 'coin' },
   { id: 'bookings', label: 'Bookings', icon: 'bookings' },
   { id: 'saved', label: 'Saved', icon: 'bookmark' },
 ] as const;

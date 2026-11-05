@@ -422,6 +422,7 @@ export default function CheckoutPage() {
                   disabled={!holdActive || paying || confirmingPayment || insufficientCoins}
                   onClick={() => guarded(onPayWithCoins)}
                 >
+                  <Icon name="coin" className="text-[1.25rem]" />
                   Pay with Coins {wallet ? `(balance: ${formatPrice({ amount: wallet.cachedBalance, currency: wallet.currency })})` : ''}
                 </Button>
                 {wallet && insufficientCoins && (

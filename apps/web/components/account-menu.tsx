@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/skeleton';
 const ITEMS = [
   { href: '/account?tab=profile', label: 'Profile', icon: 'person' },
   { href: '/account?tab=bookings', label: 'Bookings', icon: 'bookings' },
-  { href: '/account?tab=wallet', label: 'Wallet (Coins)', icon: 'wallet' },
+  { href: '/account?tab=wallet', label: 'Wallet (Coins)', icon: 'coin' },
   { href: '/support', label: 'Support', icon: 'support' },
 ];
 
