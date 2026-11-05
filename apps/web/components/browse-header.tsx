@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Logo } from '@/components/logo';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { useLocationChoice, type LocationChoice } from '@/lib/location';
+import { placeLabel, placeLines, useLocationChoice, type LocationChoice } from '@/lib/location';
 import type { VenueCategory } from '@/lib/categories';
 import { AccountMenu } from '@/components/account-menu';
 import { Icon } from '@/components/ui';
@@ -13,14 +13,6 @@ import { LocationPicker, warmPlaces } from '@/components/location-picker';
 import { VenueTypePicker } from '@/components/venue-type-picker';
 import { RotatingTypeIcon } from '@/components/rotating-type-icon';
 import { BackButton } from '@/components/back-button';
-
-/** The header's place name on one line: "Malappuram, Kerala", "Kottakkal, Malappuram" or "Near Tirur". */
-function placeLabel(choice: LocationChoice | null): string {
-  if (!choice) return 'Select location';
-  if (choice.mode === 'town') return `${choice.townName ?? choice.districtName}, ${choice.districtName}`;
-  if (choice.mode === 'geo') return choice.nearTown ? `Near ${choice.nearTown}` : 'Your location';
-  return choice.stateName ? `${choice.districtName}, ${choice.stateName}` : choice.districtName;
-}
 
 /**
  * The listing's header for the pages that sit beside it (a venue's booking page): the logo, the place, the search and the
@@ -43,6 +35,7 @@ export function BrowseHeader({ phoneBack = false }: { phoneBack?: boolean }) {
   }, []);
 
   const locationLabel = placeLabel(choice);
+  const lines = placeLines(choice);
 
   function search(e: React.FormEvent) {
     e.preventDefault();
@@ -69,9 +62,11 @@ export function BrowseHeader({ phoneBack = false }: { phoneBack?: boolean }) {
             aria-haspopup="dialog"
             className={`group ${wide} h-11 min-w-0 max-w-[65%] items-center gap-1.5 px-1 text-left transition active:opacity-70 md:h-12 md:w-auto md:max-w-[16rem] md:shrink-0`}
           >
-            <Icon name="location_on" className="text-[1.125rem] text-brand-600" />
-            <span className="min-w-0 truncate text-sm font-bold text-slate-900 underline decoration-transparent decoration-2 underline-offset-4 transition group-hover:decoration-brand-600">{locationLabel}</span>
-            <Icon name="expand_more" className="text-[1rem] text-slate-400 transition group-hover:text-brand-600" />
+            <Icon name="location_on" className="text-[1.75rem] text-brand-700" />
+            <span className="min-w-0 leading-tight">
+              <span className="block truncate text-sm font-bold text-slate-900">{lines.primary}</span>
+              {lines.secondary && <span className="block truncate text-xs font-medium text-slate-500">{lines.secondary}</span>}
+            </span>
           </button>
           <div className="ml-auto md:order-last">
             <AccountMenu />

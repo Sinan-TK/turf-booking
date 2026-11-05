@@ -35,6 +35,22 @@ export interface Town {
 export const TOWN_RADIUS_KM = 10;
 export const GEO_RADIUS_KM = 15;
 
+/** The header's place name on one line: "Malappuram, Kerala", "Kottakkal, Malappuram" or "Near Tirur". */
+export function placeLabel(choice: LocationChoice | null): string {
+  if (!choice) return 'Select location';
+  if (choice.mode === 'town') return `${choice.townName ?? choice.districtName}, ${choice.districtName}`;
+  if (choice.mode === 'geo') return choice.nearTown ? `Near ${choice.nearTown}` : 'Your location';
+  return choice.stateName ? `${choice.districtName}, ${choice.stateName}` : choice.districtName;
+}
+
+/** The same place on two lines for the header: the area ("Kottakkal") and under it the bigger place around it ("Malappuram"). */
+export function placeLines(choice: LocationChoice | null): { primary: string; secondary: string | null } {
+  if (!choice) return { primary: 'Select location', secondary: null };
+  if (choice.mode === 'town') return { primary: choice.townName ?? choice.districtName, secondary: choice.townName ? choice.districtName : choice.stateName || null };
+  if (choice.mode === 'geo') return { primary: choice.nearTown ? `Near ${choice.nearTown}` : 'Your location', secondary: choice.districtName || null };
+  return { primary: choice.districtName, secondary: choice.stateName || null };
+}
+
 const STORAGE_KEY = 'venue.location.v1';
 /** Opening choice for a first-time visitor. */
 const DEFAULT_PLACE = { state: 'Kerala', district: 'Malappuram' };
