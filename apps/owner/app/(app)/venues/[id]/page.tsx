@@ -607,7 +607,7 @@ function UnitPanel({
           <div className="space-y-3 pl-12">
             <UnitDurations unitId={unit.id} min={unit.minDurationMinutes} max={unit.maxDurationMinutes} hasPrices onSaved={onChanged} limits={limitsOf(categories.find((c) => c.id === facility.id))} />
             <UnitDescription path={`/resources/${unit.id}/description`} unitName={unit.name} description={unit.description ?? null} onSaved={onChanged} />
-            <UnitPhotos unitId={unit.id} unitName={unit.name} initial={unit.photos ?? []} />
+            <UnitPhotos unitId={unit.id} unitName={unit.name} initial={unit.photos ?? []} onChanged={onChanged} />
           </div>
         </div>
       </section>

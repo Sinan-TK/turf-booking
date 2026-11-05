@@ -74,9 +74,24 @@ function Pictures({ unit, venueName, saved, onToggleSave }: { unit: SearchResult
   const [index, setIndex] = useState(0);
   const [ready, setReady] = useState<string | null>(null); // the picture that has finished loading (it fades in over the grey field)
   const shown = photos[Math.min(index, photos.length - 1)];
+
+  // Several photos move on by themselves every few seconds; the pointer over the picture (or a dot in focus) holds them, and so does
+  // a visitor who asked for less motion.
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    if (photos.length < 2 || held || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const timer = setInterval(() => setIndex((i) => (i + 1) % photos.length), 3500);
+    return () => clearInterval(timer);
+  }, [photos.length, held]);
+
   return (
     <div>
-      <div className="relative aspect-[16/9] overflow-hidden rounded-xl bg-stone-200 sm:aspect-[16/7]">
+      <div
+        onMouseEnter={() => setHeld(true)}
+        onMouseLeave={() => setHeld(false)}
+        onFocus={() => setHeld(true)}
+        onBlur={() => setHeld(false)}
+        className="relative aspect-[16/9] overflow-hidden rounded-xl bg-stone-200 sm:aspect-[16/7]">
         {shown ? (
           <img key={shown} src={shown} alt={`${venueName}, ${unit.resource.name}`} onLoad={() => setReady(shown)} className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${ready === shown ? 'opacity-100' : 'opacity-0'}`} />
         ) : (
@@ -106,7 +121,7 @@ function Pictures({ unit, venueName, saved, onToggleSave }: { unit: SearchResult
         </a>
         {photos.length > 1 && (
           // More than one photo: dots at the bottom left of the big picture; tapping one shows that photo (no strip of previews below).
-          <div role="group" aria-label="Photos" className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-black/40 px-1.5 py-1 backdrop-blur-sm">
+          <div role="group" aria-label="Photos" className="absolute bottom-3 left-3 flex items-center">
             {photos.map((src, i) => (
               <button
                 key={src}
@@ -114,9 +129,9 @@ function Pictures({ unit, venueName, saved, onToggleSave }: { unit: SearchResult
                 onClick={() => setIndex(i)}
                 aria-label={`Photo ${i + 1} of ${photos.length}`}
                 aria-current={i === Math.min(index, photos.length - 1)}
-                className="group flex h-5 items-center px-1"
+                className="flex h-5 w-4 items-center justify-center"
               >
-                <span className={`block h-2 rounded-full transition-all ${i === Math.min(index, photos.length - 1) ? 'w-5 bg-white' : 'w-2 bg-white/60 group-hover:bg-white/90'}`} />
+                <span className={`block h-1.5 w-1.5 rounded-full shadow-[0_0_2px_rgba(0,0,0,0.5)] transition ${i === Math.min(index, photos.length - 1) ? 'scale-125 bg-white' : 'bg-white/55'}`} />
               </button>
             ))}
           </div>

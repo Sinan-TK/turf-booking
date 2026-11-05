@@ -18,7 +18,7 @@ export const MAX_UNIT_PHOTOS = 3;
  * being the main picture. The owner adds (framing each one in the cropper first), removes and picks the main one here;
  * every change saves straight away.
  */
-export function UnitPhotos({ unitId, unitName, initial, basePath }: { unitId: string; unitName: string; initial: UnitPhoto[]; basePath?: string }) {
+export function UnitPhotos({ unitId, unitName, initial, basePath, onChanged }: { unitId: string; unitName: string; initial: UnitPhoto[]; basePath?: string; onChanged?: () => void }) {
   // A unit's photos live under /resources/:id, a pooled group's under /resources/groups/:id.
   const base = basePath ?? `/resources/${unitId}`;
   const [photos, setPhotos] = useState<UnitPhoto[]>(initial);
@@ -33,6 +33,8 @@ export function UnitPhotos({ unitId, unitName, initial, basePath }: { unitId: st
     setError(null);
     try {
       setPhotos(await action());
+      // The page's own copy of this unit is now out of date: read it again, so coming back to this unit shows the new photos.
+      onChanged?.();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
@@ -66,6 +68,7 @@ export function UnitPhotos({ unitId, unitName, initial, basePath }: { unitId: st
     setError(null);
     try {
       setPhotos(await action());
+      onChanged?.();
     } catch (err) {
       setPhotos(before);
       setError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Something went wrong.');

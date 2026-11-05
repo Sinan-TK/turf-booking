@@ -23,6 +23,22 @@ test.describe('customer site: unit photos as dots', () => {
     await expect(page.locator('button[aria-label^="Photo "] img')).toHaveCount(0);
   });
 
+  test('the photos change by themselves, and the pointer over the picture holds them', async ({ page, makeVenue, ownerApi }) => {
+    const venue = await makeVenue();
+    for (const name of ['a.png', 'b.png']) await ownerApi.post(`/resources/${venue.turfId}/photos`, { multipart: { file: { name, mimeType: 'image/png', buffer: PNG } } });
+    await page.goto(`/book/${venue.facilityCode}/${venue.turfId}`);
+    const dots = page.getByRole('group', { name: 'Photos' }).getByRole('button');
+    await expect(dots.nth(0)).toHaveAttribute('aria-current', 'true');
+    await expect(dots.nth(1)).toHaveAttribute('aria-current', 'true', { timeout: 8000 }); // moved on without any click
+
+    // Holding the pointer over the picture stops it.
+    await page.locator('img[alt$="' + venue.turfName + '"]').first().hover();
+    await dots.nth(0).click({ trial: true }).catch(() => undefined);
+    const held = await page.getByRole('group', { name: 'Photos' }).locator('[aria-current="true"]').getAttribute('aria-label');
+    await page.waitForTimeout(4500);
+    expect(await page.getByRole('group', { name: 'Photos' }).locator('[aria-current="true"]').getAttribute('aria-label')).toBe(held);
+  });
+
   test('one photo shows no dots', async ({ page, makeVenue, ownerApi }) => {
     const venue = await makeVenue();
     await ownerApi.post(`/resources/${venue.courtId}/photos`, { multipart: { file: { name: 'a.png', mimeType: 'image/png', buffer: PNG } } });

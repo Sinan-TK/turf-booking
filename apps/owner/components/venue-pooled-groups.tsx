@@ -237,7 +237,7 @@ export function GroupCard({ group, category, onChanged }: { group: Group; catego
 
         <div>
           <p className="font-label-md text-label-md text-on-surface-variant">Photos</p>
-          <UnitPhotos unitId={group.id} unitName={group.name} initial={group.photos ?? []} basePath={`/resources/groups/${group.id}`} />
+          <UnitPhotos unitId={group.id} unitName={group.name} initial={group.photos ?? []} basePath={`/resources/groups/${group.id}`} onChanged={onChanged} />
         </div>
 
         <div className="flex flex-wrap items-end gap-3">
