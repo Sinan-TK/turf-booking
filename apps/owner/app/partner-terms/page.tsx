@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { CUSTOMER_SITE_URL, LEGAL } from '@/lib/legal';
 
-export const metadata: Metadata = { title: 'Venue Partner Terms — TurfX', description: 'The terms for venue owners who list and take bookings on TurfX.' };
+export const metadata: Metadata = { title: 'Venue Partner Terms — Bookyo', description: 'The terms for venue owners who list and take bookings on Bookyo.' };
 
 const link = 'font-semibold text-primary underline underline-offset-2';
 const p = 'mt-3 text-pretty text-body-md leading-relaxed text-on-surface-variant';

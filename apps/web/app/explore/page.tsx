@@ -282,7 +282,7 @@ export default function ExplorePage() {
         className={`sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur-md transition-shadow duration-300 ${scrolled ? 'shadow-[0_8px_24px_-16px_rgba(15,23,42,0.35)]' : ''}`}
       >
         <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2.5 px-4 py-3 sm:px-6 md:flex-nowrap md:gap-x-4 lg:px-10 2xl:px-14">
-          <Link href="/" aria-label="TurfX home" className="mr-2 hidden select-none lg:block">
+          <Link href="/" aria-label="Bookyo home" className="mr-2 hidden select-none lg:block">
             <Logo className="h-9 w-auto" />
           </Link>
           <button

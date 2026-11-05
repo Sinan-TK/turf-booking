@@ -58,7 +58,7 @@ export function BrowseHeader({ phoneBack = false }: { phoneBack?: boolean }) {
               <BackButton plain />
             </div>
           )}
-          <Link href="/" aria-label="TurfX home" className="mr-2 hidden select-none lg:block">
+          <Link href="/" aria-label="Bookyo home" className="mr-2 hidden select-none lg:block">
             <Logo className="h-9 w-auto" />
           </Link>
           <button

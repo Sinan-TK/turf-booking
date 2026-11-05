@@ -11,7 +11,7 @@ import { useCustomer } from '@/lib/customer';
  * sessionStorage, not localStorage: it ends with the tab, and logging out clears it, so nothing personal lingers on a shared
  * device. Every entry is keyed by the customer's id, so one person's lists can never be shown to another.
  */
-const KEY = 'turfx.account.v1';
+const KEY = 'bookyo.account.v1';
 const MAX_AGE_MS = 30 * 60_000;
 
 interface Entry {

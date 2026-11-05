@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { ContactLine, LegalPage, P, UL, type LegalSection } from '@/components/legal-page';
 import { LEGAL } from '@/lib/legal';
 
-export const metadata: Metadata = { title: 'Cookie Policy | TurfX', description: 'The cookies and browser storage TurfX uses, and why.' };
+export const metadata: Metadata = { title: 'Cookie Policy | Bookyo', description: 'The cookies and browser storage Bookyo uses, and why.' };
 
 const link = 'font-bold text-brand-700 underline underline-offset-2';
 

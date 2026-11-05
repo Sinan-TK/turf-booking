@@ -4,9 +4,9 @@
  */
 export const LEGAL = {
   /** The name customers know. */
-  brand: 'TurfX',
+  brand: 'Bookyo',
   /** The legal name of the business that runs it (a company, firm or person), as it should appear in the policies. */
-  operator: process.env.NEXT_PUBLIC_COMPANY_NAME || 'TurfX',
+  operator: process.env.NEXT_PUBLIC_COMPANY_NAME || 'Bookyo',
   /** Registered or postal address, shown when set. */
   address: process.env.NEXT_PUBLIC_COMPANY_ADDRESS || '',
   /** Where privacy, legal and grievance messages go, shown when set. */

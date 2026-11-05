@@ -34,7 +34,7 @@ export class WhatsAppCustomerMessenger implements CustomerMessenger {
     }
     return this.whatsapp.sendText(
       toPhone,
-      `Your Venue Booking login code is ${code}. It expires in ${env.OTP_TTL_MINUTES} minutes. Do not share it.`,
+      `Your Bookyo login code is ${code}. It expires in ${env.OTP_TTL_MINUTES} minutes. Do not share it.`,
     );
   }
 }

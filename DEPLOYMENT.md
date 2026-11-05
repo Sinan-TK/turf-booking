@@ -24,7 +24,7 @@ DATABASE_URL=postgresql://USER:PASS@HOST:5432/DB
 REDIS_URL=redis://HOST:6379
 AUTH_JWT_SECRET=<openssl rand -hex 32>      # signs admin/owner access tokens
 RESEND_API_KEY=re_...                        # invite + password-reset emails (unset = links only logged)
-MAIL_FROM="Venue Booking <no-reply@example.com>"   # must be a Resend-verified sender/domain
+MAIL_FROM="Bookyo <no-reply@example.com>"   # must be a Resend-verified sender/domain
 CUSTOMER_SESSION_SECRET=<openssl rand -hex 32>
 ADMIN_APP_URL=https://admin.example.com
 OWNER_APP_URL=https://owner.example.com
@@ -144,7 +144,7 @@ Banners are managed by the Super Admin under Platform > Banners: title, optional
 
 ## Legal pages (customer site)
 
-`/terms` (Terms of Use), `/privacy` (Privacy Policy), `/refunds` (Cancellation & Refund Policy), and `/cookies` (Cookie Policy) are public pages built from `apps/web/app/<name>/page.tsx` with the shared `components/legal-page.tsx`; they are linked from the landing page footer, the sign-in dialog and checkout. The texts are drafts written from how the product works today: **have a lawyer review them before launch**, and edit the wording in those files. Who the policies name is set at build time through `NEXT_PUBLIC_COMPANY_NAME` (the legal name of the business), `NEXT_PUBLIC_CONTACT_EMAIL` and `NEXT_PUBLIC_COMPANY_ADDRESS`; until set they say "TurfX" and point to the Support page. Change `updated` in `apps/web/lib/legal.ts` whenever the text changes. If the way refunds, data or cookies work changes, update the matching page in the same change.
+`/terms` (Terms of Use), `/privacy` (Privacy Policy), `/refunds` (Cancellation & Refund Policy), and `/cookies` (Cookie Policy) are public pages built from `apps/web/app/<name>/page.tsx` with the shared `components/legal-page.tsx`; they are linked from the landing page footer, the sign-in dialog and checkout. The texts are drafts written from how the product works today: **have a lawyer review them before launch**, and edit the wording in those files. Who the policies name is set at build time through `NEXT_PUBLIC_COMPANY_NAME` (the legal name of the business), `NEXT_PUBLIC_CONTACT_EMAIL` and `NEXT_PUBLIC_COMPANY_ADDRESS`; until set they say "Bookyo" and point to the Support page. Change `updated` in `apps/web/lib/legal.ts` whenever the text changes. If the way refunds, data or cookies work changes, update the matching page in the same change.
 
 ## Owner sign-up and the Venue Partner Terms
 

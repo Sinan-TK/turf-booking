@@ -50,7 +50,7 @@ export function PendingApproval({ user }: { user: OwnerUser }) {
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12 text-on-surface">
       <div className="w-full max-w-lg">
         <p className="font-headline-sm text-headline-sm">
-          TurfX <span className="text-primary">for venue owners</span>
+          Bookyo <span className="text-primary">for venue owners</span>
         </p>
 
         <div className="mt-6 rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-6 shadow-sm sm:p-8">

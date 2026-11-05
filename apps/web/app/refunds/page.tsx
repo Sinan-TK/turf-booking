@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { ContactLine, LegalPage, P, UL, type LegalSection } from '@/components/legal-page';
 import { LEGAL } from '@/lib/legal';
 
-export const metadata: Metadata = { title: 'Cancellation & Refund Policy | TurfX', description: 'How cancelling a TurfX booking works and how refunds are paid.' };
+export const metadata: Metadata = { title: 'Cancellation & Refund Policy | Bookyo', description: 'How cancelling a Bookyo booking works and how refunds are paid.' };
 
 const link = 'font-bold text-brand-700 underline underline-offset-2';
 

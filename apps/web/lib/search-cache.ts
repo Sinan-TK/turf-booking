@@ -6,7 +6,7 @@
  * sessionStorage on purpose, not localStorage: it ends with the tab, so a morning's slots are never shown the next day, and nothing
  * lingers on a shared device. A search is public data, with nothing about the person in it.
  */
-const KEY = 'turfx.search.v1';
+const KEY = 'bookyo.search.v1';
 const MAX_AGE_MS = 10 * 60_000;
 const MAX_ENTRIES = 16; // the listing's searches and the venue pages opened from them
 

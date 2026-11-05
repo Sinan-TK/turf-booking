@@ -120,7 +120,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               <Icon name="venue" className="h-5 w-5" />
             </span>
             <div className={R}>
-              <p className="text-sm font-semibold leading-tight text-white">Venue Booking</p>
+              <p className="text-sm font-semibold leading-tight text-white">Bookyo</p>
               <p className="text-xs text-gray-400">Super Admin</p>
             </div>
           </div>

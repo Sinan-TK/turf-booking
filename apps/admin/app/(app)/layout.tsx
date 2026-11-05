@@ -42,7 +42,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         >
           <Icon name="menu" className="h-5 w-5" />
         </button>
-        <p className="text-sm font-semibold text-gray-900">Venue Booking</p>
+        <p className="text-sm font-semibold text-gray-900">Bookyo</p>
       </header>
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <main className="min-w-0 flex-1 overflow-x-clip p-4 sm:p-6 lg:px-8 lg:py-8">

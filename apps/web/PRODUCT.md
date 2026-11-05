@@ -13,7 +13,7 @@ phones, often the same day or evening, usually one person booking for the whole 
 
 ## Product Purpose
 
-TurfX is the customer site of a venue-booking platform: find a venue by area or venue type (turfs, courts, pools, game rooms,
+Bookyo is the customer site of a venue-booking platform: find a venue by area or venue type (turfs, courts, pools, game rooms,
 kayaking, studios and more), see which slots are free, pick a length, pay a small advance online and get a booking ID straight away.
 Success is a group's slot locked in within a minute, without phoning the venue.
 
@@ -39,7 +39,7 @@ online and the rest at the venue. Do not position the product around WhatsApp (u
 
 ## Brand Commitments
 
-Name: TurfX. The user left the visual identity open ("nothing is fixed"): wordmark styling, colour and type may all change.
+Name: Bookyo. The user left the visual identity open ("nothing is fixed"): wordmark styling, colour and type may all change.
 
 ## Evidence on Hand
 

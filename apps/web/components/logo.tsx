@@ -1,10 +1,10 @@
 /**
- * The TurfX logo. No background of its own: it sits straight on the page. `ink` is the lettering and `hole` the colour inside the
+ * The Bookyo logo. No background of its own: it sits straight on the page. `ink` is the lettering and `hole` the colour inside the
  * letters (the page's background colour), so the logo reads on a light bar (black on white) and on a dark one (white on black).
  */
 export function Logo({ ink = '#000', hole = '#fff', className = 'h-8 w-auto' }: { ink?: string; hole?: string; className?: string }) {
   return (
-    <svg viewBox="0 0 377 117" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="TurfX" className={className}>
+    <svg viewBox="0 0 377 117" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bookyo" className={className}>
       <path d="M0 9.5V83.5C0 83.5 1.5 91.8133 10 92.5C18.5 93.1867 21 86 21 86C21 86 27 92.5 36 92.5C56.5 92.5 64.4197 77.4906 65 59.5C65.5968 41 55 27 39 27C28.5 27 23 34 23 34V9.5C23 9.5 23.0136 -1.63149e-06 11 0C0 1.49384e-06 0 9.5 0 9.5ZM22.5 60.5C22.5 53.6213 25.6213 47 32.5 47C40 47 43 53.5 43 60.5C43 66.5814 38.5 72.5 32.5 72.5C26.9703 72.5 22.5 66.5 22.5 60.5Z" fill={ink} fillRule="evenodd" clipRule="evenodd" />
       <path d="M97 93.5C115.007 93.5 129.464 78.7175 130 60.5C130 60.1159 130.005 59.7334 130.016 59.3526C129.977 41.027 116.102 24.5204 97 25.5C91.9077 25.7611 65.9839 29 65 59.5C64.2903 81.5 82.5 93.5 97 93.5ZM118.5 60.5C117.421 71.524 108.069 79.422 97 79C86.0994 78.5844 77.369 70.4023 77 59.5C76.583 47.1808 85.5407 38.4299 97 38C109.145 37.5444 119.684 48.4044 118.5 60.5Z" fill={ink} fillRule="evenodd" clipRule="evenodd" />
       <path d="M97 72.5C102.312 72.5 107.341 69.7707 108 64.5C108.5 60.5 104 57.5 104 57.5C104 57.5 107 54.7771 107 52.5C107 47.5 103 45 97 45C91 45 88 48 88 51.5C88 55.0355 91 57.5 91 57.5C91 57.5 86.0328 60.5 87 66C87.8067 70.5873 93 72.5 97 72.5ZM101.5 64.5C101.102 66.5742 99.0915 67.7939 97 67.5C94.9445 67.2112 93.3619 65.5711 93.5 63.5C93.6381 61.4289 95.4243 59.998 97.5 60C99.8513 60.0023 101.943 62.1909 101.5 64.5ZM101 52.5C101.222 54.44 98.933 55.7761 97 55.5C95.3598 55.2657 93.8767 54.1523 94 52.5C94.125 50.825 95.8203 50 97.5 50C99.1797 50 100.809 50.8312 101 52.5Z" fill={ink} fillRule="evenodd" clipRule="evenodd" />

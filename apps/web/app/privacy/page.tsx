@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { ContactLine, LegalPage, P, UL, type LegalSection } from '@/components/legal-page';
 import { LEGAL } from '@/lib/legal';
 
-export const metadata: Metadata = { title: 'Privacy Policy | TurfX', description: 'What personal information TurfX collects, why, who it is shared with and the choices you have.' };
+export const metadata: Metadata = { title: 'Privacy Policy | Bookyo', description: 'What personal information Bookyo collects, why, who it is shared with and the choices you have.' };
 
 const sections: LegalSection[] = [
   {

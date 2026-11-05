@@ -235,13 +235,13 @@ export class CustomerPasswordService {
     const heading = reset ? 'Reset your password' : 'Verify your email';
     const intro =
       purpose === 'SIGNUP'
-        ? 'Use this code to finish creating your Venue Booking account.'
+        ? 'Use this code to finish creating your Bookyo account.'
         : purpose === 'VERIFY'
-          ? 'Use this code to verify the email address on your Venue Booking account.'
-          : 'Use this code to set a new password for your Venue Booking account.';
+          ? 'Use this code to verify the email address on your Bookyo account.'
+          : 'Use this code to set a new password for your Bookyo account.';
     return this.mail.send({
       to,
-      subject: reset ? `${code} is your Venue Booking password reset code` : `${code} is your Venue Booking verification code`,
+      subject: reset ? `${code} is your Bookyo password reset code` : `${code} is your Bookyo verification code`,
       text: `Hi ${name},\n\n${intro}\n\nYour code: ${code}\n\nIt works once and expires in ${minutes} minutes. If you did not ask for it, you can ignore this email.`,
       html: `<p>Hi ${escapeHtml(name)},</p><p>${intro}</p><p style="font-size:28px;font-weight:700;letter-spacing:6px">${code}</p><p>It works once and expires in ${minutes} minutes. If you did not ask for it, you can ignore this email.</p>`,
       template: env.RESEND_OTP_TEMPLATE_ID

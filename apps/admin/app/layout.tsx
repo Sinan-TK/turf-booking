@@ -7,7 +7,7 @@ import { AuthProvider } from '@/lib/auth-context';
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
 
 export const metadata: Metadata = {
-  title: 'Venue Booking — Super Admin',
+  title: 'Bookyo — Super Admin',
   description: 'Platform administration.',
 };
 

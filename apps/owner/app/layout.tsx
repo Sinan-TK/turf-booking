@@ -4,7 +4,7 @@ import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
 
 export const metadata: Metadata = {
-  title: 'Venue Booking — Owner Portal',
+  title: 'Bookyo — Owner Portal',
   description: 'Manage your venues.',
 };
 

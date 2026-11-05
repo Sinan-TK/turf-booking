@@ -3,9 +3,9 @@
  * portal's environment (NEXT_PUBLIC_* values are read when the portal is built).
  */
 export const LEGAL = {
-  brand: 'TurfX',
+  brand: 'Bookyo',
   /** The legal name of the business that runs it. */
-  operator: process.env.NEXT_PUBLIC_COMPANY_NAME || 'TurfX',
+  operator: process.env.NEXT_PUBLIC_COMPANY_NAME || 'Bookyo',
   address: process.env.NEXT_PUBLIC_COMPANY_ADDRESS || '',
   email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || '',
   /** The date the terms were last changed. Update it whenever the text changes. */

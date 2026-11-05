@@ -87,7 +87,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary">
               <Icon name="sports_soccer" className="text-on-primary" />
             </div>
-            <span className={`font-headline-sm text-headline-sm tracking-tight text-primary ${R}`}>Venue Booking</span>
+            <span className={`font-headline-sm text-headline-sm tracking-tight text-primary ${R}`}>Bookyo</span>
           </div>
           <button
             onClick={onClose}

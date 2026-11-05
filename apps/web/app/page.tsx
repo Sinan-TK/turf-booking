@@ -158,7 +158,7 @@ export default function LandingPage() {
     <div className={`${barlow.variable} ${barlowCondensed.variable} ${s.page} flex min-h-screen flex-col`}>
       <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0f0f0e]">
         <div className={`${shell} flex items-center gap-4 py-3`}>
-          <Link href="/" aria-label="TurfX home" className={`flex select-none items-center gap-1 rounded-sm ${focusDark}`}>
+          <Link href="/" aria-label="Bookyo home" className={`flex select-none items-center gap-1 rounded-sm ${focusDark}`}>
             <Logo ink="#fff" hole="#0f0f0e" className="h-9 w-auto" />
           </Link>
           <nav aria-label="Main" className={`${s.display} ml-4 hidden items-center gap-1 text-lg font-bold text-white/70 md:flex`}>
@@ -240,7 +240,7 @@ export default function LandingPage() {
           <div className={`${shell} grid gap-10 py-16 sm:py-24 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-16`}>
             <div>
               <h2 className={`${sectionTitle} text-white`}>
-                Why book with <span className="text-[#ffcc1a]">TurfX</span>
+                Why book with <span className="text-[#ffcc1a]">Bookyo</span>
               </h2>
               <p className="mt-4 max-w-md text-pretty text-[1.0625rem] leading-relaxed text-white/70">Less chasing, more playing. Everything you need to get a slot sorted in a minute.</p>
             </div>
@@ -264,7 +264,7 @@ export default function LandingPage() {
             <div>
               <h2 className={`${s.display} text-balance text-[2.5rem] leading-[0.95] sm:text-6xl`}>Own a venue?</h2>
               <p className="mt-3 max-w-xl text-pretty text-[1.0625rem] font-medium leading-relaxed text-[#0f0f0e]/80">
-                List your turf, court or activity space on TurfX, take online bookings and see your earnings in one place.
+                List your turf, court or activity space on Bookyo, take online bookings and see your earnings in one place.
               </p>
             </div>
             <a

@@ -67,9 +67,9 @@ export class LocalIdentityAdapter implements IdentityProvider {
 
     const appUrl = params.portal === StaffPortal.ADMIN ? env.ADMIN_APP_URL : env.OWNER_APP_URL;
     const link = `${appUrl}/reset-password?token=${encodeURIComponent(raw)}`;
-    const subject = isInvite ? 'You have been invited to Venue Booking' : 'Reset your Venue Booking password';
+    const subject = isInvite ? 'You have been invited to Bookyo' : 'Reset your Bookyo password';
     const lead = isInvite
-      ? 'You have been invited to Venue Booking. Set your password to get started.'
+      ? 'You have been invited to Bookyo. Set your password to get started.'
       : 'We received a request to reset your password.';
     const expiry = isInvite
       ? `${env.INVITE_TOKEN_TTL_HOURS} hours`

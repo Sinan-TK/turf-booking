@@ -12,7 +12,7 @@ const akshar = Akshar({
 });
 
 export const metadata: Metadata = {
-  title: 'TurfX',
+  title: 'Bookyo',
   description: 'Instant 1-tap booking for sports, games and activity venues — live slots, pay online and get your confirmation on WhatsApp.',
 };
 

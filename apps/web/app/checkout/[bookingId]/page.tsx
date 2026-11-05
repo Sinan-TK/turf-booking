@@ -193,7 +193,7 @@ export default function CheckoutPage() {
         key: razorpayKey,
         amount: Math.round(Number(order.amount) * 100),
         currency: order.currency,
-        name: 'Venue Booking',
+        name: 'Bookyo',
         description: `Booking ${booking.orderId}`,
         order_id: order.gatewayOrderId,
         handler: (response) => {

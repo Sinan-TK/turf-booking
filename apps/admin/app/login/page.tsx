@@ -59,7 +59,7 @@ export default function LoginPage() {
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500">
             <Icon name="venue" className="h-5 w-5" />
           </span>
-          <span className="text-lg font-semibold">Venue Booking</span>
+          <span className="text-lg font-semibold">Bookyo</span>
         </div>
         <div className="relative max-w-md">
           <h2 className="text-4xl font-semibold leading-tight tracking-tight">

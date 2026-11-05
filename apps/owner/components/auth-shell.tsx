@@ -26,7 +26,7 @@ export function AuthShell({
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-container text-on-primary-container">
             <SvgIcon name="ball" />
           </span>
-          <span className="font-headline-sm text-headline-sm">Venue Booking</span>
+          <span className="font-headline-sm text-headline-sm">Bookyo</span>
         </div>
 
         <div className="relative max-w-md">

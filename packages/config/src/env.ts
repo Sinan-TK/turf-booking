@@ -36,7 +36,7 @@ const envSchema = z.object({
   // service logs the message (incl. the link) instead of sending —
   // dev/test only; production should always set it.
   RESEND_API_KEY: optionalString(z.string().min(1)),
-  MAIL_FROM: z.string().default('Venue Booking <onboarding@resend.dev>'),
+  MAIL_FROM: z.string().default('Bookyo <onboarding@resend.dev>'),
   // Resend template (its id from the Resend dashboard) for the emailed six-digit codes: sign-up verification and
   // password reset. Variables: HEADING, INTRO, CODE, NAME, EXPIRES_IN_MINUTES. When unset a built-in plain email is sent.
   RESEND_OTP_TEMPLATE_ID: optionalString(z.string().min(1)),

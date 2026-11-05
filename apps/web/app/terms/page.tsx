@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { ContactLine, LegalPage, P, UL, type LegalSection } from '@/components/legal-page';
 import { LEGAL } from '@/lib/legal';
 
-export const metadata: Metadata = { title: 'Terms of Use | TurfX', description: 'The rules for using TurfX to find and book venues.' };
+export const metadata: Metadata = { title: 'Terms of Use | Bookyo', description: 'The rules for using Bookyo to find and book venues.' };
 
 const link = 'font-bold text-brand-700 underline underline-offset-2';
 
@@ -21,7 +21,7 @@ const sections: LegalSection[] = [
   },
   {
     id: 'service',
-    title: 'What TurfX is',
+    title: 'What Bookyo is',
     body: (
       <P>
         {LEGAL.brand} is a booking platform. Venues (turfs, courts, pools, game rooms and similar) are run by independent owners who set their own prices, hours, rules and facilities. When you
