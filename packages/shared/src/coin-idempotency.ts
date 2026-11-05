@@ -21,6 +21,8 @@ export function coinIdempotencyKey(type: CoinTransactionType, referenceId: strin
       return `referral:${referenceId}`;
     case CoinTransactionType.ADMIN_ADJUSTMENT:
       return `admin-adjustment:${referenceId}`;
+    case CoinTransactionType.WALLET_TOPUP:
+      return `topup:${referenceId}`;
     default: {
       const exhaustiveCheck: never = type;
       throw new Error(`Unhandled CoinTransactionType: ${exhaustiveCheck}`);

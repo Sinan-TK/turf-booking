@@ -37,8 +37,10 @@ export type SlotHoldStatus = (typeof SlotHoldStatus)[keyof typeof SlotHoldStatus
 
 export const BookingStatus = {
   PENDING_PAYMENT: 'PENDING_PAYMENT',
+  PROCESSING: 'PROCESSING',
   CONFIRMED: 'CONFIRMED',
   CANCELLED: 'CANCELLED',
+  FAILED: 'FAILED',
   COMPLETED: 'COMPLETED',
   NO_SHOW: 'NO_SHOW',
 } as const;
@@ -46,8 +48,10 @@ export type BookingStatus = (typeof BookingStatus)[keyof typeof BookingStatus];
 
 export const PaymentStatus = {
   PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
   SUCCESS: 'SUCCESS',
   FAILED: 'FAILED',
+  EXPIRED: 'EXPIRED',
   REFUNDED: 'REFUNDED',
 } as const;
 export type PaymentStatus = (typeof PaymentStatus)[keyof typeof PaymentStatus];
@@ -79,6 +83,7 @@ export const CoinTransactionType = {
   PROMOTION: 'PROMOTION',
   BOOKING_REDEMPTION: 'BOOKING_REDEMPTION',
   ADMIN_ADJUSTMENT: 'ADMIN_ADJUSTMENT',
+  WALLET_TOPUP: 'WALLET_TOPUP',
 } as const;
 export type CoinTransactionType = (typeof CoinTransactionType)[keyof typeof CoinTransactionType];
 

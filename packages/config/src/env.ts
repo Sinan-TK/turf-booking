@@ -80,6 +80,13 @@ const envSchema = z.object({
   BOOKING_SESSION_TTL_MINUTES: z.coerce.number().int().positive().default(20),
   SLOT_HOLD_TTL_MINUTES: z.coerce.number().int().positive().default(10),
   PAYMENT_GRACE_WINDOW_MINUTES: z.coerce.number().int().positive().default(10),
+  // The most a slot may stay held for a payment attempt (grace extensions never go past this from the booking's creation).
+  PAYMENT_MAX_HOLD_MINUTES: z.coerce.number().int().positive().default(20),
+  // After the customer's payment goes through on their side, how long the slot stays locked waiting for the gateway to confirm it.
+  PAYMENT_PROCESSING_MINUTES: z.coerce.number().int().positive().default(5),
+  // Wallet recharge limits (in the currency's units).
+  WALLET_TOPUP_MIN: z.coerce.number().positive().default(50),
+  WALLET_TOPUP_MAX: z.coerce.number().positive().default(10000),
 
   // Razorpay
   RAZORPAY_KEY_ID: optionalString(z.string().min(1)),

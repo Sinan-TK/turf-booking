@@ -210,6 +210,7 @@ model CustomerProfile {
   savedVenues       SavedVenue[]
   slotHolds        SlotHold[]
   bookings         Booking[]
+  walletTopups     WalletTopup[]
   supportTickets   SupportTicket[]
   coinWallet       CoinWallet?
   coinTransactions CoinTransaction[]
@@ -428,6 +429,8 @@ model Venue {
   lng                       Decimal  @db.Decimal(9, 6)
   /// Optional Google Maps link the Directions button opens; without it the pin (lat/lng) is used.
   googleMapsUrl             String?
+  /// The number a customer with a confirmed booking can call; empty = the owner organization's contact number.
+  contactPhone              String?
   timezone                  String
   status                    VenueStatus @default(DRAFT)
   cancellationPolicyId      String?  @unique @db.Uuid
@@ -818,8 +821,12 @@ model InventoryReservation {
 
 enum BookingStatus {
   PENDING_PAYMENT
+  /// The customer's payment went through on their side; we are waiting (up to PAYMENT_PROCESSING_MINUTES, slot locked) for the gateway to confirm.
+  PROCESSING
   CONFIRMED
   CANCELLED
+  /// The gateway never confirmed the payment within the processing window; the slot was released.
+  FAILED
   COMPLETED
   NO_SHOW
 }
@@ -827,6 +834,7 @@ enum BookingStatus {
 enum BookingCancellationReasonCode {
   CUSTOMER_REQUESTED
   HOLD_EXPIRED
+  PAYMENT_NOT_CONFIRMED
   RESOURCE_REALLOCATED
   ADMIN_ACTION
   OWNER_ACTION
@@ -875,6 +883,11 @@ model Booking {
   advanceAmount            Decimal  @default(0) @db.Decimal(12, 2)
   /// Collected so far: the online advance, or what staff recorded at the venue. Remaining = amount - paidAmount.
   paidAmount               Decimal  @default(0) @db.Decimal(12, 2)
+  /// Of what was paid online: the part paid with Coins and the part paid with money (a booking is wholly one or the other; both 0 until confirmed).
+  coinsPaid                Decimal  @default(0) @db.Decimal(12, 2)
+  moneyPaid                Decimal  @default(0) @db.Decimal(12, 2)
+  /// While PROCESSING: when the 5-minute wait for the gateway ends.
+  processingUntil          DateTime? @db.Timestamptz
   currency                 String   @default("INR") @db.Char(3)
   paymentMethod            PaymentMethod?
   status                   BookingStatus @default(PENDING_PAYMENT)
@@ -912,9 +925,20 @@ enum PaymentProviderType {
 
 enum PaymentStatus {
   PENDING
+  /// The customer's side reported success; the gateway has not confirmed it yet.
+  PROCESSING
   SUCCESS
   FAILED
+  /// Closed without ever being captured (abandoned, or never confirmed).
+  EXPIRED
   REFUNDED
+}
+
+/// Which path first confirmed a payment (auditing: WEBHOOK is the normal one; the others mean the webhook was missed).
+enum PaymentConfirmedVia {
+  WEBHOOK
+  CLIENT
+  RECONCILER
 }
 
 model Payment {
@@ -929,6 +953,9 @@ model Payment {
   status           PaymentStatus @default(PENDING)
   method           String?  // card/upi/netbanking/... from the gateway, informational
   failureReason    String?
+  /// When the customer's browser reported success (signature checked).
+  clientVerifiedAt DateTime? @db.Timestamptz
+  confirmedVia     PaymentConfirmedVia?
   rawResponse      Json?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -970,6 +997,35 @@ model Refund {
   @@map("refunds")
 }
 
+enum WalletTopupStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  EXPIRED
+}
+
+/// A recharge of the Coins wallet with real money (its own record, never mixed with booking payments).
+model WalletTopup {
+  id               String   @id @default(uuid()) @db.Uuid
+  customerId       String   @db.Uuid
+  customer         CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  amount           Decimal  @db.Decimal(12, 2)
+  currency         String   @default("INR") @db.Char(3)
+  status           WalletTopupStatus @default(PENDING)
+  gatewayOrderId   String   @unique
+  gatewayPaymentId String?  @unique
+  confirmedVia     PaymentConfirmedVia?
+  clientVerifiedAt DateTime? @db.Timestamptz
+  failureReason    String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  coinTransactions CoinTransaction[]
+
+  @@index([customerId, createdAt])
+  @@map("wallet_topups")
+}
+
 model CoinWallet {
   id             String   @id @default(uuid()) @db.Uuid
   customerId     String   @unique @db.Uuid
@@ -990,6 +1046,7 @@ enum CoinTransactionType {
   PROMOTION
   BOOKING_REDEMPTION
   ADMIN_ADJUSTMENT
+  WALLET_TOPUP
 }
 
 /// Insert-only ledger — never updated (§10). `idempotencyKey` is a second,
@@ -1008,6 +1065,8 @@ model CoinTransaction {
   booking         Booking? @relation(fields: [bookingId], references: [id])
   refundId        String?  @db.Uuid
   refund          Refund?  @relation(fields: [refundId], references: [id])
+  walletTopupId   String?  @db.Uuid
+  walletTopup     WalletTopup? @relation(fields: [walletTopupId], references: [id])
   idempotencyKey  String   @unique
   createdByAdminId String? @db.Uuid
   createdByAdmin  AdminUser? @relation("AdminCoinAdjustment", fields: [createdByAdminId], references: [id])

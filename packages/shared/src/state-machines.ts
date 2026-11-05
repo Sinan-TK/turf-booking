@@ -35,7 +35,11 @@ export const SLOT_HOLD_TRANSITIONS: TransitionMap<SlotHoldStatus> = {
 };
 
 export const BOOKING_TRANSITIONS: TransitionMap<BookingStatus> = {
-  PENDING_PAYMENT: [BookingStatus.CONFIRMED, BookingStatus.CANCELLED],
+  PENDING_PAYMENT: [BookingStatus.PROCESSING, BookingStatus.CONFIRMED, BookingStatus.CANCELLED],
+  // The customer's payment went through on their side: the slot stays locked while the gateway confirms it (5 minutes), then it is CONFIRMED or FAILED.
+  PROCESSING: [BookingStatus.CONFIRMED, BookingStatus.FAILED, BookingStatus.CANCELLED],
+  // A payment the gateway captured after the processing window: honoured only when the slot is still free.
+  FAILED: [BookingStatus.CONFIRMED],
   CONFIRMED: [BookingStatus.CANCELLED, BookingStatus.COMPLETED, BookingStatus.NO_SHOW],
   CANCELLED: [],
   // Whether the customer came is the venue's record, and it can be put right for a while after the slot: a played booking can
@@ -45,9 +49,12 @@ export const BOOKING_TRANSITIONS: TransitionMap<BookingStatus> = {
 };
 
 export const PAYMENT_TRANSITIONS: TransitionMap<PaymentStatus> = {
-  PENDING: [PaymentStatus.SUCCESS, PaymentStatus.FAILED],
+  PENDING: [PaymentStatus.PROCESSING, PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.EXPIRED],
+  PROCESSING: [PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.EXPIRED],
   SUCCESS: [PaymentStatus.REFUNDED],
-  FAILED: [],
+  // The gateway lets a customer retry on the same order, so a failed or closed attempt can still turn out captured.
+  FAILED: [PaymentStatus.SUCCESS],
+  EXPIRED: [PaymentStatus.SUCCESS],
   REFUNDED: [],
 };
 
