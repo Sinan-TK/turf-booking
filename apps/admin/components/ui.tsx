@@ -98,6 +98,8 @@ const BADGE_COLORS: Record<string, string> = {
   INACTIVE: 'bg-gray-100 text-gray-600 ring-gray-500/20',
   CANCELLED: 'bg-red-50 text-red-700 ring-red-600/20',
   FAILED: 'bg-red-50 text-red-700 ring-red-600/20',
+  VERIFIED: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+  NOT_VERIFIED: 'bg-amber-50 text-amber-700 ring-amber-600/20',
   SUSPENDED: 'bg-red-50 text-red-700 ring-red-600/20',
   SCHEDULED: 'bg-sky-50 text-sky-700 ring-sky-600/20',
   PENDING_APPROVAL: 'bg-amber-50 text-amber-800 ring-amber-600/20',

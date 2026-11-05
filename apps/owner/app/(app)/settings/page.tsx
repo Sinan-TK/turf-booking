@@ -5,6 +5,7 @@ import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { ROLE_LABEL, ROLE_SUMMARY } from '@/lib/access';
 import { AccessCard } from '@/components/access-card';
+import { BankDetailsCard } from '@/components/bank-details-card';
 import { Button, Card, ErrorBanner, FieldError, Input, Label, PageHeader, SuccessBanner, invalidClass } from '@/components/ui';
 import { hasErrors, newPasswordError, type FieldErrors } from '@/lib/validation';
 
@@ -91,6 +92,8 @@ export default function SettingsPage() {
           <AccessCard audience="staff" />
         </div>
       )}
+
+      {user?.ownerRole === 'OWNER_ADMIN' && <BankDetailsCard />}
 
       <Card className="max-w-md">
         <h2 className="mb-1 text-sm font-semibold text-on-surface">Change Password</h2>

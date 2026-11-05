@@ -4,6 +4,7 @@ import { APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { PrismaModule } from './prisma/prisma.module';
 import { OwnerStaffModule } from './owner-staff/owner-staff.module';
+import { BankAccountsModule } from './bank-accounts/bank-accounts.module';
 import { OwnerScopeModule } from './owner-scope/owner-scope.module';
 import { AuthModule } from './auth/auth.module';
 import { AuditModule } from './audit/audit.module';
@@ -44,6 +45,7 @@ import { StorageModule } from './storage/storage.module';
     VenueCategoriesModule,
     OwnerOrganizationsModule,
     OwnerStaffModule,
+    BankAccountsModule,
     ResourcesModule,
     VenueConfigModule,
     PoliciesModule,

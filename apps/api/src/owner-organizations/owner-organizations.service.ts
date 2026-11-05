@@ -57,9 +57,16 @@ export class OwnerOrganizationsService {
       include: {
         ownerUsers: { where: { role: 'OWNER_ADMIN' }, orderBy: { createdAt: 'asc' }, take: 1, select: { name: true } },
         _count: { select: { venues: { where: { status: 'ACTIVE', deletedAt: null } } } },
+        bankAccount: { select: { status: true } },
       },
     });
-    return rows.map(({ ownerUsers, _count, ...org }) => ({ ...org, ownerName: ownerUsers[0]?.name ?? null, activeVenues: _count.venues }));
+    return rows.map(({ ownerUsers, _count, bankAccount, ...org }) => ({
+      ...org,
+      ownerName: ownerUsers[0]?.name ?? null,
+      activeVenues: _count.venues,
+      /** NONE until the owner adds bank details. */
+      bankStatus: bankAccount?.status ?? 'NONE',
+    }));
   }
 
   async getOrganization(id: string) {

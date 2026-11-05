@@ -33,6 +33,7 @@ import {
 } from '@/components/ui';
 import { emailError, hasErrors, indianPhoneError, textError, type FieldErrors } from '@/lib/validation';
 import { PhoneInput, formatPhone } from '@/components/phone-input';
+import { BankDetailsPanel } from '@/components/bank-details-panel';
 
 interface OrgVenue {
   id: string;
@@ -298,6 +299,8 @@ export default function OwnerOrgDetailPage() {
           </div>
         )}
       </Card>
+
+      <BankDetailsPanel organizationId={org.id} />
 
       <div>
         <div role="tablist" aria-label="Owner sections" className="mb-4 flex gap-1 border-b border-gray-200">

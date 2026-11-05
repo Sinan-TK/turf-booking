@@ -122,7 +122,9 @@ export class PayoutsService {
   async getForAdmin(id: string) {
     const payout = await this.prisma.client.payout.findUnique({ where: { id }, include: PAYOUT_DETAIL_INCLUDE });
     if (!payout) throw new NotFoundException('Payout not found');
-    return payout;
+    // Where to send the money, and whether the admin has checked it. Not a reason to refuse paying: the admin sees the warning.
+    const bankAccount = await this.prisma.client.organizationBankAccount.findUnique({ where: { organizationId: payout.organization.id } });
+    return { ...payout, bankAccount };
   }
 
   /**

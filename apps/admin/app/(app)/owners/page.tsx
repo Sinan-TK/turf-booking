@@ -23,6 +23,8 @@ interface Organization {
   ownerName: string | null;
   /** Venues that are live (active) right now. */
   activeVenues: number;
+  /** NONE until the owner adds bank details. */
+  bankStatus: 'NONE' | 'NOT_VERIFIED' | 'VERIFIED' | 'FAILED';
 }
 
 type SortKey = 'name' | 'owner' | 'venues' | 'status';
@@ -230,7 +232,7 @@ export default function OwnersPage() {
         </Card>
       )}
 
-      {loading && <SkeletonTable columns={6} />}
+      {loading && <SkeletonTable columns={7} />}
       {error && <ErrorBanner message={error} />}
       {data && data.length === 0 && <EmptyState message="No owner organizations yet." />}
       {data && data.length > 0 && visible.length === 0 && (
@@ -246,6 +248,7 @@ export default function OwnersPage() {
                 <th className="px-4 py-3">Contact</th>
                 <SortHeader label="Active venues" k="venues" sortKey={sort.key} dir={sort.dir} onSort={onSort} />
                 <SortHeader label="Status" k="status" sortKey={sort.key} dir={sort.dir} onSort={onSort} />
+                <th className="px-4 py-3">Bank details</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -263,6 +266,7 @@ export default function OwnersPage() {
                   <td className="px-4 py-3">
                     <Badge value={org.status} />
                   </td>
+                  <td className="px-4 py-3">{org.bankStatus === 'NONE' ? <span className="text-gray-400">Not added</span> : <Badge value={org.bankStatus} />}</td>
                   <td className="px-4 py-3 text-right">
                     <Link href={`/owners/${org.id}`} className="text-sm font-medium text-gray-900 hover:underline">
                       Manage →

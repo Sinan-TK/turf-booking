@@ -7,6 +7,7 @@ import { api, ApiError } from '@/lib/api';
 import { useFetch } from '@/lib/use-fetch';
 import { money } from '@/lib/commercial';
 import { Pagination, usePageSlice } from '@/components/pagination';
+import { BankAccountDetails, bankWarning, type BankAccount } from '@/components/bank-details-panel';
 import { Badge, Button, Card, ErrorBanner, FieldError, Input, Label, PageHeader, SkeletonDetailCard } from '@/components/ui';
 
 interface Settlement {
@@ -34,6 +35,8 @@ interface PayoutDetail {
   reference: string | null;
   paidAt: string | null;
   settlements: Settlement[];
+  /** Where to send the money (null until the owner adds it). */
+  bankAccount: BankAccount | null;
 }
 
 const KIND: Record<Settlement['kind'], string> = { PLAYED: 'Played', NO_SHOW: 'No-show', LATE_CANCEL: 'Late cancellation' };
@@ -119,6 +122,22 @@ export default function PayoutDetailPage() {
             <ErrorBanner message={apiError} />
           </div>
         )}
+      </Card>
+
+      <Card>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-gray-900">Send the money to</h2>
+          {data.bankAccount && <Badge value={data.bankAccount.status} />}
+        </div>
+        {bankWarning(data.bankAccount) && (
+          <p role="alert" className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            {bankWarning(data.bankAccount)}{' '}
+            <Link href={`/owners/${data.organization.id}`} className="font-medium underline">
+              Open the business
+            </Link>
+          </p>
+        )}
+        {data.bankAccount && <BankAccountDetails bank={data.bankAccount} />}
       </Card>
 
       <Card className="overflow-x-auto p-0">

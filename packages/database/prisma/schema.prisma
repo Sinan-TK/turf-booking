@@ -66,8 +66,44 @@ model OwnerOrganization {
   promotions  Promotion[]
   settlements BookingSettlement[]
   payouts     Payout[]
+  bankAccount OrganizationBankAccount?
 
   @@map("owner_organizations")
+}
+
+/// Where a business's weekly payouts are sent. One per business, written by its owner (password re-entered) and checked by the Super Admin;
+/// every change sends it back to NOT_VERIFIED.
+model OrganizationBankAccount {
+  id                String            @id @default(uuid()) @db.Uuid
+  organizationId    String            @unique @db.Uuid
+  organization      OwnerOrganization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  accountHolderName String
+  accountNumber     String
+  ifsc              String
+  bankName          String
+  branch            String?
+  accountType       BankAccountType   @default(SAVINGS)
+  upiId             String?
+  status            BankAccountStatus @default(NOT_VERIFIED)
+  failureReason     String?
+  verifiedAt        DateTime?
+  verifiedByAdminId String?           @db.Uuid
+  submittedAt       DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([status])
+  @@map("organization_bank_accounts")
+}
+
+enum BankAccountType {
+  SAVINGS
+  CURRENT
+}
+
+enum BankAccountStatus {
+  NOT_VERIFIED
+  VERIFIED
+  FAILED
 }
 
 enum OwnerOrganizationStatus {

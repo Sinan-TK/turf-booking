@@ -1,0 +1,222 @@
+'use client';
+
+import { useState } from 'react';
+import { api, ApiError } from '@/lib/api';
+import { useFetch } from '@/lib/use-fetch';
+import { Badge, Button, Card, ErrorBanner, FieldError, Input, Label, PasswordInput, Select, SuccessBanner, invalidClass } from '@/components/ui';
+import { hasErrors, type FieldErrors } from '@/lib/validation';
+
+interface BankAccount {
+  status: 'NONE' | 'NOT_VERIFIED' | 'VERIFIED' | 'FAILED';
+  accountHolderName?: string;
+  accountNumber?: string;
+  ifsc?: string;
+  bankName?: string;
+  branch?: string | null;
+  accountType?: 'SAVINGS' | 'CURRENT';
+  upiId?: string | null;
+  failureReason?: string | null;
+}
+
+type Field = 'holder' | 'number' | 'confirm' | 'ifsc' | 'bank' | 'upi' | 'password';
+
+const STATUS_NOTE: Record<string, string> = {
+  NOT_VERIFIED: 'Waiting for Bookyo to check these details. Payouts can be held until they are verified.',
+  VERIFIED: 'Verified. Your weekly payouts are sent to this account.',
+  FAILED: 'Bookyo could not verify these details. Fix them below and save again.',
+};
+
+/**
+ * Where this business's weekly payouts go. One set per business. Once saved the account number is only shown masked, and changing
+ * anything needs the owner's password; every change sends the details back to "not verified" until the Bookyo team checks them again.
+ */
+export function BankDetailsCard() {
+  const { data, loading, error: loadError, refetch } = useFetch<BankAccount>('/owner/bank-account');
+  const [editing, setEditing] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<FieldErrors<Field>>({});
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    holder: '',
+    number: '',
+    confirm: '',
+    ifsc: '',
+    bank: '',
+    branch: '',
+    type: 'SAVINGS',
+    upi: '',
+    password: '',
+  });
+  const set = (k: keyof typeof form, v: string) => {
+    setForm((f) => ({ ...f, [k]: v }));
+    setErrors((p) => ({ ...p, [k]: undefined }));
+  };
+
+  const has = !!data && data.status !== 'NONE';
+
+  function open() {
+    setForm({
+      holder: data?.accountHolderName ?? '',
+      number: '', // never pre-filled: the full number is not sent to the browser
+      confirm: '',
+      ifsc: data?.ifsc ?? '',
+      bank: data?.bankName ?? '',
+      branch: data?.branch ?? '',
+      type: data?.accountType ?? 'SAVINGS',
+      upi: data?.upiId ?? '',
+      password: '',
+    });
+    setErrors({});
+    setError(null);
+    setSaved(false);
+    setEditing(true);
+  }
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const digits = form.number.replace(/[\s-]/g, '');
+    const found: FieldErrors<Field> = {
+      holder: form.holder.trim().length < 2 ? 'Enter the account holder name.' : undefined,
+      number: /^\d{9,18}$/.test(digits) ? undefined : 'The account number is 9 to 18 digits.',
+      confirm: digits && form.confirm.replace(/[\s-]/g, '') !== digits ? 'The two account numbers do not match.' : undefined,
+      ifsc: /^[A-Z]{4}0[A-Z0-9]{6}$/.test(form.ifsc.trim().toUpperCase()) ? undefined : 'Enter a valid IFSC code, like HDFC0001234.',
+      bank: form.bank.trim().length < 2 ? 'Enter the bank name.' : undefined,
+      upi: form.upi.trim() && !/^[a-z0-9._-]{2,256}@[a-z][a-z0-9]{1,63}$/i.test(form.upi.trim()) ? 'Enter a valid UPI id, like name@bank.' : undefined,
+      password: form.password ? undefined : 'Enter your password to save.',
+    };
+    setErrors(found);
+    if (hasErrors(found)) {
+      const first = (['holder', 'number', 'confirm', 'ifsc', 'bank', 'upi', 'password'] as Field[]).find((k) => found[k]);
+      if (first) document.getElementById(`bank-${first}`)?.focus();
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.put('/owner/bank-account', {
+        accountHolderName: form.holder,
+        accountNumber: form.number,
+        ifsc: form.ifsc,
+        bankName: form.bank,
+        branch: form.branch,
+        accountType: form.type,
+        upiId: form.upi,
+        password: form.password,
+      });
+      setEditing(false);
+      setSaved(true);
+      refetch();
+    } catch (err) {
+      setForm((f) => ({ ...f, password: '' }));
+      setError(err instanceof ApiError ? err.message : 'Could not save your bank details');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const field = (id: Field, label: string, props: React.ComponentProps<typeof Input>) => (
+    <div>
+      <Label htmlFor={`bank-${id}`}>{label}</Label>
+      <Input id={`bank-${id}`} aria-invalid={!!errors[id]} aria-describedby={errors[id] ? `bank-${id}-error` : undefined} className={errors[id] ? invalidClass : ''} {...props} />
+      <FieldError id={`bank-${id}-error`} message={errors[id]} />
+    </div>
+  );
+
+  return (
+    <Card className="max-w-md">
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold text-on-surface">Bank details for payouts</h2>
+        {has && <Badge value={data.status} />}
+      </div>
+      <p className="mb-4 text-xs text-on-surface-variant">One account for your whole business. Your weekly earnings are paid here.</p>
+
+      {loading && !data && <p className="text-sm text-on-surface-variant">Loading…</p>}
+      {loadError && <ErrorBanner message={loadError} />}
+      {saved && <SuccessBanner message="Saved. Bookyo will check your details and mark them verified." />}
+
+      {!editing && data && (
+        <>
+          {has ? (
+            <>
+              <dl className="space-y-2 text-sm">
+                <Row label="Account holder" value={data.accountHolderName} />
+                <Row label="Account number" value={data.accountNumber} mono />
+                <Row label="IFSC" value={data.ifsc} mono />
+                <Row label="Bank" value={[data.bankName, data.branch].filter(Boolean).join(' · ')} />
+                <Row label="Account type" value={data.accountType === 'CURRENT' ? 'Current' : 'Savings'} />
+                {data.upiId && <Row label="UPI id" value={data.upiId} />}
+              </dl>
+              <p className="mt-3 text-xs text-on-surface-variant">{STATUS_NOTE[data.status]}</p>
+              {data.status === 'FAILED' && data.failureReason && (
+                <p role="alert" className="mt-2 rounded-lg bg-error-container px-3 py-2 text-xs text-on-error-container">
+                  {data.failureReason}
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-on-surface-variant">You have not added your bank details yet. Add them so Bookyo knows where to send your payouts.</p>
+          )}
+          <Button type="button" variant="secondary" className="mt-4" onClick={open}>
+            {has ? 'Change bank details' : 'Add bank details'}
+          </Button>
+        </>
+      )}
+
+      {editing && (
+        <form onSubmit={save} className="space-y-3" noValidate>
+          {error && <ErrorBanner message={error} />}
+          {has && <p className="rounded-lg bg-tertiary-container/30 px-3 py-2 text-xs text-on-tertiary-container">Saving changes marks your details as not verified until Bookyo checks them again.</p>}
+          {field('holder', 'Account holder name', { value: form.holder, autoComplete: 'off', onChange: (e) => set('holder', e.target.value) })}
+          {field('number', 'Account number', { value: form.number, inputMode: 'numeric', autoComplete: 'off', onChange: (e) => set('number', e.target.value) })}
+          {field('confirm', 'Confirm account number', { value: form.confirm, inputMode: 'numeric', autoComplete: 'off', onChange: (e) => set('confirm', e.target.value) })}
+          {field('ifsc', 'IFSC code', { value: form.ifsc, autoComplete: 'off', placeholder: 'HDFC0001234', onChange: (e) => set('ifsc', e.target.value.toUpperCase()) })}
+          {field('bank', 'Bank name', { value: form.bank, autoComplete: 'off', onChange: (e) => set('bank', e.target.value) })}
+          <div>
+            <Label htmlFor="bank-branch">Branch (optional)</Label>
+            <Input id="bank-branch" value={form.branch} autoComplete="off" onChange={(e) => set('branch', e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="bank-type">Account type</Label>
+            <Select id="bank-type" value={form.type} onChange={(e) => set('type', e.target.value)}>
+              <option value="SAVINGS">Savings</option>
+              <option value="CURRENT">Current</option>
+            </Select>
+          </div>
+          {field('upi', 'UPI id (optional)', { value: form.upi, autoComplete: 'off', placeholder: 'name@bank', onChange: (e) => set('upi', e.target.value) })}
+          <div>
+            <Label htmlFor="bank-password">Your password</Label>
+            <PasswordInput
+              id="bank-password"
+              aria-invalid={!!errors.password}
+              aria-describedby={errors.password ? 'bank-password-error' : undefined}
+              className={errors.password ? invalidClass : ''}
+              autoComplete="current-password"
+              value={form.password}
+              onChange={(e) => set('password', e.target.value)}
+            />
+            <FieldError id="bank-password-error" message={errors.password} />
+            <p className="mt-1 text-xs text-on-surface-variant">We ask for it again so nobody else can change where your money goes.</p>
+          </div>
+          <div className="flex gap-2">
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Saving…' : 'Save bank details'}
+            </Button>
+            <Button type="button" variant="secondary" disabled={saving} onClick={() => setEditing(false)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
+    </Card>
+  );
+}
+
+function Row({ label, value, mono }: { label: string; value?: string | null; mono?: boolean }) {
+  return (
+    <div className="flex justify-between gap-4">
+      <dt className="text-on-surface-variant">{label}</dt>
+      <dd className={`text-right font-medium text-on-surface ${mono ? 'font-mono tracking-wide' : ''}`}>{value || '—'}</dd>
+    </div>
+  );
+}

@@ -94,6 +94,8 @@ const BADGE_COLORS: Record<string, string> = {
   CANCELLED: 'bg-error-container text-on-error-container',
   NO_SHOW: 'bg-tertiary-container/30 text-on-tertiary-container',
   FAILED: 'bg-error-container text-on-error-container',
+  VERIFIED: 'bg-primary-fixed-dim/30 text-on-primary-container',
+  NOT_VERIFIED: 'bg-tertiary-container/30 text-on-tertiary-container',
   SUSPENDED: 'bg-error-container text-on-error-container',
   CLOSED: 'bg-surface-container-high text-on-surface-variant',
   RESOLVED: 'bg-primary-fixed-dim/30 text-on-primary-container',
