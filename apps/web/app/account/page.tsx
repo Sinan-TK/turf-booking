@@ -503,16 +503,16 @@ function Wallet() {
       )}
       {wallet && (
         <>
-          <section aria-label="Wallet balance" className="rounded-2xl bg-brand-700 p-5 text-white shadow-sm sm:p-6">
+          <section aria-label="Wallet balance" className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-4">
-                <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-cream sm:h-20 sm:w-20">
+                <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-brand-50 sm:h-20 sm:w-20">
                   <Icon name="coin" className="text-[3rem] sm:text-[3.75rem]" />
                 </span>
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-white/70">Wallet balance</p>
-                  <p className="text-4xl font-black leading-tight sm:text-5xl">{formatPrice({ amount: wallet.cachedBalance, currency: wallet.currency })}</p>
-                  <p className="text-xs text-white/70">1 Coin is worth ₹1</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Wallet balance</p>
+                  <p className="text-4xl font-black leading-tight text-gray-900 sm:text-5xl">{formatPrice({ amount: wallet.cachedBalance, currency: wallet.currency })}</p>
+                  <p className="text-xs text-gray-500">1 Coin is worth ₹1</p>
                 </div>
               </div>
               <button
@@ -527,8 +527,8 @@ function Wallet() {
                 <span>Add money</span>
               </button>
             </div>
-            <p className="mt-4 border-t border-white/15 pt-3 text-xs leading-relaxed text-white/70">
-              Add money here, or get Coins back from cancelled bookings, and spend them on any booking. Added money is used only for bookings; it is not returned to your card.
+            <p className="mt-4 border-t border-gray-100 pt-3 text-xs leading-relaxed text-gray-500">
+              Add money here, or get Coins back from cancelled bookings, and spend them on any booking. Added money is used only for bookings and is not returned to your card.
             </p>
           </section>
 

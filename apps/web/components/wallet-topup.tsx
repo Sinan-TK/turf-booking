@@ -150,7 +150,7 @@ export function WalletTopupSheet({
             <Icon name="close" className="text-[1.125rem]" />
           </button>
         </div>
-        <p className="mb-4 text-sm text-slate-600">You get the same amount in Coins and can use them to pay for any booking. Added money is spent only on bookings; it is not returned to your card.</p>
+        <p className="mb-4 text-sm text-slate-600">You get the same amount in Coins and can use them to pay for any booking. Added money is spent only on bookings and is not returned to your card.</p>
 
         <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Quick picks">
           {PRESETS.filter((p) => p >= min && p <= max).map((p) => (
