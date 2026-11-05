@@ -279,6 +279,7 @@ export default function ExplorePage() {
           <Link href="/" aria-label="Bookyo home" className="mr-2 hidden select-none lg:block">
             <Logo className="h-9 w-auto" />
           </Link>
+          <span aria-hidden="true" className="hidden h-6 w-px shrink-0 self-center bg-slate-300 lg:block" />
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
