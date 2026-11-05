@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth-context';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from './ui';
+import { Logo, LogoMark } from './logo';
 import { ConfirmDialog } from './confirm-dialog';
 import { NAV_ITEMS } from '../lib/access';
 
@@ -83,11 +84,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         } ${open ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="mb-4 flex h-16 items-center justify-between pl-[20px] pr-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary">
-              <Icon name="sports_soccer" className="text-on-primary" />
-            </div>
-            <span className={`font-headline-sm text-headline-sm tracking-tight text-primary ${R}`}>Bookyo</span>
+          <div className="flex items-center">
+            {expanded || open ? <Logo ink="#050505" hole="#FBF7EE" className="h-8 w-auto" /> : <LogoMark ink="#050505" className="h-8 w-auto" />}
           </div>
           <button
             onClick={onClose}

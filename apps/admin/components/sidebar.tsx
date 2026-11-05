@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '../lib/auth-context';
 import { Icon, type IconName } from './icons';
+import { Logo, LogoMark } from './logo';
 import { ConfirmLogout } from './confirm-logout';
 import { ApiStatusPill } from './api-status';
 
@@ -116,13 +117,14 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       >
         <div className="flex items-center justify-between py-5 pl-[18px] pr-4">
           <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-white shadow-lg shadow-brand-900/40">
-              <Icon name="venue" className="h-5 w-5" />
-            </span>
-            <div className={R}>
-              <p className="text-sm font-semibold leading-tight text-white">Bookyo</p>
-              <p className="text-xs text-gray-400">Super Admin</p>
-            </div>
+            {expanded || open ? (
+              <div>
+                <Logo ink="#ffffff" hole="#0f172a" className="h-7 w-auto" />
+                <p className="mt-0.5 text-xs text-gray-400">Super Admin</p>
+              </div>
+            ) : (
+              <LogoMark ink="#ffffff" className="h-8 w-auto" />
+            )}
           </div>
           <button
             onClick={onClose}

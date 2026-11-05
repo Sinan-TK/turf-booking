@@ -1,3 +1,4 @@
+import { Logo } from '@/components/logo';
 import { SvgIcon, type SvgIconName } from '@/components/svg-icons';
 
 const HIGHLIGHTS: Array<{ icon: SvgIconName; text: string }> = [
@@ -23,10 +24,7 @@ export function AuthShell({
         <div className="pointer-events-none absolute -bottom-36 -left-20 h-[26rem] w-[26rem] rounded-full bg-primary-fixed-dim/15 blur-3xl" />
 
         <div className="relative flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-container text-on-primary-container">
-            <SvgIcon name="ball" />
-          </span>
-          <span className="font-headline-sm text-headline-sm">Bookyo</span>
+          <Logo ink="#ffffff" hole="#050505" className="h-10 w-auto" />
         </div>
 
         <div className="relative max-w-md">

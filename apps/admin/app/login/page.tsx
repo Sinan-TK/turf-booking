@@ -7,6 +7,7 @@ import { Button, ErrorBanner, FieldError, Input, Label, invalidClass } from '@/c
 import { ApiError } from '@/lib/api';
 import { emailError, hasErrors, type FieldErrors } from '@/lib/validation';
 import { Icon } from '@/components/icons';
+import { Logo } from '@/components/logo';
 import { PasswordInput } from '@/components/password-input';
 
 export default function LoginPage() {
@@ -56,10 +57,7 @@ export default function LoginPage() {
         <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-brand-500/25 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-32 -left-16 h-96 w-96 rounded-full bg-sky-500/15 blur-3xl" />
         <div className="relative flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500">
-            <Icon name="venue" className="h-5 w-5" />
-          </span>
-          <span className="text-lg font-semibold">Bookyo</span>
+          <Logo ink="#ffffff" hole="#0f172a" className="h-9 w-auto" />
         </div>
         <div className="relative max-w-md">
           <h2 className="text-4xl font-semibold leading-tight tracking-tight">
