@@ -77,7 +77,7 @@ function BookingRow({ booking: b }: { booking: Booking }) {
   const pending = b.status === 'PENDING_PAYMENT';
   return (
     <Link
-      href={pending ? `/checkout/${b.id}` : `/bookings/${b.id}`}
+      href={pending || b.status === 'PROCESSING' ? `/checkout/${b.id}` : `/bookings/${b.id}`}
       className="group flex h-full flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-gray-300 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700"
     >
       <div className="flex items-start justify-between gap-2">

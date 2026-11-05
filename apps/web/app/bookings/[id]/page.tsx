@@ -36,7 +36,11 @@ interface Booking {
   endTime: string;
   groundType: string;
   paymentMethod: string | null;
+  /** How it was paid online: exactly one of the two is above zero once the booking is confirmed. */
+  coinsPaid?: string;
+  moneyPaid?: string;
   createdAt?: string;
+  processingUntil?: string | null;
   cancelledAt?: string | null;
   cancellationReasonCode?: string | null;
   cancellationNote?: string | null;
@@ -48,6 +52,8 @@ interface Booking {
     id: string;
     name: string;
     address: string;
+    /** The venue's number, only for a confirmed booking. */
+    contactPhone?: string | null;
     facilityCode: string;
     googleMapsUrl: string | null;
     lat: number;
@@ -98,6 +104,19 @@ function BookingDetail() {
   }
 
   useEffect(load, [id]);
+
+  // A payment still being confirmed: ask the server (which asks the gateway) every few seconds until it settles.
+  const processing = booking?.status === 'PROCESSING';
+  useEffect(() => {
+    if (!processing) return;
+    const timer = setInterval(() => {
+      api
+        .get(`/payments/sync/${id}`)
+        .catch(() => undefined)
+        .finally(load);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [processing, id]);
 
   async function onConfirmCancel() {
     setCancelling(true);
@@ -163,6 +182,18 @@ function BookingDetail() {
     return (
       <div className="space-y-4">
         {cancelResultMessage && <SuccessBanner message={cancelResultMessage} />}
+        {booking.status === 'PROCESSING' && (
+          <div role="status" className="rounded-md border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-900">
+            <p className="font-semibold">Payment received, confirming…</p>
+            <p>
+              We are waiting for the bank to confirm your payment. Your slot is kept for you, and this page updates by itself
+              {booking.processingUntil ? ` (we check until ${new Date(booking.processingUntil).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })})` : ''}.
+            </p>
+          </div>
+        )}
+        {booking.status === 'FAILED' && (
+          <ErrorBanner message="We could not confirm your payment, so the slot was released. If money was deducted it returns to your bank automatically, usually within a few days. If it does not, contact support with your order number." />
+        )}
 
         <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[3fr_2fr]">
           <div className="min-w-0 space-y-4 lg:sticky lg:top-24">
@@ -207,6 +238,15 @@ function BookingDetail() {
                     <Icon name="navigation" className="text-[0.875rem]" />
                     Directions
                   </a>
+                  {booking.venue.contactPhone && (
+                    <a
+                      href={`tel:${booking.venue.contactPhone}`}
+                      className="ml-2 mt-3 inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-gray-800 transition hover:bg-gray-50 active:scale-95"
+                    >
+                      <Icon name="call" className="text-[0.875rem]" />
+                      Call venue
+                    </a>
+                  )}
                 </div>
               </div>
             </Card>
@@ -222,6 +262,20 @@ function BookingDetail() {
                   <p className="text-right text-sm font-semibold text-brand-700">{countdown}</p>
                 )}
               </div>
+              {booking.venue.contactPhone && (
+                <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-gray-200 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-xs text-gray-500">Venue contact</p>
+                    <p className="truncate text-sm font-semibold text-gray-900">{booking.venue.contactPhone}</p>
+                  </div>
+                  <a
+                    href={`tel:${booking.venue.contactPhone}`}
+                    className="shrink-0 rounded-xl bg-brand-700 px-3.5 py-2 text-xs font-bold text-white transition hover:bg-brand-800 active:scale-95"
+                  >
+                    Call
+                  </a>
+                </div>
+              )}
               <ul className="mt-3 space-y-1.5 text-xs text-gray-600">
                 <li>Arrive a few minutes early so your slot starts on time.</li>
                 {toPayAtVenue > 0 && (
@@ -270,11 +324,13 @@ function BookingDetail() {
                 {booking.status === 'PENDING_PAYMENT' && advance > 0 && (
                   <Row label="To pay now" value={money(advance)} />
                 )}
-                {paid > 0 && <Row label="Paid" value={money(paid)} />}
+                {Number(booking.coinsPaid ?? 0) > 0 && <Row label="Paid with Coins" value={money(Number(booking.coinsPaid))} />}
+                {Number(booking.moneyPaid ?? 0) > 0 && <Row label="Paid online" value={money(Number(booking.moneyPaid))} />}
+                {paid > 0 && Number(booking.coinsPaid ?? 0) + Number(booking.moneyPaid ?? 0) === 0 && <Row label="Paid" value={money(paid)} />}
                 {toPayAtVenue > 0 && (
                   <Row label="Pay at the venue" value={money(toPayAtVenue.toFixed(2))} strong />
                 )}
-                <Row label="Method" value={PAYMENT_METHODS[booking.paymentMethod ?? ''] ?? '—'} />
+                {booking.paymentMethod && <Row label="Method" value={PAYMENT_METHODS[booking.paymentMethod] ?? '—'} />}
               </dl>
               {booking.status === 'PENDING_PAYMENT' && (
                 <Link
