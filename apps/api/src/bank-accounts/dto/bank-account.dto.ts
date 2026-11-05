@@ -17,21 +17,7 @@ export const saveBankAccountSchema = z.object({
     .transform((s) => s.trim().toUpperCase())
     .pipe(z.string().regex(IFSC_PATTERN, 'Enter a valid IFSC code, like HDFC0001234')),
   bankName: z.string().transform(clean).pipe(z.string().min(2, 'Enter the bank name').max(120)),
-  branch: z
-    .string()
-    .transform(clean)
-    .pipe(z.string().max(120))
-    .optional()
-    .nullable()
-    .transform((v) => (v ? v : null)),
   accountType: z.enum(['SAVINGS', 'CURRENT']).default('SAVINGS'),
-  upiId: z
-    .string()
-    .transform((s) => s.trim().toLowerCase())
-    .pipe(z.union([z.literal(''), z.string().regex(/^[a-z0-9._-]{2,256}@[a-z][a-z0-9]{1,63}$/, 'Enter a valid UPI id, like name@bank')]))
-    .optional()
-    .nullable()
-    .transform((v) => (v ? v : null)),
   password: z.string().min(1, 'Enter your password to save changes').max(200),
 });
 export class SaveBankAccountDto extends createZodDto(saveBankAccountSchema) {}

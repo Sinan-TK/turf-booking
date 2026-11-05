@@ -12,9 +12,7 @@ export interface BankAccount {
   accountNumber?: string;
   ifsc?: string;
   bankName?: string;
-  branch?: string | null;
   accountType?: 'SAVINGS' | 'CURRENT';
-  upiId?: string | null;
   failureReason?: string | null;
   verifiedAt?: string | null;
   submittedAt?: string;
@@ -36,9 +34,8 @@ export function BankAccountDetails({ bank }: { bank: BankAccount }) {
       <Item label="Account holder" value={bank.accountHolderName} />
       <Item label="Account number" value={bank.accountNumber} mono copy />
       <Item label="IFSC" value={bank.ifsc} mono copy />
-      <Item label="Bank" value={[bank.bankName, bank.branch].filter(Boolean).join(' · ')} />
+      <Item label="Bank" value={bank.bankName} />
       <Item label="Account type" value={bank.accountType === 'CURRENT' ? 'Current' : 'Savings'} />
-      {bank.upiId && <Item label="UPI id" value={bank.upiId} />}
     </dl>
   );
 }

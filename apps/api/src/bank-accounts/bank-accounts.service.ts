@@ -12,9 +12,7 @@ type Row = {
   accountNumber: string;
   ifsc: string;
   bankName: string;
-  branch: string | null;
   accountType: 'SAVINGS' | 'CURRENT';
-  upiId: string | null;
   status: 'NOT_VERIFIED' | 'VERIFIED' | 'FAILED';
   failureReason: string | null;
   verifiedAt: Date | null;
@@ -71,9 +69,7 @@ export class BankAccountsService {
       accountNumber: dto.accountNumber,
       ifsc: dto.ifsc,
       bankName: dto.bankName,
-      branch: dto.branch ?? null,
       accountType: dto.accountType,
-      upiId: dto.upiId ?? null,
     };
     const existing = await this.prisma.client.organizationBankAccount.findUnique({ where: { organizationId } });
     if (existing && (Object.keys(data) as Array<keyof typeof data>).every((k) => existing[k] === data[k])) {

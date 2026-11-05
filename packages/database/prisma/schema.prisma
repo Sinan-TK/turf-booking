@@ -81,9 +81,7 @@ model OrganizationBankAccount {
   accountNumber     String
   ifsc              String
   bankName          String
-  branch            String?
   accountType       BankAccountType   @default(SAVINGS)
-  upiId             String?
   status            BankAccountStatus @default(NOT_VERIFIED)
   failureReason     String?
   verifiedAt        DateTime?

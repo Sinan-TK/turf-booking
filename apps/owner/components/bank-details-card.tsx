@@ -12,13 +12,11 @@ interface BankAccount {
   accountNumber?: string;
   ifsc?: string;
   bankName?: string;
-  branch?: string | null;
   accountType?: 'SAVINGS' | 'CURRENT';
-  upiId?: string | null;
   failureReason?: string | null;
 }
 
-type Field = 'holder' | 'number' | 'confirm' | 'ifsc' | 'bank' | 'upi' | 'password';
+type Field = 'holder' | 'number' | 'confirm' | 'ifsc' | 'bank' | 'password';
 
 const STATUS_NOTE: Record<string, string> = {
   NOT_VERIFIED: 'Waiting for Bookyo to check these details. Payouts can be held until they are verified.',
@@ -43,9 +41,7 @@ export function BankDetailsCard() {
     confirm: '',
     ifsc: '',
     bank: '',
-    branch: '',
     type: 'SAVINGS',
-    upi: '',
     password: '',
   });
   const set = (k: keyof typeof form, v: string) => {
@@ -62,9 +58,7 @@ export function BankDetailsCard() {
       confirm: '',
       ifsc: data?.ifsc ?? '',
       bank: data?.bankName ?? '',
-      branch: data?.branch ?? '',
       type: data?.accountType ?? 'SAVINGS',
-      upi: data?.upiId ?? '',
       password: '',
     });
     setErrors({});
@@ -83,12 +77,11 @@ export function BankDetailsCard() {
       confirm: digits && form.confirm.replace(/[\s-]/g, '') !== digits ? 'The two account numbers do not match.' : undefined,
       ifsc: /^[A-Z]{4}0[A-Z0-9]{6}$/.test(form.ifsc.trim().toUpperCase()) ? undefined : 'Enter a valid IFSC code, like HDFC0001234.',
       bank: form.bank.trim().length < 2 ? 'Enter the bank name.' : undefined,
-      upi: form.upi.trim() && !/^[a-z0-9._-]{2,256}@[a-z][a-z0-9]{1,63}$/i.test(form.upi.trim()) ? 'Enter a valid UPI id, like name@bank.' : undefined,
       password: form.password ? undefined : 'Enter your password to save.',
     };
     setErrors(found);
     if (hasErrors(found)) {
-      const first = (['holder', 'number', 'confirm', 'ifsc', 'bank', 'upi', 'password'] as Field[]).find((k) => found[k]);
+      const first = (['holder', 'number', 'confirm', 'ifsc', 'bank', 'password'] as Field[]).find((k) => found[k]);
       if (first) document.getElementById(`bank-${first}`)?.focus();
       return;
     }
@@ -99,9 +92,7 @@ export function BankDetailsCard() {
         accountNumber: form.number,
         ifsc: form.ifsc,
         bankName: form.bank,
-        branch: form.branch,
         accountType: form.type,
-        upiId: form.upi,
         password: form.password,
       });
       setEditing(false);
@@ -143,9 +134,8 @@ export function BankDetailsCard() {
                 <Row label="Account holder" value={data.accountHolderName} />
                 <Row label="Account number" value={data.accountNumber} mono />
                 <Row label="IFSC" value={data.ifsc} mono />
-                <Row label="Bank" value={[data.bankName, data.branch].filter(Boolean).join(' · ')} />
+                <Row label="Bank" value={data.bankName} />
                 <Row label="Account type" value={data.accountType === 'CURRENT' ? 'Current' : 'Savings'} />
-                {data.upiId && <Row label="UPI id" value={data.upiId} />}
               </dl>
               <p className="mt-3 text-xs text-on-surface-variant">{STATUS_NOTE[data.status]}</p>
               {data.status === 'FAILED' && data.failureReason && (
@@ -173,17 +163,12 @@ export function BankDetailsCard() {
           {field('ifsc', 'IFSC code', { value: form.ifsc, autoComplete: 'off', placeholder: 'HDFC0001234', onChange: (e) => set('ifsc', e.target.value.toUpperCase()) })}
           {field('bank', 'Bank name', { value: form.bank, autoComplete: 'off', onChange: (e) => set('bank', e.target.value) })}
           <div>
-            <Label htmlFor="bank-branch">Branch (optional)</Label>
-            <Input id="bank-branch" value={form.branch} autoComplete="off" onChange={(e) => set('branch', e.target.value)} />
-          </div>
-          <div>
             <Label htmlFor="bank-type">Account type</Label>
             <Select id="bank-type" value={form.type} onChange={(e) => set('type', e.target.value)}>
               <option value="SAVINGS">Savings</option>
               <option value="CURRENT">Current</option>
             </Select>
           </div>
-          {field('upi', 'UPI id (optional)', { value: form.upi, autoComplete: 'off', placeholder: 'name@bank', onChange: (e) => set('upi', e.target.value) })}
           <div className="sm:col-span-2">
             <Label htmlFor="bank-password">Your password</Label>
             <PasswordInput

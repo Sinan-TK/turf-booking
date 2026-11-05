@@ -21,9 +21,7 @@ describe('Business bank details', () => {
     accountNumber: '123456789012',
     ifsc: 'hdfc0001234',
     bankName: 'HDFC Bank',
-    branch: 'Kozhikode',
     accountType: 'CURRENT',
-    upiId: 'greenfield@hdfcbank',
     password: PASSWORD,
     ...over,
   });
@@ -80,9 +78,7 @@ describe('Business bank details', () => {
     expect(await bad({ accountNumber: '12345abc9012' })).toBe(400);
     expect(await bad({ accountHolderName: ' ' })).toBe(400);
     expect(await bad({ bankName: '' })).toBe(400);
-    expect(await bad({ upiId: 'not a upi' })).toBe(400);
     expect(await bad({ accountType: 'GOLD' })).toBe(400);
-    expect(await bad({ upiId: '', branch: '' })).toBe(200); // both optional
     await owner.ownerAgent.put('/owner/bank-account').send(details());
   });
 
