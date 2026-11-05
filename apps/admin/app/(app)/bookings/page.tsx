@@ -32,6 +32,8 @@ const PAYMENT_METHOD_OPTIONS = [
 const STATUS_OPTIONS = [
   { value: '', label: 'All' },
   { value: 'PENDING_PAYMENT', label: 'Pending payment' },
+  { value: 'PROCESSING', label: 'Payment confirming' },
+  { value: 'FAILED', label: 'Failed' },
   { value: 'CONFIRMED', label: 'Confirmed' },
   { value: 'CANCELLED', label: 'Cancelled' },
   { value: 'COMPLETED', label: 'Completed' },

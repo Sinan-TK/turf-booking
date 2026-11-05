@@ -330,7 +330,7 @@ function BookingDetail() {
                 {toPayAtVenue > 0 && (
                   <Row label="Pay at the venue" value={money(toPayAtVenue.toFixed(2))} strong />
                 )}
-                {booking.paymentMethod && <Row label="Method" value={PAYMENT_METHODS[booking.paymentMethod] ?? '—'} />}
+                {booking.paymentMethod && Number(booking.coinsPaid ?? 0) + Number(booking.moneyPaid ?? 0) === 0 && <Row label="Method" value={PAYMENT_METHODS[booking.paymentMethod] ?? '—'} />}
               </dl>
               {booking.status === 'PENDING_PAYMENT' && (
                 <Link

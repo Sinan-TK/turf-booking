@@ -36,6 +36,8 @@ interface Booking {
 const STATUS_OPTIONS = [
   { value: '', label: 'All' },
   { value: 'PENDING_PAYMENT', label: 'Pending payment' },
+  { value: 'PROCESSING', label: 'Payment confirming' },
+  { value: 'FAILED', label: 'Failed' },
   { value: 'CONFIRMED', label: 'Confirmed' },
   { value: 'COMPLETED', label: 'Completed' },
   { value: 'CANCELLED', label: 'Cancelled' },

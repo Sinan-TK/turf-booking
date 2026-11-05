@@ -12,6 +12,7 @@ import { SvgIcon } from '@/components/svg-icons';
 import { FacilityIcon } from '@/components/facility-icon';
 import { VenueMapLink } from '@/components/venue-map-link';
 import { VenueAdvanceBooking } from '@/components/venue-advance-booking';
+import { VenueContactPhone } from '@/components/venue-contact-phone';
 import { VenueDescription } from '@/components/venue-description';
 import { BlockedDatesSection, UnitTools } from '@/components/venue-availability';
 import { AddPooledItem, GroupCard, type Group } from '@/components/venue-pooled-groups';
@@ -39,6 +40,7 @@ interface Venue {
   address: string;
   googleMapsUrl: string | null;
   advanceBookingDays: number;
+  contactPhone?: string | null;
   status: string;
   timezone: string;
   defaultSlotGranularityMinutes: number;
@@ -269,6 +271,7 @@ export default function VenueDetailPage() {
             <VenueDescription venueId={venue.id} description={venue.description} onSaved={() => refetch()} />
             <VenueMapLink venueId={venue.id} link={venue.googleMapsUrl} onSaved={() => refetch()} />
             <VenueAdvanceBooking venueId={venue.id} days={venue.advanceBookingDays} onSaved={() => refetch()} />
+            <VenueContactPhone venueId={venue.id} phone={venue.contactPhone ?? null} onSaved={() => refetch()} />
           </div>
           <div className="divide-y divide-outline-variant/20">
             <div className="py-3">

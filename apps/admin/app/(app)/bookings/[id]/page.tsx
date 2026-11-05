@@ -32,6 +32,9 @@ interface BookingDetail {
   endTime: string;
   groundType: string;
   paymentMethod: string | null;
+  coinsPaid?: string;
+  moneyPaid?: string;
+  processingUntil?: string | null;
   cancellationReasonCode: string | null;
   cancellationNote: string | null;
   venue: { name: string; facilityCode: string };
@@ -111,7 +114,11 @@ export default function BookingDetailPage() {
           </div>
           <div>
             <dt className="text-gray-500">Payment Method</dt>
-            <dd>{booking.paymentMethod || '—'}</dd>
+            <dd>
+              {booking.paymentMethod || '—'}
+              {Number(booking.coinsPaid ?? 0) > 0 && <span className="block text-xs text-gray-500">{booking.currency} {booking.coinsPaid} paid with Coins</span>}
+              {Number(booking.moneyPaid ?? 0) > 0 && <span className="block text-xs text-gray-500">{booking.currency} {booking.moneyPaid} paid online</span>}
+            </dd>
           </div>
           {booking.cancellationReasonCode && (
             <div className="col-span-2">

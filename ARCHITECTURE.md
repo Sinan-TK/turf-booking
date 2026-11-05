@@ -1731,3 +1731,12 @@ are called out explicitly where they occur (Promotions, Notifications,
 WhatsApp settings, Admin Users CRUD, general Reports/Analytics, VENUE-
 scoped cancellation-policy assignment, footprint-propagation for
 resource-specific blackouts) rather than silently omitted.
+
+## Payments in flight, late payments and wallet top-ups
+
+- A booking is paid either with Razorpay or with Coins, never a mix (unchanged). `Booking.coinsPaid` / `moneyPaid` record which, and how much.
+- **The webhook is not the only way a payment confirms.** When the customer's browser reports success, `POST /payments/verify` checks the signature and the caller, moves the booking to **PROCESSING** (the slot stays locked for `PAYMENT_PROCESSING_MINUTES`, default 5) and asks Razorpay's API directly whether the payment was captured. A reconciler (every minute, `PaymentReconcilerService`) does the same for payments whose browser never reported and whose webhook never came. The webhook, the browser path and the reconciler all run the same idempotent `PaymentsService.settleCapture`.
+- At the end of the processing window, after one last look at Razorpay, a booking with nothing captured becomes **FAILED** and its slot is released. A payment captured later is honoured if the slot is still free (the single-unit lock row is switched back on; the database exclusion constraint refuses it if someone else booked the slot), otherwise it is refunded in full as Coins and the customer is told. A booking cancelled by the customer or staff is never revived.
+- Webhook events that failed before are re-run when Razorpay re-sends them; only PROCESSED events are duplicates. A failed attempt that is retried on the same order and captured still confirms. A captured amount that differs from what was asked is never trusted: it is refunded as Coins (bookings) or not credited (top-ups).
+- **Wallet top-up** (`POST /me/coins/topup`): Coins bought with money, 1:1, between `WALLET_TOPUP_MIN` and `WALLET_TOPUP_MAX`. Credited once through the same idempotent ledger (`topup:<id>`). Top-ups are never refunded to the card; Coins only leave as bookings.
+- `Venue.contactPhone` (falls back to the owner organization's number) is returned only to a customer whose booking is confirmed, never by the public venue lookup.
