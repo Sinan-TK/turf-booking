@@ -45,6 +45,17 @@ function write(key: string, data: unknown): void {
   }
 }
 
+/** Forget one kept list (it changed somewhere else), so the next visit to it waits for the live answer instead of showing the old one. */
+export function forgetAccountData(customerId: string, name: string): void {
+  try {
+    const store = load();
+    delete store[`${customerId}:${name}`];
+    window.sessionStorage.setItem(KEY, JSON.stringify(store));
+  } catch {
+    // nothing to forget
+  }
+}
+
 /** Forget everything kept for the account pages (on log out). */
 export function clearAccountCache(): void {
   try {

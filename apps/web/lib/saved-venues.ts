@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
+import { forgetAccountData } from '@/lib/account-cache';
 import { useToast } from '@/components/toast';
 
 /**
@@ -15,8 +16,9 @@ export function useSavedVenues() {
   useEffect(() => {
     if (!customer) return setSavedIds(new Set());
     api
-      .get<Array<{ venueId?: string; venue?: { id: string } }>>('/me/saved-venues')
-      .then((rows) => setSavedIds(new Set(rows.map((r) => r.venue?.id ?? r.venueId ?? '').filter(Boolean))))
+      // The list is the saved venues themselves (each has its own id); older shapes carried a venueId or a nested venue.
+      .get<Array<{ id?: string; venueId?: string; venue?: { id: string } }>>('/me/saved-venues')
+      .then((rows) => setSavedIds(new Set(rows.map((r) => r.id ?? r.venue?.id ?? r.venueId ?? '').filter(Boolean))))
       .catch(() => undefined);
   }, [customer]);
 
@@ -38,6 +40,7 @@ export function useSavedVenues() {
     try {
       if (wasSaved) await api.delete(`/me/saved-venues/${venueId}`);
       else await api.post('/me/saved-venues', { venueId });
+      if (customer) forgetAccountData(customer.id, 'saved-venues'); // the Saved tab shows the change, not its older copy
     } catch {
       flip(wasSaved);
       toast.show(wasSaved ? 'Could not remove it from your saved venues.' : 'Could not save that venue. Please try again.');
