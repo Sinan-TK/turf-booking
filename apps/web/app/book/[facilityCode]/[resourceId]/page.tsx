@@ -72,7 +72,6 @@ function Pictures({ unit, venueName, saved, onToggleSave }: { unit: SearchResult
     return [...own, ...(unit.venue.photoUrl && !own.includes(unit.venue.photoUrl) ? [unit.venue.photoUrl] : [])];
   }, [unit]);
   const [index, setIndex] = useState(0);
-  const [ready, setReady] = useState<string | null>(null); // the picture that has finished loading (it fades in over the grey field)
   const shown = photos[Math.min(index, photos.length - 1)];
 
   // Several photos move on by themselves every few seconds; the pointer over the picture (or a dot in focus) holds them, and so does
@@ -92,8 +91,20 @@ function Pictures({ unit, venueName, saved, onToggleSave }: { unit: SearchResult
         onFocus={() => setHeld(true)}
         onBlur={() => setHeld(false)}
         className="relative aspect-[16/9] overflow-hidden rounded-xl bg-stone-200 sm:aspect-[16/7]">
-        {shown ? (
-          <img key={shown} src={shown} alt={`${venueName}, ${unit.resource.name}`} onLoad={() => setReady(shown)} className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${ready === shown ? 'opacity-100' : 'opacity-0'}`} />
+        {photos.length > 0 ? (
+          // Every photo is stacked and loaded up front; the shown one fades in over the others, so a change is a smooth cross-fade, never a blank.
+          photos.map((src) => {
+            const active = src === shown;
+            return (
+              <img
+                key={src}
+                src={src}
+                alt={active ? `${venueName}, ${unit.resource.name}` : ''}
+                aria-hidden={active ? undefined : true}
+                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-[900ms] ease-in-out ${active ? 'opacity-100' : 'opacity-0'}`}
+              />
+            );
+          })
         ) : (
           <div aria-hidden="true" className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-stone-100 via-stone-200 to-stone-300">
             <CategoryIcon iconKey={unit.category?.iconKey ?? 'category'} iconSvg={unit.category?.iconSvg} className="text-[6rem] text-stone-500/70" />
@@ -121,19 +132,25 @@ function Pictures({ unit, venueName, saved, onToggleSave }: { unit: SearchResult
         </a>
         {photos.length > 1 && (
           // More than one photo: dots at the bottom left of the big picture; tapping one shows that photo (no strip of previews below).
-          <div role="group" aria-label="Photos" className="absolute bottom-3 left-3 flex items-center">
-            {photos.map((src, i) => (
-              <button
-                key={src}
-                type="button"
-                onClick={() => setIndex(i)}
-                aria-label={`Photo ${i + 1} of ${photos.length}`}
-                aria-current={i === Math.min(index, photos.length - 1)}
-                className="flex h-5 w-4 items-center justify-center"
-              >
-                <span className={`block h-1.5 w-1.5 rounded-full shadow-[0_0_2px_rgba(0,0,0,0.5)] transition ${i === Math.min(index, photos.length - 1) ? 'scale-125 bg-white' : 'bg-white/55'}`} />
-              </button>
-            ))}
+          // A small glass capsule: the shown photo's dot stretches into a bar that fills up as the next change gets closer (it stops while held).
+          <div role="group" aria-label="Photos" className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-black/30 px-2 py-1 backdrop-blur-md">
+            {photos.map((src, i) => {
+              const on = i === Math.min(index, photos.length - 1);
+              return (
+                <button
+                  key={src}
+                  type="button"
+                  onClick={() => setIndex(i)}
+                  aria-label={`Photo ${i + 1} of ${photos.length}`}
+                  aria-current={on}
+                  className="flex h-4 items-center px-0.5"
+                >
+                  <span className={`relative block h-1.5 overflow-hidden rounded-full bg-white/45 transition-[width] duration-500 ease-out ${on ? 'w-6' : 'w-1.5 hover:bg-white/80'}`}>
+                    {on && <span key={index} className="photo-dot-fill absolute inset-y-0 left-0 w-full rounded-full bg-white" style={{ animationPlayState: held ? 'paused' : 'running' }} />}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

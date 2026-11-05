@@ -171,3 +171,22 @@ html {
     stroke-dashoffset: 0;
   }
 }
+
+/* The shown photo's dot on the venue page: a bar that fills across the 3.5 seconds before the next photo (see Pictures). */
+.photo-dot-fill {
+  transform-origin: left center;
+  animation: photo-dot-fill 3.5s linear forwards;
+}
+@keyframes photo-dot-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .photo-dot-fill {
+    animation: none;
+  }
+}
