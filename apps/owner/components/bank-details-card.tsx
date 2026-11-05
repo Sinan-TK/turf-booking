@@ -5,6 +5,7 @@ import { api, ApiError } from '@/lib/api';
 import { useFetch } from '@/lib/use-fetch';
 import { Badge, Button, Card, ErrorBanner, FieldError, Input, Label, PasswordInput, Select, SuccessBanner, invalidClass } from '@/components/ui';
 import { SvgIcon } from '@/components/svg-icons';
+import { Modal } from '@/components/modal';
 import { hasErrors, type FieldErrors } from '@/lib/validation';
 
 interface BankAccount {
@@ -190,34 +191,6 @@ export function BankDetailsCard() {
                 <Row label="Bank" value={data.bankName} />
                 <Row label="Account type" value={data.accountType === 'CURRENT' ? 'Current' : 'Savings'} />
               </dl>
-              {revealing && !revealed && (
-                <form onSubmit={reveal} className="mt-3 rounded-xl border border-outline-variant/40 p-3" noValidate>
-                  <Label htmlFor="bank-reveal-password">Your password</Label>
-                  <div className="flex flex-wrap items-start gap-2">
-                    <div className="min-w-[14rem] flex-1">
-                      <PasswordInput
-                        id="bank-reveal-password"
-                        autoComplete="current-password"
-                        aria-invalid={!!revealError}
-                        aria-describedby={revealError ? 'bank-reveal-error' : undefined}
-                        className={revealError ? invalidClass : ''}
-                        value={revealPassword}
-                        onChange={(e) => {
-                          setRevealPassword(e.target.value);
-                          setRevealError(null);
-                        }}
-                      />
-                      <FieldError id="bank-reveal-error" message={revealError ?? undefined} />
-                    </div>
-                    <Button type="submit" disabled={checking}>
-                      {checking ? 'Checking…' : 'Show number'}
-                    </Button>
-                    <Button type="button" variant="secondary" disabled={checking} onClick={() => setRevealing(false)}>
-                      Cancel
-                    </Button>
-                  </div>
-                </form>
-              )}
               <p className="mt-3 text-xs text-on-surface-variant">{STATUS_NOTE[data.status]}</p>
               {data.status === 'FAILED' && data.failureReason && (
                 <p role="alert" className="mt-2 rounded-lg bg-error-container px-3 py-2 text-xs text-on-error-container">
@@ -273,6 +246,36 @@ export function BankDetailsCard() {
             </Button>
           </div>
         </form>
+      )}
+      {revealing && !revealed && (
+        <Modal title="View account number" subtitle="Type your password to see the full number." onClose={() => setRevealing(false)} busy={checking}>
+          <form onSubmit={reveal} className="space-y-4 p-6" noValidate>
+            <div>
+              <Label htmlFor="bank-reveal-password">Your password</Label>
+              <PasswordInput
+                id="bank-reveal-password"
+                autoComplete="current-password"
+                aria-invalid={!!revealError}
+                aria-describedby={revealError ? 'bank-reveal-error' : undefined}
+                className={revealError ? invalidClass : ''}
+                value={revealPassword}
+                onChange={(e) => {
+                  setRevealPassword(e.target.value);
+                  setRevealError(null);
+                }}
+              />
+              <FieldError id="bank-reveal-error" message={revealError ?? undefined} />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" disabled={checking} onClick={() => setRevealing(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={checking}>
+                {checking ? 'Checking…' : 'Show number'}
+              </Button>
+            </div>
+          </form>
+        </Modal>
       )}
     </Card>
   );
