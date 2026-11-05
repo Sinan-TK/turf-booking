@@ -57,13 +57,34 @@ export class BankAccountsService {
     return row ? this.view(row, true) : NONE;
   }
 
-  async save(dto: SaveBankAccountDto, actor: AuthContext) {
+  /** The signed-in owner must type their own password again. The same message whether it is wrong or the login has none. */
+  private async assertPassword(actor: AuthContext, password: string, refusal: string) {
     const organizationId = this.orgOf(actor);
     const user = await this.prisma.client.venueOwnerUser.findUnique({ where: { id: actor.id } });
-    // The same message whether the password is wrong or the login has none, so nothing is revealed.
-    if (!user || user.organizationId !== organizationId || !user.passwordHash || !(await verifyPassword(dto.password, user.passwordHash))) {
-      throw new ForbiddenException('That password is not right. Your bank details were not changed.');
+    if (!user || user.organizationId !== organizationId || !user.passwordHash || !(await verifyPassword(password, user.passwordHash))) {
+      throw new ForbiddenException(refusal);
     }
+  }
+
+  /** The whole account number, for the owner who types their password. Every view is written to the audit log. */
+  async reveal(password: string, actor: AuthContext) {
+    const organizationId = this.orgOf(actor);
+    await this.assertPassword(actor, password, 'That password is not right.');
+    const row = await this.prisma.client.organizationBankAccount.findUnique({ where: { organizationId } });
+    if (!row) throw new NotFoundException('You have not added bank details yet');
+    await this.audit.record({
+      actor,
+      action: 'BANK_ACCOUNT_NUMBER_VIEWED',
+      entityType: 'OwnerOrganization',
+      entityId: organizationId,
+      metadata: { last4: row.accountNumber.slice(-4) },
+    });
+    return { accountNumber: row.accountNumber };
+  }
+
+  async save(dto: SaveBankAccountDto, actor: AuthContext) {
+    const organizationId = this.orgOf(actor);
+    await this.assertPassword(actor, dto.password, 'That password is not right. Your bank details were not changed.');
     const data = {
       accountHolderName: dto.accountHolderName,
       accountNumber: dto.accountNumber,

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, UseGuards } from '@nestjs/common';
 import { Role } from '@venue/shared';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -7,7 +7,7 @@ import { OwnerRoles } from '../auth/decorators/owner-roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { BankAccountsService } from './bank-accounts.service';
-import { FailBankAccountDto, SaveBankAccountDto } from './dto/bank-account.dto';
+import { FailBankAccountDto, RevealBankAccountDto, SaveBankAccountDto } from './dto/bank-account.dto';
 
 /** The owner admin's own business: read it (number masked) and change it with their password. */
 @Controller('owner/bank-account')
@@ -20,6 +20,13 @@ export class OwnerBankAccountController {
   @Get()
   get(@CurrentUser() actor: AuthContext) {
     return this.accounts.getForOwner(actor);
+  }
+
+  /** The full account number, after the owner types their password again. */
+  @Post('reveal')
+  @HttpCode(200)
+  reveal(@Body() dto: RevealBankAccountDto, @CurrentUser() actor: AuthContext) {
+    return this.accounts.reveal(dto.password, actor);
   }
 
   @Put()

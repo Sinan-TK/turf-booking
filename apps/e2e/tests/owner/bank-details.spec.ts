@@ -43,5 +43,18 @@ test.describe('owner portal: bank details', () => {
     await expect(page.getByText(`4455${stamp}00`)).toHaveCount(0);
     await expect(page.getByText('HDFC0001234')).toBeVisible();
     await expect(page.getByText('NOT VERIFIED', { exact: true })).toBeVisible();
+
+    // The whole number appears only after the password; a wrong one shows nothing.
+    const full = `4455${stamp}00`;
+    await page.getByRole('button', { name: 'View account number' }).click();
+    await page.getByLabel('Your password').fill('not-my-password');
+    await page.getByRole('button', { name: 'Show number' }).click();
+    await expect(page.getByText('That password is not right.')).toBeVisible();
+    await expect(page.getByText(full)).toHaveCount(0);
+    await page.getByLabel('Your password').fill(ACCOUNTS.owner.password);
+    await page.getByRole('button', { name: 'Show number' }).click();
+    await expect(page.getByTestId('account-number')).toHaveText(full);
+    await page.getByRole('button', { name: 'Hide account number' }).click();
+    await expect(page.getByTestId('account-number')).not.toHaveText(full);
   });
 });

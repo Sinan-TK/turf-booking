@@ -69,6 +69,22 @@ describe('Business bank details', () => {
     expect(JSON.stringify(log?.metadata)).not.toContain('123456789012');
   });
 
+  test('the full number is shown only with the password, and each view is logged', async () => {
+    const viewed = () => prisma.auditLog.count({ where: { action: 'BANK_ACCOUNT_NUMBER_VIEWED', entityId: owner.organizationId } });
+    const before = await viewed();
+    expect((await owner.ownerAgent.post('/owner/bank-account/reveal').send({ password: 'nope' })).status).toBe(403);
+    expect((await owner.ownerAgent.post('/owner/bank-account/reveal').send({})).status).toBe(400);
+    expect(await viewed()).toBe(before);
+    const ok = await owner.ownerAgent.post('/owner/bank-account/reveal').send({ password: PASSWORD });
+    expect(ok.status).toBe(200);
+    expect(ok.body).toEqual({ accountNumber: '123456789012' });
+    expect(await viewed()).toBe(before + 1);
+    const staff = await createStaffFixture(app, owner.organizationId, [venueId]);
+    expect((await staff.agent.post('/owner/bank-account/reveal').send({ password: PASSWORD })).status).toBe(403);
+    const other = await createOwnerFixture(app, adminAgent);
+    expect((await other.ownerAgent.post('/owner/bank-account/reveal').send({ password: PASSWORD })).status).toBe(403);
+  });
+
   test('the details are checked', async () => {
     const bad = async (over: Record<string, unknown>) => (await owner.ownerAgent.put('/owner/bank-account').send(details(over))).status;
     expect(await bad({ ifsc: 'HDFC1234567' })).toBe(400); // fifth character must be 0

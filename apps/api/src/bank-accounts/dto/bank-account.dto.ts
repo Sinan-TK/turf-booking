@@ -22,6 +22,9 @@ export const saveBankAccountSchema = z.object({
 });
 export class SaveBankAccountDto extends createZodDto(saveBankAccountSchema) {}
 
+export const revealBankAccountSchema = z.object({ password: z.string().min(1, 'Enter your password').max(200) });
+export class RevealBankAccountDto extends createZodDto(revealBankAccountSchema) {}
+
 export const failBankAccountSchema = z.object({
   reason: z.string().transform(clean).pipe(z.string().min(3, 'Say what is wrong, so the owner can fix it').max(300)),
 });

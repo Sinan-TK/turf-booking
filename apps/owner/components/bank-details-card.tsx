@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useFetch } from '@/lib/use-fetch';
 import { Badge, Button, Card, ErrorBanner, FieldError, Input, Label, PasswordInput, Select, SuccessBanner, invalidClass } from '@/components/ui';
@@ -50,6 +50,39 @@ export function BankDetailsCard() {
   };
 
   const has = !!data && data.status !== 'NONE';
+
+  // The full account number: shown only after the password is typed, and hidden again after half a minute.
+  const [revealing, setRevealing] = useState(false);
+  const [revealPassword, setRevealPassword] = useState('');
+  const [revealError, setRevealError] = useState<string | null>(null);
+  const [revealed, setRevealed] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  useEffect(() => {
+    if (!revealed) return;
+    const t = setTimeout(() => setRevealed(null), 30_000);
+    return () => clearTimeout(t);
+  }, [revealed]);
+
+  async function reveal(e: React.FormEvent) {
+    e.preventDefault();
+    if (!revealPassword) {
+      setRevealError('Enter your password.');
+      return;
+    }
+    setChecking(true);
+    setRevealError(null);
+    try {
+      const res = await api.post<{ accountNumber: string }>('/owner/bank-account/reveal', { password: revealPassword });
+      setRevealed(res.accountNumber);
+      setRevealing(false);
+      setRevealPassword('');
+    } catch (err) {
+      setRevealError(err instanceof ApiError ? err.message : 'Could not show the number');
+      setRevealPassword('');
+    } finally {
+      setChecking(false);
+    }
+  }
 
   function open() {
     setForm({
@@ -132,11 +165,57 @@ export function BankDetailsCard() {
             <>
               <dl className="grid gap-x-8 gap-y-4 rounded-xl bg-surface-container-low p-4 text-sm sm:grid-cols-2">
                 <Row label="Account holder" value={data.accountHolderName} />
-                <Row label="Account number" value={data.accountNumber} mono />
+                <div className="min-w-0">
+                  <dt className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">Account number</dt>
+                  <dd data-testid="account-number" className="mt-0.5 break-words font-mono font-medium tracking-wide text-on-surface">{revealed ?? data.accountNumber}</dd>
+                  <dd className="mt-1">
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+                      onClick={() => {
+                        if (revealed) setRevealed(null);
+                        else {
+                          setRevealError(null);
+                          setRevealing((v) => !v);
+                        }
+                      }}
+                    >
+                      {revealed ? 'Hide account number' : 'View account number'}
+                    </button>
+                  </dd>
+                </div>
                 <Row label="IFSC" value={data.ifsc} mono />
                 <Row label="Bank" value={data.bankName} />
                 <Row label="Account type" value={data.accountType === 'CURRENT' ? 'Current' : 'Savings'} />
               </dl>
+              {revealing && !revealed && (
+                <form onSubmit={reveal} className="mt-3 rounded-xl border border-outline-variant/40 p-3" noValidate>
+                  <Label htmlFor="bank-reveal-password">Your password</Label>
+                  <div className="flex flex-wrap items-start gap-2">
+                    <div className="min-w-[14rem] flex-1">
+                      <PasswordInput
+                        id="bank-reveal-password"
+                        autoComplete="current-password"
+                        aria-invalid={!!revealError}
+                        aria-describedby={revealError ? 'bank-reveal-error' : undefined}
+                        className={revealError ? invalidClass : ''}
+                        value={revealPassword}
+                        onChange={(e) => {
+                          setRevealPassword(e.target.value);
+                          setRevealError(null);
+                        }}
+                      />
+                      <FieldError id="bank-reveal-error" message={revealError ?? undefined} />
+                    </div>
+                    <Button type="submit" disabled={checking}>
+                      {checking ? 'Checking…' : 'Show number'}
+                    </Button>
+                    <Button type="button" variant="secondary" disabled={checking} onClick={() => setRevealing(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              )}
               <p className="mt-3 text-xs text-on-surface-variant">{STATUS_NOTE[data.status]}</p>
               {data.status === 'FAILED' && data.failureReason && (
                 <p role="alert" className="mt-2 rounded-lg bg-error-container px-3 py-2 text-xs text-on-error-container">
