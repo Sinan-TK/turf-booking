@@ -561,7 +561,7 @@ function UnitPanel({
       <section aria-label={unit.name} className="overflow-hidden rounded-xl bg-surface-container-lowest shadow-sm ring-1 ring-outline-variant/30">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/20 bg-surface-container-low px-container-padding py-4">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-on-primary">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-container-lowest text-on-surface ring-1 ring-outline-variant/50">
               <FacilityIcon iconKey={facility.iconKey} iconSvg={facility.iconSvg} className="text-[24px]" />
             </span>
             <div>
