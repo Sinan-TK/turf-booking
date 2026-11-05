@@ -142,7 +142,10 @@ export function WalletTopupSheet({
       <div className="absolute inset-0 bg-slate-900/50" onMouseDown={() => !busy && !waiting && onClose()} aria-hidden="true" />
       <div role="dialog" aria-modal="true" aria-label="Add money to wallet" className="relative w-full max-w-md rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-900">Add money to your wallet</h2>
+          <h2 className="flex items-center gap-2.5 text-lg font-bold text-slate-900">
+            <Icon name="coin" className="text-[2.25rem]" />
+            Add money to your wallet
+          </h2>
           <button type="button" aria-label="Close" onClick={onClose} disabled={busy || waiting} className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:opacity-40">
             <Icon name="close" className="text-[1.125rem]" />
           </button>
