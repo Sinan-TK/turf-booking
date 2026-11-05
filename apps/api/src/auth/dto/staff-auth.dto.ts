@@ -1,7 +1,12 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { passwordPolicyProblem } from '@venue/shared';
 
-const password = z.string().min(8).max(128);
+/** A NEW password: 8 or more characters with a capital, a small letter, a number and a special character. */
+const password = z.string().max(128).superRefine((v, ctx) => {
+  const problem = passwordPolicyProblem(v);
+  if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem });
+});
 
 export const staffLoginSchema = z.object({
   email: z.string().email().max(254),

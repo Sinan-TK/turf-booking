@@ -1,5 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { passwordPolicyProblem } from '@venue/shared';
 
 export const requestCodeSchema = z.object({ phone: z.string().min(1).max(30) });
 export class RequestCodeDto extends createZodDto(requestCodeSchema) {}
@@ -11,7 +12,13 @@ export const verifyCodeSchema = z.object({
 export class VerifyCodeDto extends createZodDto(verifyCodeSchema) {}
 
 const email = z.string().trim().email('Enter a valid email address, like you@example.com.').max(254);
-const newPassword = z.string().min(8, 'Use at least 8 characters.').max(128, 'Use at most 128 characters.');
+const newPassword = z
+  .string()
+  .max(128, 'Use at most 128 characters.')
+  .superRefine((v, ctx) => {
+    const problem = passwordPolicyProblem(v);
+    if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem });
+  });
 const name = z.string().trim().min(1, 'Enter your name.').max(80);
 
 /** Google's signed ID token, as the browser's "Sign in with Google" button returns it. */

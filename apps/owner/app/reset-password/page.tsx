@@ -70,7 +70,7 @@ export default function ResetPasswordPage() {
             }}
           />
           <FieldError id="reset-password-error" message={passwordMsg} />
-          <p className="mt-1.5 text-xs text-on-surface-variant">At least 8 characters.</p>
+          <p className="mt-1.5 text-xs text-on-surface-variant">At least 8 characters, with a capital letter, a small letter, a number and a special character.</p>
         </div>
         <Button type="submit" disabled={submitting || !token} className="w-full py-2.5">
           {submitting ? 'Saving…' : 'Set password'}

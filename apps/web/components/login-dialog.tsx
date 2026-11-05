@@ -541,7 +541,7 @@ export function LoginDialog({
                         }}
                       />
                       <FieldError id="login-password-error" message={msgs.password} />
-                      <p className="mt-1 text-xs text-slate-500">At least 8 characters.</p>
+                      <p className="mt-1 text-xs text-slate-500">At least 8 characters, with a capital letter, a small letter, a number and a special character.</p>
                     </div>
                     <Button type="submit" className="w-full" disabled={busy}>
                       {busy ? 'Creating…' : 'Create account'}
@@ -677,7 +677,7 @@ export function LoginDialog({
                 }}
               />
               <FieldError id="login-password-error" message={msgs.password} />
-              <p className="mt-1 text-xs text-slate-500">At least 8 characters.</p>
+              <p className="mt-1 text-xs text-slate-500">At least 8 characters, with a capital letter, a small letter, a number and a special character.</p>
             </div>
             <div>
               <Label htmlFor="login-confirm">Repeat the password</Label>

@@ -87,7 +87,7 @@ describe('Customer sign-in with Google', () => {
   test('a mailbox already proven (by a reset code) is linked to the Google account, keeping its password', async () => {
     const e = email();
     const subLinked = `sub-linked-${uniqueSuffix()}`;
-    const existing = await unprovenPasswordAccount(e, 'Linked Person', 'a-long-password');
+    const existing = await unprovenPasswordAccount(e, 'Linked Person', 'A-long-password1!');
     await prisma.customerProfile.update({ where: { id: existing.id }, data: { emailVerified: true } });
 
     const res = await google(agentFor(app), token(e, 'Linked Person', subLinked));

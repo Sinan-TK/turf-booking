@@ -12,5 +12,6 @@ export * from './schemas/search';
 export * from './schemas/booking';
 export * from './unit-duration';
 export * from './icon-svg';
+export * from './password-policy';
 
 export * from './csp';

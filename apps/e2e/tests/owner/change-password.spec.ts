@@ -5,6 +5,14 @@ test.describe('owner portal: change password', () => {
   test('the new password must be typed twice, the same both times', async ({ page }) => {
     await page.goto('/settings');
     await page.getByLabel('Current Password').fill('whatever-current');
+    // The rules: 8 characters, a capital, a small letter, a number and a special character.
+    await page.getByLabel('New Password', { exact: true }).fill('alllowercase1!');
+    await page.getByRole('button', { name: 'Change Password' }).click();
+    await expect(page.getByText('Use a capital letter, a small letter, a number and a special character.')).toBeVisible();
+    await page.getByLabel('New Password', { exact: true }).fill('Short1!');
+    await page.getByRole('button', { name: 'Change Password' }).click();
+    await expect(page.getByText('Use at least 8 characters.')).toBeVisible();
+
     await page.getByLabel('New Password', { exact: true }).fill('Brand-new-pass-1');
     await page.getByLabel('Confirm New Password').fill('Brand-new-pass-2');
     await page.getByRole('button', { name: 'Change Password' }).click();

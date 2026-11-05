@@ -40,11 +40,14 @@ export function emailError(value: string): string | undefined {
 /** A new password (sign-up, reset, change). Signing in only asks that something was typed. */
 export function newPasswordError(value: string): string | undefined {
   if (!value) return 'Enter a password.';
-  if (value.length < 8) return 'Use at least 8 characters.';
   if (value.length > 128) return 'Use at most 128 characters.';
+  if (value.length < 8) return 'Use at least 8 characters.';
+  if (!/[A-Z]/.test(value) || !/[a-z]/.test(value) || !/\d/.test(value) || !/[^A-Za-z0-9\s]/.test(value)) {
+    return 'Use a capital letter, a small letter, a number and a special character.';
+  }
 }
 
-/** How hard a password is to guess, for the meter shown while typing. Informational: the only rule is 8 to 128 characters. */
+/** How hard a password is to guess, for the meter shown while typing. Informational: the rules are checked separately. */
 export function passwordStrength(value: string): { level: 0 | 1 | 2 | 3; label: string } {
   if (value.length < 8) return { level: 0, label: value ? 'Too short' : '' };
   const points =
@@ -62,7 +65,7 @@ export function passwordError(value: string): string | undefined {
 }
 
 export interface PasswordRule {
-  id: 'length' | 'different';
+  id: 'length' | 'upper' | 'lower' | 'digit' | 'special' | 'different';
   label: string;
   ok: boolean;
 }
@@ -71,6 +74,10 @@ export interface PasswordRule {
 export function passwordRules(next: string, current: string): PasswordRule[] {
   return [
     { id: 'length', label: '8 to 128 characters', ok: next.length >= 8 && next.length <= 128 },
+    { id: 'upper', label: 'One capital letter', ok: /[A-Z]/.test(next) },
+    { id: 'lower', label: 'One small letter', ok: /[a-z]/.test(next) },
+    { id: 'digit', label: 'One number', ok: /\d/.test(next) },
+    { id: 'special', label: 'One special character, like ! or @', ok: /[^A-Za-z0-9\s]/.test(next) },
     { id: 'different', label: 'Different from your current password', ok: !!next && (!current || next !== current) },
   ];
 }

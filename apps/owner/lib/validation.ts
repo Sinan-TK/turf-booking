@@ -12,8 +12,11 @@ export function emailError(value: string): string | undefined {
 
 export function newPasswordError(value: string): string | undefined {
   if (!value) return 'Enter a new password.';
-  if (value.length < 8) return 'Use at least 8 characters.';
   if (value.length > 128) return 'Use at most 128 characters.';
+  if (value.length < 8) return 'Use at least 8 characters.';
+  if (!/[A-Z]/.test(value) || !/[a-z]/.test(value) || !/\d/.test(value) || !/[^A-Za-z0-9\s]/.test(value)) {
+    return 'Use a capital letter, a small letter, a number and a special character.';
+  }
 }
 
 /** Required text with an optional length range; `label` reads like "Venue name". */

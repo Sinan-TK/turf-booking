@@ -77,7 +77,7 @@ export default function ResetPasswordPage() {
             }}
           />
           <FieldError id="reset-password-error" message={passwordMsg} />
-          <p className="mt-1.5 text-xs text-gray-500">At least 8 characters.</p>
+          <p className="mt-1.5 text-xs text-gray-500">At least 8 characters, with a capital letter, a small letter, a number and a special character.</p>
         </div>
         <Button type="submit" loading={submitting} disabled={!token} className="w-full">
           {submitting ? 'Saving…' : 'Set password'}

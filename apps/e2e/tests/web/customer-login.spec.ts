@@ -120,7 +120,7 @@ test.describe('customer sign-in', () => {
     await expect(nav.getByLabel('Search venues')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Log in' })).toHaveCount(0);
     await nav.getByRole('button', { name: 'Go back' }).click();
-    await expect(page).not.toHaveURL(//account/);
+    await expect(page).not.toHaveURL(/\/account/);
     await page.goto('/account');
 
     // Edit stands out: a solid green button, not a plain outline.

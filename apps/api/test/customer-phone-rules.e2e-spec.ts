@@ -65,7 +65,7 @@ describe('Customer phone number rules', () => {
     // The same when starting a sign-up.
     const signup = await agentFor(app)
       .post('/customer-auth/signup')
-      .send({ name: 'Taker', email: email(), phone: p, password: 'a-long-password' });
+      .send({ name: 'Taker', email: email(), phone: p, password: 'A-long-password1!' });
     expect(signup.status).toBe(409);
   });
 

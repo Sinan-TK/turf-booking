@@ -61,7 +61,12 @@ describe('Staff auth links & password changes', () => {
       .send({ token: raw, password: 'short' });
     expect(tooShort.status).toBe(400);
 
-    const newPassword = 'a-brand-new-password';
+    for (const weak of ['alllowercase1!', 'ALLUPPERCASE1!', 'NoNumbersHere!', 'NoSpecial12345']) {
+      const res = await request(app.getHttpServer()).post('/auth/admin/reset-password').send({ token: raw, password: weak });
+      expect([weak, res.status]).toEqual([weak, 400]);
+    }
+
+    const newPassword = 'A-brand-new-password1!';
     const ok = await request(app.getHttpServer())
       .post('/auth/admin/reset-password')
       .send({ token: raw, password: newPassword });
@@ -69,7 +74,7 @@ describe('Staff auth links & password changes', () => {
 
     const reuse = await request(app.getHttpServer())
       .post('/auth/admin/reset-password')
-      .send({ token: raw, password: 'yet-another-password' });
+      .send({ token: raw, password: 'Yet-another-password1!' });
     expect(reuse.status).toBe(400);
 
     const oldLogin = await request(app.getHttpServer()).post('/auth/admin/login').send({ email, password });
@@ -103,7 +108,7 @@ describe('Staff auth links & password changes', () => {
       },
     });
 
-    const body = (token: string) => ({ token, password: 'long-enough-password' });
+    const body = (token: string) => ({ token, password: 'Long-enough-password1!' });
     expect(
       (await request(app.getHttpServer()).post('/auth/admin/reset-password').send(body(expired.raw))).status,
     ).toBe(400);
@@ -135,12 +140,12 @@ describe('Staff auth links & password changes', () => {
 
     const bad = await agent
       .post('/auth/admin/change-password')
-      .send({ currentPassword: 'wrong-wrong-wrong', newPassword: 'another-new-password' });
+      .send({ currentPassword: 'wrong-wrong-wrong', newPassword: 'Another-new-password1!' });
     expect(bad.status).toBe(400);
 
     const ok = await agent
       .post('/auth/admin/change-password')
-      .send({ currentPassword: password, newPassword: 'another-new-password' });
+      .send({ currentPassword: password, newPassword: 'Another-new-password1!' });
     expect(ok.status).toBe(200);
     expect((await agent.get('/auth/admin/me')).status).toBe(200);
 

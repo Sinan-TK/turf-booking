@@ -18,7 +18,7 @@ describe('Customer email + password', () => {
   const sent: MailMessage[] = [];
   const email = () => `pw-${uniqueSuffix()}@example.com`;
   const phone = () => `+9198${Math.floor(10_000_000 + Math.random() * 89_999_999)}`;
-  const PASSWORD = 'a-long-password';
+  const PASSWORD = 'A-long-password1!';
 
   const details = (e: string, over: Record<string, unknown> = {}) => ({ name: 'Pw Person', email: e, phone: phone(), password: PASSWORD, ...over });
   /** Step one of sign-up: checks the details and emails a code. */
@@ -165,12 +165,20 @@ describe('Customer email + password', () => {
 
     test('only a hash of the code and of the password is stored while sign-up waits', async () => {
       const e = email();
-      await signupStart(e, { password: 'very-secret-pw-1' });
+      await signupStart(e, { password: 'Very-secret-pw-1!' });
       const code = lastCodeFor(e)!;
       const row = await prisma.customerEmailCode.findFirstOrThrow({ where: { email: e } });
       expect(row.codeHash).not.toContain(code);
-      expect(JSON.stringify(row)).not.toContain('very-secret-pw-1');
+      expect(JSON.stringify(row)).not.toContain('Very-secret-pw-1!');
       expect((row.payload as { passwordHash: string }).passwordHash).toMatch(/^scrypt\$/);
+    });
+
+    test('a new password needs 8 characters, a capital, a small letter, a number and a special character', async () => {
+      for (const weak of ['Short1!', 'alllowercase1!', 'ALLUPPERCASE1!', 'NoNumbersHere!', 'NoSpecial12345']) {
+        const res = await signupStart(email(), { password: weak });
+        expect([weak, res.status]).toEqual([weak, 400]);
+      }
+      expect((await signupStart(email(), { password: 'Good-pass-1' })).status).toBe(200);
     });
 
     test('rejects a missing name, a bad email, a short password and a bad phone number', async () => {
@@ -231,13 +239,13 @@ describe('Customer email + password', () => {
 
     test('only the browser that started a sign-up can finish it: another start for the address cannot hijack it', async () => {
       const e = email();
-      await signupStart(e, { password: 'victims-own-pw-1' });
+      await signupStart(e, { password: 'Victims-own-pw-1!' });
       const victimTicket = tickets.get(e)!;
       const victimCode = lastCodeFor(e)!;
 
       // Someone else asks for a code for the same address (after the cooldown) with their own password.
       await ageCodes(e);
-      const attackerStart = await signupStart(e, { name: 'Attacker', password: 'attackers-pw-1' });
+      const attackerStart = await signupStart(e, { name: 'Attacker', password: 'Attackers-pw-1!' });
       expect(attackerStart.status).toBe(200);
       const attackerTicket = tickets.get(e)!;
       const newCode = lastCodeFor(e)!;
@@ -342,8 +350,8 @@ describe('Customer email + password', () => {
       await ageCodes(e);
       await forgot(e);
       const second = lastCodeFor(e)!;
-      if (second !== first) expect((await reset(e, first, 'new-password-1')).status).toBe(400); // superseded
-      expect((await reset(e, second, 'new-password-1')).status).toBe(200);
+      if (second !== first) expect((await reset(e, first, 'New-password-1!')).status).toBe(400); // superseded
+      expect((await reset(e, second, 'New-password-1!')).status).toBe(200);
     });
 
     test('the code sets the password once, verifies the email, signs every session out and cannot be reused', async () => {
@@ -355,24 +363,24 @@ describe('Customer email + password', () => {
       const code = lastCodeFor(e)!;
 
       expect((await reset(e, code, 'short')).status).toBe(400);
-      expect((await reset(e, wrongCode(code), 'new-password-1')).status).toBe(400);
-      const ok = await reset(e, code, 'new-password-1');
+      expect((await reset(e, wrongCode(code), 'New-password-1!')).status).toBe(400);
+      const ok = await reset(e, code, 'New-password-1!');
       expect(ok.status).toBe(200);
       expect(ok.headers['set-cookie']).toBeUndefined(); // setting a password does not sign anyone in
 
       expect((await rowByEmail(e)).emailVerified).toBe(true);
       expect((await agent.get('/customer-auth/me')).status).toBe(401); // the old session was revoked
       expect((await login(e, PASSWORD)).status).toBe(401);
-      expect((await login(e, 'new-password-1')).status).toBe(200);
-      expect((await reset(e, code, 'another-password-2')).status).toBe(400); // single use
+      expect((await login(e, 'New-password-1!')).status).toBe(200);
+      expect((await reset(e, code, 'Another-password-2!')).status).toBe(400); // single use
     });
 
     test('a wrong code for an unknown address looks the same as a wrong code for a real one', async () => {
       const e = email();
       await signup(e);
       await forgot(e);
-      const real = await reset(e, wrongCode(lastCodeFor(e)!), 'new-password-1');
-      const stranger = await reset(email(), '123456', 'new-password-1');
+      const real = await reset(e, wrongCode(lastCodeFor(e)!), 'New-password-1!');
+      const stranger = await reset(email(), '123456', 'New-password-1!');
       expect(real.status).toBe(400);
       expect(stranger.status).toBe(400);
       expect(stranger.body).toEqual(real.body);
@@ -383,8 +391,8 @@ describe('Customer email + password', () => {
       await signup(e);
       await forgot(e);
       const code = lastCodeFor(e)!;
-      for (let i = 0; i < 5; i++) expect((await reset(e, wrongCode(code), 'new-password-1')).status).toBe(400);
-      expect((await reset(e, code, 'new-password-1')).status).toBe(400);
+      for (let i = 0; i < 5; i++) expect((await reset(e, wrongCode(code), 'New-password-1!')).status).toBe(400);
+      expect((await reset(e, code, 'New-password-1!')).status).toBe(400);
       expect((await login(e, PASSWORD)).status).toBe(200); // the password is unchanged
     });
 
@@ -397,7 +405,7 @@ describe('Customer email + password', () => {
       expect(victimAccount.status).toBe(201);
       await forgot(mine);
       const code = lastCodeFor(mine)!;
-      expect((await reset(victim, code, 'new-password-1')).status).toBe(400);
+      expect((await reset(victim, code, 'New-password-1!')).status).toBe(400);
       expect((await login(victim, PASSWORD)).status).toBe(200);
 
       // Changing an unproven profile email does not carry the code over to the new address either.
@@ -409,7 +417,7 @@ describe('Customer email + password', () => {
       const unprovenCode = lastCodeFor(unproven)!;
       const fresh = email();
       expect((await typed.patch('/customer-auth/me').send({ email: fresh })).status).toBe(200);
-      expect((await reset(fresh, unprovenCode, 'new-password-1')).status).toBe(400);
+      expect((await reset(fresh, unprovenCode, 'New-password-1!')).status).toBe(400);
       expect((await rowByEmail(fresh)).emailVerified).toBe(false);
     });
 
@@ -419,7 +427,7 @@ describe('Customer email + password', () => {
       await forgot(e);
       const code = lastCodeFor(e)!;
       await prisma.customerEmailCode.updateMany({ where: { email: e }, data: { expiresAt: new Date(Date.now() - 1000) } });
-      const res = await reset(e, code, 'new-password-1');
+      const res = await reset(e, code, 'New-password-1!');
       expect(res.status).toBe(400);
       expect(JSON.stringify(res.body)).toMatch(/incorrect or has expired/);
     });
@@ -430,7 +438,7 @@ describe('Customer email + password', () => {
       await forgot(e);
       const code = lastCodeFor(e)!;
       await prisma.customerProfile.update({ where: { id: customer.body.customer.id }, data: { status: 'BLOCKED' } });
-      expect((await reset(e, code, 'new-password-1')).status).toBe(400);
+      expect((await reset(e, code, 'New-password-1!')).status).toBe(400);
     });
 
     test('a Google-only customer has no password until they use Forgot password', async () => {
@@ -441,9 +449,9 @@ describe('Customer email + password', () => {
       await forgot(g.e);
       const code = lastCodeFor(g.e)!;
       expect(code).toBeTruthy();
-      expect((await reset(g.e, code, 'google-person-pw')).status).toBe(200);
+      expect((await reset(g.e, code, 'Google-person-pw1!')).status).toBe(200);
 
-      const signedIn = await login(g.e, 'google-person-pw');
+      const signedIn = await login(g.e, 'Google-person-pw1!');
       expect(signedIn.status).toBe(200);
       expect(signedIn.body.customer).toMatchObject({ id: g.id, hasPassword: true, emailVerified: true });
     });
@@ -471,7 +479,7 @@ describe('Customer email + password', () => {
   describe('change password', () => {
     test('is refused, with the way forward, for a customer who has no password', async () => {
       const g = await googleOnly();
-      const res = await g.agent.post('/customer-auth/change-password').send({ currentPassword: 'x', newPassword: 'brand-new-pw1' });
+      const res = await g.agent.post('/customer-auth/change-password').send({ currentPassword: 'x', newPassword: 'Brand-new-pw1!' });
       expect(res.status).toBe(400);
       expect(JSON.stringify(res.body)).toMatch(/Forgot password/);
     });
@@ -483,7 +491,7 @@ describe('Customer email + password', () => {
       const laptop = agentFor(app);
       expect((await laptop.post('/customer-auth/login').send({ email: e, password: PASSWORD })).status).toBe(200);
 
-      const wrong = await phoneOne.post('/customer-auth/change-password').send({ currentPassword: 'nope', newPassword: 'brand-new-pw1' });
+      const wrong = await phoneOne.post('/customer-auth/change-password').send({ currentPassword: 'nope', newPassword: 'Brand-new-pw1!' });
       expect(wrong.status).toBe(400);
       expect(wrong.body).toMatchObject({ code: 'CURRENT_PASSWORD_WRONG', message: 'Current password is incorrect' }); // the form places this under the field
       const same = await phoneOne.post('/customer-auth/change-password').send({ currentPassword: PASSWORD, newPassword: PASSWORD });
@@ -493,17 +501,17 @@ describe('Customer email + password', () => {
       expect(tooShort.status).toBe(400);
       expect(tooShort.body.errors[0].path[0]).toBe('newPassword');
       expect((await phoneOne.post('/customer-auth/change-password').send({ currentPassword: PASSWORD, newPassword: 'short' })).status).toBe(400);
-      const ok = await phoneOne.post('/customer-auth/change-password').send({ currentPassword: PASSWORD, newPassword: 'brand-new-pw1' });
+      const ok = await phoneOne.post('/customer-auth/change-password').send({ currentPassword: PASSWORD, newPassword: 'Brand-new-pw1!' });
       expect(ok.status).toBe(200);
 
       expect((await phoneOne.get('/customer-auth/me')).status).toBe(200); // a fresh session replaced it
       expect((await laptop.get('/customer-auth/me')).status).toBe(401); // the other device is signed out
       expect((await login(e, PASSWORD)).status).toBe(401);
-      expect((await login(e, 'brand-new-pw1')).status).toBe(200);
+      expect((await login(e, 'Brand-new-pw1!')).status).toBe(200);
     });
 
     test('needs a signed-in customer', async () => {
-      const res = await request(app.getHttpServer()).post('/customer-auth/change-password').send({ currentPassword: 'x', newPassword: 'brand-new-pw1' });
+      const res = await request(app.getHttpServer()).post('/customer-auth/change-password').send({ currentPassword: 'x', newPassword: 'Brand-new-pw1!' });
       expect(res.status).toBe(401);
     });
   });
