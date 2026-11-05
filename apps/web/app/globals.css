@@ -52,7 +52,7 @@ html {
   border-radius: 9999px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background-color: #3f9f7e;
+  background-color: #050505;
 }
 *::-webkit-scrollbar-corner {
   background: transparent;

@@ -207,7 +207,7 @@ export default function CheckoutPage() {
             .catch(() => undefined) // fast-path only; the webhook is authoritative either way
             .finally(() => pollForConfirmation(booking.id));
         },
-        theme: { color: '#047857' },
+        theme: { color: '#050505' },
       };
       new window.Razorpay(options).open();
     } catch (err) {

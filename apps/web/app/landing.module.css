@@ -1,17 +1,17 @@
 /*
- * The landing page's world: a split-flap departures board for game time. Black flap panels, yellow lit characters,
- * a concrete-grey ground. Everything here is used by app/page.tsx only.
+ * The landing page's world: a split-flap departures board for game time. Black flap panels, lime lit characters,
+ * a warm-white ground. Everything here is used by app/page.tsx only.
  */
 .page {
-  --ink: #0f0f0e;
-  --board: #161615;
-  --flap: #242422;
-  --seam: #0a0a09;
-  --lit: #ffcc1a;
-  --lit-deep: #e6b300;
-  --ground: #e8e8e3;
-  --line: #cfcfc8;
-  --muted: #55554f;
+  --ink: #050505;
+  --board: #0d0d0d;
+  --flap: #1c1c1c;
+  --seam: #000000;
+  --lit: #A5F52B;
+  --lit-deep: #8fd91a;
+  --ground: #FFFCF6;
+  --line: #e6e1d4;
+  --muted: #5a5750;
   font-family: var(--font-barlow), system-ui, sans-serif;
   background: var(--ground);
   color: var(--ink);

@@ -126,7 +126,7 @@ test.describe('customer sign-in', () => {
     // Edit stands out: a solid green button, not a plain outline.
     const editColour = await page.getByRole('button', { name: 'Edit' }).evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(editColour).not.toBe('rgb(255, 255, 255)');
-    expect(editColour).toBe('rgb(12, 90, 68)'); // the brand green (brand-700)
+    expect(editColour).toBe('rgb(5, 5, 5)'); // the brand black (brand-700)
 
     // Log out sits at the right end of the nav bar.
     const logout = nav.getByRole('button', { name: 'Log out' });

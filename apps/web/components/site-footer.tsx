@@ -22,7 +22,7 @@ export function SiteFooter() {
         <div className="grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_repeat(2,minmax(0,1fr))] lg:gap-12">
           <div className="max-w-sm">
             <Link href="/" aria-label={`${LEGAL.brand} home`} className={`inline-block select-none rounded-md ${focus}`}>
-              <Logo hole="#f8fafc" className="h-10 w-auto" />
+              <Logo hole="#FFFCF6" className="h-10 w-auto" />
             </Link>
             <p className="mt-4 text-pretty text-[0.9375rem] font-medium leading-relaxed text-slate-600">
               Turfs, courts, pools, game rooms and activity venues near you. Live slots, a small advance, and your confirmation on WhatsApp.

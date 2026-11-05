@@ -7,21 +7,28 @@ const config: Config = {
     borderRadius: { none: '0', DEFAULT: '3px', sm: '2px', md: '4px', lg: '5px', xl: '6px', '2xl': '8px', '3xl': '8px', full: '9999px' },
     extend: {
       colors: {
-        // The customer site's theme. Change this one scale to re-theme every page.
-        // brand: deep pitch green, for headings, selected states and the solid buttons (white text from 600 up).
+        // The customer site's theme, taken from the Bookyo logo. Change this one scale to re-theme every page.
+        // brand: the logo's black (#050505) for headings, links and the solid buttons (white text from 500 up), with the dart's lime
+        // green (#A5F52B, 400) for highlights and its pale tints (50-300) for selected states and soft backgrounds.
         brand: {
-          50: '#eef7f3',
-          100: '#d5ede3',
-          200: '#abdac7',
-          300: '#77c0a4',
-          400: '#3f9f7e',
-          500: '#1e8263',
-          600: '#106b51',
-          700: '#0c5a44',
-          800: '#0a4a39',
-          900: '#083d30',
-          950: '#04231b',
+          50: '#f6fde6',
+          100: '#ebfbc4',
+          200: '#d9f78f',
+          300: '#c3f35b',
+          400: '#A5F52B',
+          500: '#4a4a46',
+          600: '#2c2c29',
+          700: '#050505',
+          800: '#141414',
+          900: '#0b0b0b',
+          950: '#000000',
         },
+        // The logo's other colours: the kayak wave's aqua, and the page background's warm white.
+        aqua: { DEFAULT: '#42DDE0', soft: '#e2f9fa', deep: '#0f8f93' },
+        cream: '#FFFCF6',
+        // The page background (warm white) wherever the site used the palest grey.
+        gray: { 50: '#FFFCF6' },
+        slate: { 50: '#FFFCF6' },
         venue: {
           primary: '#0F5132',
           accent: '#22C55E',
@@ -34,9 +41,9 @@ const config: Config = {
         sans: ['var(--font-akshar)', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
-        'glow': '0 4px 20px -2px rgba(12, 90, 68, 0.28)',
+        'glow': '0 4px 20px -2px rgba(5, 5, 5, 0.18)',
         'subtle': '0 2px 10px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.03)',
-        'card': '0 10px 30px -5px rgba(10, 46, 29, 0.05)',
+        'card': '0 10px 30px -5px rgba(5, 5, 5, 0.06)',
       }
     },
   },

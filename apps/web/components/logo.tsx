@@ -2,7 +2,7 @@
  * The Bookyo logo. No background of its own: it sits straight on the page. `ink` is the lettering and `hole` the colour inside the
  * letters (the page's background colour), so the logo reads on a light bar (black on white) and on a dark one (white on black).
  */
-export function Logo({ ink = '#000', hole = '#fff', className = 'h-8 w-auto' }: { ink?: string; hole?: string; className?: string }) {
+export function Logo({ ink = '#050505', hole = '#fff', className = 'h-8 w-auto' }: { ink?: string; hole?: string; className?: string }) {
   return (
     <svg viewBox="0 0 377 117" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bookyo" className={className}>
       <path d="M0 9.5V83.5C0 83.5 1.5 91.8133 10 92.5C18.5 93.1867 21 86 21 86C21 86 27 92.5 36 92.5C56.5 92.5 64.4197 77.4906 65 59.5C65.5968 41 55 27 39 27C28.5 27 23 34 23 34V9.5C23 9.5 23.0136 -1.63149e-06 11 0C0 1.49384e-06 0 9.5 0 9.5ZM22.5 60.5C22.5 53.6213 25.6213 47 32.5 47C40 47 43 53.5 43 60.5C43 66.5814 38.5 72.5 32.5 72.5C26.9703 72.5 22.5 66.5 22.5 60.5Z" fill={ink} fillRule="evenodd" clipRule="evenodd" />
