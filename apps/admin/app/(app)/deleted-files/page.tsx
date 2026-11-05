@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useFetch } from '@/lib/use-fetch';
 import { usePagedFetch, PAGE_SIZE } from '@/lib/use-paged-fetch';
@@ -45,7 +45,6 @@ export default function DeletedFilesPage() {
   const { values, set, clear, active, page, setPage, query } = useListFilters({ search: '', status: 'waiting' });
   const { rows, total, error, loading, refetch } = usePagedFetch<DeletedFile>('/admin/deleted-files', query, page);
   const summary = useFetch<{ waiting: number; removed: number }>('/admin/deleted-files/summary');
-  const [picked, setPicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -53,7 +52,6 @@ export default function DeletedFilesPage() {
   const reload = () => {
     refetch();
     summary.refetch();
-    setPicked(new Set());
   };
 
   async function run(label: string, action: () => Promise<string>) {
@@ -97,20 +95,35 @@ export default function DeletedFilesPage() {
       return `${parts.join(', ')}.`;
     });
 
-  const markRemoved = (ids: string[]) =>
-    run('mark', async () => {
-      const r = await api.post<{ marked: number }>('/admin/deleted-files/mark-removed', { ids });
-      return `${r.marked} file${r.marked === 1 ? '' : 's'} marked as removed.`;
-    });
-
-  const waitingRows = rows.filter((r) => !r.removedAt);
-  const allPicked = waitingRows.length > 0 && waitingRows.every((r) => picked.has(r.id));
-  const toggle = (id: string) =>
-    setPicked((cur) => {
-      const next = new Set(cur);
-      if (!next.delete(id)) next.add(id);
-      return next;
-    });
+  /**
+   * The list keeps itself up to date: the page looks at the waiting files when it opens and each time you come back to it (after deleting
+   * in Cloudflare), and the ones that are gone leave the list. Nothing is ticked or marked by hand.
+   */
+  const lastCheck = useRef(0);
+  const autoCheck = useRef<() => Promise<void>>(async () => undefined);
+  autoCheck.current = async () => {
+    if (Date.now() - lastCheck.current < 15_000) return;
+    lastCheck.current = Date.now();
+    try {
+      const r = await api.post<{ nowGone: number }>('/admin/deleted-files/check');
+      if (r.nowGone > 0) {
+        setNotice(`${r.nowGone} file${r.nowGone === 1 ? ' was' : 's were'} found gone from the bucket and cleared from the list.`);
+        reload();
+      }
+    } catch {
+      // the Check bucket button shows a failure; the automatic look stays quiet
+    }
+  };
+  useEffect(() => {
+    void autoCheck.current();
+    const onBack = () => document.visibilityState === 'visible' && void autoCheck.current();
+    document.addEventListener('visibilitychange', onBack);
+    window.addEventListener('focus', onBack);
+    return () => {
+      document.removeEventListener('visibilitychange', onBack);
+      window.removeEventListener('focus', onBack);
+    };
+  }, []);
 
   return (
     <div>
@@ -125,9 +138,8 @@ export default function DeletedFilesPage() {
         <Card className="mb-4 text-sm text-gray-600">
           <p className="font-medium text-gray-900">How to clear these out of R2</p>
           <ol className="mt-1.5 list-decimal space-y-0.5 pl-5">
-            <li>Press <strong>Copy all waiting keys</strong> and delete those files in the Cloudflare dashboard (or a tool such as rclone).</li>
-            <li>Press <strong>Check bucket</strong>. It looks at each file and marks the ones that are gone.</li>
-            <li>Anything left can be ticked and marked removed by hand.</li>
+            <li>Press <strong>Copy all waiting keys</strong> and delete those files in the Cloudflare dashboard (or with a tool such as rclone).</li>
+            <li>Come back to this page. It looks at the files by itself and clears the ones that are gone (press <strong>Check bucket</strong> to look right now).</li>
           </ol>
         </Card>
         <ListToolbar
@@ -146,11 +158,6 @@ export default function DeletedFilesPage() {
           <Button variant="secondary" onClick={() => void checkBucket()} loading={busy === 'check'}>
             Check bucket
           </Button>
-          {picked.size > 0 && (
-            <Button onClick={() => void markRemoved([...picked])} loading={busy === 'mark'}>
-              Mark {picked.size} selected as removed
-            </Button>
-          )}
         </div>
       </ListSection>
 
@@ -174,28 +181,15 @@ export default function DeletedFilesPage() {
           <table className="w-full text-left text-sm">
             <thead className="border-b border-gray-200 bg-gray-50/70 text-xs font-medium uppercase tracking-wide text-gray-500">
               <tr>
-                <th className="w-10 px-4 py-3">
-                  <input
-                    type="checkbox"
-                    aria-label="Select every waiting file on this page"
-                    checked={allPicked}
-                    disabled={waitingRows.length === 0}
-                    onChange={() => setPicked(allPicked ? new Set() : new Set(waitingRows.map((r) => r.id)))}
-                  />
-                </th>
                 <th className="px-4 py-3">File</th>
                 <th className="px-4 py-3">What it was</th>
                 <th className="px-4 py-3">Deleted</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
               {rows.map((f) => (
                 <tr key={f.id} className="border-b border-gray-100 align-middle transition-colors hover:bg-brand-50/40">
-                  <td className="px-4 py-3">
-                    {!f.removedAt && <input type="checkbox" aria-label={`Select ${f.key}`} checked={picked.has(f.id)} onChange={() => toggle(f.id)} />}
-                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <a href={f.url} target="_blank" rel="noopener noreferrer" className="block h-10 w-14 shrink-0 overflow-hidden rounded-md bg-gray-100 ring-1 ring-gray-200" title="Open the file">
@@ -233,13 +227,6 @@ export default function DeletedFilesPage() {
                       <span className="inline-flex rounded-full bg-yellow-50 px-2 py-0.5 text-[11px] font-semibold text-yellow-800 ring-1 ring-inset ring-yellow-200">
                         Waiting
                       </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {!f.removedAt && (
-                      <button type="button" onClick={() => void markRemoved([f.id])} disabled={busy !== null} className="text-sm font-medium text-gray-900 hover:underline disabled:opacity-50">
-                        Mark removed
-                      </button>
                     )}
                   </td>
                 </tr>

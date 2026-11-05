@@ -3,7 +3,7 @@ import { png } from '../../support/png';
 
 /** The Super Admin's Deleted files: a photo an owner removes is listed (still in the bucket), can be checked, and marked as removed. */
 test.describe('admin: deleted files', () => {
-  test('a removed unit photo is listed as waiting, found still in the bucket by Check bucket, and marked removed', async ({ page, makeVenue, ownerApi }) => {
+  test('a removed unit photo is listed as waiting and stays while the file is still in the bucket; a confirmed one shows under Removed', async ({ page, makeVenue, ownerApi, adminApi }) => {
     const venue = await makeVenue();
     const added = await ownerApi.post(`/resources/${venue.turfId}/photos`, { multipart: { file: { name: 'p.png', mimeType: 'image/png', buffer: png(64, 32, [90, 120, 200]) } } });
     expect(added.ok()).toBe(true);
@@ -28,18 +28,21 @@ test.describe('admin: deleted files', () => {
     await expect(page.getByRole('status')).toContainText(/still in the bucket/);
     await expect(row).toContainText('Waiting');
 
-    // Ticking the row and marking it removed moves it to the Removed list.
-    await row.getByRole('checkbox').check();
-    await page.getByRole('button', { name: 'Mark 1 selected as removed' }).click();
-    await expect(page.getByRole('status')).toContainText('1 file marked as removed.');
-    await expect(page.getByRole('row').filter({ hasText: venue.name })).toHaveCount(0);
+    // Nothing to tick or mark by hand: once the file is gone from the bucket the list clears it by itself. Here it is still stored, so it stays.
+    await expect(row.getByRole('checkbox')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Mark .* as removed/ })).toHaveCount(0);
 
+    // A file confirmed removed (the API's own record of it) shows under Removed and not under Waiting.
+    const id = ((await (await adminApi.get(`/admin/deleted-files?search=${encodeURIComponent(venue.name)}`)).json()) as Array<{ id: string }>)[0]!.id;
+    await adminApi.post(`/admin/deleted-files/${id}/removed`);
+    await page.reload();
+    await page.getByPlaceholder('Search by file name or what it was…').fill(venue.name);
+    await expect(page.getByRole('row').filter({ hasText: venue.name })).toHaveCount(0);
     await page.locator('button[aria-haspopup="listbox"]').first().click();
     await page.getByRole('option', { name: 'Removed from the bucket' }).click();
     const removed = page.getByRole('row').filter({ hasText: venue.name });
     await expect(removed).toHaveCount(1);
     await expect(removed).toContainText('Removed');
-    await expect(removed.getByRole('checkbox')).toHaveCount(0);
   });
 
   test('the page is only in the Super Admin portal and its summary counts what is waiting', async ({ adminApi }) => {
