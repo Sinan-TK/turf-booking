@@ -24,6 +24,24 @@ test.describe('customer site: location', () => {
     await find(page, manjeriVenue.name);
   });
 
+  test('the picker opens already filled, with no loading placeholders, even when the places are slow to arrive', async ({ page }) => {
+    await page.goto('/explore');
+    await settled(page);
+    await header(page, 'Malappuram').click();
+    await expect(picker(page).getByRole('button').filter({ hasText: /Manjeri/ }).first()).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    // From now on the list of places takes 5 seconds to arrive; the picker must not wait for it.
+    await page.route('**/places', async (route) => {
+      await new Promise((r) => setTimeout(r, 5000));
+      await route.continue().catch(() => undefined);
+    });
+    await header(page, 'Malappuram').click();
+    const dialog = picker(page);
+    await expect(dialog.getByRole('button').filter({ hasText: /Manjeri/ }).first()).toBeVisible({ timeout: 1500 });
+    await expect(dialog.locator('.animate-pulse')).toHaveCount(0);
+  });
+
   test('the picker lists Malappuram\'s towns, filters them as you type, and closes with Escape', async ({ page }) => {
     await page.goto('/explore');
     await header(page, 'Malappuram').click();

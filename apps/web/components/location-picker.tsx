@@ -15,6 +15,46 @@ interface Place extends Town {
   stateName: string;
 }
 
+const PLACES_KEY = 'bookyo.places.v1';
+let placesMemory: Place[] | null = null;
+let placesLoading: Promise<Place[]> | null = null;
+
+/** The last list of places seen in this tab (the list barely changes, and is the same for everyone), so the picker opens already filled. */
+function savedPlaces(): Place[] | null {
+  if (placesMemory) return placesMemory;
+  try {
+    const raw = window.sessionStorage.getItem(PLACES_KEY);
+    const rows = raw ? (JSON.parse(raw) as Place[]) : null;
+    return Array.isArray(rows) && rows.length > 0 ? (placesMemory = rows) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Fetches the places (one request at a time) and keeps them for the next opening. */
+function loadPlaces(): Promise<Place[]> {
+  placesLoading ??= api
+    .get<Place[]>('/places')
+    .then((rows) => {
+      placesMemory = rows;
+      try {
+        window.sessionStorage.setItem(PLACES_KEY, JSON.stringify(rows));
+      } catch {
+        // storage full or blocked: the next opening just asks again
+      }
+      return rows;
+    })
+    .finally(() => {
+      placesLoading = null;
+    });
+  return placesLoading;
+}
+
+/** Starts loading the places ahead of time (call it when the page is up), so the picker has no loading wait the first time either. */
+export function warmPlaces(): void {
+  if (!savedPlaces()) void loadPlaces().catch(() => undefined);
+}
+
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
 
 /**
@@ -35,7 +75,7 @@ export function LocationPicker({
   const searchBox = useRef<HTMLInputElement>(null);
 
   // Every place a customer can search from, in any state: "Area, District, State".
-  const [places, setPlaces] = useState<Place[] | null>(null);
+  const [places, setPlaces] = useState<Place[] | null>(() => savedPlaces());
   const [placesError, setPlacesError] = useState(false);
   const [query, setQuery] = useState('');
   const [locating, setLocating] = useState(false);
@@ -46,11 +86,12 @@ export function LocationPicker({
 
   useEffect(() => {
     let cancelled = false;
-    placesRequest.current = api.get<Place[]>('/places');
+    // Shown at once when seen before; the live list replaces it a moment later.
+    placesRequest.current = loadPlaces();
     placesRequest.current
       .then((rows) => !cancelled && setPlaces(rows))
       .catch(() => {
-        if (cancelled) return;
+        if (cancelled || savedPlaces()) return;
         setPlaces([]);
         setPlacesError(true);
       });

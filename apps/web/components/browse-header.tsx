@@ -9,7 +9,7 @@ import { useLocationChoice, type LocationChoice } from '@/lib/location';
 import type { VenueCategory } from '@/lib/categories';
 import { AccountMenu } from '@/components/account-menu';
 import { Icon } from '@/components/ui';
-import { LocationPicker } from '@/components/location-picker';
+import { LocationPicker, warmPlaces } from '@/components/location-picker';
 import { VenueTypePicker } from '@/components/venue-type-picker';
 import { RotatingTypeIcon } from '@/components/rotating-type-icon';
 import { BackButton } from '@/components/back-button';
@@ -33,6 +33,7 @@ export function BrowseHeader({ phoneBack = false }: { phoneBack?: boolean }) {
   const router = useRouter();
   const { choice, setChoice } = useLocationChoice();
   const [pickerOpen, setPickerOpen] = useState(false);
+  useEffect(() => warmPlaces(), []); // the places are fetched ahead, so the picker opens already filled
   const [typePickerOpen, setTypePickerOpen] = useState(false);
   const [categories, setCategories] = useState<VenueCategory[]>([]);
   const [text, setText] = useState('');

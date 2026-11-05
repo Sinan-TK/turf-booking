@@ -10,7 +10,7 @@ import { useSavedVenues } from '@/lib/saved-venues';
 import { CategoryIcon, ErrorBanner, Icon } from '@/components/ui';
 import { LoadingNote, Skeleton, VenueCardSkeleton, VenueCardsSkeleton } from '@/components/skeleton';
 import { AccountMenu } from '@/components/account-menu';
-import { LocationPicker } from '@/components/location-picker';
+import { LocationPicker, warmPlaces } from '@/components/location-picker';
 import { VenueTypePicker } from '@/components/venue-type-picker';
 import { RotatingTypeIcon } from '@/components/rotating-type-icon';
 import { readSearch, writeSearch } from '@/lib/search-cache';
@@ -49,6 +49,7 @@ export default function ExplorePage() {
   // Where to search: the saved choice, otherwise Malappuram. Nothing is searched until that is known.
   const { choice, setChoice, ready } = useLocationChoice();
   const [pickerOpen, setPickerOpen] = useState(false);
+  useEffect(() => warmPlaces(), []); // the places are fetched ahead, so the picker opens already filled
   const [typePickerOpen, setTypePickerOpen] = useState(false);
 
   // The header gains a soft shadow once the page has scrolled a little.
