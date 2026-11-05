@@ -219,3 +219,11 @@ export function OfferTag({ offer, className = '' }: { offer: { percent: number }
     </span>
   );
 }
+
+/** A description typed one point per line, as the list of points customers read (a leading dash, star or bullet is ignored). */
+export function descriptionPoints(text: string | null | undefined): string[] {
+  return (text ?? '')
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*[-*•]\s*/, '').trim())
+    .filter(Boolean);
+}

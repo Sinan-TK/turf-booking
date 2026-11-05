@@ -43,7 +43,7 @@ export function UnitDescription({ path, unitName, description, onSaved }: { path
           <h3 className="text-sm font-semibold text-on-surface">Description</h3>
           {!editing && (
             <p className="mt-1 whitespace-pre-line text-body-md text-on-surface-variant">
-              {description ? description : 'None yet. Add a few lines about this unit. Customers read it on the booking page when they pick it.'}
+              {description ? description : 'None yet. Add a few points about this unit, one per line. Customers read them as a list on the booking page.'}
             </p>
           )}
         </div>
@@ -76,6 +76,7 @@ export function UnitDescription({ path, unitName, description, onSaved }: { path
         >
           <div>
             <Label htmlFor={id}>About this unit</Label>
+            <p className="mb-1.5 text-xs text-on-surface-variant">Press Enter after each point. Customers see every line as its own bullet point.</p>
             <textarea
               id={id}
               rows={4}
@@ -85,7 +86,7 @@ export function UnitDescription({ path, unitName, description, onSaved }: { path
                 setValue(e.target.value);
                 setFieldError(undefined);
               }}
-              placeholder="Floodlit 5-a-side turf with a rubber surface. Bring your own shoes."
+              placeholder={'Floodlit 5-a-side turf\nRubber surface, bring your own shoes\nChanging rooms and parking'}
               className="w-full rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-3 py-2.5 text-body-md text-on-surface placeholder:text-on-surface-variant/60 hover:border-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
             <div className="mt-1 flex items-start justify-between gap-3">

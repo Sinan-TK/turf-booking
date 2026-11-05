@@ -19,6 +19,7 @@ import {
   todayIso,
   useBookSlot,
   type SearchResult,
+  descriptionPoints,
 } from '@/lib/booking';
 import { CategoryIcon, ErrorBanner, Icon } from '@/components/ui';
 import { DetailSkeleton } from '@/components/skeleton';
@@ -294,7 +295,16 @@ function BookingPage() {
             <Icon name="location_on" className="text-[1rem] text-slate-400" />
             {r.venue.address}
           </p>
-          {r.resource.description && <p className="mt-3 max-w-2xl whitespace-pre-line text-pretty text-sm leading-relaxed text-slate-600">{r.resource.description}</p>}
+          {descriptionPoints(r.resource.description).length > 0 && (
+            <ul aria-label={`About ${r.resource.name}`} className="mt-3 max-w-2xl space-y-1.5">
+              {descriptionPoints(r.resource.description).map((point, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm leading-relaxed text-slate-600">
+                  <span aria-hidden="true" className="mt-[0.55rem] h-1.5 w-1.5 shrink-0 rounded-full bg-brand-400 ring-1 ring-brand-700/30" />
+                  <span className="min-w-0">{point}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </header>
 
         </div>
