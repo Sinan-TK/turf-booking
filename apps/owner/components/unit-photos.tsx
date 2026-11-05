@@ -123,17 +123,12 @@ export function UnitPhotos({ unitId, unitName, initial, basePath, onChanged }: {
                   Make main
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => void remove(photo)}
+              <HoldToDelete
+                label={`Remove photo ${i + 1} of ${unitName}`}
                 disabled={busy !== null}
-                title="Remove photo"
-                aria-label={`Remove photo ${i + 1} of ${unitName}`}
-                className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-red-700 shadow hover:bg-red-50 disabled:opacity-50"
-              >
-                <SvgIcon name="trash" className="h-4 w-4" />
-                Remove
-              </button>
+                onHold={() => void remove(photo)}
+                onTap={() => setError('Press and hold Remove to delete this photo.')}
+              />
             </div>
           </figure>
         ))}
@@ -161,5 +156,72 @@ export function UnitPhotos({ unitId, unitName, initial, basePath, onChanged }: {
         </p>
       )}
     </div>
+  );
+}
+
+const HOLD_MS = 1000;
+
+/**
+ * Deleting a photo is final (its file is deleted from storage), so the button has to be held: red fills it from the left, and the photo is
+ * deleted when it is full. Letting go early empties it again and deletes nothing. Space and Enter hold it too.
+ */
+function HoldToDelete({ label, disabled, onHold, onTap }: { label: string; disabled: boolean; onHold: () => void; onTap: () => void }) {
+  const [holding, setHolding] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const start = () => {
+    if (disabled || timer.current) return;
+    setHolding(true);
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      setHolding(false);
+      onHold();
+    }, HOLD_MS);
+  };
+  const stop = (early: boolean) => {
+    if (!timer.current) return;
+    clearTimeout(timer.current);
+    timer.current = null;
+    setHolding(false);
+    if (early) onTap();
+  };
+  useEffect(() => () => void (timer.current && clearTimeout(timer.current)), []);
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      title="Press and hold to delete this photo"
+      aria-label={label}
+      aria-description="Press and hold to delete"
+      onPointerDown={(e) => {
+        if (e.button === 0) start();
+      }}
+      onPointerUp={() => stop(true)}
+      onPointerLeave={() => stop(false)}
+      onPointerCancel={() => stop(false)}
+      onKeyDown={(e) => {
+        if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
+          e.preventDefault();
+          start();
+        }
+      }}
+      onKeyUp={(e) => {
+        if (e.key === ' ' || e.key === 'Enter') stop(true);
+      }}
+      onBlur={() => stop(false)}
+      onContextMenu={(e) => e.preventDefault()}
+      className="relative inline-flex touch-none select-none items-center gap-1 overflow-hidden rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-red-700 shadow hover:bg-red-50 disabled:opacity-50"
+    >
+      <span
+        aria-hidden="true"
+        className="absolute inset-y-0 left-0 bg-red-600 ease-linear"
+        style={{ width: holding ? '100%' : '0%', transitionProperty: 'width', transitionDuration: holding ? `${HOLD_MS}ms` : '150ms' }}
+      />
+      <span className={`relative inline-flex items-center gap-1 transition-colors ${holding ? 'text-white' : ''}`}>
+        <SvgIcon name="trash" className="h-4 w-4" />
+        Hold to delete
+      </span>
+    </button>
   );
 }

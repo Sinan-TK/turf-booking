@@ -26,7 +26,15 @@ test.describe('owner portal: unit photos', () => {
     await expect(page.locator(`img[alt="${venue.turfName} photo 1"]`)).toBeVisible();
 
     // And removing one is remembered the same way.
-    await page.getByRole('button', { name: new RegExp(`^Remove photo 1 of ${venue.turfName}`) }).click();
+    // Deleting needs a hold: a quick tap only explains, and deletes nothing.
+    const remove = page.getByRole('button', { name: new RegExp(`^Remove photo 1 of ${venue.turfName}`) });
+    await remove.click();
+    await expect(page.getByRole('alert').filter({ hasText: 'Press and hold Remove' })).toBeVisible();
+    await expect(page.locator(`img[alt="${venue.turfName} photo 1"]`)).toBeVisible();
+    await remove.hover();
+    await page.mouse.down();
+    await page.waitForTimeout(1400);
+    await page.mouse.up();
     await expect(page.locator(`img[alt^="${venue.turfName} photo"]`)).toHaveCount(0);
     await openUnitTab(page, venue.courtName);
     await openUnitTab(page, venue.turfName);
