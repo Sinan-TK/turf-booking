@@ -164,12 +164,12 @@ function BookingDetail() {
       <div className="space-y-4">
         {cancelResultMessage && <SuccessBanner message={cancelResultMessage} />}
 
-        <div className="grid items-start gap-4 lg:grid-cols-[3fr_2fr]">
-          <div className="space-y-4 lg:sticky lg:top-24">
+        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[3fr_2fr]">
+          <div className="min-w-0 space-y-4 lg:sticky lg:top-24">
             <Card>
-              <div className="flex items-start gap-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
                 {/* A small picture (the venue-type icon when there is no photo), not a banner. */}
-                <div className="h-28 shrink-0 overflow-hidden rounded-xl sm:h-36">
+                <div className="h-24 max-w-full shrink-0 self-start overflow-hidden rounded-xl sm:h-36">
                   {picture ? (
                     <Thumb src={picture} />
                   ) : (
@@ -236,7 +236,7 @@ function BookingDetail() {
             </Card>
           </div>
 
-          <div className="space-y-4">
+          <div className="min-w-0 space-y-4">
             <Card>
               <h3 className="mb-3 text-sm font-semibold text-gray-900">Your slot</h3>
               <dl className="space-y-3 text-sm">

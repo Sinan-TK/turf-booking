@@ -100,3 +100,18 @@ test.describe('customer site: booking details', () => {
     }
   });
 });
+
+test.describe('customer site: booking details on a small phone', () => {
+  test('nothing spills past the screen at 320px, even with a long venue name and a photo', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 700 });
+    await open(
+      page,
+      booking({
+        venue: { id: 'v9', name: 'Greenfield Sports Arena And Recreation Club', address: '12 Stadium Road, Near The Old Bus Stand, Malappuram', facilityCode: 'GRN-009', googleMapsUrl: null, lat: 11.1, lng: 76.1, photoUrl: null },
+      }),
+    );
+    await expect(page.getByRole('heading', { name: /Greenfield Sports Arena/ })).toBeVisible();
+    const width = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(width).toBeLessThanOrEqual(320);
+  });
+});

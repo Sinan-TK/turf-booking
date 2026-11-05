@@ -201,9 +201,9 @@ export function BookingDetailSkeleton({ label = 'Loading your booking…' }: { l
     </div>
   );
   return (
-    <Region label={label} className="grid items-start gap-4 lg:grid-cols-[3fr_2fr]">
-      <div className="flex items-start gap-4 rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-        <Skeleton className="h-28 w-28 shrink-0 rounded-xl sm:h-36 sm:w-48" />
+    <Region label={label} className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[3fr_2fr]">
+      <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:flex-row sm:items-start sm:gap-4">
+        <Skeleton className="h-24 w-36 shrink-0 rounded-xl sm:h-36 sm:w-48" />
         <div className="flex-1 space-y-2">
           <Skeleton className="h-5 w-1/2" />
           <Skeleton className="h-3 w-3/4" />
