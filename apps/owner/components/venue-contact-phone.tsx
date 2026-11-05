@@ -12,17 +12,24 @@ import { SvgIcon } from '@/components/svg-icons';
 export function VenueContactPhone({
   venueId,
   phone,
+  call,
+  whatsapp,
   fallback,
   onSaved,
 }: {
   venueId: string;
   phone: string | null;
+  /** Whether customers get a Call button / a WhatsApp button for the number. */
+  call: boolean;
+  whatsapp: boolean;
   /** The organization's contact number, used while this is empty. */
   fallback?: string;
   onSaved: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(phone ?? '');
+  const [callOn, setCallOn] = useState(call);
+  const [whatsappOn, setWhatsappOn] = useState(whatsapp);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -30,7 +37,7 @@ export function VenueContactPhone({
     setSaving(true);
     setError(null);
     try {
-      await api.patch(`/venues/${venueId}`, { contactPhone: value.trim() === '' ? null : value.trim() });
+      await api.patch(`/venues/${venueId}`, { contactPhone: value.trim() === '' ? null : value.trim(), contactCall: callOn, contactWhatsapp: whatsappOn });
       onSaved();
       setEditing(false);
     } catch (err) {
@@ -52,7 +59,8 @@ export function VenueContactPhone({
               ) : (
                 <>Your organization&apos;s number{fallback ? <> (<strong className="text-on-surface">{fallback}</strong>)</> : null} is used.</>
               )}{' '}
-              Customers see it, with a Call button, once their booking is confirmed.
+              Customers see it once their booking is confirmed, with{' '}
+              <strong className="text-on-surface">{call && whatsapp ? 'Call and WhatsApp buttons' : call ? 'a Call button' : whatsapp ? 'a WhatsApp button' : 'no buttons'}</strong>.
             </p>
           )}
         </div>
@@ -64,6 +72,8 @@ export function VenueContactPhone({
             className="inline-flex items-center gap-1.5 !px-3 !py-1.5"
             onClick={() => {
               setValue(phone ?? '');
+              setCallOn(call);
+              setWhatsappOn(whatsapp);
               setError(null);
               setEditing(true);
             }}
@@ -96,6 +106,19 @@ export function VenueContactPhone({
             />
             <p className="mt-1 text-xs text-on-surface-variant">An Indian mobile number. Leave it empty to use your organization&apos;s number.</p>
           </div>
+          <fieldset>
+            <legend className="text-sm font-medium text-on-surface">Customers can reach the venue by</legend>
+            <div className="mt-1.5 flex flex-wrap gap-3">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-outline-variant/50 px-3 py-2 text-sm text-on-surface">
+                <input type="checkbox" checked={callOn} onChange={(e) => setCallOn(e.target.checked)} className="h-4 w-4 accent-primary" />
+                Call
+              </label>
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-outline-variant/50 px-3 py-2 text-sm text-on-surface">
+                <input type="checkbox" checked={whatsappOn} onChange={(e) => setWhatsappOn(e.target.checked)} className="h-4 w-4 accent-primary" />
+                WhatsApp
+              </label>
+            </div>
+          </fieldset>
           {error && <ErrorBanner message={error} />}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" disabled={saving} onClick={() => setEditing(false)}>

@@ -431,6 +431,9 @@ model Venue {
   googleMapsUrl             String?
   /// The number a customer with a confirmed booking can call; empty = the owner organization's contact number.
   contactPhone              String?
+  /// Whether a customer with a confirmed booking is offered a Call button / a WhatsApp button for the number above.
+  contactCall               Boolean  @default(true)
+  contactWhatsapp           Boolean  @default(false)
   timezone                  String
   status                    VenueStatus @default(DRAFT)
   cancellationPolicyId      String?  @unique @db.Uuid

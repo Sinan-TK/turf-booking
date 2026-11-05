@@ -94,6 +94,8 @@ export class VenuesService {
         lng: dto.lng,
         googleMapsUrl: dto.googleMapsUrl,
         contactPhone: dto.contactPhone,
+        contactCall: dto.contactCall,
+        contactWhatsapp: dto.contactWhatsapp,
         advanceBookingDays: dto.advanceBookingDays,
         timezone: district.timezone,
         // defaultSlotGranularityMinutes is not settable — always the

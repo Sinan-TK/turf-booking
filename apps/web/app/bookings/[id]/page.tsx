@@ -54,6 +54,9 @@ interface Booking {
     address: string;
     /** The venue's number, only for a confirmed booking. */
     contactPhone?: string | null;
+    /** Which buttons the owner switched on for that number. */
+    contactCall?: boolean;
+    contactWhatsapp?: boolean;
     facilityCode: string;
     googleMapsUrl: string | null;
     lat: number;
@@ -64,6 +67,38 @@ interface Booking {
   resourceName: string | null;
   /** The kind of venue it is: "Badminton Court", with what one bookable unit is called ("Court"). */
   facility: { name: string; unitLabel: string; iconKey?: string; iconSvg?: string | null } | null;
+}
+
+/**
+ * The ways the owner switched on to reach the venue: a phone icon (opens the dialler) and a WhatsApp icon (opens a chat with that number).
+ * Nothing is drawn when both are off or there is no number.
+ */
+function ContactButtons({ venue, className = '' }: { venue: Booking['venue']; className?: string }) {
+  const phone = venue.contactPhone;
+  if (!phone || (!venue.contactCall && !venue.contactWhatsapp)) return null;
+  const digits = phone.replace(/\D/g, '');
+  const base = 'h-9 w-9 items-center justify-center rounded-xl text-[1.125rem] shadow-sm transition active:scale-95';
+  return (
+    <span className={`items-center gap-2 ${className}`}>
+      {venue.contactCall && (
+        <a href={`tel:${phone}`} aria-label={`Call ${venue.name}`} title="Call the venue" className={`inline-flex border border-gray-200 bg-white text-gray-900 hover:bg-gray-50 ${base}`}>
+          <Icon name="call" />
+        </a>
+      )}
+      {venue.contactWhatsapp && (
+        <a
+          href={`https://wa.me/${digits}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`WhatsApp ${venue.name}`}
+          title="Chat with the venue on WhatsApp"
+          className={`inline-flex bg-[#25D366] text-white hover:bg-[#1fb857] ${base}`}
+        >
+          <Icon name="whatsapp" />
+        </a>
+      )}
+    </span>
+  );
 }
 
 /** Directions to the venue: its own Google Maps link when it has one, else a pin at its coordinates. */
@@ -238,15 +273,7 @@ function BookingDetail() {
                     <Icon name="navigation" className="text-[0.875rem]" />
                     Directions
                   </a>
-                  {booking.venue.contactPhone && (
-                    <a
-                      href={`tel:${booking.venue.contactPhone}`}
-                      className="ml-2 mt-3 inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-gray-800 transition hover:bg-gray-50 active:scale-95"
-                    >
-                      <Icon name="call" className="text-[0.875rem]" />
-                      Call venue
-                    </a>
-                  )}
+                  <ContactButtons venue={booking.venue} className="ml-2 mt-3 inline-flex" />
                 </div>
               </div>
             </Card>
@@ -268,12 +295,7 @@ function BookingDetail() {
                     <p className="text-xs text-gray-500">Venue contact</p>
                     <p className="truncate text-sm font-semibold text-gray-900">{booking.venue.contactPhone}</p>
                   </div>
-                  <a
-                    href={`tel:${booking.venue.contactPhone}`}
-                    className="shrink-0 rounded-xl bg-brand-700 px-3.5 py-2 text-xs font-bold text-white transition hover:bg-brand-800 active:scale-95"
-                  >
-                    Call
-                  </a>
+                  <ContactButtons venue={booking.venue} className="flex shrink-0" />
                 </div>
               )}
               <ul className="mt-3 space-y-1.5 text-xs text-gray-600">

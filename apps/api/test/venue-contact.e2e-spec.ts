@@ -63,6 +63,32 @@ describe('Venue contact number', () => {
     expect(view2.body.venue.contactPhone).toBe(org.contactPhone);
   });
 
+  test('the owner chooses Call and/or WhatsApp for the number, and a confirmed booking carries those choices', async () => {
+    await ownerAgent.patch(`/venues/${venue.venueId}`).send({ contactPhone: '9847012345' });
+    const b = await booking();
+    await pay(b);
+
+    // Call is on and WhatsApp off until the owner says otherwise.
+    const first = await b.agent.get(`/me/bookings/${b.id}`);
+    expect(first.body.venue).toMatchObject({ contactCall: true, contactWhatsapp: false });
+
+    expect((await ownerAgent.patch(`/venues/${venue.venueId}`).send({ contactCall: false, contactWhatsapp: true })).status).toBe(200);
+    expect((await b.agent.get(`/me/bookings/${b.id}`)).body.venue).toMatchObject({ contactCall: false, contactWhatsapp: true });
+
+    await ownerAgent.patch(`/venues/${venue.venueId}`).send({ contactCall: true });
+    expect((await b.agent.get(`/me/bookings/${b.id}`)).body.venue).toMatchObject({ contactCall: true, contactWhatsapp: true });
+    expect((await ownerAgent.patch(`/venues/${venue.venueId}`).send({ contactCall: 'yes' })).status).toBe(400);
+
+    // Unpaid bookings get neither button, and the public lookup shows neither option.
+    const pending = await booking();
+    expect((await pending.agent.get(`/me/bookings/${pending.id}`)).body.venue).toMatchObject({ contactPhone: null, contactCall: false, contactWhatsapp: false });
+    const code = (await prisma.venue.findUniqueOrThrow({ where: { id: venue.venueId } })).facilityCode;
+    const publicVenue = (await request(app.getHttpServer()).get(`/venues/by-code/${code}`)).body;
+    expect(publicVenue.contactPhone).toBeUndefined();
+    // (reset for the tests that follow)
+    await ownerAgent.patch(`/venues/${venue.venueId}`).send({ contactCall: true, contactWhatsapp: false });
+  });
+
   test('an unpaid (pending) booking does not carry the number', async () => {
     const b = await booking();
     const view = await b.agent.get(`/me/bookings/${b.id}`);

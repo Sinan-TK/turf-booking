@@ -132,20 +132,48 @@ test.describe('customer site: after paying at the checkout', () => {
     await expect(page.getByText('Payment received, confirming…')).toBeVisible();
   });
 
-  test('a confirmed booking shows the venue contact number with a Call button', async ({ page }) => {
-    const state = {
+  function confirmedWith(options: { contactCall: boolean; contactWhatsapp: boolean }) {
+    return {
       current: booking({
         status: 'CONFIRMED',
         paymentMethod: 'MONEY',
         moneyPaid: '200.00',
         paidAmount: '200.00',
-        venue: { id: 'v1', name: 'Greenfield Sports Arena', address: '12 Park Road', facilityCode: 'GRN-1', googleMapsUrl: null, lat: 11, lng: 76, contactPhone: '+919847012345' },
+        venue: { id: 'v1', name: 'Greenfield Sports Arena', address: '12 Park Road', facilityCode: 'GRN-1', googleMapsUrl: null, lat: 11, lng: 76, contactPhone: '+919847012345', ...options },
       }),
     };
-    await open(page, state);
+  }
+
+  test('a confirmed booking shows the venue number with a Call icon when Call is on', async ({ page }) => {
+    await open(page, confirmedWith({ contactCall: true, contactWhatsapp: false }));
     await page.goto(`/bookings/${ID}`);
     await expect(page.getByText('Venue contact')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Call venue' })).toHaveAttribute('href', 'tel:+919847012345');
+    await expect(page.getByRole('link', { name: 'Call Greenfield Sports Arena' }).first()).toHaveAttribute('href', 'tel:+919847012345');
+    await expect(page.getByRole('link', { name: /^WhatsApp/ })).toHaveCount(0);
     await expect(page.getByText('Paid online')).toHaveCount(1);
+  });
+
+  test('WhatsApp on shows a WhatsApp icon that opens a chat with the number', async ({ page }) => {
+    await open(page, confirmedWith({ contactCall: false, contactWhatsapp: true }));
+    await page.goto(`/bookings/${ID}`);
+    const link = page.getByRole('link', { name: 'WhatsApp Greenfield Sports Arena' }).first();
+    await expect(link).toHaveAttribute('href', 'https://wa.me/919847012345');
+    await expect(link).toHaveAttribute('target', '_blank');
+    await expect(page.getByRole('link', { name: /^Call / })).toHaveCount(0);
+  });
+
+  test('with both on both icons show, with both off none do', async ({ page }) => {
+    await open(page, confirmedWith({ contactCall: true, contactWhatsapp: true }));
+    await page.goto(`/bookings/${ID}`);
+    await expect(page.getByRole('link', { name: /^Call / }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: /^WhatsApp / }).first()).toBeVisible();
+    await page.screenshot({ path: 'test-results/contact-icons.png' });
+  });
+
+  test('with both off no contact icon is shown', async ({ page }) => {
+    await open(page, confirmedWith({ contactCall: false, contactWhatsapp: false }));
+    await page.goto(`/bookings/${ID}`);
+    await expect(page.getByText('Paid online')).toHaveCount(1);
+    await expect(page.getByRole('link', { name: /^(Call|WhatsApp) / })).toHaveCount(0);
   });
 });

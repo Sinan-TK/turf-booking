@@ -755,6 +755,9 @@ export class BookingsService {
         lng: Number(booking.venue.lng),
         // The venue's number (its own, else the owner organization's): only a customer whose booking is confirmed gets it.
         contactPhone: ['CONFIRMED', 'COMPLETED', 'NO_SHOW'].includes(booking.status) ? (booking.venue.contactPhone ?? booking.venue.organization.contactPhone) : null,
+        // Which buttons the owner switched on for that number (both off = the number is shown but nothing to tap).
+        contactCall: ['CONFIRMED', 'COMPLETED', 'NO_SHOW'].includes(booking.status) ? booking.venue.contactCall : false,
+        contactWhatsapp: ['CONFIRMED', 'COMPLETED', 'NO_SHOW'].includes(booking.status) ? booking.venue.contactWhatsapp : false,
       },
       resourceName: booked?.name ?? null,
       facility: booked ? { name: booked.category.name, unitLabel: booked.category.unitLabel, iconKey: booked.category.iconKey, iconSvg: booked.category.iconSvg } : null,

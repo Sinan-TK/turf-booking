@@ -41,6 +41,8 @@ interface Venue {
   googleMapsUrl: string | null;
   advanceBookingDays: number;
   contactPhone?: string | null;
+  contactCall?: boolean;
+  contactWhatsapp?: boolean;
   status: string;
   timezone: string;
   defaultSlotGranularityMinutes: number;
@@ -271,7 +273,7 @@ export default function VenueDetailPage() {
           <div className="divide-y divide-outline-variant/20">
             <VenueMapLink venueId={venue.id} link={venue.googleMapsUrl} onSaved={() => refetch()} />
             <VenueAdvanceBooking venueId={venue.id} days={venue.advanceBookingDays} onSaved={() => refetch()} />
-            <VenueContactPhone venueId={venue.id} phone={venue.contactPhone ?? null} onSaved={() => refetch()} />
+            <VenueContactPhone venueId={venue.id} phone={venue.contactPhone ?? null} call={venue.contactCall ?? true} whatsapp={venue.contactWhatsapp ?? false} onSaved={() => refetch()} />
           </div>
           <div className="divide-y divide-outline-variant/20">
             <div className="py-3">

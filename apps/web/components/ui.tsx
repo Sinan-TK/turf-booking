@@ -58,6 +58,7 @@ import {
 } from 'lucide-react';
 
 import { CoinSvg } from '@/components/coin-icon';
+import { WhatsappSvg } from '@/components/whatsapp-icon';
 
 /** The site's place icon: a bent arrow, drawn in the colour of the text around it (the 'navigation' icon, on the Directions buttons). */
 function LocationArrow({ size = '1em', className }: { size?: string | number; className?: string }) {
@@ -68,7 +69,7 @@ function LocationArrow({ size = '1em', className }: { size?: string | number; cl
   );
 }
 
-type IconComponent = LucideIcon | typeof LocationArrow | typeof CoinSvg;
+type IconComponent = LucideIcon | typeof LocationArrow | typeof CoinSvg | typeof WhatsappSvg;
 
 const ICON_MAP: Record<string, IconComponent> = {
   // Facility icons (the keys the Super Admin picks in the facility catalogue).
@@ -105,6 +106,7 @@ const ICON_MAP: Record<string, IconComponent> = {
   close: X,
   add: Plus,
   coin: CoinSvg,
+  whatsapp: WhatsappSvg,
   call: Phone,
   my_location: LocateFixed,
   arrow_back: ArrowLeft,

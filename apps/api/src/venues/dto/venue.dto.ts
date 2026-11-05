@@ -14,6 +14,9 @@ export const createVenueSchema = z.object({
   googleMapsUrl: optionalGoogleMapsUrlSchema,
   // The number a customer with a confirmed booking can call (empty = the owner organization's contact number is used).
   contactPhone: indianMobileSchema.optional(),
+  // Which buttons a customer with a confirmed booking gets for that number.
+  contactCall: z.boolean().optional(),
+  contactWhatsapp: z.boolean().optional(),
   // How many days ahead customers can book: today and the next (n - 1) days. Defaults to 7; at most 14.
   advanceBookingDays: z.number().int().min(1, 'Choose at least 1 day.').max(14, 'Customers can book at most 14 days ahead.').optional(),
   // No timezone or facility here: the timezone comes from the district, and
@@ -48,6 +51,8 @@ export const updateVenueSchema = z.object({
     .optional()
     .transform((v) => (v === undefined ? undefined : v === null || v.trim() === '' ? null : v.trim()))
     .pipe(z.union([z.undefined(), z.null(), indianMobileSchema])),
+  contactCall: z.boolean().optional(),
+  contactWhatsapp: z.boolean().optional(),
   advanceBookingDays: z.number().int().min(1, 'Choose at least 1 day.').max(14, 'Customers can book at most 14 days ahead.').optional(),
   status: z.enum(['DRAFT', 'ACTIVE', 'INACTIVE', 'SUSPENDED']).optional(),
 });
