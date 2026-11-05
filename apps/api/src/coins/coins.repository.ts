@@ -50,6 +50,13 @@ export interface CoinsRepository {
     creditAmount: Prisma.Decimal | number | string;
   }): Promise<Refund>;
   adminAdjustAtomic(entry: LedgerEntryInput): Promise<CoinTransaction>;
+  creditTopupAtomic(params: {
+    topupId: string;
+    customerId: string;
+    amount: Prisma.Decimal | number | string;
+    gatewayPaymentId: string | undefined;
+    confirmedVia: string;
+  }): Promise<CoinTransaction>;
 }
 
 export const COINS_REPOSITORY = Symbol('COINS_REPOSITORY');

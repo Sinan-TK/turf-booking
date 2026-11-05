@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, UseGuards, ParseUUIDPipe } from '@nestjs/common';
 import { Role } from '@venue/shared';
+import { loadEnv } from '@venue/config';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -15,8 +16,11 @@ export class CoinsController {
 
   @Get('me/coins')
   @Roles(Role.CUSTOMER)
-  getMyWallet(@CurrentUser() actor: AuthContext) {
-    return this.coins.getWallet(actor.id);
+  async getMyWallet(@CurrentUser() actor: AuthContext) {
+    const wallet = await this.coins.getWallet(actor.id);
+    // The limits for "Add money", so the wallet page can show them without hard-coding them.
+    const env = loadEnv();
+    return { ...wallet, topupMin: env.WALLET_TOPUP_MIN, topupMax: env.WALLET_TOPUP_MAX };
   }
 
   @Get('me/coins/transactions')

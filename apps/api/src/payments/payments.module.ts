@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
+import { PaymentReconcilerService } from './payment-reconciler.service';
 import { AdminPaymentsController, OwnerPaymentsController, PaymentsController } from './payments.controller';
 import { RazorpayProvider } from './razorpay.provider';
 import { PAYMENT_PROVIDER } from './payment-provider.interface';
@@ -13,6 +14,7 @@ import { CustomerMessagingModule } from '../customer-messaging/customer-messagin
   controllers: [PaymentsController, AdminPaymentsController, OwnerPaymentsController],
   providers: [
     PaymentsService,
+    PaymentReconcilerService,
     RazorpayProvider,
     { provide: PAYMENT_PROVIDER, useClass: RazorpayProvider },
     PrismaPaymentsRepository,

@@ -22,6 +22,13 @@ export class WhatsAppCustomerMessenger implements CustomerMessenger {
     return this.whatsapp.sendText(toPhone, `✅ Booking ${orderId} cancelled.${refundLine}`);
   }
 
+  latePaymentRefunded(toPhone: string, orderId: string, coinsCredited: string): Promise<void> {
+    return this.whatsapp.sendText(
+      toPhone,
+      `Your payment for booking ${orderId} reached us after the slot was released, so it could not be kept. 🪙 ${coinsCredited} Coins were added to your wallet; you can use them for your next booking.`,
+    );
+  }
+
   async loginCode(toPhone: string, code: string): Promise<void> {
     const env = loadEnv();
     if (env.AUTH_OTP_DELIVERY === 'log') {

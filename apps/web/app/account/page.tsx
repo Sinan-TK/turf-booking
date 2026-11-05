@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAccountData } from '@/lib/account-cache';
@@ -19,10 +19,15 @@ import { LogoutButton } from '@/components/logout-button';
 import { VerifyEmailDialog } from '@/components/verify-email-dialog';
 import { SavedVenuesPanel } from '@/components/saved-venues-panel';
 import { BackButton } from '@/components/back-button';
+import { WalletTopupSheet } from '@/components/wallet-topup';
+import { formatPrice } from '@/lib/booking';
 
 interface CoinWallet {
   cachedBalance: string;
   currency: string;
+  /** The least and most that can be added at a time. */
+  topupMin?: number;
+  topupMax?: number;
 }
 interface CoinTransaction {
   id: string;
@@ -39,6 +44,7 @@ const TYPE_LABELS: Record<string, string> = {
   PROMOTION: 'Promotion',
   BOOKING_REDEMPTION: 'Used for a booking',
   ADMIN_ADJUSTMENT: 'Adjustment',
+  WALLET_TOPUP: 'Added to wallet',
 };
 
 function labelFor(type: string): string {
@@ -468,7 +474,7 @@ function ChangePassword() {
 
 function Wallet() {
   // The last answer paints at once; the live one replaces it.
-  const { data, error } = useAccountData(
+  const { data, setData, error } = useAccountData(
     'wallet',
     async () => {
       const [wallet, txs] = await Promise.all([api.get<CoinWallet>('/me/coins'), api.get<CoinTransaction[]>('/me/coins/transactions')]);
@@ -478,16 +484,65 @@ function Wallet() {
   );
   const wallet = data?.wallet ?? null;
   const txs = data?.txs ?? null;
+  const router = useRouter();
+  const params = useSearchParams();
+  // "Add money" opens by itself when the checkout sent the customer here for the missing amount (?add=300&back=/checkout/...).
+  const asked = Number(params.get('add'));
+  const back = params.get('back');
+  const [adding, setAdding] = useState(false);
+  const [initialAmount, setInitialAmount] = useState<number | undefined>(undefined);
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    if (autoOpened.current || !wallet || !Number.isFinite(asked) || asked <= 0) return;
+    autoOpened.current = true;
+    setInitialAmount(asked);
+    setAdding(true);
+  }, [wallet, asked]);
+
+  /** The Coins arrived: read the wallet again, and go back to the checkout that sent the customer here (if its slot is still held it carries on). */
+  async function credited() {
+    try {
+      const [fresh, list] = await Promise.all([api.get<CoinWallet>('/me/coins'), api.get<CoinTransaction[]>('/me/coins/transactions')]);
+      setData({ wallet: fresh, txs: list.slice(0, 20) });
+    } catch {
+      // the next visit reads it again
+    }
+    if (back && back.startsWith('/checkout/')) router.replace(back);
+  }
 
   return (
     <Card>
-      <h2 className="mb-3 text-sm font-semibold text-gray-900">Coins wallet</h2>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold text-gray-900">Coins wallet</h2>
+        {wallet && (
+          <button
+            type="button"
+            onClick={() => {
+              setInitialAmount(undefined);
+              setAdding(true);
+            }}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-brand-700 px-3.5 py-2 text-xs font-bold text-white transition hover:bg-brand-800 active:scale-95"
+          >
+            <Icon name="add" className="text-[1rem]" />
+            Add money
+          </button>
+        )}
+      </div>
+      {adding && wallet && (
+        <WalletTopupSheet
+          min={wallet.topupMin ?? 50}
+          max={wallet.topupMax ?? 10000}
+          initialAmount={initialAmount}
+          onClose={() => setAdding(false)}
+          onCredited={() => void credited()}
+        />
+      )}
       {error && <ErrorBanner message={error} />}
       {!error && !wallet && <WalletSkeleton />}
       {wallet && (
         <>
-          <p className="text-3xl font-semibold text-gray-900">{wallet.cachedBalance}</p>
-          <p className="mb-4 text-xs text-gray-500">Coins from cancelled bookings. Use them to pay for your next one.</p>
+          <p className="text-3xl font-semibold text-gray-900">{formatPrice({ amount: wallet.cachedBalance, currency: wallet.currency })}</p>
+          <p className="mb-4 text-xs text-gray-500">1 Coin is worth 1 rupee. Add money here or get Coins back from cancelled bookings, and use them to pay for a booking.</p>
           {txs && txs.length === 0 && <p className="text-sm text-gray-500">No transactions yet.</p>}
           {txs && txs.length > 0 && (
             <ul className="divide-y divide-gray-100 text-sm">
@@ -501,7 +556,7 @@ function Wallet() {
                     </div>
                     <p className={`shrink-0 font-medium ${credit ? 'text-brand-700' : 'text-gray-900'}`}>
                       {credit ? '+' : ''}
-                      {t.amount}
+                      {formatPrice({ amount: t.amount, currency: wallet.currency })}
                     </p>
                   </li>
                 );

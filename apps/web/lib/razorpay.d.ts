@@ -11,11 +11,13 @@ export interface RazorpayCheckoutOptions {
     razorpay_signature: string;
   }) => void;
   modal?: { ondismiss?: () => void };
+  prefill?: { name?: string; email?: string; contact?: string };
   theme?: { color?: string };
 }
 
 interface RazorpayCheckout {
   open: () => void;
+  on: (event: string, callback: (response: { error?: { description?: string; reason?: string } }) => void) => void;
 }
 
 declare global {

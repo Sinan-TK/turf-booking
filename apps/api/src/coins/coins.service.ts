@@ -1,4 +1,5 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@venue/database';
 import {
   assertTransition,
   RefundStatus,
@@ -50,6 +51,10 @@ export class CoinsService {
     // is synchronous, so an ineligible state just means the hold expired
     // or the booking was already resolved between page load and this
     // click; assertTransition's error surfaces as a normal 4xx.
+    // Only an unpaid booking whose slot is still held can be paid with Coins: not one whose card payment is being confirmed,
+    // and not one whose timer has run out (the sweep can lag a minute behind it).
+    if (booking.status === 'PROCESSING') throw new ConflictException('Your payment is already being confirmed.');
+    if (slotHold.holdExpiresAt.getTime() <= Date.now()) throw new ConflictException('This slot is no longer held. Please choose a time again.');
     assertTransition('Booking', BOOKING_TRANSITIONS, booking.status, 'CONFIRMED');
     assertTransition('SlotHold', SLOT_HOLD_TRANSITIONS, slotHold.status, 'CONFIRMED');
 
@@ -96,6 +101,17 @@ export class CoinsService {
    * async hop: crediting a ledger is a pure DB operation with no
    * external gateway call, so there's nothing to wait on.
    */
+  /** Credits the wallet for a captured recharge (idempotent: the same top-up can only ever be credited once). */
+  creditTopup(params: {
+    topupId: string;
+    customerId: string;
+    amount: Prisma.Decimal | number | string;
+    gatewayPaymentId: string | undefined;
+    confirmedVia: 'WEBHOOK' | 'CLIENT' | 'RECONCILER';
+  }) {
+    return this.coins.creditTopupAtomic(params);
+  }
+
   async completeRefund(refundId: string) {
     const refund = await this.coins.findRefundById(refundId);
     if (refund.status === RefundStatus.COMPLETED) return refund; // already done — safe no-op

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import Razorpay from 'razorpay';
 import { loadEnv } from '@venue/config';
-import type { CreateOrderResult, PaymentProvider } from './payment-provider.interface';
+import type { CreateOrderResult, GatewayPayment, PaymentProvider } from './payment-provider.interface';
 
 @Injectable()
 export class RazorpayProvider implements PaymentProvider {
@@ -54,6 +54,26 @@ export class RazorpayProvider implements PaymentProvider {
     return safeCompare(expected, params.signature);
   }
 
+  async fetchPayment(gatewayPaymentId: string): Promise<GatewayPayment | null> {
+    try {
+      return toGatewayPayment(await this.client.payments.fetch(gatewayPaymentId));
+    } catch (error) {
+      // Razorpay answers 400/404 for an id it does not know; anything else (network, 5xx) is a real failure the caller must see.
+      const status = (error as { statusCode?: number }).statusCode;
+      if (status === 400 || status === 404) return null;
+      throw error;
+    }
+  }
+
+  async fetchOrderPayments(gatewayOrderId: string): Promise<GatewayPayment[]> {
+    const result = await this.client.orders.fetchPayments(gatewayOrderId);
+    return (result.items ?? []).map(toGatewayPayment);
+  }
+
+  async capturePayment(gatewayPaymentId: string, amountMinorUnits: number, currency: string): Promise<GatewayPayment> {
+    return toGatewayPayment(await this.client.payments.capture(gatewayPaymentId, amountMinorUnits, currency));
+  }
+
   verifyWebhookSignature(rawBody: Buffer, signatureHeader: string | undefined): boolean {
     if (!signatureHeader) return false;
     const expected = createHmac('sha256', this.webhookSecret).update(rawBody).digest('hex');
@@ -74,6 +94,11 @@ export class RazorpayProvider implements PaymentProvider {
       payload,
     };
   }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toGatewayPayment(p: any): GatewayPayment {
+  return { id: p.id, orderId: p.order_id, status: p.status, amountMinorUnits: Number(p.amount), currency: String(p.currency ?? 'INR') };
 }
 
 function safeCompare(a: string, b: string): boolean {

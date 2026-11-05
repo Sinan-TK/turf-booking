@@ -77,6 +77,7 @@ export class PrismaCoinsRepository implements CoinsRepository {
           ? params.referenceId
           : undefined,
         refundId: type === 'REFUND' ? params.referenceId : undefined,
+        walletTopupId: type === 'WALLET_TOPUP' ? params.referenceId : undefined,
         idempotencyKey,
         createdByAdminId: params.createdByAdminId,
       },
@@ -110,7 +111,7 @@ export class PrismaCoinsRepository implements CoinsRepository {
       // sequence ever changes).
       const updatedBooking = await tx.booking.update({
         where: { id: params.bookingId, status: params.expectedBookingStatus as BookingStatus },
-        data: { status: 'CONFIRMED', paymentMethod: 'COINS', paidAmount: params.amount },
+        data: { status: 'CONFIRMED', paymentMethod: 'COINS', paidAmount: params.amount, coinsPaid: params.amount, moneyPaid: 0, processingUntil: null },
       });
       await tx.slotHold.update({
         where: { id: params.slotHoldId, status: params.expectedSlotHoldStatus as SlotHoldStatus },
@@ -164,6 +165,38 @@ export class PrismaCoinsRepository implements CoinsRepository {
       return tx.refund.update({
         where: { id: params.refundId, status: 'PROCESSING' },
         data: { status: 'COMPLETED' },
+      });
+    });
+  }
+
+  /**
+   * A wallet recharge the gateway has captured: the top-up turns SUCCESS and the wallet is credited in ONE transaction. Replaying it
+   * (webhook, client confirmation and reconciler all arrive at this) finds the ledger row by its key and changes nothing.
+   */
+  async creditTopupAtomic(params: {
+    topupId: string;
+    customerId: string;
+    amount: Prisma.Decimal | number | string;
+    gatewayPaymentId: string | undefined;
+    confirmedVia: string;
+  }) {
+    return this.prisma.client.$transaction(async (tx) => {
+      const topup = await tx.walletTopup.findUniqueOrThrow({ where: { id: params.topupId } });
+      if (topup.status !== 'SUCCESS') {
+        await tx.walletTopup.update({
+          where: { id: params.topupId },
+          data: {
+            status: 'SUCCESS',
+            gatewayPaymentId: params.gatewayPaymentId ?? topup.gatewayPaymentId,
+            confirmedVia: params.confirmedVia as 'WEBHOOK' | 'CLIENT' | 'RECONCILER',
+          },
+        });
+      }
+      return this.applyLedgerEntry(tx, {
+        customerId: params.customerId,
+        type: 'WALLET_TOPUP',
+        amount: params.amount,
+        referenceId: params.topupId,
       });
     });
   }

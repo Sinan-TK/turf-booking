@@ -178,7 +178,7 @@ describe('Payment flow', () => {
     expect(booking.status).toBe('PENDING_PAYMENT');
   });
 
-  test('a payment confirmed after the hold already expired is refunded to coins, not honored', async () => {
+  test('a payment confirmed after the hold expired AND the slot was taken by someone else is refunded to coins, not honored', async () => {
     const { agent: customer, customerId } = await createCustomerFixture(app);
     const startTime = futureStart(13, 9).toISOString();
 
@@ -201,6 +201,11 @@ describe('Payment flow', () => {
 
     const cancelledBooking = await prisma.booking.findUniqueOrThrow({ where: { id: hold.body.id } });
     expect(cancelledBooking.status).toBe('CANCELLED');
+
+    // Somebody else books the freed slot before the money arrives: this booking can no longer be put back.
+    const { agent: other } = await createCustomerFixture(app);
+    const taken = await other.post('/bookings/hold').send({ resourceId: venue.halfAId, startTime, durationMinutes: 60 });
+    expect(taken.status).toBe(201);
 
     const res = await signedWebhookRequest(
       app,

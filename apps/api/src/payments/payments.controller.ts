@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, HttpCode, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Param, ParseUUIDPipe, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
@@ -12,7 +12,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { OwnerRoles } from '../auth/decorators/owner-roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { PaymentsService } from './payments.service';
-import { CreateOrderDto, VerifyPaymentDto } from './dto/payment.dto';
+import { CreateOrderDto, CreateTopupDto, VerifyPaymentDto } from './dto/payment.dto';
 import type { AuthContext } from '../auth/auth.types';
 
 @Controller()
@@ -29,12 +29,38 @@ export class PaymentsController {
   @Post('payments/verify')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.CUSTOMER)
-  verify(@Body() dto: VerifyPaymentDto) {
-    return this.payments.verifyClientCallback({
-      gatewayOrderId: dto.razorpayOrderId,
-      gatewayPaymentId: dto.razorpayPaymentId,
-      signature: dto.razorpaySignature,
-    });
+  verify(@Body() dto: VerifyPaymentDto, @CurrentUser() actor: AuthContext) {
+    return this.payments.verifyClientCallback(
+      {
+        gatewayOrderId: dto.razorpayOrderId,
+        gatewayPaymentId: dto.razorpayPaymentId,
+        signature: dto.razorpaySignature,
+      },
+      actor,
+    );
+  }
+
+  /** The checkout page's waiting loop: asks the gateway about the booking's payment, so it never depends on the webhook. */
+  @Get('payments/sync/:bookingId')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.CUSTOMER)
+  sync(@Param('bookingId', ParseUUIDPipe) bookingId: string, @CurrentUser() actor: AuthContext) {
+    return this.payments.syncBooking(bookingId, actor);
+  }
+
+  /** Wallet recharge: buy Coins with money. */
+  @Post('me/coins/topup')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.CUSTOMER)
+  createTopup(@Body() dto: CreateTopupDto, @CurrentUser() actor: AuthContext) {
+    return this.payments.createTopup(dto.amount, actor);
+  }
+
+  @Get('me/coins/topups/:id')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.CUSTOMER)
+  getTopup(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthContext) {
+    return this.payments.getTopup(id, actor);
   }
 
   // No AuthGuard — Razorpay calls this directly. Authenticity comes

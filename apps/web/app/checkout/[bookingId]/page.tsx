@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Script from 'next/script';
 import { api, ApiError } from '@/lib/api';
 import { useCustomer } from '@/lib/customer';
 import { formatCountdown, formatDay, formatTimeRange, useCountdown } from '@/lib/checkout';
+import { formatPrice } from '@/lib/booking';
+import { PaymentSuccess } from '@/components/payment-success';
 import type { RazorpayCheckoutOptions } from '@/lib/razorpay';
-import { Badge, Button, Card, ErrorBanner, Icon, LoadingState, SuccessBanner } from '@/components/ui';
+import { Badge, Button, Card, ErrorBanner, Icon, LoadingState } from '@/components/ui';
 import { DetailSkeleton } from '@/components/skeleton';
 import { Screen } from '@/components/screen';
 import { CancellationTerms, useCancellationPreview } from '@/components/cancellation-terms';
@@ -28,9 +30,16 @@ interface CheckoutBooking {
   durationMinutes: number;
   groundType: string;
   paymentMethod: string | null;
+  /** How the booking was paid, once it is: exactly one of the two is above zero. */
+  coinsPaid?: string;
+  moneyPaid?: string;
   venue: { id: string; name: string; address: string };
   resourceName: string | null;
   holdExpiresAt: string;
+  /** While PROCESSING: when the wait for the bank's confirmation ends. */
+  processingUntil?: string | null;
+  /** The server's clock when this was sent (the countdowns follow it, not the visitor's clock). */
+  serverNow?: string;
 }
 interface CoinWallet {
   cachedBalance: string;
@@ -50,6 +59,13 @@ export default function CheckoutPage() {
   const [payError, setPayError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
   const [confirmingPayment, setConfirmingPayment] = useState(false);
+  // True from the moment the payment popup opens until it is closed or answers, so "slot no longer held" never shows behind it.
+  const [popupOpen, setPopupOpen] = useState(false);
+  // How far the visitor's clock is from the server's (server minus visitor), so the countdowns agree with the server.
+  const [skewMs, setSkewMs] = useState(0);
+  const [celebrate, setCelebrate] = useState(false);
+  const sawUnpaid = useRef(false);
+  const router = useRouter();
   const payingRef = useRef(false);
   const mounted = useRef(true);
   const preview = useCancellationPreview(bookingId, booking?.status);
@@ -68,6 +84,7 @@ export default function CheckoutPage() {
       const b = await api.get<CheckoutBooking>(`/me/bookings/${bookingId}`);
       if (!mounted.current) return;
       setBooking(b);
+      if (b.serverNow) setSkewMs(Date.parse(b.serverNow) - Date.now());
       setView('ready');
     } catch (err) {
       if (!mounted.current) return;
@@ -103,6 +120,31 @@ export default function CheckoutPage() {
   // API already scopes it; this covers stale state after switching accounts).
   const mine = booking !== null && customerId !== null && booking.customerId === customerId ? booking : null;
   const pending = mine !== null && mine.status === 'PENDING_PAYMENT';
+  const processing = mine !== null && mine.status === 'PROCESSING';
+
+  // A booking that turns CONFIRMED while this page was waiting for money gets the success moment, then moves on to the booking;
+  // one that was already confirmed when opened goes straight to its page.
+  useEffect(() => {
+    if (!mine) return;
+    if (mine.status === 'PENDING_PAYMENT' || mine.status === 'PROCESSING') sawUnpaid.current = true;
+    if (mine.status === 'CONFIRMED') {
+      if (sawUnpaid.current) setCelebrate(true);
+      else router.replace(`/bookings/${mine.id}`);
+    }
+  }, [mine, router]);
+
+  // While the bank's confirmation is awaited, ask the server (which asks the gateway) every few seconds, so this never depends on the webhook.
+  useEffect(() => {
+    if (!processing || !mine) return;
+    const id = mine.id;
+    const timer = setInterval(() => {
+      api
+        .get(`/payments/sync/${id}`)
+        .catch(() => undefined)
+        .finally(() => void load());
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [processing, mine, load]);
 
   useEffect(() => {
     if (!pending) return;
@@ -113,12 +155,16 @@ export default function CheckoutPage() {
   }, [pending]);
 
   // When the hold runs out, refetch so the page flips without a reload.
-  const secondsLeft = useCountdown(mine && pending ? mine.holdExpiresAt : null, () => {
+  const clientTime = (iso: string) => new Date(Date.parse(iso) - skewMs).toISOString();
+  const secondsLeft = useCountdown(mine && pending ? clientTime(mine.holdExpiresAt) : null, () => {
+    load();
+  });
+  const processingLeft = useCountdown(mine && processing && mine.processingUntil ? clientTime(mine.processingUntil) : null, () => {
     load();
   });
   // A payment already in flight must survive the timer running out.
   const holdActive = pending && secondsLeft !== null && secondsLeft > 0;
-  const holdLost = mine !== null && !confirmingPayment && (mine.status === 'CANCELLED' || (pending && secondsLeft === 0));
+  const holdLost = mine !== null && !confirmingPayment && !popupOpen && (mine.status === 'CANCELLED' || (pending && secondsLeft === 0));
 
   async function guarded(fn: () => Promise<void>) {
     if (payingRef.current) return;
@@ -140,39 +186,27 @@ export default function CheckoutPage() {
       await load();
     } catch (err) {
       setPayError(err instanceof ApiError ? err.message : 'Payment with Coins failed.');
+      if (err instanceof ApiError && err.status === 409) void load();
     }
   }
 
-  // The webhook, not this browser callback, is what actually confirms the
-  // booking (ARCHITECTURE.md §9) — after Razorpay's own success handler
-  // fires, this polls the booking's own status for a short window instead
-  // of trusting the redirect.
-  async function pollForConfirmation(id: string) {
+  // After Razorpay's own success callback the browser tells the server (which checks the signature and asks the gateway itself), so the
+  // booking is confirmed without waiting for the webhook; if the bank has not confirmed yet the booking is PROCESSING and the loop above settles it.
+  async function afterPaid(response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }, id: string) {
+    setPopupOpen(false);
     setConfirmingPayment(true);
-    for (let i = 0; i < 14; i++) {
-      await new Promise((r) => setTimeout(r, 1500));
-      if (!mounted.current) return;
-      try {
-        const current = await api.get<CheckoutBooking>(`/me/bookings/${id}`);
-        if (current.status === 'CONFIRMED') {
-          setBooking(current);
-          setConfirmingPayment(false);
-          return;
-        }
-        if (current.status === 'CANCELLED') {
-          setBooking(current);
-          setConfirmingPayment(false);
-          setPayError(
-            'This booking was cancelled before payment could be confirmed — the slot may have expired. Any captured payment is refunded to Coins.',
-          );
-          return;
-        }
-      } catch {
-        // keep polling
-      }
+    try {
+      await api.post('/payments/verify', {
+        bookingId: id,
+        razorpayOrderId: response.razorpay_order_id,
+        razorpayPaymentId: response.razorpay_payment_id,
+        razorpaySignature: response.razorpay_signature,
+      });
+    } catch {
+      // The page below shows the truth either way; the server also finds the payment by itself.
     }
-    setConfirmingPayment(false);
-    setPayError("Payment is still being confirmed. This can take a minute — check 'Bookings' shortly.");
+    await load();
+    if (mounted.current) setConfirmingPayment(false);
   }
 
   async function onPayWithRazorpay() {
@@ -196,31 +230,49 @@ export default function CheckoutPage() {
         name: 'Bookyo',
         description: `Booking ${booking.orderId}`,
         order_id: order.gatewayOrderId,
-        handler: (response) => {
-          api
-            .post('/payments/verify', {
-              bookingId: booking.id,
-              razorpayOrderId: response.razorpay_order_id,
-              razorpayPaymentId: response.razorpay_payment_id,
-              razorpaySignature: response.razorpay_signature,
-            })
-            .catch(() => undefined) // fast-path only; the webhook is authoritative either way
-            .finally(() => pollForConfirmation(booking.id));
+        handler: (response) => void afterPaid(response, booking.id),
+        modal: {
+          // Closed without paying: the slot stays held (its time was extended); fetch the new time and let them try again.
+          ondismiss: () => {
+            setPopupOpen(false);
+            void load();
+          },
         },
         theme: { color: '#050505' },
       };
-      new window.Razorpay(options).open();
+      const checkout = new window.Razorpay(options);
+      checkout.on('payment.failed', (res) => {
+        setPayError(res.error?.description ?? 'The payment did not go through. You can try again.');
+      });
+      setPopupOpen(true);
+      checkout.open();
     } catch (err) {
+      setPopupOpen(false);
       setPayError(err instanceof ApiError ? err.message : 'Could not start payment.');
+      if (err instanceof ApiError && err.status === 409) void load();
     }
   }
 
   // Only the booking amount (the advance) is paid now; the rest of the full price is paid at the venue.
   const dueNow = booking ? (Number(booking.advanceAmount) > 0 ? Number(booking.advanceAmount) : Number(booking.amount)) : 0;
   const insufficientCoins = !wallet || (booking ? Number(wallet.cachedBalance) < dueNow : true);
+  // How many more Coins it takes, so the customer can top the wallet up for exactly that.
+  const missingCoins = wallet ? Math.max(0, Math.ceil((dueNow - Number(wallet.cachedBalance)) * 100) / 100) : 0;
+
+  const paidWithCoins = mine !== null && Number(mine.coinsPaid ?? 0) > 0;
+  const paidAmount = mine
+    ? formatPrice({ amount: String(paidWithCoins ? mine.coinsPaid : Number(mine.moneyPaid ?? 0) > 0 ? mine.moneyPaid : dueNow), currency: mine.currency })
+    : '';
 
   return (
     <Screen>
+      {celebrate && mine && (
+        <PaymentSuccess
+          amount={paidAmount}
+          detail={paidWithCoins ? 'Paid with Coins' : 'Paid online'}
+          onDone={() => router.replace(`/bookings/${mine.id}`)}
+        />
+      )}
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
       <h1 className="mb-6 flex items-center justify-center gap-2 text-xl font-semibold text-gray-900">
         <Icon name="schedule" />
@@ -320,7 +372,30 @@ export default function CheckoutPage() {
             </div>
           )}
 
-          {!holdLost && confirmingPayment && <LoadingState message="Confirming your payment…" />}
+          {!holdLost && confirmingPayment && !processing && <LoadingState message="Confirming your payment…" />}
+
+          {processing && (
+            <div className="space-y-3 rounded-md border border-gray-200 bg-gray-50 px-4 py-5 text-center" role="status">
+              <p className="text-sm font-semibold text-gray-900">Confirming your payment…</p>
+              <p className="text-sm text-gray-600">
+                We have your payment and are waiting for the bank to confirm it. Your slot is kept for you
+                {processingLeft !== null && processingLeft > 0 ? ` (${formatCountdown(processingLeft)} left)` : ''}.
+              </p>
+              <p className="text-xs text-gray-500">You can leave this page: your booking appears under Bookings as soon as it is confirmed.</p>
+            </div>
+          )}
+
+          {mine.status === 'FAILED' && (
+            <div className="space-y-3">
+              <ErrorBanner message="We could not confirm your payment, so the slot was released. If money was deducted it returns to your bank automatically, usually within a few days. If it does not, contact support with your order number." />
+              <Link href="/explore" className="block">
+                <Button className="w-full">Choose another time</Button>
+              </Link>
+              <Link href="/support" className="block text-center text-sm font-medium text-gray-700 underline">
+                Contact support
+              </Link>
+            </div>
+          )}
 
           {!holdLost && pending && (
             <>
@@ -347,11 +422,22 @@ export default function CheckoutPage() {
                   disabled={!holdActive || paying || confirmingPayment || insufficientCoins}
                   onClick={() => guarded(onPayWithCoins)}
                 >
-                  Pay with Coins {wallet ? `(balance: ${wallet.cachedBalance})` : ''}
+                  Pay with Coins {wallet ? `(balance: ${formatPrice({ amount: wallet.cachedBalance, currency: wallet.currency })})` : ''}
                 </Button>
+                {wallet && insufficientCoins && (
+                  <p className="text-center text-xs text-gray-500">
+                    You need {formatPrice({ amount: String(missingCoins), currency: wallet.currency })} more Coins.{' '}
+                    <Link
+                      href={`/account?tab=wallet&add=${Math.ceil(missingCoins)}&back=${encodeURIComponent(`/checkout/${mine.id}`)}`}
+                      className="font-semibold text-gray-900 underline underline-offset-2"
+                    >
+                      Add money to your wallet
+                    </Link>
+                  </p>
+                )}
               </div>
               <p className="mt-4 text-center text-xs text-gray-400">
-                Pay with money or Coins — never both for the same booking.
+                Pay with money or with Coins, one or the other for each booking.
               </p>
               <p className="mt-2 text-center text-xs text-gray-400">
                 By paying you agree to the{' '}
@@ -367,27 +453,16 @@ export default function CheckoutPage() {
             </>
           )}
 
-          {mine.status !== 'PENDING_PAYMENT' && mine.status !== 'CANCELLED' && (
-            <div className="space-y-3">
-              {mine.status === 'CONFIRMED' && (
-                <SuccessBanner
-                  message={
-                    <span className="flex items-center gap-1.5">
-                      <Icon name="bolt" className="text-[1.125rem]" />
-                      Booking confirmed! We have sent the details to your WhatsApp.
-                    </span>
-                  }
-                />
-              )}
-              <Link href={`/bookings/${mine.id}`} className="block">
-                <Button className="w-full">View booking</Button>
-              </Link>
-              <Link href="/" className="block">
-                <Button variant="secondary" className="w-full">
-                  Back to home
-                </Button>
-              </Link>
-            </div>
+          {mine.status === 'CANCELLED' && !holdLost && (
+            <Link href="/explore" className="block">
+              <Button className="w-full">Choose another time</Button>
+            </Link>
+          )}
+
+          {mine.status === 'CONFIRMED' && !celebrate && (
+            <Link href={`/bookings/${mine.id}`} className="block">
+              <Button className="w-full">View booking</Button>
+            </Link>
           )}
         </Card>
       )}

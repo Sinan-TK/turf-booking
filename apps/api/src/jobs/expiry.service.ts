@@ -50,49 +50,59 @@ export class ExpiryService {
   @Cron(CronExpression.EVERY_MINUTE)
   async expireSlotHolds() {
     const expired = await this.prisma.client.slotHold.findMany({
-      where: { status: 'HELD', holdExpiresAt: { lt: new Date() } },
+      // A booking in its PROCESSING window keeps its slot: the payment reconciler decides it, never this sweep.
+      where: {
+        status: 'HELD',
+        holdExpiresAt: { lt: new Date() },
+        NOT: { booking: { is: { status: 'PROCESSING' } } },
+      },
       include: { booking: true },
     });
 
     for (const hold of expired) {
       assertTransition('SlotHold', SLOT_HOLD_TRANSITIONS, hold.status, 'EXPIRED');
-      await this.prisma.client.$transaction(async (tx) => {
-        await tx.slotHold.update({
-          where: { id: hold.id, status: hold.status },
-          data: { status: 'EXPIRED' },
-        });
-        await tx.resourceLock.updateMany({
-          where: { slotHoldId: hold.id },
-          data: { status: 'EXPIRED' },
-        });
-        // No-op for exclusive holds; releases pooled reservations so
-        // expired kayak holds free their units (same keep-in-sync rule
-        // as cancelAtomic and both confirm paths).
-        await tx.inventoryReservation.updateMany({
-          where: { slotHoldId: hold.id },
-          data: { status: 'EXPIRED' },
-        });
-
-        if (hold.booking && hold.booking.status === 'PENDING_PAYMENT') {
-          assertTransition('Booking', BOOKING_TRANSITIONS, hold.booking.status, 'CANCELLED');
-          await tx.booking.update({
-            where: { id: hold.booking.id, status: hold.booking.status },
-            data: {
-              status: 'CANCELLED',
-              cancellationReasonCode: 'HOLD_EXPIRED',
-              cancelledAt: new Date(),
-            },
+      try {
+        await this.prisma.client.$transaction(async (tx) => {
+          await tx.slotHold.update({
+            where: { id: hold.id, status: hold.status },
+            data: { status: 'EXPIRED' },
           });
-        }
-      });
+          await tx.resourceLock.updateMany({
+            where: { slotHoldId: hold.id },
+            data: { status: 'EXPIRED' },
+          });
+          // No-op for exclusive holds; releases pooled reservations so
+          // expired kayak holds free their units (same keep-in-sync rule
+          // as cancelAtomic and both confirm paths).
+          await tx.inventoryReservation.updateMany({
+            where: { slotHoldId: hold.id },
+            data: { status: 'EXPIRED' },
+          });
 
-      await this.audit.record({
-        actor: 'SYSTEM',
-        action: 'SLOT_HOLD_EXPIRED',
-        entityType: 'SlotHold',
-        entityId: hold.id,
-        metadata: { bookingId: hold.booking?.id },
-      });
+          if (hold.booking && hold.booking.status === 'PENDING_PAYMENT') {
+            assertTransition('Booking', BOOKING_TRANSITIONS, hold.booking.status, 'CANCELLED');
+            await tx.booking.update({
+              where: { id: hold.booking.id, status: hold.booking.status },
+              data: {
+                status: 'CANCELLED',
+                cancellationReasonCode: 'HOLD_EXPIRED',
+                cancelledAt: new Date(),
+              },
+            });
+          }
+        });
+
+        await this.audit.record({
+          actor: 'SYSTEM',
+          action: 'SLOT_HOLD_EXPIRED',
+          entityType: 'SlotHold',
+          entityId: hold.id,
+          metadata: { bookingId: hold.booking?.id },
+        });
+      } catch (error) {
+        // The payment confirmation got there first (or another run did): leave this hold and carry on with the rest.
+        this.logger.warn(`Could not expire hold ${hold.id}: ${(error as Error).message}`);
+      }
     }
     if (expired.length > 0) this.logger.log(`Expired ${expired.length} slot hold(s)`);
   }

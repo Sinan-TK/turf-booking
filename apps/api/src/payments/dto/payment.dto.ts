@@ -7,9 +7,14 @@ export const createOrderSchema = z.object({
 export class CreateOrderDto extends createZodDto(createOrderSchema) {}
 
 export const verifyPaymentSchema = z.object({
-  bookingId: z.string().uuid(),
+  bookingId: z.string().uuid().optional(),
   razorpayOrderId: z.string().min(1),
   razorpayPaymentId: z.string().min(1),
   razorpaySignature: z.string().min(1),
 });
 export class VerifyPaymentDto extends createZodDto(verifyPaymentSchema) {}
+
+export const createTopupSchema = z.object({
+  amount: z.number().positive(),
+});
+export class CreateTopupDto extends createZodDto(createTopupSchema) {}

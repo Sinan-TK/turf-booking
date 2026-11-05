@@ -746,11 +746,22 @@ export class BookingsService {
     const booked = resource ?? resourceGroup; // a single unit (a court), or a pooled item (kayaks) with a quantity
     return {
       ...forCustomer(booking),
-      venue: { ...booking.venue, photos: undefined, photoUrl: booking.venue.photos[0]?.url ?? null, lat: Number(booking.venue.lat), lng: Number(booking.venue.lng) },
+      venue: {
+        ...booking.venue,
+        photos: undefined,
+        organization: undefined,
+        photoUrl: booking.venue.photos[0]?.url ?? null,
+        lat: Number(booking.venue.lat),
+        lng: Number(booking.venue.lng),
+        // The venue's number (its own, else the owner organization's): only a customer whose booking is confirmed gets it.
+        contactPhone: ['CONFIRMED', 'COMPLETED', 'NO_SHOW'].includes(booking.status) ? (booking.venue.contactPhone ?? booking.venue.organization.contactPhone) : null,
+      },
       resourceName: booked?.name ?? null,
       facility: booked ? { name: booked.category.name, unitLabel: booked.category.unitLabel, iconKey: booked.category.iconKey, iconSvg: booked.category.iconSvg } : null,
       photoUrl: booked?.photos[0] ? this.storage.publicUrl(booked.photos[0].key) : null,
       holdExpiresAt: slotHold.holdExpiresAt,
+      // The server's clock, so the checkout countdown does not depend on the visitor's.
+      serverNow: new Date().toISOString(),
     };
   }
 
@@ -1106,6 +1117,9 @@ function forCustomer<T extends { status: BookingStatus }>(booking: T): T {
 }
 
 function assertCancellable(status: BookingStatus) {
+  if (status === 'PROCESSING') {
+    throw new BadRequestException('Your payment is being confirmed. You can cancel once it is confirmed (in a few minutes at most).');
+  }
   if (!BOOKING_TRANSITIONS[status]?.includes('CANCELLED')) {
     throw new BadRequestException(
       status === 'CANCELLED' ? 'This booking is already cancelled.' : `A ${status.toLowerCase().replace('_', ' ')} booking can't be cancelled.`,

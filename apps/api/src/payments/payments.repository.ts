@@ -5,6 +5,7 @@ import type {
   Prisma,
   Refund,
   SlotHold,
+  WalletTopup,
   WebhookEvent,
 } from '@venue/database';
 import type { DateRange } from '../common/list-filters';
@@ -74,7 +75,28 @@ export interface ConfirmPaymentAtomicParams {
   slotHoldStatus: string;
   /** What this payment collected: the booking is paid up to this much. */
   paidAmount: Prisma.Decimal | number | string;
+  /** Which path confirmed it: the webhook, the customer's browser, or the reconciler. */
+  confirmedVia: 'WEBHOOK' | 'CLIENT' | 'RECONCILER';
 }
+
+/** A payment the gateway captured after its booking lost the slot, honoured only when the slot is still free. */
+export interface HonourLatePaymentParams {
+  paymentId: string;
+  paymentStatus: string;
+  gatewayPaymentId: string | undefined;
+  rawPayload: unknown;
+  bookingId: string;
+  bookingStatus: string;
+  slotHoldId: string;
+  paidAmount: Prisma.Decimal | number | string;
+  confirmedVia: 'WEBHOOK' | 'CLIENT' | 'RECONCILER';
+}
+
+export type ProcessingDueBooking = Prisma.BookingGetPayload<{
+  include: { payments: true; venue: { select: { organizationId: true } } };
+}>;
+
+export type StalePendingPayment = Prisma.PaymentGetPayload<{ include: { booking: { select: { status: true } } } }>;
 
 /**
  * Clean-Architecture port: PaymentsService (use-case) depends on this
@@ -98,6 +120,7 @@ export interface PaymentsRepository {
     currency: string;
     rawResponse: unknown;
   }): Promise<Payment>;
+  /** `duplicate` only when this event was already PROCESSED; one that failed earlier is handed back to be run again. */
   recordWebhookEvent(params: {
     gateway: string;
     eventId: string;
@@ -115,6 +138,39 @@ export interface PaymentsRepository {
   listRefundsForAdmin(filters: AdminRefundFilters & { limit?: number; offset?: number }): Promise<RefundListItem[]>;
   countRefundsForAdmin(filters: AdminRefundFilters): Promise<number>;
   findFailedPaymentView(gatewayOrderId: string): Promise<FailedPaymentView | null>;
+
+  // --- payments in flight, the processing window and late captures
+  /** The newest unfinished (PENDING or PROCESSING) Razorpay payment of a booking, so a second click reuses it. */
+  findOpenRazorpayPayment(bookingId: string): Promise<Payment | null>;
+  /** Pushes a HELD hold's expiry out; false when it is no longer HELD (the sweeper got there first). */
+  extendSlotHoldIfHeld(id: string, holdExpiresAt: Date): Promise<boolean>;
+  /** The customer's side reported success: payment -> PROCESSING and booking -> PROCESSING with its slot kept locked until processingUntil. */
+  markProcessingAtomic(params: {
+    paymentId: string;
+    gatewayPaymentId: string;
+    bookingId: string;
+    slotHoldId: string;
+    processingUntil: Date;
+  }): Promise<{ bookingMoved: boolean }>;
+  honourLatePaymentAtomic(params: HonourLatePaymentParams): Promise<boolean>;
+  /** The processing window ended with nothing captured: booking FAILED, payments EXPIRED, slot released. */
+  failProcessingAtomic(params: { bookingId: string; slotHoldId: string }): Promise<boolean>;
+  listProcessing(): Promise<ProcessingDueBooking[]>;
+  listStalePendingPayments(olderThan: Date): Promise<StalePendingPayment[]>;
+  closePayment(paymentId: string, expectedStatus: string, to: 'FAILED' | 'EXPIRED', reason: string): Promise<void>;
+
+  // --- wallet recharges
+  createWalletTopup(params: {
+    customerId: string;
+    amount: Prisma.Decimal | number | string;
+    currency: string;
+    gatewayOrderId: string;
+  }): Promise<WalletTopup>;
+  findWalletTopupByOrderId(gatewayOrderId: string): Promise<WalletTopup | null>;
+  findWalletTopupById(id: string): Promise<WalletTopup | null>;
+  markWalletTopupVerified(id: string, gatewayPaymentId: string): Promise<void>;
+  closeWalletTopup(id: string, to: 'FAILED' | 'EXPIRED', reason: string): Promise<void>;
+  listStalePendingTopups(olderThan: Date): Promise<WalletTopup[]>;
   markPaymentFailed(params: {
     paymentId: string;
     expectedStatus: string;

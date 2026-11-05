@@ -93,6 +93,7 @@ export class VenuesService {
         lat: dto.lat,
         lng: dto.lng,
         googleMapsUrl: dto.googleMapsUrl,
+        contactPhone: dto.contactPhone,
         advanceBookingDays: dto.advanceBookingDays,
         timezone: district.timezone,
         // defaultSlotGranularityMinutes is not settable — always the
@@ -184,6 +185,8 @@ export class VenuesService {
     if (!venue || venue.status !== 'ACTIVE' || venue.deletedAt) {
       throw new NotFoundException('Facility not found');
     }
-    return venue;
+    // The contact number is for customers with a confirmed booking only; the public lookup never carries it.
+    const { contactPhone: _private, ...publicVenue } = venue;
+    return publicVenue;
   }
 }

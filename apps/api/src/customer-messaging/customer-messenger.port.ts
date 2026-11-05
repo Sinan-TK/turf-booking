@@ -9,6 +9,8 @@ export const CUSTOMER_MESSENGER = Symbol('CUSTOMER_MESSENGER');
 export interface CustomerMessenger {
   bookingConfirmed(toPhone: string, orderId: string): Promise<void>;
   bookingCancelled(toPhone: string, orderId: string, coinsCredited?: string): Promise<void>;
+  /** A payment arrived after the slot was gone and was returned as Coins. */
+  latePaymentRefunded(toPhone: string, orderId: string, coinsCredited: string): Promise<void>;
   /** Delivers a one-time website login code. Must reject if it could not be sent. */
   loginCode(toPhone: string, code: string): Promise<void>;
 }

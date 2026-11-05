@@ -6,7 +6,7 @@ import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module';
 import { cspReportContentType } from '../../src/health/csp-report.middleware';
 import { RazorpayProvider } from '../../src/payments/razorpay.provider';
-import { PAYMENT_PROVIDER } from '../../src/payments/payment-provider.interface';
+import { PAYMENT_PROVIDER, type GatewayPayment } from '../../src/payments/payment-provider.interface';
 import {
   CUSTOMER_MESSENGER,
   type CustomerMessenger,
@@ -18,11 +18,15 @@ export class FakeCustomerMessenger implements CustomerMessenger {
   failNext = false;
   confirmed: Array<{ phone: string; orderId: string }> = [];
   cancelled: Array<{ phone: string; orderId: string }> = [];
+  lateRefunds: Array<{ phone: string; orderId: string; coins: string }> = [];
   async bookingConfirmed(phone: string, orderId: string) {
     this.confirmed.push({ phone, orderId });
   }
   async bookingCancelled(phone: string, orderId: string) {
     this.cancelled.push({ phone, orderId });
+  }
+  async latePaymentRefunded(phone: string, orderId: string, coins: string) {
+    this.lateRefunds.push({ phone, orderId, coins });
   }
   async loginCode(phone: string, code: string) {
     if (this.failNext) {
@@ -43,7 +47,56 @@ export class FakeCustomerMessenger implements CustomerMessenger {
 // (inherited unchanged) so webhook tests still exercise genuine HMAC
 // verification against RAZORPAY_WEBHOOK_SECRET, exactly like the
 // self-signed curl payloads used in Phase 6's manual testing.
+/**
+ * What the pretend gateway knows: the payment attempts made on each order. A spec "pays" an order with `fakeGateway.capture(orderId, amountMinor)`;
+ * the service then finds the payment when it asks the gateway (client confirmation, sync, reconciler) exactly as it would with Razorpay.
+ */
+export const fakeGateway = {
+  attempts: new Map<string, GatewayPayment[]>(),
+  /** The gateway took the money (captured). Returns the payment id. */
+  capture(orderId: string, amountMinorUnits: number, currency = 'INR'): string {
+    return this.add(orderId, amountMinorUnits, 'captured', currency);
+  },
+  /** The money was authorized but not captured yet. */
+  authorize(orderId: string, amountMinorUnits: number, currency = 'INR'): string {
+    return this.add(orderId, amountMinorUnits, 'authorized', currency);
+  },
+  add(orderId: string, amountMinorUnits: number, status: string, currency = 'INR'): string {
+    const id = `pay_test_${randomUUID().slice(0, 12)}`;
+    this.attempts.set(orderId, [...(this.attempts.get(orderId) ?? []), { id, orderId, status, amountMinorUnits, currency }]);
+    return id;
+  },
+  /** Make every question to the gateway fail, as in an outage. */
+  down: false,
+  reset() {
+    this.attempts.clear();
+    this.down = false;
+  },
+};
+
 class FakeRazorpayProvider extends RazorpayProvider {
+  override async fetchPayment(id: string) {
+    if (fakeGateway.down) throw new Error('gateway unreachable');
+    for (const list of fakeGateway.attempts.values()) {
+      const found = list.find((p) => p.id === id);
+      if (found) return { ...found };
+    }
+    return null;
+  }
+  override async fetchOrderPayments(orderId: string) {
+    if (fakeGateway.down) throw new Error('gateway unreachable');
+    return (fakeGateway.attempts.get(orderId) ?? []).map((p) => ({ ...p }));
+  }
+  override async capturePayment(id: string) {
+    for (const list of fakeGateway.attempts.values()) {
+      const found = list.find((p) => p.id === id);
+      if (found) {
+        found.status = 'captured';
+        return { ...found };
+      }
+    }
+    throw new Error('unknown payment');
+  }
   override async createOrder(params: { amountMinorUnits: number; currency: string; receipt: string }) {
     const gatewayOrderId = `order_test_${randomUUID().slice(0, 12)}`;
     return { gatewayOrderId, raw: { id: gatewayOrderId, ...params } };

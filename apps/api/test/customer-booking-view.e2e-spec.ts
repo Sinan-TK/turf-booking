@@ -33,7 +33,7 @@ describe('Customer booking view', () => {
     expect(view.body).toHaveProperty('venue.googleMapsUrl');
     expect(view.body.resourceName).toBe('5s Half A');
     const football = await prisma.venueCategory.findUniqueOrThrow({ where: { slug: 'FOOTBALL_TURF' } });
-    expect(view.body.facility).toEqual({ name: football.name, unitLabel: football.unitLabel });
+    expect(view.body.facility).toMatchObject({ name: football.name, unitLabel: football.unitLabel, iconKey: football.iconKey });
     // What the earlier page already relied on is still there.
     expect(view.body).toMatchObject({ id: hold.body.id, orderId: hold.body.orderId, status: 'PENDING_PAYMENT', groundType: '5S' });
     expect(view.body.holdExpiresAt).toBeTruthy();
