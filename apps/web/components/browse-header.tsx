@@ -68,13 +68,13 @@ export function BrowseHeader({ phoneBack = false }: { phoneBack?: boolean }) {
               {lines.secondary && <span className="block truncate text-xs font-medium text-slate-500">{lines.secondary}</span>}
             </span>
           </button>
-          <div className="ml-auto md:order-last">
+          <div className="ml-auto md:ml-0 md:order-last">
             <AccountMenu />
           </div>
           <form
             onSubmit={search}
             role="search"
-            className={`nav-search order-last ${wide} h-9 w-full items-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 transition-[box-shadow,border-color,background-color] hover:border-slate-300 [&:has(input:focus)]:border-brand-500 [&:has(input:focus)]:bg-white md:order-none md:h-10 md:w-auto md:max-w-3xl md:flex-1`}
+            className={`nav-search order-last ${wide} h-9 w-full items-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 transition-[box-shadow,border-color,background-color] hover:border-slate-300 [&:has(input:focus)]:border-brand-500 [&:has(input:focus)]:bg-white md:order-none md:ml-auto md:h-10 md:w-[24rem] md:flex-none lg:w-[28rem]`}
           >
             <div className="relative h-full min-w-0 flex-1">
             <input
