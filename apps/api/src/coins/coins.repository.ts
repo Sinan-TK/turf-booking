@@ -27,6 +27,8 @@ export interface LedgerEntryInput {
 export interface CoinsRepository {
   findWalletByCustomerId(customerId: string): Promise<CoinWallet | null>;
   listTransactions(customerId: string): Promise<CoinTransaction[]>;
+  /** Recharges that are not (yet) credited: still waiting, failed or abandoned. */
+  listOpenTopups(customerId: string): Promise<Array<{ id: string; amount: Prisma.Decimal; status: string; createdAt: Date }>>;
   findBookingById(id: string): Promise<Booking | null>;
   findSlotHoldById(id: string): Promise<SlotHold>;
   findCustomerById(id: string): Promise<CustomerProfile | null>;

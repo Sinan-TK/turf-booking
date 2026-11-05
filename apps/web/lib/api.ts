@@ -42,6 +42,8 @@ export interface Page<T> {
   nextCursor: string | null;
   /** For search: how many days the day picker should offer (the venues' "book up to n days ahead"). */
   advanceDays: number | null;
+  /** For paged lists: how many rows there are in all (X-Total-Count). */
+  total?: number | null;
 }
 
 async function requestPage<T>(path: string): Promise<Page<T>> {
@@ -53,7 +55,7 @@ async function requestPage<T>(path: string): Promise<Page<T>> {
     throw new ApiError(res.status, message, body);
   }
   const advance = Number(res.headers.get('X-Advance-Days'));
-  return { data: body as T, nextCursor: res.headers.get('X-Next-Cursor'), advanceDays: Number.isInteger(advance) && advance > 0 ? advance : null };
+  return { data: body as T, nextCursor: res.headers.get('X-Next-Cursor'), advanceDays: Number.isInteger(advance) && advance > 0 ? advance : null, total: res.headers.get('X-Total-Count') !== null ? Number(res.headers.get('X-Total-Count')) : null };
 }
 
 export const api = {

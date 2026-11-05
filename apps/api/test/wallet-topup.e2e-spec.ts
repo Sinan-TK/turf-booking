@@ -159,6 +159,27 @@ describe('Wallet top-up', () => {
     expect((await stranger.get(`/me/coins/topups/${res.body.topupId}`)).status).toBe(403);
   });
 
+  test('the history lists credited and waiting recharges, newest first, a page at a time with the total', async () => {
+    const { agent, res, customerId } = await start(500); // stays PENDING
+    const second = await agent.post('/me/coins/topup').send({ amount: 200 });
+    await webhook(captured(second.body.gatewayOrderId, `pay_hist_${second.body.gatewayOrderId}`, 20000), `evt_hist_${second.body.gatewayOrderId}`);
+
+    const all = await agent.get('/me/coins/transactions');
+    expect(all.status).toBe(200);
+    expect(all.headers['x-total-count']).toBe('2');
+    const byStatus = Object.fromEntries(all.body.map((r: { status: string; amount: string }) => [r.status, Number(r.amount)]));
+    expect(byStatus).toEqual({ PENDING: 500, COMPLETED: 200 });
+    const pending = all.body.find((r: { status: string }) => r.status === 'PENDING');
+    expect(pending.type).toBe('WALLET_TOPUP');
+    expect(pending.balanceAfter).toBeNull();
+    expect(pending.id).toBe(res.body.topupId);
+
+    const page = await agent.get('/me/coins/transactions?limit=1&offset=1');
+    expect(page.body).toHaveLength(1);
+    expect(page.headers['x-total-count']).toBe('2');
+    expect(await balanceOf(customerId)).toBe(200);
+  });
+
   test('the recharged Coins can pay for a booking afterwards (the ledger is the same wallet)', async () => {
     const { res, customerId } = await start(500);
     await webhook(captured(res.body.gatewayOrderId, `pay_topup_spend_${res.body.gatewayOrderId}`, 50000), `evt_topup_spend_${res.body.gatewayOrderId}`);

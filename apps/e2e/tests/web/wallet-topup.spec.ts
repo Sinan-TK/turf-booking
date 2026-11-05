@@ -10,6 +10,20 @@ test.use({ baseURL: URLS.web });
 
 const customer = { id: 'c1', name: 'PW Customer', phone: '+919100000000', email: null, phoneVerified: true, emailVerified: false, hasPassword: false, needsProfile: false };
 
+// 11 rows: a recharge still waiting, a debit, and credits, newest first (two pages of 8).
+const HISTORY = [
+  { id: 'h0', type: 'WALLET_TOPUP', amount: '300.00', balanceAfter: null, createdAt: new Date(Date.now() - 60_000).toISOString(), status: 'PENDING' },
+  { id: 'h1', type: 'BOOKING_REDEMPTION', amount: '-200.00', balanceAfter: '120.00', createdAt: new Date(Date.now() - 3_600_000).toISOString(), status: 'COMPLETED', bookingId: 'b1' },
+  ...Array.from({ length: 9 }, (_, i) => ({
+    id: `h${i + 2}`,
+    type: i % 2 ? 'REFUND' : 'WALLET_TOPUP',
+    amount: '100.00',
+    balanceAfter: String(320 - i * 10),
+    createdAt: new Date(Date.now() - (i + 2) * 86_400_000).toISOString(),
+    status: 'COMPLETED',
+  })),
+];
+
 async function open(page: import('@playwright/test').Page) {
   const cors = { 'access-control-allow-origin': URLS.web, 'access-control-allow-credentials': 'true', 'access-control-allow-headers': 'content-type', 'access-control-allow-methods': 'GET,POST,OPTIONS' };
   await page.route(`${URLS.api}/**`, async (route) => {
@@ -19,7 +33,15 @@ async function open(page: import('@playwright/test').Page) {
     const json = (body: unknown) => route.fulfill({ status: 200, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify(body) });
     if (url.pathname === '/customer-auth/me') return json(customer);
     if (url.pathname === '/me/coins') return json({ cachedBalance: '120.00', currency: 'INR', topupMin: 50, topupMax: 10000 });
-    if (url.pathname === '/me/coins/transactions') return json([{ id: 't1', type: 'WALLET_TOPUP', amount: '120.00', balanceAfter: '120.00', createdAt: new Date().toISOString() }]);
+    if (url.pathname === '/me/coins/transactions') {
+      const limit = Number(url.searchParams.get('limit') ?? 50);
+      const offset = Number(url.searchParams.get('offset') ?? 0);
+      return route.fulfill({
+        status: 200,
+        headers: { ...cors, 'content-type': 'application/json', 'access-control-expose-headers': 'X-Total-Count', 'x-total-count': String(HISTORY.length) },
+        body: JSON.stringify(HISTORY.slice(offset, offset + limit)),
+      });
+    }
     return route.continue();
   });
 }
@@ -30,7 +52,34 @@ test.describe('customer site: wallet Add money', () => {
     await page.goto('/account?tab=wallet');
     await expect(page.getByText('₹120').first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add money' })).toBeVisible();
-    await expect(page.getByText('Added to wallet')).toBeVisible();
+    await expect(page.getByText('Added to wallet').first()).toBeVisible();
+  });
+
+  test('the history marks Coins in green, Coins out in red and a waiting recharge in yellow, and pages through the rest', async ({ page }) => {
+    await open(page);
+    await page.goto('/account?tab=wallet');
+    const history = page.getByRole('region', { name: 'Coin history' });
+    await expect(history.getByRole('listitem')).toHaveCount(8);
+
+    const waiting = history.getByRole('listitem').filter({ hasText: 'Pending' });
+    await expect(waiting).toHaveCount(1);
+    await expect(waiting.getByText('₹300')).toHaveClass(/text-yellow-700/);
+
+    const spent = history.getByRole('listitem').filter({ hasText: 'Used for a booking' });
+    await expect(spent.getByText('−₹200')).toHaveClass(/text-red-700/);
+    await expect(spent.getByRole('link')).toHaveAttribute('href', '/bookings/b1');
+
+    const credit = history.getByRole('listitem').filter({ hasText: 'Cancellation refund' }).first();
+    await expect(credit.getByText('+₹100')).toHaveClass(/text-green-700/);
+
+    await expect(history.getByText('1–8 of 11')).toBeVisible();
+    await expect(history.getByRole('button', { name: 'Previous' })).toBeDisabled();
+    await history.getByRole('button', { name: 'Next' }).click();
+    await expect(history.getByText('9–11 of 11')).toBeVisible();
+    await expect(history.getByRole('listitem')).toHaveCount(3);
+    await expect(history.getByRole('button', { name: 'Next' })).toBeDisabled();
+    await history.getByRole('button', { name: 'Previous' }).click();
+    await expect(history.getByRole('listitem')).toHaveCount(8);
   });
 
   test('the sheet offers quick amounts and explains what is wrong with an amount that is not allowed', async ({ page }) => {

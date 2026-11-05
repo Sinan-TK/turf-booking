@@ -26,8 +26,25 @@ export class CoinsService {
     return wallet;
   }
 
-  async getTransactions(customerId: string) {
-    return this.coins.listTransactions(customerId);
+  /**
+   * The wallet history, newest first: what happened to the balance (credits and debits) plus recharges that are not credited yet
+   * (PENDING: waiting for the bank) or never were (FAILED, EXPIRED). A page of it, and the total, for the wallet page.
+   */
+  async getTransactions(customerId: string, page: { limit: number; offset: number } = { limit: 50, offset: 0 }) {
+    const [ledger, open] = await Promise.all([this.coins.listTransactions(customerId), this.coins.listOpenTopups(customerId)]);
+    const rows = [
+      ...ledger.map((t) => ({ ...t, status: 'COMPLETED' as const })),
+      ...open.map((t) => ({
+        id: t.id,
+        type: 'WALLET_TOPUP' as const,
+        amount: t.amount,
+        balanceAfter: null,
+        createdAt: t.createdAt,
+        bookingId: null,
+        status: t.status === 'PENDING' ? ('PENDING' as const) : t.status === 'FAILED' ? ('FAILED' as const) : ('EXPIRED' as const),
+      })),
+    ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return { total: rows.length, rows: rows.slice(page.offset, page.offset + page.limit) };
   }
 
   /**

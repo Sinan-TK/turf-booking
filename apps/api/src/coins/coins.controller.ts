@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Param, Post, UseGuards, ParseUUIDPipe } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Res, UseGuards, ParseUUIDPipe } from '@nestjs/common';
+import type { Response } from 'express';
+import { parsePage, setTotalCount } from '../common/pagination';
 import { Role } from '@venue/shared';
 import { loadEnv } from '@venue/config';
 import { AuthGuard } from '../auth/guards/auth.guard';
@@ -25,8 +27,15 @@ export class CoinsController {
 
   @Get('me/coins/transactions')
   @Roles(Role.CUSTOMER)
-  getMyTransactions(@CurrentUser() actor: AuthContext) {
-    return this.coins.getTransactions(actor.id);
+  async getMyTransactions(
+    @CurrentUser() actor: AuthContext,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Res({ passthrough: true }) res?: Response,
+  ) {
+    const { total, rows } = await this.coins.getTransactions(actor.id, parsePage(limit, offset, { limit: 50, max: 100 }));
+    if (res) setTotalCount(res, total);
+    return rows;
   }
 
   // The COINS half of the mutually-exclusive payment-method rule (§9) —

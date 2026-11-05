@@ -20,6 +20,7 @@ import { VerifyEmailDialog } from '@/components/verify-email-dialog';
 import { SavedVenuesPanel } from '@/components/saved-venues-panel';
 import { BackButton } from '@/components/back-button';
 import { WalletTopupSheet } from '@/components/wallet-topup';
+import { WalletHistory } from '@/components/wallet-history';
 import { formatPrice } from '@/lib/booking';
 
 interface CoinWallet {
@@ -29,28 +30,6 @@ interface CoinWallet {
   topupMin?: number;
   topupMax?: number;
 }
-interface CoinTransaction {
-  id: string;
-  type: string;
-  amount: string;
-  balanceAfter: string;
-  createdAt: string;
-}
-
-const TYPE_LABELS: Record<string, string> = {
-  BOOKING_REWARD: 'Booking reward',
-  REFUND: 'Cancellation refund',
-  REFERRAL: 'Referral bonus',
-  PROMOTION: 'Promotion',
-  BOOKING_REDEMPTION: 'Used for a booking',
-  ADMIN_ADJUSTMENT: 'Adjustment',
-  WALLET_TOPUP: 'Added to wallet',
-};
-
-function labelFor(type: string): string {
-  return TYPE_LABELS[type] ?? type.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
-}
-
 /** "Verified" / "Not verified", next to a phone number or an email. */
 function VerifiedChip({ verified, what }: { verified: boolean; what: string }) {
   return (
@@ -474,16 +453,10 @@ function ChangePassword() {
 
 function Wallet() {
   // The last answer paints at once; the live one replaces it.
-  const { data, setData, error } = useAccountData(
-    'wallet',
-    async () => {
-      const [wallet, txs] = await Promise.all([api.get<CoinWallet>('/me/coins'), api.get<CoinTransaction[]>('/me/coins/transactions')]);
-      return { wallet, txs: txs.slice(0, 20) };
-    },
-    'Could not load your wallet.',
-  );
+  const { data, setData, error } = useAccountData('wallet', () => api.get<CoinWallet>('/me/coins').then((wallet) => ({ wallet })), 'Could not load your wallet.');
   const wallet = data?.wallet ?? null;
-  const txs = data?.txs ?? null;
+  // Bumped after a recharge, so the history is read again.
+  const [historyKey, setHistoryKey] = useState(0);
   const router = useRouter();
   const params = useSearchParams();
   // "Add money" opens by itself when the checkout sent the customer here for the missing amount (?add=300&back=/checkout/...).
@@ -502,8 +475,9 @@ function Wallet() {
   /** The Coins arrived: read the wallet again, and go back to the checkout that sent the customer here (if its slot is still held it carries on). */
   async function credited() {
     try {
-      const [fresh, list] = await Promise.all([api.get<CoinWallet>('/me/coins'), api.get<CoinTransaction[]>('/me/coins/transactions')]);
-      setData({ wallet: fresh, txs: list.slice(0, 20) });
+      const fresh = await api.get<CoinWallet>('/me/coins');
+      setData({ wallet: fresh });
+      setHistoryKey((k) => k + 1);
     } catch {
       // the next visit reads it again
     }
@@ -546,26 +520,8 @@ function Wallet() {
             {formatPrice({ amount: wallet.cachedBalance, currency: wallet.currency })}
           </p>
           <p className="mb-4 text-xs text-gray-500">1 Coin is worth 1 rupee. Add money here or get Coins back from cancelled bookings, and use them to pay for a booking.</p>
-          {txs && txs.length === 0 && <p className="text-sm text-gray-500">No transactions yet.</p>}
-          {txs && txs.length > 0 && (
-            <ul className="divide-y divide-gray-100 text-sm">
-              {txs.map((t) => {
-                const credit = Number(t.amount) >= 0;
-                return (
-                  <li key={t.id} className="flex items-center justify-between gap-3 py-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-gray-900">{labelFor(t.type)}</p>
-                      <p className="text-xs text-gray-500">{new Date(t.createdAt).toLocaleString()}</p>
-                    </div>
-                    <p className={`shrink-0 font-medium ${credit ? 'text-brand-700' : 'text-gray-900'}`}>
-                      {credit ? '+' : ''}
-                      {formatPrice({ amount: t.amount, currency: wallet.currency })}
-                    </p>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+          <h3 className="mb-2 text-sm font-semibold text-gray-900">History</h3>
+          <WalletHistory currency={wallet.currency} refreshKey={historyKey} />
         </>
       )}
     </Card>

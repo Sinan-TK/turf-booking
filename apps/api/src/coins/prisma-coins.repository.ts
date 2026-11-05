@@ -32,6 +32,15 @@ export class PrismaCoinsRepository implements CoinsRepository {
     });
   }
 
+  listOpenTopups(customerId: string) {
+    return this.prisma.client.walletTopup.findMany({
+      where: { customerId, status: { not: 'SUCCESS' } },
+      select: { id: true, amount: true, status: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+  }
+
   findBookingById(id: string) {
     return this.prisma.client.booking.findUnique({ where: { id } });
   }
