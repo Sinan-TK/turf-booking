@@ -193,6 +193,18 @@ export class ResourcesService {
     });
   }
 
+  /** The text customers read about one unit; empty removes it. */
+  async setDescription(id: string, description: string, actor: AuthContext) {
+    const resource = await this.prisma.client.resource.findUnique({ where: { id } });
+    if (!resource) throw new NotFoundException('Unit not found');
+    await this.assertVenueOwnership(resource.venueId, actor);
+    return this.prisma.client.resource.update({
+      where: { id },
+      data: { description: description === '' ? null : description },
+      include: { category: { select: CATEGORY_SUMMARY } },
+    });
+  }
+
   /** Same, for every unit of one facility in a venue, so a pool can close without touching the turf. */
   async setFacilityBookable(
     dto: { venueId: string; categoryId: string; isBookable: boolean },
@@ -434,6 +446,7 @@ export class ResourcesService {
       name?: string;
       totalUnits?: number;
       isBookable?: boolean;
+      description?: string;
       slotMode?: 'FLEXIBLE' | 'FIXED';
       fixedSlots?: Array<{ start: string; end: string; count: number; price?: number | null; advance?: number | null }>;
     },
@@ -467,6 +480,7 @@ export class ResourcesService {
         ...(dto.name !== undefined ? { name: dto.name } : {}),
         ...(dto.totalUnits !== undefined ? { totalUnits: dto.totalUnits } : {}),
         ...(dto.isBookable !== undefined ? { isBookable: dto.isBookable } : {}),
+        ...(dto.description !== undefined ? { description: dto.description === '' ? null : dto.description } : {}),
         slotMode,
         fixedSlots: (slotMode === 'FIXED' ? slots : []) as unknown as Prisma.InputJsonValue,
       },

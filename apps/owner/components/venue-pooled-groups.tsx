@@ -7,6 +7,7 @@ import { optimistic, type Mutate } from '@/lib/optimistic';
 import { durationLabel, type VenueCategory, type VenueCategorySummary } from '@/lib/categories';
 import { Button, ErrorBanner, FieldError, Input, Label, Select, invalidClass } from '@/components/ui';
 import { UnitPhotos, type UnitPhoto } from '@/components/unit-photos';
+import { UnitDescription } from '@/components/unit-description';
 
 /** A fixed slot as the API keeps it: venue-local times, how many items, and the price and online amount for one item (null = not priced yet). */
 interface ApiSlot {
@@ -65,6 +66,7 @@ export interface Group {
   category: VenueCategorySummary;
   /** Up to three, main photo first: what customers see on the card. */
   photos: UnitPhoto[];
+  description?: string | null;
 }
 
 interface GroupPrice {
@@ -230,6 +232,8 @@ export function GroupCard({ group, category, onChanged }: { group: Group; catego
       <div className="space-y-6 p-container-padding">
         {error && <ErrorBanner message={error} />}
         {saved && <p role="status" className="text-sm font-medium text-emerald-700">{saved} saved.</p>}
+
+        <UnitDescription path={`/resources/groups/${group.id}`} unitName={group.name} description={group.description ?? null} onSaved={onChanged} />
 
         <div>
           <p className="font-label-md text-label-md text-on-surface-variant">Photos</p>

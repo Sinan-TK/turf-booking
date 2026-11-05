@@ -9,7 +9,7 @@ import { Icon } from '@/components/ui';
 export interface SearchResult {
   venue: { id: string; name: string; facilityCode: string; address: string; photoUrl: string | null; lat: number; lng: number; googleMapsUrl?: string | null };
   /** photoUrls: the unit's photos (up to three, main one first); empty when the owner has added none. */
-  resource: { id: string; name: string; groundType: string; photoUrls?: string[] };
+  resource: { id: string; name: string; groundType: string; photoUrls?: string[]; description?: string | null };
   category?: { slug: string; name: string; iconKey: string; iconSvg?: string | null; unitLabel: string; venueLabel: string };
   distanceKm?: number;
   /** The length (minutes) the start times and prices are for: the one asked for where this unit offers it, else its shortest. */

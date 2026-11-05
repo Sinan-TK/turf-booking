@@ -30,6 +30,7 @@ import {
   SetFacilityBookableDto,
   ReorderPhotosDto,
   SetResourceBookableDto,
+  SetResourceDescriptionDto,
   SetResourceDurationsDto,
 } from './dto/resource.dto';
 import type { AuthContext } from '../auth/auth.types';
@@ -65,6 +66,12 @@ export class ResourcesController {
     @CurrentUser() actor: AuthContext,
   ) {
     return this.resources.setBookable(id, dto.isBookable, actor);
+  }
+
+  @Patch(':id/description')
+  @Roles(Role.SUPER_ADMIN, Role.VENUE_OWNER)
+  setDescription(@Param('id', ParseUUIDPipe) id: string, @Body() dto: SetResourceDescriptionDto, @CurrentUser() actor: AuthContext) {
+    return this.resources.setDescription(id, dto.description, actor);
   }
 
   @Patch(':id/durations')

@@ -25,6 +25,10 @@ export class CreateResourceDto extends createZodDto(createResourceSchema) {}
 export const setResourceBookableSchema = z.object({ isBookable: z.boolean() });
 export class SetResourceBookableDto extends createZodDto(setResourceBookableSchema) {}
 
+// What customers read about one unit (empty clears it).
+export const setResourceDescriptionSchema = z.object({ description: z.string().max(2000).transform((v) => v.trim()) });
+export class SetResourceDescriptionDto extends createZodDto(setResourceDescriptionSchema) {}
+
 // A unit's shortest and longest booking. Its prices are per block of the shortest.
 export const setResourceDurationsSchema = z.object({
   minDurationMinutes: z.number().int().positive().max(1440),
@@ -81,6 +85,7 @@ export const updateResourceGroupSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   totalUnits: z.number().int().positive().max(10000).optional(),
   isBookable: z.boolean().optional(),
+  description: z.string().max(2000).transform((v) => v.trim()).optional(),
   slotMode: z.enum(['FLEXIBLE', 'FIXED']).optional(),
   fixedSlots: z.array(fixedSlotSchema).max(48).optional(),
 });

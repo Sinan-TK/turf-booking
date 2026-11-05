@@ -144,7 +144,6 @@ function BookingPage() {
 
   const [units, setUnits] = useState<SearchResult[] | null>(null);
   const [dayCount, setDayCount] = useState(MOST_DAYS);
-  const [about, setAbout] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -189,21 +188,6 @@ function BookingPage() {
       .catch((err) => mine === latest.current && setError(err instanceof ApiError ? err.message : 'Could not load this venue.'))
       .finally(() => mine === latest.current && setLoading(false));
   }, [facilityCode, dateIso, durationMinutes]);
-
-  // The venue's description, when it has one (the page works without it).
-  useEffect(() => {
-    const path = `about:${facilityCode}`;
-    const saved = readSearch<{ description: string | null }>(path);
-    if (saved?.data[0]) setAbout(saved.data[0].description);
-    api
-      .get<{ description?: string | null }>(`/venues/by-code/${encodeURIComponent(facilityCode)}`)
-      .then((v) => {
-        const description = v.description?.trim() || null;
-        setAbout(description);
-        writeSearch(path, { data: [{ description }], nextCursor: null, advanceDays: null });
-      })
-      .catch(() => undefined);
-  }, [facilityCode]);
 
   const unit = units?.find((u) => u.resource.id === resourceId) ?? units?.[0];
 
@@ -310,7 +294,7 @@ function BookingPage() {
             <Icon name="location_on" className="text-[1rem] text-slate-400" />
             {r.venue.address}
           </p>
-          {about && <p className="mt-3 max-w-2xl whitespace-pre-line text-pretty text-sm leading-relaxed text-slate-600">{about}</p>}
+          {r.resource.description && <p className="mt-3 max-w-2xl whitespace-pre-line text-pretty text-sm leading-relaxed text-slate-600">{r.resource.description}</p>}
         </header>
 
         </div>

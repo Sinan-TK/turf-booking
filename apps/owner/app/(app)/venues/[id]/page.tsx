@@ -13,7 +13,7 @@ import { FacilityIcon } from '@/components/facility-icon';
 import { VenueMapLink } from '@/components/venue-map-link';
 import { VenueAdvanceBooking } from '@/components/venue-advance-booking';
 import { VenueContactPhone } from '@/components/venue-contact-phone';
-import { VenueDescription } from '@/components/venue-description';
+import { UnitDescription } from '@/components/unit-description';
 import { BlockedDatesSection, UnitTools } from '@/components/venue-availability';
 import { AddPooledItem, GroupCard, type Group } from '@/components/venue-pooled-groups';
 import { UnitPhotos, type UnitPhoto } from '@/components/unit-photos';
@@ -59,6 +59,7 @@ interface Resource {
   maxDurationMinutes: number;
   /** Up to three, main photo first: what customers see on the venue card. */
   photos: UnitPhoto[];
+  description?: string | null;
 }
 
 // An owner can pause their venue (INACTIVE) and make it live again (ACTIVE); DRAFT and SUSPENDED are platform actions reserved for Super Admin,
@@ -268,7 +269,6 @@ export default function VenueDetailPage() {
       <section className="rounded-xl bg-white p-container-padding shadow-sm ring-1 ring-outline-variant/30">
         <div className="grid grid-cols-1 gap-x-10 lg:grid-cols-2">
           <div className="divide-y divide-outline-variant/20">
-            <VenueDescription venueId={venue.id} description={venue.description} onSaved={() => refetch()} />
             <VenueMapLink venueId={venue.id} link={venue.googleMapsUrl} onSaved={() => refetch()} />
             <VenueAdvanceBooking venueId={venue.id} days={venue.advanceBookingDays} onSaved={() => refetch()} />
             <VenueContactPhone venueId={venue.id} phone={venue.contactPhone ?? null} onSaved={() => refetch()} />
@@ -606,6 +606,7 @@ function UnitPanel({
           </div>
           <div className="space-y-3 pl-12">
             <UnitDurations unitId={unit.id} min={unit.minDurationMinutes} max={unit.maxDurationMinutes} hasPrices onSaved={onChanged} limits={limitsOf(categories.find((c) => c.id === facility.id))} />
+            <UnitDescription path={`/resources/${unit.id}/description`} unitName={unit.name} description={unit.description ?? null} onSaved={onChanged} />
             <UnitPhotos unitId={unit.id} unitName={unit.name} initial={unit.photos ?? []} />
           </div>
         </div>

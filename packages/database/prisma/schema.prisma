@@ -534,6 +534,8 @@ model Resource {
   name        String
   groundType  String   // open string ("5S", "7S", ...), not a hardcoded enum
   isBookable  Boolean  @default(true)
+  /// What customers read about this unit on the venue's booking page (the owner writes it per unit).
+  description String?
   status      ResourceStatus @default(ACTIVE)
   sortOrder   Int      @default(0)
   /// Shortest booking of this unit, in minutes. Its prices are per block of this length.
@@ -1607,6 +1609,8 @@ model ResourceGroup {
   totalUnits     Int?
   /// Whether customers can book it (the owner can block it, like a unit).
   isBookable     Boolean        @default(true)
+  /// What customers read about this pooled item (the owner writes it per item).
+  description    String?
   slotMode       GroupSlotMode  @default(FLEXIBLE)
   /// FIXED mode: the slots customers can book, venue-local and never overlapping:
   /// [{ "start": "08:00", "end": "09:30", "count": 5, "price": 400, "advance": 200 }] (price and advance are per item; null = not priced yet).

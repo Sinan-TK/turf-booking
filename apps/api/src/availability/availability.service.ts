@@ -89,7 +89,7 @@ export interface SearchResult {
   /** The length (minutes) the start times and prices are for. */
   durationMinutes: number;
   /** photoUrls: the unit's photos (at most three, main one first); empty when the owner has added none. */
-  resource: { id: string; name: string; groundType: string; photoUrls: string[] };
+  resource: { id: string; name: string; groundType: string; photoUrls: string[]; description: string | null };
   distanceKm: number | undefined;
   availableStartTimes: string[];
   policy: {
@@ -391,7 +391,7 @@ export class AvailabilityService {
             googleMapsUrl: venue.googleMapsUrl,
           },
           category: group.category,
-          resource: { id: group.id, name: group.name, groundType: '', photoUrls: group.photos.map((p) => this.storage.publicUrl(p.key)) },
+          resource: { id: group.id, name: group.name, groundType: '', photoUrls: group.photos.map((p) => this.storage.publicUrl(p.key)), description: group.description ?? null },
           distanceKm:
             params.lat !== undefined && params.lng !== undefined
               ? Number(haversineKm(params.lat, params.lng, Number(venue.lat), Number(venue.lng)).toFixed(2))
@@ -531,6 +531,7 @@ export class AvailabilityService {
         name: resource.name,
         groundType: resource.groundType,
         photoUrls: resource.photos.map((p) => this.storage.publicUrl(p.key)),
+        description: resource.description ?? null,
       },
       distanceKm:
         params.lat !== undefined && params.lng !== undefined
@@ -637,7 +638,7 @@ export class AvailabilityService {
         googleMapsUrl: venue.googleMapsUrl,
       },
       category: group.category,
-      resource: { id: group.id, name: group.name, groundType: '', photoUrls: group.photos.map((p) => this.storage.publicUrl(p.key)) },
+      resource: { id: group.id, name: group.name, groundType: '', photoUrls: group.photos.map((p) => this.storage.publicUrl(p.key)), description: group.description ?? null },
       distanceKm:
         params.lat !== undefined && params.lng !== undefined
           ? Number(haversineKm(params.lat, params.lng, Number(venue.lat), Number(venue.lng)).toFixed(2))

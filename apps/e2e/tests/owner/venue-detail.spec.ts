@@ -44,17 +44,23 @@ test.describe('owner portal: venue details', () => {
     await expect(page.getByRole('tab', { name: 'Pricing & hours' })).toHaveAttribute('aria-selected', 'true');
   });
 
-  test('the venue description is edited from its Edit button at the top, and shows there', async ({ page, makeVenue, ownerApi }) => {
+  test('a unit has its own description, written in its tab, and the venue tab has none', async ({ page, makeVenue, ownerApi }) => {
     const venue = await makeVenue();
     await page.goto(`/venues/${venue.id}`);
-    await page.getByRole('button', { name: 'Edit description' }).click();
-    await page.getByLabel('About this venue').fill('Floodlit turf with parking and a canteen.');
+    await expect(page.getByRole('button', { name: /^Edit description/ })).toHaveCount(0); // the venue itself no longer has one
+    await openSection(page, 'Units');
+    await openUnitTab(page, venue.turfName);
+    await page.getByRole('button', { name: `Edit description of ${venue.turfName}` }).click();
+    await page.getByLabel('About this unit').fill('Floodlit turf with a rubber surface.');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByLabel('About this venue')).toHaveCount(0); // saved: the editor closes
-    await expect(page.getByText('Floodlit turf with parking and a canteen.')).toBeVisible();
-    expect((await (await ownerApi.get(`/venues/${venue.id}`)).json()).description).toBe('Floodlit turf with parking and a canteen.');
-    await page.reload();
-    await expect(page.getByText('Floodlit turf with parking and a canteen.')).toBeVisible();
+    await expect(page.getByLabel('About this unit')).toHaveCount(0); // saved: the editor closes
+    await expect(page.getByText('Floodlit turf with a rubber surface.')).toBeVisible();
+    const resources = (await (await ownerApi.get(`/resources?venueId=${venue.id}`)).json()) as Array<{ id: string; name: string; description: string | null }>;
+    expect(resources.find((r) => r.name === venue.turfName)?.description).toBe('Floodlit turf with a rubber surface.');
+
+    // The court's own tab does not show the turf's text.
+    await openUnitTab(page, venue.courtName);
+    await expect(page.getByText('Floodlit turf with a rubber surface.')).toHaveCount(0);
   });
 
   test('closing the whole venue for a day is done on the Venue tab, not on a unit, and shows only there', async ({ page, makeVenue }) => {
