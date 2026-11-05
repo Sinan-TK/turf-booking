@@ -192,7 +192,7 @@ export class VenueCategoriesService {
     const key = `${STORAGE_FOLDERS.facilities}/${id}/${randomUUID()}.${type.ext}`;
     await this.storage.put(key, file.buffer, type.mime);
     await this.prisma.client.venueCategory.update({ where: { id }, data: { imageKey: key } });
-    if (category.imageKey) await this.storage.remove(category.imageKey, { source: 'CATEGORY_IMAGE', label: `Facility · ${category.slug}`, by: { type: 'ADMIN', id: actor.id } });
+    if (category.imageKey) await this.storage.remove(category.imageKey);
     await this.audit.record({ actor, action: 'VENUE_CATEGORY_IMAGE_SET', entityType: 'VenueCategory', entityId: id, metadata: { slug: category.slug } });
     return this.getAdmin(id);
   }
@@ -202,7 +202,7 @@ export class VenueCategoriesService {
     if (!category) throw new NotFoundException('Facility not found');
     if (category.imageKey) {
       await this.prisma.client.venueCategory.update({ where: { id }, data: { imageKey: null } });
-      await this.storage.remove(category.imageKey, { source: 'CATEGORY_IMAGE', label: `Facility · ${category.slug}`, by: { type: 'ADMIN', id: actor.id } });
+      await this.storage.remove(category.imageKey);
       await this.audit.record({ actor, action: 'VENUE_CATEGORY_IMAGE_REMOVED', entityType: 'VenueCategory', entityId: id, metadata: { slug: category.slug } });
     }
     return this.getAdmin(id);
@@ -259,7 +259,7 @@ export class VenueCategoriesService {
     }
     // BookingPolicy rows scoped to this category cascade with it.
     await this.prisma.client.venueCategory.delete({ where: { id } });
-    if (category.imageKey) await this.storage.remove(category.imageKey, { source: 'CATEGORY_IMAGE', label: `Facility · ${category.slug}`, by: { type: 'ADMIN', id: actor.id } });
+    if (category.imageKey) await this.storage.remove(category.imageKey);
     await this.audit.record({
       actor,
       action: 'VENUE_CATEGORY_DELETED',

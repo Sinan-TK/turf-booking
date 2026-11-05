@@ -84,13 +84,6 @@ async function request<T>(
 
 export const api = {
   get: <T>(path: string) => request<T>(path),
-  /** GET a plain-text answer (a list to copy). */
-  getText: async (path: string): Promise<string> => {
-    let res = await send(path, {});
-    if (res.status === 401 && (await refreshSession())) res = await send(path, {});
-    if (!res.ok) throw new ApiError(res.status, res.statusText, undefined);
-    return res.text();
-  },
   /** GET a page of a list: the rows plus the total match count the API
    * reports in the X-Total-Count header. */
   getPage: async <T>(path: string): Promise<{ rows: T[]; total: number }> => {

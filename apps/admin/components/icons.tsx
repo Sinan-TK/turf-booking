@@ -23,7 +23,6 @@ const PATHS = {
   rupee: 'M6 4h12M6 9h12M9 4c5 0 6 3.5 3 6s-4 3-6 3l8 7',
   building: 'M4 21V5a2 2 0 012-2h8a2 2 0 012 2v16M16 9h2a2 2 0 012 2v10M3 21h18M8 8h4M8 12h4M8 16h4',
   check: 'M5 13l4 4L19 7',
-  trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V4h6v3',
   back: 'M19 12H5M11 18l-6-6 6-6',
   minus: 'M5 12h14',
   ban: 'M12 21a9 9 0 100-18 9 9 0 000 18zM5.6 5.6l12.8 12.8',

@@ -78,28 +78,16 @@ export class ResourcePhotosService {
     const key = `venues/${venueId}/${folder}/${randomUUID()}.${type.ext}`;
     await this.storage.put(key, file.buffer, type.mime);
     const nextOrder = existing.reduce((most, p) => Math.max(most, p.sortOrder + 1), 0);
-    try {
-      await this.prisma.client.resourcePhoto.create({ data: { ...owner, key, sortOrder: nextOrder } });
-    } catch (err) {
-      // The file is in the bucket but no photo row points to it: list it so it can be cleaned up by hand.
-      await this.storage.remove(key, { source: 'resourceId' in owner ? 'UNIT_PHOTO' : 'GROUP_PHOTO', label: `Unsaved upload · ${venueId}`, venueId, by: { type: 'SYSTEM' } });
-      throw err;
-    }
+    await this.prisma.client.resourcePhoto.create({ data: { ...owner, key, sortOrder: nextOrder } });
     return this.photosFor(owner);
   }
 
   private async removeFor(owner: Owner, photoId: string, actor: AuthContext): Promise<UnitPhoto[]> {
-    const { venueId, label } = await this.owned(owner, actor);
+    await this.owned(owner, actor);
     const photo = await this.prisma.client.resourcePhoto.findFirst({ where: { id: photoId, ...owner } });
     if (!photo) throw new NotFoundException('Photo not found');
     await this.prisma.client.resourcePhoto.delete({ where: { id: photo.id } });
-    // The file stays in the bucket (the app has no delete access there): it goes on the Super Admin's Deleted files list.
-    await this.storage.remove(photo.key, {
-      source: 'resourceId' in owner ? 'UNIT_PHOTO' : 'GROUP_PHOTO',
-      label,
-      venueId,
-      by: { type: actor.role === 'SUPER_ADMIN' ? 'ADMIN' : 'OWNER', id: actor.id },
-    });
+    await this.storage.remove(photo.key);
     return this.photosFor(owner);
   }
 
@@ -130,14 +118,13 @@ export class ResourcePhotosService {
   }
 
   /** The unit or group exists and belongs to a venue the actor may manage; answers with that venue's id. */
-  private async owned(owner: Owner, actor: AuthContext): Promise<{ venueId: string; label: string }> {
-    const select = { venueId: true, name: true, venue: { select: { name: true } } } as const;
+  private async owned(owner: Owner, actor: AuthContext): Promise<{ venueId: string }> {
     const found =
       'resourceId' in owner
-        ? await this.prisma.client.resource.findUnique({ where: { id: owner.resourceId }, select })
-        : await this.prisma.client.resourceGroup.findUnique({ where: { id: owner.resourceGroupId }, select });
+        ? await this.prisma.client.resource.findUnique({ where: { id: owner.resourceId }, select: { venueId: true } })
+        : await this.prisma.client.resourceGroup.findUnique({ where: { id: owner.resourceGroupId }, select: { venueId: true } });
     if (!found) throw new NotFoundException('resourceId' in owner ? 'Unit not found' : 'Group not found');
     await this.resources.assertCanManageVenue(found.venueId, actor);
-    return { venueId: found.venueId, label: `${found.venue.name} · ${found.name}` };
+    return found;
   }
 }
