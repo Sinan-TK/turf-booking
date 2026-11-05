@@ -26,7 +26,7 @@ test.describe('customer sign-in', () => {
     await logIn(page, uniquePhone(), 'PW Menu Person');
     await page.getByRole('button', { name: 'Account menu' }).click();
     const items = await page.getByRole('menuitem').allTextContents();
-    expect(items.slice(0, 4)).toEqual(['Profile', 'Bookings', 'Wallet (Coins)', 'Support']);
+    expect(items.slice(0, 3)).toEqual(['Profile', 'Bookings', 'Wallet']);
     await page.getByRole('menuitem', { name: 'Profile' }).click();
     await expect(page).toHaveURL(/\/account\?tab=profile$/);
     await expect(page.getByRole('tab', { name: 'Profile' })).toHaveAttribute('aria-selected', 'true');

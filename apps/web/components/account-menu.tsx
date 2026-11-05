@@ -10,8 +10,7 @@ import { Skeleton } from '@/components/skeleton';
 const ITEMS = [
   { href: '/account?tab=profile', label: 'Profile', icon: 'person' },
   { href: '/account?tab=bookings', label: 'Bookings', icon: 'bookings' },
-  { href: '/account?tab=wallet', label: 'Wallet (Coins)', icon: 'wallet' },
-  { href: '/support', label: 'Support', icon: 'support' },
+  { href: '/account?tab=wallet', label: 'Wallet', icon: 'wallet' },
 ];
 
 /** Header control: "Log in" when logged out, otherwise an avatar with the
