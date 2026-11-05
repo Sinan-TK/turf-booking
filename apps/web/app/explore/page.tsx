@@ -300,30 +300,19 @@ export default function ExplorePage() {
           <div className="ml-auto md:order-last">
             <AccountMenu />
           </div>
-          <div className={`nav-search order-last flex h-11 w-full items-center overflow-hidden rounded-xl border bg-slate-50/70 px-3.5 transition-[box-shadow,border-color,background-color] [&:has(input:focus)]:border-brand-500 [&:has(input:focus)]:bg-white md:order-none md:h-12 md:w-auto md:max-w-3xl md:flex-1 ${form.categorySlugs.length > 0 ? 'border-brand-600' : 'border-slate-200 hover:border-slate-300'}`}>
-            <Icon name="search" className="text-[1.125rem] text-slate-500" />
+          <div className={`nav-search order-last flex h-9 w-full items-center overflow-hidden rounded-xl border bg-slate-50/70 px-3.5 transition-[box-shadow,border-color,background-color] [&:has(input:focus)]:border-brand-500 [&:has(input:focus)]:bg-white md:order-none md:h-10 md:w-auto md:max-w-3xl md:flex-1 ${form.categorySlugs.length > 0 ? 'border-brand-600' : 'border-slate-200 hover:border-slate-300'}`}>
+            <div className="relative h-full min-w-0 flex-1">
             <input
               ref={searchBox}
               value={nameFilter}
               onChange={(e) => setNameFilter(e.target.value)}
               aria-label="Search venues"
-              className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none"
+              className="peer h-full w-full min-w-0 bg-transparent pl-6 pr-2 text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none [&:not(:placeholder-shown)]:pl-0"
               placeholder="Search venues, turfs, pools, badminton, activities..."
               type="text"
             />
-            {nameFilter && (
-              <button
-                type="button"
-                onClick={() => {
-                  setNameFilter('');
-                  searchBox.current?.focus();
-                }}
-                aria-label="Clear search"
-                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-200/70 hover:text-slate-700"
-              >
-                <Icon name="close" className="text-[0.9375rem]" />
-              </button>
-            )}
+              <Icon name="search" className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 text-[1rem] text-slate-400 peer-[:not(:placeholder-shown)]:hidden" />
+            </div>
             {/* Pick several venue types at once, as part of the same bar (the word is left off on phones to save room). */}
             <button
               type="button"

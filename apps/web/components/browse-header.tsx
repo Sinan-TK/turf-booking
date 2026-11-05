@@ -79,17 +79,19 @@ export function BrowseHeader({ phoneBack = false }: { phoneBack?: boolean }) {
           <form
             onSubmit={search}
             role="search"
-            className={`nav-search order-last ${wide} h-11 w-full items-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 transition-[box-shadow,border-color,background-color] hover:border-slate-300 [&:has(input:focus)]:border-brand-500 [&:has(input:focus)]:bg-white md:order-none md:h-12 md:w-auto md:max-w-3xl md:flex-1`}
+            className={`nav-search order-last ${wide} h-9 w-full items-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 transition-[box-shadow,border-color,background-color] hover:border-slate-300 [&:has(input:focus)]:border-brand-500 [&:has(input:focus)]:bg-white md:order-none md:h-10 md:w-auto md:max-w-3xl md:flex-1`}
           >
-            <Icon name="search" className="text-[1.125rem] text-slate-500" />
+            <div className="relative h-full min-w-0 flex-1">
             <input
               value={text}
               onChange={(e) => setText(e.target.value)}
               aria-label="Search venues"
-              className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none"
+              className="peer h-full w-full min-w-0 bg-transparent pl-6 pr-2 text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none [&:not(:placeholder-shown)]:pl-0"
               placeholder="Search venues, turfs, pools, badminton, activities..."
               type="text"
             />
+              <Icon name="search" className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 text-[1rem] text-slate-400 peer-[:not(:placeholder-shown)]:hidden" />
+            </div>
             <button
               type="button"
               onClick={() => setTypePickerOpen(true)}
