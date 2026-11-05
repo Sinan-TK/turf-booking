@@ -11,6 +11,7 @@ const ITEMS = [
   { href: '/account?tab=profile', label: 'Profile', icon: 'person' },
   { href: '/account?tab=bookings', label: 'Bookings', icon: 'bookings' },
   { href: '/account?tab=wallet', label: 'Wallet', icon: 'wallet' },
+  { href: '/account?tab=saved', label: 'Saved', icon: 'bookmark' },
 ];
 
 /** Header control: "Log in" when logged out, otherwise an avatar with the
