@@ -8,7 +8,6 @@ import { BankAccountsModule } from './bank-accounts/bank-accounts.module';
 import { OwnerScopeModule } from './owner-scope/owner-scope.module';
 import { AuthModule } from './auth/auth.module';
 import { AuditModule } from './audit/audit.module';
-import { BannersModule } from './banners/banners.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { LocationsModule } from './locations/locations.module';
 import { VenuesModule } from './venues/venues.module';
@@ -37,7 +36,6 @@ import { StorageModule } from './storage/storage.module';
     StorageModule,
     OwnerScopeModule,
     AuditModule,
-    BannersModule,
     NotificationsModule,
     AuthModule,
     LocationsModule,

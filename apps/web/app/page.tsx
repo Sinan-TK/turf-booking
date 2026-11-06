@@ -1,13 +1,8 @@
 'use client';
 
 /*
- * THESIS: the landing page is a departures board for game time: venue types listed like departures, a live clock, one search.
- *   It refuses the category default of a green gradient hero over rounded white cards.
- * OWN-WORLD: black flap panels split across the middle, lit lime condensed capitals, a warm-white ground, one lime band.
- * STORY: a group organiser sees what can be booked, searches or taps a venue type, and lands on live slots in /explore.
- * FIRST VIEWPORT: black board; headline and search on the left, the "Browse by type" board with a flipping clock on the right
- *   (stacked on phones, search first). The primary action is Find venues.
- * FORM: split-flap departures board, grounded list position 6, seed 6eaf877a.
+ * The landing page, kept simple: a clean header, one headline with one search, the venue types as picture cards, how booking works,
+ * why Bookyo, and a way in for venue owners. Black, warm white and the logo's lime; nothing else competes with the search.
  */
 
 import { useEffect, useState } from 'react';
@@ -16,14 +11,11 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import type { VenueCategory } from '@/lib/categories';
 import { AccountMenu } from '@/components/account-menu';
-import { BannerSlider } from '@/components/banner-slider';
 import { CategoryIcon, Icon } from '@/components/ui';
 import { Skeleton } from '@/components/skeleton';
 import { OWNER_PORTAL_URL } from '@/lib/legal';
 import { SiteFooter } from '@/components/site-footer';
-import { barlow, barlowCondensed } from './landing-fonts';
 import { Logo } from '@/components/logo';
-import s from './landing.module.css';
 
 const STEPS = [
   { title: 'Find a venue', text: 'Search by area or pick a type: turfs, courts, pools, game rooms and more.' },
@@ -38,97 +30,31 @@ const REASONS = [
   { icon: 'bookings', title: 'Everything in one place', text: 'Your bookings, your wallet and support, all under your account.' },
 ] as const;
 
-/** Keyboard focus on the board: a lit ring. */
-const focusDark = 'outline-none focus-visible:ring-2 focus-visible:ring-[#A5F52B] focus-visible:ring-offset-2 focus-visible:ring-offset-[#050505]';
+const focus = 'outline-none focus-visible:ring-4 focus-visible:ring-brand-700/20';
+const shell = 'mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8';
 
-/** Characters on flaps; a character that changes turns over (it is keyed by its value, so a new one mounts and flips). */
-function Flaps({ text, className = '' }: { text: string; className?: string }) {
+/** One venue type: its picture (or icon) and name, leading to its slots. */
+function TypeCard({ category: c }: { category: VenueCategory }) {
   return (
-    <span className="inline-flex gap-[3px]">
-      {text.split('').map((ch, i) =>
-        ch === ':' || ch === ' ' ? (
-          <span key={`${i}-sep`} className="inline-flex w-[0.45em] items-center justify-center text-[#A5F52B]">
-            {ch}
-          </span>
-        ) : (
-          <span key={`${i}-${ch}`} className={`${s.flap} ${className}`}>
-            <span className={s.flipChar}>{ch}</span>
-          </span>
-        ),
-      )}
-    </span>
+    <li>
+      <Link
+        href={`/explore?type=${encodeURIComponent(c.slug)}`}
+        className={`group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white transition duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-card ${focus}`}
+      >
+        <span className="relative flex aspect-[4/3] items-center justify-center bg-brand-50 text-brand-700">
+          <CategoryIcon iconKey={c.iconKey} iconSvg={c.iconSvg} className="text-[2.5rem]" />
+          {c.imageUrl && <img src={c.imageUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />}
+        </span>
+        <span className="flex items-center justify-between gap-2 px-4 py-3.5">
+          <span className="truncate text-base font-bold text-slate-900">{c.name}</span>
+          <Icon name="chevron_right" className="shrink-0 text-[1.25rem] text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-brand-700" />
+        </span>
+      </Link>
+    </li>
   );
 }
 
-/** The board's clock: the visitor's own time, turning over each minute. Drawn only in the browser (the server cannot know it). */
-function BoardClock() {
-  const [now, setNow] = useState<Date | null>(null);
-  useEffect(() => {
-    setNow(new Date());
-    const timer = setInterval(() => setNow(new Date()), 10_000);
-    return () => clearInterval(timer);
-  }, []);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const time = now ? `${pad(now.getHours())}:${pad(now.getMinutes())}` : '--:--';
-  const day = now ? now.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase() : '';
-  return (
-    <span className="flex items-center gap-3">
-      <span className="sr-only">Time now</span>
-      <Flaps text={time} className="h-8 w-6 text-lg font-bold sm:h-9 sm:w-7 sm:text-xl" />
-      <span aria-hidden="true" className={`${s.display} text-sm font-bold tracking-wide text-white/55`}>
-        {day}
-      </span>
-    </span>
-  );
-}
-
-/** The kinds of venue as departures: picture or icon, name in lit capitals, and the way to its slots. */
-function TypeBoard({ categories }: { categories: VenueCategory[] | null }) {
-  return (
-    <section aria-labelledby="types-heading" className={`${s.rise} overflow-hidden rounded-md bg-[#0d0d0d] shadow-[0_30px_60px_-30px_rgba(0,0,0,0.9)] ring-1 ring-white/10`} style={{ '--d': '120ms' } as React.CSSProperties}>
-      <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
-        <h2 id="types-heading" className={`${s.display} text-xl text-[#A5F52B] sm:text-2xl`}>
-          Browse by type
-        </h2>
-        <BoardClock />
-      </div>
-      <div aria-hidden="true" className={`${s.display} grid grid-cols-[3rem_1fr_auto] gap-3 px-4 pb-1 pt-2.5 text-[0.75rem] font-bold tracking-[0.08em] text-white/45 sm:px-5`}>
-        <span />
-        <span>Venue</span>
-        <span>Slots</span>
-      </div>
-      <ul className="max-h-[26rem] overflow-y-auto px-2 pb-2 sm:px-3">
-        {categories === null &&
-          [0, 1, 2, 3].map((i) => (
-            <li key={i} className="px-2 py-1.5">
-              <Skeleton className="h-12 w-full rounded-md !bg-white/10" />
-            </li>
-          ))}
-        {categories?.map((c, i) => (
-          <li key={c.slug} className={s.row} style={{ '--d': `${200 + i * 70}ms` } as React.CSSProperties}>
-            <Link
-              href={`/explore?type=${encodeURIComponent(c.slug)}`}
-              className={`group grid grid-cols-[3rem_1fr_auto] items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-white/[0.06] ${focusDark}`}
-            >
-              <span className={`${s.tile} relative h-12 w-12 text-white/80`}>
-                <CategoryIcon iconKey={c.iconKey} iconSvg={c.iconSvg} className="text-[1.5rem]" />
-                {c.imageUrl && <img src={c.imageUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />}
-              </span>
-              <span className={`${s.display} truncate text-[1.375rem] leading-none text-white transition-colors group-hover:text-[#A5F52B] sm:text-[1.625rem]`}>{c.name}</span>
-              <span className={`${s.display} inline-flex items-center gap-1 rounded-sm bg-[#A5F52B] px-2.5 py-1.5 text-[0.9375rem] leading-none text-[#050505] transition group-hover:bg-white`}>
-                See
-                <Icon name="chevron_right" className="text-[1rem]" />
-              </span>
-            </Link>
-          </li>
-        ))}
-        {categories && categories.length === 0 && <li className="px-3 py-6 text-sm text-white/70">Venues are being added. Check back soon.</li>}
-      </ul>
-    </section>
-  );
-}
-
-/** The landing page: the board (search and venue types), advertising banners, how booking works, and a way in for venue owners. */
+/** The landing page: search, venue types, how booking works, why Bookyo, and a way in for venue owners. */
 export default function LandingPage() {
   const router = useRouter();
   const [categories, setCategories] = useState<VenueCategory[] | null>(null);
@@ -151,21 +77,18 @@ export default function LandingPage() {
     router.push(q ? `/explore?q=${encodeURIComponent(q)}` : '/explore');
   }
 
-  const shell = 'mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-10';
-  const sectionTitle = `${s.display} text-balance text-[2.25rem] leading-[0.95] sm:text-5xl`;
-
   return (
-    <div className={`${barlow.variable} ${barlowCondensed.variable} ${s.page} flex min-h-screen flex-col`}>
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#050505]">
+    <div className="flex min-h-screen flex-col bg-cream">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-cream/90 backdrop-blur">
         <div className={`${shell} flex items-center gap-4 py-3`}>
-          <Link href="/" aria-label="Bookyo home" className={`flex select-none items-center gap-1 rounded-sm ${focusDark}`}>
-            <Logo ink="#fff" hole="#050505" className="h-9 w-auto" />
+          <Link href="/" aria-label="Bookyo home" className={`flex select-none items-center rounded-md ${focus}`}>
+            <Logo hole="#FFFCF6" className="h-9 w-auto" />
           </Link>
-          <nav aria-label="Main" className={`${s.display} ml-4 hidden items-center gap-1 text-lg font-bold text-white/70 md:flex`}>
-            <Link href="/explore" className={`rounded-sm px-3 py-1.5 transition-colors hover:text-[#A5F52B] ${focusDark}`}>
+          <nav aria-label="Main" className="ml-4 hidden items-center gap-1 text-[0.9375rem] font-semibold text-slate-600 md:flex">
+            <Link href="/explore" className={`rounded-md px-3 py-1.5 transition hover:text-brand-700 ${focus}`}>
               Explore venues
             </Link>
-            <Link href="/support" className={`rounded-sm px-3 py-1.5 transition-colors hover:text-[#A5F52B] ${focusDark}`}>
+            <Link href="/support" className={`rounded-md px-3 py-1.5 transition hover:text-brand-700 ${focus}`}>
               Support
             </Link>
           </nav>
@@ -176,103 +99,127 @@ export default function LandingPage() {
       </header>
 
       <main className="flex-1">
-        {/* ------------------------------------------------------------ The board */}
-        <section className={`relative overflow-hidden bg-[#050505] text-white ${s.boardGrid}`}>
-          <div className={`${shell} grid items-start gap-10 pb-14 pt-10 sm:pb-20 sm:pt-14 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-14 lg:pb-24 lg:pt-20`}>
-            <div className="lg:pt-4">
-              <h1 className={`${s.display} ${s.rise} text-balance text-[3.25rem] leading-[0.88] sm:text-7xl lg:text-[6rem]`}>
-                Book your game, <span className="text-[#A5F52B]">in seconds.</span>
-              </h1>
-              <p className={`${s.rise} mt-6 max-w-[34rem] text-pretty text-[1.0625rem] leading-relaxed text-white/75 sm:text-lg`} style={{ '--d': '80ms' } as React.CSSProperties}>
-                Turfs, courts, pools, game rooms and activity venues near you. See which slots are free right now, pay a small advance and
-                get your booking ID straight away.
-              </p>
+        {/* ----------------------------------------------------------- Hero */}
+        <section className={`${shell} pb-14 pt-14 text-center sm:pb-20 sm:pt-20`}>
+          <h1 className="mx-auto max-w-3xl text-balance text-[2.75rem] font-black leading-[1.05] tracking-tight text-slate-900 sm:text-6xl">
+            Book your game, <span className="rounded-md bg-brand-400 px-2 [box-decoration-break:clone]">in seconds.</span>
+          </h1>
+          <p className="mx-auto mt-5 max-w-xl text-pretty text-lg leading-relaxed text-slate-600">
+            Turfs, courts, pools, game rooms and activity venues near you. See which slots are free right now and book in a minute.
+          </p>
 
-              <form onSubmit={search} role="search" className={`${s.rise} mt-8 flex max-w-[36rem] flex-col gap-2 sm:flex-row`} style={{ '--d': '160ms' } as React.CSSProperties}>
-                <label className="relative flex-1">
-                  <span className="sr-only">Search venues</span>
-                  <Icon name="search" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[1.25rem] text-white/50" />
-                  <input
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    placeholder="Search venues, turfs, pools, badminton..."
-                    className={`${s.search} h-14 w-full rounded-md border border-white/15 bg-[#1c1c1b] pl-12 pr-4 text-base font-medium text-white placeholder-white/45 transition-colors focus:border-[#A5F52B] focus:outline-none`}
-                  />
-                </label>
-                <button
-                  type="submit"
-                  className={`${s.display} h-14 rounded-md bg-[#A5F52B] px-7 text-xl text-[#050505] transition hover:bg-white active:scale-[0.98] ${focusDark}`}
-                >
-                  Find venues
-                </button>
-              </form>
-            </div>
+          <form
+            onSubmit={search}
+            role="search"
+            className="mx-auto mt-8 flex max-w-2xl flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-card sm:flex-row"
+          >
+            <label className="relative flex-1">
+              <span className="sr-only">Search venues</span>
+              <Icon name="search" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[1.25rem] text-slate-400" />
+              <input
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Search venues, turfs, pools, badminton..."
+                className="h-12 w-full rounded-xl bg-transparent pl-12 pr-4 text-base font-medium text-slate-900 placeholder-slate-400 outline-none"
+              />
+            </label>
+            <button
+              type="submit"
+              className={`h-12 rounded-xl bg-brand-700 px-7 text-base font-bold text-white transition hover:bg-brand-600 active:scale-[0.98] ${focus}`}
+            >
+              Find venues
+            </button>
+          </form>
 
-            <TypeBoard categories={categories} />
-          </div>
-        </section>
-
-        {/* ------------------------------------------------------ Advertising */}
-        <section aria-label="Offers" className={`${shell} pt-10 sm:pt-14`}>
-          <BannerSlider />
-        </section>
-
-        {/* ------------------------------------------------------ How it works */}
-        <section className={`${shell} py-16 sm:py-24`}>
-          <h2 className={sectionTitle}>How it works</h2>
-          <ol className="mt-10 grid border-t-2 border-[#050505] md:grid-cols-3">
-            {STEPS.map((step, i) => (
-              <li key={step.title} className="flex gap-5 border-b border-[#cfcfc8] py-7 md:flex-col md:gap-6 md:border-b-0 md:border-r md:px-7 md:py-9 md:first:pl-0 md:last:border-r-0">
-                <span aria-hidden="true" className={`${s.flap} ${s.display} h-16 w-12 shrink-0 text-[2.5rem] leading-none`}>
-                  {i + 1}
-                </span>
-                <span>
-                  <span className={`${s.display} block text-[1.75rem] leading-none`}>{step.title}</span>
-                  <span className="mt-2.5 block max-w-xs text-pretty text-base leading-relaxed text-[#55554f]">{step.text}</span>
-                </span>
+          <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-semibold text-slate-600">
+            {['Live availability', 'Pay only a small advance', 'Instant booking ID'].map((t) => (
+              <li key={t} className="inline-flex items-center gap-1.5">
+                <Icon name="check" className="text-[1rem] text-brand-700" />
+                {t}
               </li>
             ))}
-          </ol>
+          </ul>
+        </section>
+
+        {/* ---------------------------------------------------- Venue types */}
+        <section aria-labelledby="types-heading" className={`${shell} pb-16 sm:pb-24`}>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 id="types-heading" className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
+                Browse by type
+              </h2>
+              <p className="mt-1.5 text-base text-slate-600">Pick what you want to play and see its open slots.</p>
+            </div>
+            <Link href="/explore" className={`inline-flex items-center gap-1 rounded-md text-[0.9375rem] font-bold text-brand-700 hover:underline ${focus}`}>
+              All venues
+              <Icon name="chevron_right" className="text-[1.125rem]" />
+            </Link>
+          </div>
+          <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+            {categories === null &&
+              Array.from({ length: 8 }, (_, i) => (
+                <li key={i} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                  <Skeleton className="aspect-[4/3] w-full rounded-none" />
+                  <div className="px-4 py-3.5">
+                    <Skeleton className="h-5 w-2/3" />
+                  </div>
+                </li>
+              ))}
+            {categories?.map((c) => <TypeCard key={c.slug} category={c} />)}
+          </ul>
+          {categories && categories.length === 0 && <p className="mt-8 text-base text-slate-600">Venues are being added. Check back soon.</p>}
+        </section>
+
+        {/* -------------------------------------------------- How it works */}
+        <section className="border-y border-slate-200 bg-white">
+          <div className={`${shell} py-16 sm:py-20`}>
+            <h2 className="text-center text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">How it works</h2>
+            <ol className="mt-10 grid gap-4 md:grid-cols-3 md:gap-6">
+              {STEPS.map((step, i) => (
+                <li key={step.title} className="rounded-2xl border border-slate-200 bg-cream p-6">
+                  <span aria-hidden="true" className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-400 text-lg font-black text-brand-700">
+                    {i + 1}
+                  </span>
+                  <h3 className="mt-4 text-xl font-extrabold text-slate-900">{step.title}</h3>
+                  <p className="mt-1.5 text-pretty text-base leading-relaxed text-slate-600">{step.text}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
         </section>
 
         {/* -------------------------------------------------------------- Why */}
-        <section className="bg-[#050505] text-white">
-          <div className={`${shell} grid gap-10 py-16 sm:py-24 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-16`}>
-            <div>
-              <h2 className={`${sectionTitle} text-white`}>
-                Why book with <span className="text-[#A5F52B]">Bookyo</span>
-              </h2>
-              <p className="mt-4 max-w-md text-pretty text-[1.0625rem] leading-relaxed text-white/70">Less chasing, more playing. Everything you need to get a slot sorted in a minute.</p>
-            </div>
-            <ul className="border-t border-white/15">
-              {REASONS.map((r) => (
-                <li key={r.title} className="grid grid-cols-[2.75rem_1fr] items-start gap-4 border-b border-white/15 py-5 sm:grid-cols-[2.75rem_16rem_1fr] sm:items-center">
-                  <span className={`${s.flap} h-11 w-11 text-[1.25rem]`}>
-                    <Icon name={r.icon} />
-                  </span>
-                  <span className={`${s.display} text-[1.5rem] leading-none text-[#A5F52B]`}>{r.title}</span>
-                  <span className="col-start-2 text-pretty text-base leading-relaxed text-white/75 sm:col-start-3">{r.text}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+        <section className={`${shell} py-16 sm:py-20`}>
+          <h2 className="text-center text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">Why book with Bookyo</h2>
+          <p className="mx-auto mt-2 max-w-lg text-center text-base text-slate-600">Less chasing, more playing. Get a slot sorted in a minute.</p>
+          <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {REASONS.map((r) => (
+              <li key={r.title} className="rounded-2xl border border-slate-200 bg-white p-6">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-[1.375rem] text-brand-700">
+                  <Icon name={r.icon} />
+                </span>
+                <h3 className="mt-4 text-lg font-extrabold text-slate-900">{r.title}</h3>
+                <p className="mt-1.5 text-pretty text-[0.9375rem] leading-relaxed text-slate-600">{r.text}</p>
+              </li>
+            ))}
+          </ul>
         </section>
 
         {/* ------------------------------------------------------- For owners */}
-        <section className="bg-[#A5F52B] text-[#050505]">
-          <div className={`${shell} flex flex-col items-start justify-between gap-7 py-14 sm:flex-row sm:items-center sm:py-16`}>
+        <section className={`${shell} pb-16 sm:pb-24`}>
+          <div className="flex flex-col items-start justify-between gap-6 rounded-2xl bg-brand-700 p-8 text-white sm:flex-row sm:items-center sm:p-10">
             <div>
-              <h2 className={`${s.display} text-balance text-[2.5rem] leading-[0.95] sm:text-6xl`}>Own a venue?</h2>
-              <p className="mt-3 max-w-xl text-pretty text-[1.0625rem] font-medium leading-relaxed text-[#050505]/80">
+              <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Own a venue?</h2>
+              <p className="mt-2 max-w-xl text-pretty text-base leading-relaxed text-white/75">
                 List your turf, court or activity space on Bookyo, take online bookings and see your earnings in one place.
               </p>
             </div>
             <a
               href={`${OWNER_PORTAL_URL}/register`}
-              className={`${s.display} inline-flex shrink-0 items-center gap-2 rounded-md bg-[#050505] px-7 py-4 text-xl text-white transition hover:bg-[#2a2a28] active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-[#050505] focus-visible:ring-offset-2 focus-visible:ring-offset-[#A5F52B]`}
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-brand-400 px-6 py-3.5 text-base font-extrabold text-brand-700 outline-none transition hover:bg-white focus-visible:ring-4 focus-visible:ring-white/40 active:scale-[0.98]"
             >
               List your venue
-              <Icon name="chevron_right" className="text-[1.25rem] text-[#A5F52B]" />
+              <Icon name="chevron_right" className="text-[1.125rem]" />
             </a>
           </div>
         </section>

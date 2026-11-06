@@ -4,7 +4,7 @@ import { URLS } from '../../support/env';
 
 test.use({ baseURL: URLS.web });
 
-/** The landing page at "/" (advertising, venue types, how it works) and the venue listing now at "/explore". */
+/** The landing page at "/" (search, venue types, how it works) and the venue listing now at "/explore". */
 test.describe('customer site: landing page', () => {
   test('"/" is the landing page and the listing is at /explore', async ({ page }) => {
     await page.goto('/');
@@ -36,37 +36,16 @@ test.describe('customer site: landing page', () => {
     await expect(page.getByRole('button', { name: /Venue types, 1 selected/ })).toBeVisible();
   });
 
-  test('live banners are shown as a slider with their title, and link where the admin said', async ({ page }) => {
-    await page.route(`${URLS.api}/banners`, async (route) => {
-      if (route.request().method() !== 'GET') return route.continue();
-      await route.fulfill({
-        status: 200,
-        headers: { 'content-type': 'application/json', 'access-control-allow-origin': URLS.web, 'access-control-allow-credentials': 'true' },
-        body: JSON.stringify([
-          { id: '1', title: 'Weekend football offer', subtitle: 'Book before Friday', imageUrl: null, linkUrl: '/explore?type=FOOTBALL_TURF' },
-          { id: '2', title: 'Hostile link', subtitle: null, imageUrl: null, linkUrl: 'javascript:alert(1)' },
-        ]),
-      });
-    });
-    await page.goto('/');
-    const slider = page.getByRole('region', { name: 'Offers and announcements' });
-    await expect(slider.getByText('Weekend football offer')).toBeVisible();
-    const first = slider.getByRole('link', { name: /1 of 2: Weekend football offer/ });
-    await expect(first).toHaveAttribute('href', '/explore?type=FOOTBALL_TURF');
-    await slider.getByRole('button', { name: 'Banner 2 of 2' }).click();
-    await expect(slider.getByText('Hostile link')).toBeVisible();
-    // A link that is not a path on this site or an https address is never followed: that banner is just a picture.
-    await expect(slider.locator('a[href^="javascript"]')).toHaveCount(0);
-  });
-
-  test('with no banners the slider is gone, not an empty box', async ({ page }) => {
-    await page.route(`${URLS.api}/banners`, async (route) => {
-      if (route.request().method() !== 'GET') return route.continue();
-      await route.fulfill({ status: 200, headers: { 'content-type': 'application/json', 'access-control-allow-origin': URLS.web, 'access-control-allow-credentials': 'true' }, body: '[]' });
+  test('there is no advertising section: the page goes from the search and venue types to how it works', async ({ page }) => {
+    let askedForBanners = false;
+    page.on('request', (r) => {
+      if (new URL(r.url()).pathname === '/banners') askedForBanners = true;
     });
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'Browse by type' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Offers and announcements' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'How it works' })).toBeVisible();
+    await expect(page.getByRole('region', { name: /Offers/ })).toHaveCount(0);
+    expect(askedForBanners).toBe(false);
   });
 
   test('the landing page runs with nothing blocked by the content security policy', async ({ page }) => {
