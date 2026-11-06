@@ -67,6 +67,11 @@ test.describe('customer site: after paying at the checkout', () => {
     await expect(page.getByRole('button', { name: /^Pay with Coins/ })).toBeEnabled();
     await expect(page.getByText(/whatsapp/i)).toHaveCount(0);
     await page.getByRole('button', { name: /^Pay with Coins/ }).click();
+    // Coins are only spent after a confirmation that shows how much.
+    const dialog = page.getByRole('dialog', { name: 'Pay with Coins?' });
+    await expect(dialog).toContainText('₹200');
+    await expect(dialog).toContainText('Coins after');
+    await dialog.getByRole('button', { name: /^Pay .* with Coins$/ }).click();
 
     const success = page.getByRole('status', { name: 'Payment successful' });
     await expect(success).toBeVisible();
@@ -77,11 +82,29 @@ test.describe('customer site: after paying at the checkout', () => {
     await expect(page).toHaveURL(new RegExp(`/bookings/${ID}$`), { timeout: 10_000 });
   });
 
+  test('cancelling the Coins confirmation pays nothing', async ({ page }) => {
+    const state = { current: booking() };
+    await open(page, state);
+    await page.goto(`/checkout/${ID}`);
+    await page.getByRole('button', { name: /^Pay with Coins/ }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByRole('status', { name: 'Payment successful' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Pay with Coins/ })).toBeEnabled();
+    expect(state.current.status).toBe('PENDING_PAYMENT');
+
+    // Esc cancels too.
+    await page.getByRole('button', { name: /^Pay with Coins/ }).click();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  });
+
   test('"View booking" skips the wait', async ({ page }) => {
     const state = { current: booking() };
     await open(page, state);
     await page.goto(`/checkout/${ID}`);
     await page.getByRole('button', { name: /^Pay with Coins/ }).click();
+    await page.getByRole('dialog').getByRole('button', { name: /^Pay .* with Coins$/ }).click();
     await page.getByRole('button', { name: 'View booking' }).click();
     await expect(page).toHaveURL(new RegExp(`/bookings/${ID}$`));
   });

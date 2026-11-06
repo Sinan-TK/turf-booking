@@ -13,6 +13,7 @@ import type { RazorpayCheckoutOptions } from '@/lib/razorpay';
 import { Badge, Button, Card, ErrorBanner, Icon, LoadingState } from '@/components/ui';
 import { DetailSkeleton } from '@/components/skeleton';
 import { Screen } from '@/components/screen';
+import { Modal } from '@/components/modal';
 import { CancellationTerms, useCancellationPreview } from '@/components/cancellation-terms';
 
 interface CheckoutBooking {
@@ -58,6 +59,8 @@ export default function CheckoutPage() {
   const [wallet, setWallet] = useState<CoinWallet | null>(null);
   const [payError, setPayError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
+  // "Pay ₹X with your Coins?": asked before any Coins are spent.
+  const [confirmCoins, setConfirmCoins] = useState(false);
   const [confirmingPayment, setConfirmingPayment] = useState(false);
   // True from the moment the payment popup opens until it is closed or answers, so "slot no longer held" never shows behind it.
   const [popupOpen, setPopupOpen] = useState(false);
@@ -420,11 +423,47 @@ export default function CheckoutPage() {
                   variant="secondary"
                   className="flex w-full items-center justify-center gap-1.5"
                   disabled={!holdActive || paying || confirmingPayment || insufficientCoins}
-                  onClick={() => guarded(onPayWithCoins)}
+                  onClick={() => setConfirmCoins(true)}
                 >
                   <Icon name="coin" className="text-[1.25rem]" />
                   Pay with Coins {wallet ? `(balance: ${formatPrice({ amount: wallet.cachedBalance, currency: wallet.currency })})` : ''}
                 </Button>
+                {confirmCoins && wallet && (
+                  <Modal title="Pay with Coins?" onClose={() => setConfirmCoins(false)}>
+                    <div className="space-y-4 px-5 py-5">
+                      <p className="text-sm text-gray-700">
+                        <strong className="text-gray-900">{formatPrice({ amount: String(dueNow), currency: wallet.currency })}</strong> will be taken from
+                        your Coins to confirm this booking.
+                      </p>
+                      <dl className="space-y-1.5 rounded-xl bg-gray-50 px-4 py-3 text-sm">
+                        <div className="flex justify-between">
+                          <dt className="text-gray-500">Coins now</dt>
+                          <dd className="font-medium text-gray-900">{formatPrice({ amount: wallet.cachedBalance, currency: wallet.currency })}</dd>
+                        </div>
+                        <div className="flex justify-between">
+                          <dt className="text-gray-500">Coins after</dt>
+                          <dd className="font-medium text-gray-900">
+                            {formatPrice({ amount: String(Math.max(0, Number(wallet.cachedBalance) - dueNow)), currency: wallet.currency })}
+                          </dd>
+                        </div>
+                      </dl>
+                      <div className="flex justify-end gap-2">
+                        <Button type="button" variant="secondary" onClick={() => setConfirmCoins(false)}>
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            setConfirmCoins(false);
+                            void guarded(onPayWithCoins);
+                          }}
+                        >
+                          Pay {formatPrice({ amount: String(dueNow), currency: wallet.currency })} with Coins
+                        </Button>
+                      </div>
+                    </div>
+                  </Modal>
+                )}
                 {wallet && insufficientCoins && (
                   <p className="text-center text-xs text-gray-500">
                     You need {formatPrice({ amount: String(missingCoins), currency: wallet.currency })} more Coins.{' '}
