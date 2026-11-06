@@ -5,6 +5,7 @@ import { api, ApiError } from '@/lib/api';
 import type { Customer } from '@/lib/customer';
 import { Button, ErrorBanner, FieldError, Icon, Input, Label, SuccessBanner, invalidClass } from '@/components/ui';
 import { GoogleButton } from '@/components/google-button';
+import { useSiteConfig } from '@/lib/site-config';
 import { PasswordInput } from '@/components/password-input';
 import { codeError, emailError, indianPhoneError, nameError, newPasswordError, passwordError } from '@/lib/validation';
 import { PhoneInput } from '@/components/phone-input';
@@ -40,6 +41,9 @@ export function LoginDialog({
 }) {
   const [view, setView] = useState<View>(customer ? 'profile' : 'home');
   const [tab, setTab] = useState<Tab>('signin');
+  // Google is offered only while the Super Admin has it switched on (until then it neither shows nor works).
+  const siteConfig = useSiteConfig();
+  const google = HAS.google && siteConfig?.googleSignIn === true;
   // The address the sign-up form found already has an account (checked when the field is left), so it can say so and offer the way in.
   const [takenEmail, setTakenEmail] = useState<string | null>(null);
   // The customer who is signed in but still has to finish their profile.
@@ -333,7 +337,7 @@ export function LoginDialog({
 
   const completing = !!customer;
   const titles: Record<View, [string, string]> = {
-    home: ['Log in or sign up', HAS.google ? 'Continue with Google, or use your email.' : 'Use your email and password.'],
+    home: ['Log in or sign up', google ? 'Continue with Google, or use your email.' : 'Use your email and password.'],
     'signup-code': ['Verify your email', `We sent a 6-digit code to ${email.trim()}.`],
     forgot: ['Set or reset your password', 'We will email you a code to choose a new password.'],
     reset: ['Enter the code', `If ${email.trim()} has an account, a 6-digit code is on its way.`],
@@ -386,8 +390,8 @@ export function LoginDialog({
         {view === 'home' && (
           <div className="space-y-4">
             {notice && <SuccessBanner message={notice} />}
-            {HAS.google && <GoogleButton onCredential={onGoogle} disabled={busy} />}
-            {HAS.google && HAS.email && (
+            {google && <GoogleButton onCredential={onGoogle} disabled={busy} />}
+            {google && HAS.email && (
               <div className="flex items-center gap-2 text-[0.6875rem] font-semibold uppercase tracking-wide text-slate-400">
                 <span className="h-px flex-1 bg-slate-200" /> or <span className="h-px flex-1 bg-slate-200" />
               </div>

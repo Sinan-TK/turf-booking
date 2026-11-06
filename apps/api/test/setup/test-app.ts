@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import { randomUUID } from 'node:crypto';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module';
+import { PrismaService } from '../../src/prisma/prisma.service';
 import { cspReportContentType } from '../../src/health/csp-report.middleware';
 import { RazorpayProvider } from '../../src/payments/razorpay.provider';
 import { PAYMENT_PROVIDER, type GatewayPayment } from '../../src/payments/payment-provider.interface';
@@ -138,5 +139,8 @@ export async function createTestApp(options: { throttle?: boolean } = {}): Promi
   app.use('/csp-report', cspReportContentType);
   app.use(cookieParser());
   await app.init();
+  // Google sign-in is off on a real site until an admin switches it on; the tests that use it start with it on (site.e2e-spec.ts
+  // tests the off state itself).
+  await moduleFixture.get(PrismaService).client.platformSetting.upsert({ where: { key: 'googleSignIn' }, create: { key: 'googleSignIn', value: 'true' }, update: { value: 'true' } });
   return app;
 }

@@ -1,3 +1,4 @@
+import { existsSync, readFileSync, unlinkSync } from 'node:fs';
 import { closeDatabase, database } from './customer';
 
 /**
@@ -7,6 +8,7 @@ import { closeDatabase, database } from './customer';
  * `pnpm --filter @venue/database purge:test-data`.
  */
 export default async function globalTeardown(): Promise<void> {
+  await restoreGoogleSignIn();
   if (process.env.E2E_KEEP_DATA) return;
   try {
     const prisma = await database();
@@ -18,5 +20,23 @@ export default async function globalTeardown(): Promise<void> {
     console.warn('\nCould not clean up the test data:', error instanceof Error ? error.message : error);
   } finally {
     await closeDatabase();
+  }
+}
+
+/** The run switched Google sign-in on for the customer tests (see auth.setup.ts): put it back as it was before the run. */
+async function restoreGoogleSignIn(): Promise<void> {
+  const file = '.auth/google-before.json';
+  if (!existsSync(file)) return;
+  try {
+    const before = JSON.parse(readFileSync(file, 'utf8')) as { googleSignIn: boolean };
+    const prisma = await database();
+    await prisma.platformSetting.upsert({
+      where: { key: 'googleSignIn' },
+      create: { key: 'googleSignIn', value: String(before.googleSignIn) },
+      update: { value: String(before.googleSignIn) },
+    });
+    unlinkSync(file);
+  } catch (error) {
+    console.warn('Could not restore the Google sign-in setting:', error instanceof Error ? error.message : error);
   }
 }

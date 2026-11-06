@@ -54,14 +54,67 @@ function TypeCard({ category: c }: { category: VenueCategory }) {
   );
 }
 
+interface FeaturedVenue {
+  id: string;
+  name: string;
+  address: string;
+  area: string | null;
+  facilityCode: string;
+  photoUrl: string | null;
+  facilities: string[];
+}
+
+/** One featured venue: its picture, name, place and the kinds of facility it has, leading to its slots. */
+function FeaturedCard({ venue: v }: { venue: FeaturedVenue }) {
+  return (
+    <li>
+      <Link
+        href={`/explore?q=${encodeURIComponent(v.name)}`}
+        className={`group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white transition duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-card ${focus}`}
+      >
+        <span className="relative flex aspect-[16/10] items-center justify-center bg-brand-50 text-brand-700">
+          <Icon name="stadium" className="text-[2.5rem]" />
+          {v.photoUrl && <img src={v.photoUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />}
+        </span>
+        <span className="flex flex-1 flex-col gap-2 px-4 pb-4 pt-3.5">
+          <span className="truncate text-lg font-extrabold text-slate-900">{v.name}</span>
+          <span className="flex items-center gap-1.5 text-sm text-slate-600">
+            <Icon name="location_on" className="shrink-0 text-[1rem] text-slate-400" />
+            <span className="truncate">{v.area ? `${v.area} · ${v.address}` : v.address}</span>
+          </span>
+          {v.facilities.length > 0 && (
+            <span className="flex flex-wrap gap-1.5">
+              {v.facilities.map((f) => (
+                <span key={f} className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700 ring-1 ring-brand-200">
+                  {f}
+                </span>
+              ))}
+            </span>
+          )}
+          <span className="mt-auto inline-flex items-center gap-1 pt-1 text-sm font-bold text-brand-700">
+            View slots
+            <Icon name="chevron_right" className="text-[1.125rem] transition group-hover:translate-x-0.5" />
+          </span>
+        </span>
+      </Link>
+    </li>
+  );
+}
+
 /** The landing page: search, venue types, how booking works, why Bookyo, and a way in for venue owners. */
 export default function LandingPage() {
   const router = useRouter();
   const [categories, setCategories] = useState<VenueCategory[] | null>(null);
   const [text, setText] = useState('');
+  // The venues the Super Admin chose to feature (none: the section is not shown).
+  const [featured, setFeatured] = useState<FeaturedVenue[]>([]);
 
   useEffect(() => {
     let cancelled = false;
+    api
+      .get<FeaturedVenue[]>('/site/featured-venues')
+      .then((rows) => !cancelled && setFeatured(rows))
+      .catch(() => undefined);
     api
       .get<VenueCategory[]>('/categories?available=true')
       .then((rows) => !cancelled && setCategories(rows))
@@ -81,10 +134,7 @@ export default function LandingPage() {
     <div className="flex min-h-screen flex-col bg-cream">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-cream/90 backdrop-blur">
         <div className={`${shell} flex items-center gap-4 py-3`}>
-          <Link href="/" aria-label="Bookyo home" className={`flex select-none items-center rounded-md ${focus}`}>
-            <Logo hole="#FFFCF6" className="h-9 w-auto" />
-          </Link>
-          <nav aria-label="Main" className="ml-4 hidden items-center gap-1 text-[0.9375rem] font-semibold text-slate-600 md:flex">
+          <nav aria-label="Main" className="flex items-center gap-1 text-[0.9375rem] font-semibold text-slate-600">
             <Link href="/explore" className={`rounded-md px-3 py-1.5 transition hover:text-brand-700 ${focus}`}>
               Explore venues
             </Link>
@@ -100,7 +150,8 @@ export default function LandingPage() {
 
       <main className="flex-1">
         {/* ----------------------------------------------------------- Hero */}
-        <section className={`${shell} pb-14 pt-14 text-center sm:pb-20 sm:pt-20`}>
+        <section className={`${shell} pb-14 pt-10 text-center sm:pb-20 sm:pt-14`}>
+          <Logo hole="#FFFCF6" className="mx-auto mb-8 h-16 w-auto select-none sm:mb-10 sm:h-24" />
           <h1 className="mx-auto max-w-3xl text-balance text-[2.75rem] font-black leading-[1.05] tracking-tight text-slate-900 sm:text-6xl">
             Book your game, <span className="rounded-md bg-brand-400 px-2 [box-decoration-break:clone]">in seconds.</span>
           </h1>
@@ -169,6 +220,21 @@ export default function LandingPage() {
           </ul>
           {categories && categories.length === 0 && <p className="mt-8 text-base text-slate-600">Venues are being added. Check back soon.</p>}
         </section>
+
+        {/* ------------------------------------------------- Featured venues */}
+        {featured.length > 0 && (
+          <section aria-labelledby="featured-heading" className={`${shell} pb-16 sm:pb-24`}>
+            <h2 id="featured-heading" className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
+              Featured venues
+            </h2>
+            <p className="mt-1.5 text-base text-slate-600">Popular places to play, picked for you.</p>
+            <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {featured.map((v) => (
+                <FeaturedCard key={v.id} venue={v} />
+              ))}
+            </ul>
+          </section>
+        )}
 
         {/* -------------------------------------------------- How it works */}
         <section className="border-y border-slate-200 bg-white">

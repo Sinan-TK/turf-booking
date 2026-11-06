@@ -60,3 +60,20 @@ for (const portal of ['owner', 'admin'] as const) {
     keepOwnCookiesOnly(portal);
   });
 }
+
+/**
+ * Google sign-in is off on the site until the Super Admin turns it on, but the customer tests sign in through the test Google
+ * button, so a run switches it on (through the admin API) and the global teardown puts it back as it was.
+ */
+setup('switch on the Google sign-in for the customer tests', async () => {
+  const api = await request.newContext({ baseURL: URLS.api, storageState: '.auth/admin.json' });
+  try {
+    const before = (await (await api.get('/admin/site')).json()) as { googleSignIn: boolean };
+    // Only the first of several setups in one run remembers what it was.
+    if (!existsSync('.auth/google-before.json')) writeFileSync('.auth/google-before.json', JSON.stringify(before));
+    const res = await api.put('/admin/site/google', { data: { enabled: true } });
+    expect(res.ok(), await res.text()).toBeTruthy();
+  } finally {
+    await api.dispose();
+  }
+});

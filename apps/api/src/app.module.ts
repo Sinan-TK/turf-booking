@@ -5,6 +5,7 @@ import { ZodValidationPipe } from 'nestjs-zod';
 import { PrismaModule } from './prisma/prisma.module';
 import { OwnerStaffModule } from './owner-staff/owner-staff.module';
 import { BankAccountsModule } from './bank-accounts/bank-accounts.module';
+import { SiteModule } from './site/site.module';
 import { OwnerScopeModule } from './owner-scope/owner-scope.module';
 import { AuthModule } from './auth/auth.module';
 import { AuditModule } from './audit/audit.module';
@@ -44,6 +45,7 @@ import { StorageModule } from './storage/storage.module';
     OwnerOrganizationsModule,
     OwnerStaffModule,
     BankAccountsModule,
+    SiteModule,
     ResourcesModule,
     VenueConfigModule,
     PoliciesModule,

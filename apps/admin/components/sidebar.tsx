@@ -38,6 +38,7 @@ const NAV_GROUPS: Array<{ title: string; items: Array<{ href: string; label: str
     title: 'Platform',
     items: [
       { href: '/policies', label: 'Commercial terms', icon: 'shield' },
+      { href: '/site', label: 'Landing page', icon: 'venue' },
       { href: '/announcements', label: 'Announcements', icon: 'megaphone' },
       { href: '/audit-log', label: 'Audit log', icon: 'history' },
     ],

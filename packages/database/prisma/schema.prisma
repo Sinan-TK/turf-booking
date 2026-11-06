@@ -478,6 +478,8 @@ model Venue {
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
   deletedAt                 DateTime?
+  /// Shown in the landing page's "Featured venues", in this order (lowest first). Chosen by the Super Admin; null = not featured.
+  featuredOrder             Int?
 
   operatingHours OperatingHours[]
   photos         VenuePhoto[]
@@ -1754,3 +1756,12 @@ model BlockedPeriod {
   @@map("blocked_periods")
 }
 
+/// Switches the Super Admin controls for the whole site, one row each. Known keys: "googleSignIn" ("true" shows Google sign-in to customers
+/// and lets it work; anything else, or no row, means it is off).
+model PlatformSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("platform_settings")
+}

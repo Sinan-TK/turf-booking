@@ -7,6 +7,7 @@ import { CustomerOtpService } from './customer-otp.service';
 import { CustomerPasswordService } from './customer-password.service';
 import { CustomerSessionService } from './customer-session.service';
 import { CustomersService, customerView } from '../customers/customers.service';
+import { SiteService } from '../site/site.service';
 import { GOOGLE_TOKEN_VERIFIER, type GoogleTokenVerifier } from './google-token-verifier';
 import { AuthGuard } from './guards/auth.guard';
 import { RolesGuard } from './guards/roles.guard';
@@ -44,6 +45,7 @@ export class CustomerAuthController {
     private readonly sessions: CustomerSessionService,
     private readonly customers: CustomersService,
     @Inject(GOOGLE_TOKEN_VERIFIER) private readonly google: GoogleTokenVerifier,
+    private readonly site: SiteService,
   ) {}
 
   /** Opens a session and sets the cookie; every sign-in method ends here. */
@@ -62,6 +64,8 @@ export class CustomerAuthController {
   @HttpCode(200)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async googleLogin(@Body() dto: GoogleLoginDto, @Res({ passthrough: true }) res: Response) {
+    // Off until the Super Admin turns it on (Google must approve the app first): then it does not work at all.
+    await this.site.assertGoogleSignInEnabled();
     const identity = await this.google.verify(dto.credential);
     const customer = await this.customers.findOrCreateByGoogle(identity);
     if (customer.status === 'BLOCKED') throw new ForbiddenException(BLOCKED);

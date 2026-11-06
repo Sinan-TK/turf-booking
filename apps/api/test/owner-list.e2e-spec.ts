@@ -1,6 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { createTestApp } from './setup/test-app';
-import { createOwnerFixture, createVenueFixture, loginAsSuperAdmin, prisma, type TestAgent } from './setup/fixtures';
+import { createOwnerFixture, createVenueFixture, loginAsSuperAdmin, prisma, uniqueSuffix, type TestAgent } from './setup/fixtures';
 
 /** The Super Admin's list of owner organizations carries who the owner is and how many venues are live. */
 describe('Owner organizations list', () => {
@@ -37,9 +37,9 @@ describe('Owner organizations list', () => {
   it('an organization with no login yet has no owner name, and with several logins shows the owner admin, not staff', async () => {
     const created = await admin.post('/admin/organizations').send({ name: 'E2E Org No Login', contactEmail: 'e2e-nologin@example.com', contactPhone: '9847012345' }).expect(201);
     expect(await find(created.body.id)).toMatchObject({ ownerName: null, activeVenues: 0 });
-    await prisma.venueOwnerUser.create({ data: { organizationId: created.body.id, email: 'e2e-staff-first@example.com', name: 'E2E Staff Person', role: 'OWNER_STAFF' } });
+    await prisma.venueOwnerUser.create({ data: { organizationId: created.body.id, email: `e2e-staff-first-${uniqueSuffix()}@example.com`, name: 'E2E Staff Person', role: 'OWNER_STAFF' } });
     expect((await find(created.body.id))?.ownerName).toBeNull(); // staff is not the owner
-    await prisma.venueOwnerUser.create({ data: { organizationId: created.body.id, email: 'e2e-admin-second@example.com', name: 'E2E The Owner', role: 'OWNER_ADMIN' } });
+    await prisma.venueOwnerUser.create({ data: { organizationId: created.body.id, email: `e2e-admin-second-${uniqueSuffix()}@example.com`, name: 'E2E The Owner', role: 'OWNER_ADMIN' } });
     expect((await find(created.body.id))?.ownerName).toBe('E2E The Owner');
   });
 });
