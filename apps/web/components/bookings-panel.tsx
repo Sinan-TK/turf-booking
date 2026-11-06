@@ -1,11 +1,12 @@
 'use client';
 
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useAccountData } from '@/lib/account-cache';
 import { Badge, Card, CategoryIcon, ErrorBanner } from '@/components/ui';
 import { formatPrice } from '@/lib/booking';
-import { BookingRowsSkeleton } from '@/components/skeleton';
+import { BookingRowsSkeleton, LoadingNote, Skeleton } from '@/components/skeleton';
 
 interface Facility {
   name: string;
@@ -38,10 +39,64 @@ function timeRange(startIso: string, endIso: string): string {
   return `${CLOCK.format(new Date(startIso))} – ${CLOCK.format(new Date(endIso))}`;
 }
 
-/** The customer's bookings, newest first. Shown as a tab on the account page. */
+/** How many bookings each load brings (the first screenful, then the same again every time the end of the list is scrolled to). */
+const PAGE = 12;
+
+/** The customer's bookings, newest first, a page at a time: more are added below as the list is scrolled. Shown as a tab on the account page. */
 export function BookingsPanel() {
-  // The last answer paints at once; the live one replaces it.
-  const { data: bookings, error } = useAccountData('bookings', () => api.get<Booking[]>('/me/bookings'), 'Something went wrong.');
+  // The first page paints at once from the last answer; the live one replaces it.
+  const { data: first, error } = useAccountData(
+    'bookings-pages',
+    async () => {
+      const page = await api.getPage<Booking[]>(`/me/bookings?limit=${PAGE}&offset=0`);
+      return { rows: page.data, total: page.total ?? page.data.length };
+    },
+    'Something went wrong.',
+  );
+  // The pages after the first, and how many there are in all.
+  const [more, setMore] = useState<Booking[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreError, setMoreError] = useState<string | null>(null);
+  const firstRows = first?.rows;
+  useEffect(() => {
+    // A fresh first page (the live answer, or a return to the tab) starts the list again from the top.
+    setMore([]);
+    setMoreError(null);
+  }, [firstRows]);
+
+  const bookings = first ? [...first.rows, ...more.filter((m) => !first.rows.some((r) => r.id === m.id))] : null;
+  const total = first?.total ?? 0;
+  const hasMore = !!bookings && bookings.length < total;
+
+  const loadMore = useCallback(async () => {
+    if (!bookings || loadingMore || bookings.length >= total) return;
+    setLoadingMore(true);
+    setMoreError(null);
+    try {
+      const page = await api.getPage<Booking[]>(`/me/bookings?limit=${PAGE}&offset=${bookings.length}`);
+      setMore((cur) => [...cur, ...page.data]);
+    } catch (err) {
+      setMoreError(err instanceof ApiError ? err.message : 'Could not load more bookings.');
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [bookings, loadingMore, total]);
+
+  // Scrolling near the end loads the next page. The watcher is set up again after every load, so it also fires straight away
+  // when the list is still too short to fill the screen.
+  const endOfList = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = endOfList.current;
+    if (!el || !hasMore || loadingMore || moreError) return;
+    const watcher = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) void loadMore();
+      },
+      { rootMargin: '400px 0px' },
+    );
+    watcher.observe(el);
+    return () => watcher.disconnect();
+  }, [hasMore, loadingMore, moreError, bookings?.length, loadMore]);
 
   return (
     <>
@@ -56,13 +111,51 @@ export function BookingsPanel() {
         </Card>
       )}
       {!error && bookings && bookings.length > 0 && (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {bookings.map((b) => (
-            <li key={b.id} className="h-full">
-              <BookingRow booking={b} />
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {bookings.map((b) => (
+              <li key={b.id} className="h-full">
+                <BookingRow booking={b} />
+              </li>
+            ))}
+            {/* The next ones load into the same grid: cards of the same shape while they come. */}
+            {loadingMore && (
+              <>
+                <LoadingNote label="Loading more bookings" />
+                {Array.from({ length: 4 }, (_, i) => (
+                  <li key={`more-${i}`} aria-hidden="true" className="h-full">
+                    <div className="flex h-full flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                      <div className="flex items-start justify-between gap-2">
+                        <Skeleton className="h-16 w-14 rounded-xl" />
+                        <Skeleton className="h-5 w-24 rounded-full" />
+                      </div>
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-3 w-1/2" />
+                        <Skeleton className="h-3 w-2/3" />
+                        <Skeleton className="h-2.5 w-1/3" />
+                      </div>
+                      <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+                        <Skeleton className="h-4 w-16" />
+                        <Skeleton className="h-3 w-12" />
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </>
+            )}
+          </ul>
+          {hasMore && <div ref={endOfList} aria-hidden="true" className="h-px" />}
+          {moreError && (
+            <div className="mt-3 text-center">
+              <p className="text-sm text-red-600">{moreError}</p>
+              <button type="button" onClick={() => void loadMore()} className="mt-1 text-sm font-semibold text-brand-700 underline underline-offset-2">
+                Try again
+              </button>
+            </div>
+          )}
+          {!hasMore && bookings.length > PAGE && <p className="mt-4 text-center text-xs text-gray-400">That is all your bookings.</p>}
+        </>
       )}
     </>
   );

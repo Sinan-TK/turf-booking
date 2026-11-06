@@ -60,8 +60,11 @@ export class PaymentsService {
     if (booking.customerId !== actor.id) {
       throw new ForbiddenException("Cannot pay for another customer's booking");
     }
-    if (booking.status === 'PROCESSING') throw new ConflictException('Your payment is already being confirmed.');
-    if (booking.status !== 'PENDING_PAYMENT') {
+    // PROCESSING is also what a booking shows while the payment popup is open: that is only an attempt, so the customer can open it again.
+    if (booking.status === 'PROCESSING' && (await this.payments.hasReportedPayment(bookingId))) {
+      throw new ConflictException('Your payment is already being confirmed.');
+    }
+    if (booking.status !== 'PENDING_PAYMENT' && booking.status !== 'PROCESSING') {
       throw new BadRequestException(`Booking is ${booking.status}, not payable`);
     }
     const alreadyPaid = await this.payments.findSuccessfulPaymentForBooking(bookingId);
@@ -85,7 +88,8 @@ export class PaymentsService {
       if (!(await this.payments.extendSlotHoldIfHeld(slotHold.id, extendedUntil))) {
         throw new ConflictException('This slot is no longer held. Please choose a time again.');
       }
-      return { paymentId: open.id, gatewayOrderId: open.gatewayOrderId, amount: charge, currency: booking.currency, reused: true };
+      const processingUntil = await this.startAttempt(booking.id, slotHold.id, booking.createdAt);
+      return { paymentId: open.id, gatewayOrderId: open.gatewayOrderId, amount: charge, currency: booking.currency, reused: true, processingUntil };
     }
     if (open && open.status === 'PENDING') await this.payments.closePayment(open.id, 'PENDING', 'EXPIRED', 'Replaced by a new order');
 
@@ -107,13 +111,45 @@ export class PaymentsService {
       rawResponse: order.raw,
     });
 
+    const processingUntil = await this.startAttempt(booking.id, slotHold.id, booking.createdAt);
     return {
       paymentId: payment.id,
       gatewayOrderId: order.gatewayOrderId,
       amount: charge,
       currency: booking.currency,
       reused: false,
+      processingUntil,
     };
+  }
+
+  /** The payment popup is opening: the booking shows PROCESSING and its slot is locked for the processing window (default 5 minutes). */
+  private async startAttempt(bookingId: string, slotHoldId: string, bookingCreatedAt: Date): Promise<Date> {
+    const env = loadEnv();
+    // Never past the longest a booking may be held, however often the popup is opened.
+    const processingUntil = new Date(Math.min(Date.now() + env.PAYMENT_PROCESSING_MINUTES * 60_000, bookingCreatedAt.getTime() + env.PAYMENT_MAX_HOLD_MINUTES * 60_000));
+    if (processingUntil.getTime() <= Date.now() || !(await this.payments.markAttemptAtomic({ bookingId, slotHoldId, processingUntil }))) {
+      throw new ConflictException('This slot is no longer held. Please choose a time again.');
+    }
+    return processingUntil;
+  }
+
+  /**
+   * The customer closed the payment popup without paying: the booking goes back to PENDING_PAYMENT with its slot still held, so they
+   * can pick another way to pay. Nothing changes once a payment has been reported (that one is waiting for the bank).
+   */
+  async cancelAttempt(bookingId: string, actor: AuthContext): Promise<{ status: string }> {
+    const booking = await this.payments.findBookingById(bookingId);
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.customerId !== actor.id) throw new ForbiddenException("Cannot change another customer's booking");
+    if (booking.status === 'PROCESSING') {
+      const env = loadEnv();
+      const holdUntil = new Date(
+        Math.min(Date.now() + env.PAYMENT_GRACE_WINDOW_MINUTES * 60_000, booking.createdAt.getTime() + env.PAYMENT_MAX_HOLD_MINUTES * 60_000),
+      );
+      await this.payments.revertAttemptAtomic({ bookingId, slotHoldId: booking.slotHoldId, holdUntil });
+    }
+    const after = await this.payments.findBookingById(bookingId);
+    return { status: after?.status ?? booking.status };
   }
 
   /**
@@ -145,7 +181,7 @@ export class PaymentsService {
     if (booking.customerId !== actor.id) throw new ForbiddenException("Cannot confirm another customer's payment");
     if (payment.status === 'SUCCESS') return { status: 'CONFIRMED', bookingId: booking.id };
 
-    if (booking.status === 'PENDING_PAYMENT') {
+    if (booking.status === 'PENDING_PAYMENT' || booking.status === 'PROCESSING') {
       const slotHold = await this.payments.findSlotHoldById(booking.slotHoldId);
       if (slotHold.status === 'HELD') {
         const processingUntil = new Date(Date.now() + loadEnv().PAYMENT_PROCESSING_MINUTES * 60_000);
@@ -550,6 +586,8 @@ export class PaymentsService {
     const payment = await this.payments.findFailedPaymentView(gatewayOrderId);
     // Only an attempt nobody has reported as paid is failed: a PROCESSING one is waiting for its own confirmation.
     if (!payment || payment.status !== 'PENDING') return; // already resolved — safe no-op
+    // The popup is still open for a retry (a declined card): the booking's own window decides how long it waits.
+    if (payment.booking.status === 'PROCESSING') return;
 
     assertTransition('Payment', PAYMENT_TRANSITIONS, payment.status, 'FAILED');
     await this.payments.markPaymentFailed({

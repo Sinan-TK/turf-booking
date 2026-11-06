@@ -768,8 +768,12 @@ export class BookingsService {
     };
   }
 
-  async listForCustomer(actor: AuthContext) {
-    return (await this.bookings.listForCustomer(actor.id)).map(forCustomer);
+  async listForCustomer(actor: AuthContext, page?: { limit: number; offset: number }) {
+    return (await this.bookings.listForCustomer(actor.id, page)).map(forCustomer);
+  }
+
+  countForCustomer(actor: AuthContext) {
+    return this.bookings.countForCustomer(actor.id);
   }
 
   /**

@@ -101,5 +101,14 @@ describe('Booking lists: newest first, and sorting by column', () => {
     const mine = await agent.get('/me/bookings').expect(200);
     // b was made last (though it starts earlier), so it comes first.
     expect(ids(mine.body)).toEqual([b.body.id, a.body.id]);
+
+    // A page at a time: the count of all of them is in a header, and the pages do not overlap.
+    const one = await agent.get('/me/bookings?limit=1&offset=0').expect(200);
+    expect(Number(one.headers['x-total-count'])).toBe(2);
+    expect(ids(one.body)).toEqual([b.body.id]);
+    const two = await agent.get('/me/bookings?limit=1&offset=1').expect(200);
+    expect(ids(two.body)).toEqual([a.body.id]);
+    expect((await agent.get('/me/bookings?limit=1&offset=2').expect(200)).body).toEqual([]);
+    expect((await agent.get('/me/bookings?limit=abc')).status).toBe(400);
   });
 });

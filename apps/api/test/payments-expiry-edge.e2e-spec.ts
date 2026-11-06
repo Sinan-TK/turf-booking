@@ -63,7 +63,7 @@ describe('Payments around expiry and a missing webhook', () => {
     createHmac('sha256', loadEnv().RAZORPAY_KEY_SECRET!).update(`${orderId}|${paymentId}`).digest('hex');
 
   /** A customer with a held slot and an open Razorpay order. */
-  async function checkout() {
+  async function checkout(popupOpen = false) {
     const { agent, customerId } = await createCustomerFixture(app);
     await prisma.customerProfile.update({ where: { id: customerId }, data: { phoneVerified: true } });
     const startTime = futureStart(day++, 9).toISOString();
@@ -71,6 +71,8 @@ describe('Payments around expiry and a missing webhook', () => {
     expect(hold.status).toBe(201);
     const order = await agent.post('/payments/create-order').send({ bookingId: hold.body.id });
     expect(order.status).toBe(201);
+    // Opening the payment popup makes the booking PROCESSING; this helper's customer closes it again (back to pending, order still open).
+    if (!popupOpen) expect((await agent.post('/payments/cancel-attempt').send({ bookingId: hold.body.id })).status).toBe(200);
     return {
       agent,
       customerId,

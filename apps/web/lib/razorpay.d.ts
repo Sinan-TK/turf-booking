@@ -10,6 +10,8 @@ export interface RazorpayCheckoutOptions {
     razorpay_payment_id: string;
     razorpay_signature: string;
   }) => void;
+  /** Seconds after which the popup closes by itself. */
+  timeout?: number;
   modal?: { ondismiss?: () => void };
   prefill?: { name?: string; email?: string; contact?: string };
   theme?: { color?: string };

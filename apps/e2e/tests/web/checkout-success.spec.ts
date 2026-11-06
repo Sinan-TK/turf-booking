@@ -39,7 +39,7 @@ function booking(extra: Record<string, unknown> = {}) {
   };
 }
 
-async function open(page: import('@playwright/test').Page, state: { current: Record<string, unknown> }, wallet = '1000.00') {
+async function open(page: import('@playwright/test').Page, state: { current: Record<string, unknown> }, wallet = '1000.00', calls: string[] = []) {
   const cors = { 'access-control-allow-origin': URLS.web, 'access-control-allow-credentials': 'true', 'access-control-allow-headers': 'content-type', 'access-control-allow-methods': 'GET,POST,OPTIONS' };
   await page.route(`${URLS.api}/**`, async (route) => {
     const req = route.request();
@@ -50,6 +50,23 @@ async function open(page: import('@playwright/test').Page, state: { current: Rec
     if (url.pathname === '/me/coins') return json({ cachedBalance: wallet, currency: 'INR', topupMin: 50, topupMax: 10000 });
     if (url.pathname.endsWith('/cancellation')) return json({ canCancel: true, currency: 'INR', paidOnline: '0', now: null, windows: [], closesAt: null });
     if (url.pathname.startsWith('/payments/sync/')) return json({ status: state.current.status });
+    // Opening the payment popup makes the booking PROCESSING; closing it puts it back; a reported payment confirms it.
+    if (url.pathname === '/payments/create-order') {
+      calls.push('create-order');
+      const processingUntil = new Date(Date.now() + 5 * 60_000).toISOString();
+      state.current = { ...state.current, status: 'PROCESSING', processingUntil };
+      return json({ paymentId: 'p1', gatewayOrderId: 'order_test_1', amount: '200.00', currency: 'INR', reused: false, processingUntil }, 201);
+    }
+    if (url.pathname === '/payments/cancel-attempt') {
+      calls.push('cancel-attempt');
+      state.current = { ...state.current, status: 'PENDING_PAYMENT', processingUntil: null };
+      return json({ status: 'PENDING_PAYMENT' });
+    }
+    if (url.pathname === '/payments/verify') {
+      calls.push('verify');
+      state.current = booking({ status: 'CONFIRMED', paymentMethod: 'MONEY', moneyPaid: '200.00', paidAmount: '200.00' });
+      return json({ status: 'CONFIRMED', bookingId: ID }, 201);
+    }
     if (url.pathname.endsWith('/pay-with-coins')) {
       state.current = booking({ status: 'CONFIRMED', paymentMethod: 'COINS', coinsPaid: '200.00', paidAmount: '200.00' });
       return json(state.current, 201);
@@ -97,6 +114,49 @@ test.describe('customer site: after paying at the checkout', () => {
     await page.getByRole('button', { name: /^Pay with Coins/ }).click();
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog')).toHaveCount(0);
+  });
+
+  test('opening the payment window makes the booking Processing; closing it makes it pending again; paying confirms it', async ({ page }) => {
+    const calls: string[] = [];
+    const state = { current: booking() };
+    // A stand-in for Razorpay's window, so the page's own behaviour can be driven: it keeps the options the page gave it.
+    await page.route('https://checkout.razorpay.com/**', (route) => route.abort());
+    await page.addInitScript(() => {
+      (window as unknown as { Razorpay: unknown }).Razorpay = class {
+        constructor(options: unknown) {
+          (window as unknown as { __rzp: unknown }).__rzp = options;
+        }
+        on() {}
+        open() {}
+      };
+    });
+    await open(page, state, '1000.00', calls);
+    await page.goto(`/checkout/${ID}`);
+
+    await page.getByRole('button', { name: 'Pay online' }).click();
+    // Processing at once, with the 5-minute window shown.
+    await expect(page.getByText('Complete your payment…')).toBeVisible();
+    await expect(page.getByText(/\(\d:\d\d left\)/)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Pay online' })).toHaveCount(0);
+    expect(calls).toContain('create-order');
+    const timeout = await page.evaluate(() => (window as unknown as { __rzp: { timeout: number } }).__rzp.timeout);
+    expect(timeout).toBeGreaterThan(200); // the window closes by itself with the booking's 5 minutes
+    expect(timeout).toBeLessThanOrEqual(300);
+
+    // Closed without paying: back to pending, and the customer can pay again.
+    await page.evaluate(() => (window as unknown as { __rzp: { modal: { ondismiss: () => void } } }).__rzp.modal.ondismiss());
+    await expect(page.getByRole('button', { name: 'Pay online' })).toBeVisible();
+    await expect(page.getByText('Complete your payment…')).toHaveCount(0);
+    expect(calls).toContain('cancel-attempt');
+
+    // Open it again and pay: the success moment.
+    await page.getByRole('button', { name: 'Pay online' }).click();
+    await expect(page.getByText('Complete your payment…')).toBeVisible();
+    await page.evaluate(() =>
+      (window as unknown as { __rzp: { handler: (r: unknown) => void } }).__rzp.handler({ razorpay_order_id: 'order_test_1', razorpay_payment_id: 'pay_test_1', razorpay_signature: 'sig' }),
+    );
+    await expect(page.getByRole('status', { name: 'Payment successful' })).toBeVisible({ timeout: 10_000 });
+    expect(calls).toContain('verify');
   });
 
   test('"View booking" skips the wait', async ({ page }) => {

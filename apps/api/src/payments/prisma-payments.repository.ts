@@ -306,7 +306,7 @@ export class PrismaPaymentsRepository implements PaymentsRepository {
         data: { status: 'PROCESSING', gatewayPaymentId: params.gatewayPaymentId, clientVerifiedAt: new Date() },
       });
       const moved = await tx.booking.updateMany({
-        where: { id: params.bookingId, status: 'PENDING_PAYMENT' },
+        where: { id: params.bookingId, status: { in: ['PENDING_PAYMENT', 'PROCESSING'] } },
         data: { status: 'PROCESSING', processingUntil: params.processingUntil },
       });
       if (moved.count > 0) {
@@ -317,6 +317,38 @@ export class PrismaPaymentsRepository implements PaymentsRepository {
         });
       }
       return { bookingMoved: moved.count > 0 };
+    });
+  }
+
+  async markAttemptAtomic(params: { bookingId: string; slotHoldId: string; processingUntil: Date }) {
+    return this.prisma.client.$transaction(async (tx) => {
+      const moved = await tx.booking.updateMany({
+        where: { id: params.bookingId, status: { in: ['PENDING_PAYMENT', 'PROCESSING'] } },
+        data: { status: 'PROCESSING', processingUntil: params.processingUntil },
+      });
+      if (moved.count === 0) return false;
+      await tx.slotHold.updateMany({
+        where: { id: params.slotHoldId, status: 'HELD' },
+        data: { holdExpiresAt: new Date(params.processingUntil.getTime() + 60_000) },
+      });
+      return true;
+    });
+  }
+
+  async hasReportedPayment(bookingId: string) {
+    return (await this.prisma.client.payment.count({ where: { bookingId, clientVerifiedAt: { not: null } } })) > 0;
+  }
+
+  async revertAttemptAtomic(params: { bookingId: string; slotHoldId: string; holdUntil: Date }) {
+    return this.prisma.client.$transaction(async (tx) => {
+      if ((await tx.payment.count({ where: { bookingId: params.bookingId, clientVerifiedAt: { not: null } } })) > 0) return false;
+      const back = await tx.booking.updateMany({
+        where: { id: params.bookingId, status: 'PROCESSING' },
+        data: { status: 'PENDING_PAYMENT', processingUntil: null },
+      });
+      if (back.count === 0) return false;
+      await tx.slotHold.updateMany({ where: { id: params.slotHoldId, status: 'HELD' }, data: { holdExpiresAt: params.holdUntil } });
+      return true;
     });
   }
 

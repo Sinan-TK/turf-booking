@@ -149,9 +149,15 @@ export class PrismaBookingsRepository implements BookingsRepository {
     });
   }
 
-  listForCustomer(customerId: string) {
+  countForCustomer(customerId: string) {
+    return this.prisma.client.booking.count({ where: { customerId } });
+  }
+
+  listForCustomer(customerId: string, page?: { limit: number; offset: number }) {
     return this.prisma.client.booking.findMany({
       where: { customerId },
+      take: page?.limit,
+      skip: page?.offset,
       // The newest booking first.
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
       // What the My bookings list shows: the venue, and the unit or pooled item with its facility icon.

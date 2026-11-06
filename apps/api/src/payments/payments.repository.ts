@@ -152,6 +152,15 @@ export interface PaymentsRepository {
     slotHoldId: string;
     processingUntil: Date;
   }): Promise<{ bookingMoved: boolean }>;
+  /**
+   * The customer opened the payment popup: the booking is PROCESSING and its slot stays locked until processingUntil, with no payment
+   * reported yet. Safe to repeat (a second click only moves the end of the window).
+   */
+  markAttemptAtomic(params: { bookingId: string; slotHoldId: string; processingUntil: Date }): Promise<boolean>;
+  /** Whether the customer's side has reported a payment for this booking (as opposed to only opening the popup). */
+  hasReportedPayment(bookingId: string): Promise<boolean>;
+  /** The popup was closed without paying: PROCESSING -> PENDING_PAYMENT again, the slot kept until holdUntil. False if it was not an attempt. */
+  revertAttemptAtomic(params: { bookingId: string; slotHoldId: string; holdUntil: Date }): Promise<boolean>;
   honourLatePaymentAtomic(params: HonourLatePaymentParams): Promise<boolean>;
   /** The processing window ended with nothing captured: booking FAILED, payments EXPIRED, slot released. */
   failProcessingAtomic(params: { bookingId: string; slotHoldId: string }): Promise<boolean>;

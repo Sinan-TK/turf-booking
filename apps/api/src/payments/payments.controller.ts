@@ -26,6 +26,15 @@ export class PaymentsController {
     return this.payments.createOrder(dto.bookingId, actor);
   }
 
+  /** The payment popup was closed without paying: the booking goes back from PROCESSING to PENDING_PAYMENT. */
+  @Post('payments/cancel-attempt')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.CUSTOMER)
+  @HttpCode(200)
+  cancelAttempt(@Body() dto: CreateOrderDto, @CurrentUser() actor: AuthContext) {
+    return this.payments.cancelAttempt(dto.bookingId, actor);
+  }
+
   @Post('payments/verify')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.CUSTOMER)

@@ -196,7 +196,8 @@ export interface BookingsRepository {
   setAttendance(id: string, from: BookingStatus[], to: 'COMPLETED' | 'NO_SHOW'): Promise<boolean>;
   findBookingDetailById(id: string): Promise<BookingDetail | null>;
   findBookingCheckoutViewById(id: string): Promise<BookingCheckoutView | null>;
-  listForCustomer(customerId: string): Promise<Booking[]>;
+  listForCustomer(customerId: string, page?: { limit: number; offset: number }): Promise<Booking[]>;
+  countForCustomer(customerId: string): Promise<number>;
   listForAdmin(filters: AdminBookingFilters & { limit?: number; offset?: number }): Promise<BookingListItem[]>;
   countForAdmin(filters: AdminBookingFilters): Promise<number>;
   findCustomerById(id: string): Promise<CustomerProfile | null>;

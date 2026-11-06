@@ -221,7 +221,7 @@ export default function CheckoutPage() {
     }
     setPayError(null);
     try {
-      const order = await api.post<{ gatewayOrderId: string; amount: string; currency: string }>(
+      const order = await api.post<{ gatewayOrderId: string; amount: string; currency: string; processingUntil?: string }>(
         '/payments/create-order',
         { bookingId: booking.id },
       );
@@ -233,12 +233,17 @@ export default function CheckoutPage() {
         name: 'Bookyo',
         description: `Booking ${booking.orderId}`,
         order_id: order.gatewayOrderId,
+        // The popup closes by itself when the booking's 5-minute processing window ends.
+        timeout: order.processingUntil ? Math.max(60, Math.floor((Date.parse(order.processingUntil) - Date.now()) / 1000)) : undefined,
         handler: (response) => void afterPaid(response, booking.id),
         modal: {
-          // Closed without paying: the slot stays held (its time was extended); fetch the new time and let them try again.
+          // Closed without paying: the booking goes back from PROCESSING to pending, the slot stays held, and they can try again.
           ondismiss: () => {
             setPopupOpen(false);
-            void load();
+            void api
+              .post('/payments/cancel-attempt', { bookingId: booking.id })
+              .catch(() => undefined)
+              .finally(() => void load());
           },
         },
         theme: { color: '#050505' },
@@ -249,6 +254,8 @@ export default function CheckoutPage() {
       });
       setPopupOpen(true);
       checkout.open();
+      // The booking is PROCESSING from here on: show it.
+      void load();
     } catch (err) {
       setPopupOpen(false);
       setPayError(err instanceof ApiError ? err.message : 'Could not start payment.');
@@ -379,9 +386,11 @@ export default function CheckoutPage() {
 
           {processing && (
             <div className="space-y-3 rounded-md border border-gray-200 bg-gray-50 px-4 py-5 text-center" role="status">
-              <p className="text-sm font-semibold text-gray-900">Confirming your payment…</p>
+              <p className="text-sm font-semibold text-gray-900">{popupOpen ? 'Complete your payment…' : 'Confirming your payment…'}</p>
               <p className="text-sm text-gray-600">
-                We have your payment and are waiting for the bank to confirm it. Your slot is kept for you
+                {popupOpen
+                  ? 'Finish the payment in the payment window. Your slot is kept for you'
+                  : 'We are waiting for the bank to confirm your payment. Your slot is kept for you'}
                 {processingLeft !== null && processingLeft > 0 ? ` (${formatCountdown(processingLeft)} left)` : ''}.
               </p>
               <p className="text-xs text-gray-500">You can leave this page: your booking appears under Bookings as soon as it is confirmed.</p>

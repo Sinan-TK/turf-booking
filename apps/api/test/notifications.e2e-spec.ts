@@ -235,6 +235,7 @@ describe('Owner notifications', () => {
         .post('/bookings/hold')
         .send({ resourceId: venue.halfAId, startTime, durationMinutes: 60 });
       const order = await customer.post('/payments/create-order').send({ bookingId: hold.body.id });
+      await customer.post('/payments/cancel-attempt').send({ bookingId: hold.body.id }); // the payment window was closed again
       const gatewayOrderId = order.body.gatewayOrderId as string;
 
       const res = await signedWebhookRequest(

@@ -49,9 +49,17 @@ export class BookingsController {
     return this.bookings.previewGroupSlot(resourceGroupId, start, duration, qty);
   }
 
+  // ?limit=&offset= for a page at a time (newest first); the whole count is in X-Total-Count.
   @Get('me/bookings')
-  listMine(@CurrentUser() actor: AuthContext) {
-    return this.bookings.listForCustomer(actor);
+  async listMine(
+    @CurrentUser() actor: AuthContext,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Res({ passthrough: true }) res?: Response,
+  ) {
+    const [rows, total] = await Promise.all([this.bookings.listForCustomer(actor, parsePage(limit, offset)), this.bookings.countForCustomer(actor)]);
+    if (res) setTotalCount(res, total);
+    return rows;
   }
 
   @Get('me/bookings/:id')
