@@ -22,7 +22,7 @@ import {
   descriptionPoints,
 } from '@/lib/booking';
 import { CategoryIcon, ErrorBanner, Icon } from '@/components/ui';
-import { DetailSkeleton } from '@/components/skeleton';
+import { BookPageSkeleton } from '@/components/skeleton';
 import { readSearch, writeSearch } from '@/lib/search-cache';
 import { useSavedVenues } from '@/lib/saved-venues';
 import { BrowseHeader } from '@/components/browse-header';
@@ -245,7 +245,7 @@ function BookingPage() {
   if (!unit || !units) {
     return (
       <Screen>
-        {loading && <DetailSkeleton />}
+        {loading && <BookPageSkeleton />}
         {!loading && (
           <div className="space-y-4">
             <ErrorBanner message={error ?? 'Could not load this venue.'} />
@@ -495,7 +495,7 @@ function BookingPage() {
 
 export default function BookPage() {
   return (
-    <Suspense fallback={<Screen><DetailSkeleton /></Screen>}>
+    <Suspense fallback={<Screen><BookPageSkeleton /></Screen>}>
       <BookingPage />
     </Suspense>
   );

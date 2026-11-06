@@ -1,4 +1,5 @@
-import { expect, test, type Route } from '@playwright/test';
+import type { Route } from '@playwright/test';
+import { expect, test } from '../../support/fixtures';
 import { logIn } from '../../support/customer-ui';
 import { uniquePhone } from '../../support/dates';
 
@@ -17,6 +18,37 @@ test.describe('customer site: skeleton loading', () => {
     await expect(loading.locator('.animate-pulse').first()).toBeVisible(); // grey shapes, not a line of text
     expect(await loading.locator('.animate-pulse').count()).toBeGreaterThan(10);
     await expect(loading).toHaveCount(0, { timeout: 20_000 }); // gone once the results (or the empty message) arrive
+  });
+
+  test('a listing card skeleton has every part of the real card: banner, name, unit tabs, hour bar and Book Now', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.route('**/search?*', slow(4000));
+    await page.goto('/explore');
+    const loading = page.getByRole('status').filter({ hasText: 'Checking live availability…' });
+    await expect(loading).toBeVisible();
+    const card = loading.locator(':scope > div').first();
+    expect(await card.locator('.aspect-\\[16\\/7\\]').count()).toBe(1); // the banner
+    expect(await card.locator('.w-\\[8\\.5rem\\]').count()).toBe(3); // three unit tabs
+    expect(await card.locator('.flex-1.rounded-\\[3px\\]').count()).toBe(18); // the day's hour bar
+    // Three cards across on a laptop, like the real grid.
+    const tops = await loading.locator(':scope > div').evaluateAll((els) => els.slice(0, 3).map((e) => Math.round(e.getBoundingClientRect().top)));
+    expect(new Set(tops).size).toBe(1);
+  });
+
+  test('the Book Now page shows the shape of the page (picture, facilities, days, slots) while it loads', async ({ page, venue }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.route('**/search?*', slow(4000));
+    await page.goto(`/book/${venue.facilityCode}/${venue.turfId}`);
+    const loading = page.getByRole('status').filter({ hasText: 'Loading this venue…' });
+    await expect(loading).toBeVisible();
+    expect(await loading.locator('.animate-pulse').count()).toBeGreaterThan(30);
+    // Two columns on a laptop: the picture on the left, the day chips and slot card on the right, starting at the same height.
+    const columns = loading.locator(':scope > div');
+    await expect(columns).toHaveCount(2);
+    const tops = await columns.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+    expect(new Set(tops).size).toBe(1);
+    await expect(loading).toHaveCount(0, { timeout: 20_000 });
+    await expect(page.getByRole('article', { name: new RegExp('Book ') })).toBeVisible();
   });
 
   test('the account tabs show skeletons while their lists load', async ({ page }) => {
