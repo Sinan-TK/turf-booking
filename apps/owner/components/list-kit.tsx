@@ -268,8 +268,13 @@ export function DataTable({
   children,
   footer,
   rowCount,
+  sort,
+  onSort,
 }: {
-  columns: Array<string | { label: string; className?: string }>;
+  /** A column with a `sort` key is a button that sorts the table by it (see useSort). */
+  columns: Array<string | { label: string; className?: string; sort?: string }>;
+  sort?: { key: string; dir: 'asc' | 'desc' };
+  onSort?: (key: string) => void;
   loading: boolean;
   /** Message when there are no rows and nothing is loading. */
   empty: string;
@@ -286,9 +291,28 @@ export function DataTable({
             <tr>
               {columns.map((c, i) => {
                 const col = typeof c === 'string' ? { label: c } : c;
+                const key = 'sort' in col ? col.sort : undefined;
+                const on = !!key && sort?.key === key;
                 return (
-                  <th key={i} className={`${TH} ${col.className ?? ''}`}>
-                    {col.label}
+                  <th
+                    key={i}
+                    className={`${TH} ${col.className ?? ''}`}
+                    aria-sort={key ? (on ? (sort?.dir === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}
+                  >
+                    {key && onSort ? (
+                      <button
+                        type="button"
+                        onClick={() => onSort(key)}
+                        className={`group inline-flex items-center gap-1 uppercase tracking-wide ${on ? 'text-on-surface' : 'hover:text-on-surface'}`}
+                      >
+                        {col.label}
+                        <span aria-hidden="true" className={`text-[10px] ${on ? 'text-primary' : 'text-outline-variant group-hover:text-on-surface-variant'}`}>
+                          {on ? (sort?.dir === 'asc' ? '▲' : '▼') : '↕'}
+                        </span>
+                      </button>
+                    ) : (
+                      col.label
+                    )}
                   </th>
                 );
               })}

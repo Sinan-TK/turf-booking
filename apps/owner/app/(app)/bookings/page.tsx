@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useFetch } from '@/lib/use-fetch';
 import { useAuth } from '@/lib/auth-context';
 import { useListFilters } from '@/lib/use-list-filters';
+import { useSort, withSort } from '@/lib/use-sort';
 import { PAGE_SIZE, usePagedFetch } from '@/lib/use-paged-fetch';
 import { formatMoney, remainingAmount } from '@/lib/money';
 import { Badge, Button, ErrorBanner, PageHeader } from '@/components/ui';
@@ -25,6 +26,8 @@ interface Booking {
   paidAmount: string;
   currency: string;
   startTime: string;
+  /** When the booking was made. */
+  createdAt: string;
   groundType: string;
   paymentMethod: string | null;
   venue: { name: string; facilityCode: string };
@@ -56,8 +59,15 @@ export default function BookingsPage() {
   const { isStaff, selectedVenueId } = useAuth();
   const { data: venues } = useFetch<Array<{ id: string; name: string }>>('/venues/mine');
   // Staff work in one venue at a time: the header's venue always scopes their list (and replaces the venue filter).
-  const query = isStaff && selectedVenueId ? `${f.query}${f.query ? '&' : ''}venueId=${selectedVenueId}` : f.query;
-  const { rows, total, error, loading } = usePagedFetch<Booking>('/owner/bookings', query, f.page);
+  const scoped = isStaff && selectedVenueId ? `${f.query}${f.query ? '&' : ''}venueId=${selectedVenueId}` : f.query;
+  // Newest booking first until a column is chosen; dates and money start with the newest or biggest.
+  type Column = 'created' | 'start' | 'order' | 'venue' | 'customer' | 'amount' | 'status';
+  const { sort, toggle, query: sortQuery } = useSort<Column>(
+    { key: 'created', dir: 'desc' },
+    { created: 'desc', start: 'desc', order: 'desc', amount: 'desc' },
+    () => f.setPage(1),
+  );
+  const { rows, total, error, loading } = usePagedFetch<Booking>('/owner/bookings', withSort(scoped, sortQuery), f.page);
 
   const venueOptions = [
     { value: '', label: 'All' },
@@ -111,7 +121,20 @@ export default function BookingsPage() {
       {error && <ErrorBanner message={error} />}
       {!error && (
         <DataTable
-          columns={['Order', 'Venue', 'Customer', 'Start', 'Total', 'Paid', 'Remaining', 'Status', { label: '', className: 'w-20' }]}
+          columns={[
+            { label: 'Order', sort: 'order' },
+            { label: 'Venue', sort: 'venue' },
+            { label: 'Customer', sort: 'customer' },
+            { label: 'Booked', sort: 'created' },
+            { label: 'Start', sort: 'start' },
+            { label: 'Total', sort: 'amount' },
+            'Paid',
+            'Remaining',
+            { label: 'Status', sort: 'status' },
+            { label: '', className: 'w-20' },
+          ]}
+          sort={sort}
+          onSort={(k) => toggle(k as Column)}
           loading={loading}
           rowCount={rows.length}
           empty={f.active ? 'No bookings match your search or filters.' : 'No bookings yet.'}
@@ -125,6 +148,7 @@ export default function BookingsPage() {
                 <p className="text-xs text-on-surface-variant">{b.groundType}</p>
               </td>
               <td className="px-4 py-3 text-on-surface-variant">{b.customer.name || b.customer.whatsappNumber || b.customer.email || 'Customer'}{b.isWalkIn && <span className="ml-1.5 rounded-full bg-surface-container px-1.5 py-0.5 align-middle text-[10px] font-semibold text-on-surface-variant">Walk-in</span>}</td>
+              <td className="whitespace-nowrap px-4 py-3 text-on-surface-variant">{new Date(b.createdAt).toLocaleString()}</td>
               <td className="whitespace-nowrap px-4 py-3 text-on-surface-variant">
                 {new Date(b.startTime).toLocaleString()}
               </td>

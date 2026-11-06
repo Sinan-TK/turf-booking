@@ -48,6 +48,10 @@ type RawBookingListItem = Prisma.BookingGetPayload<{
   };
 }>;
 
+/** The columns the admin and owner booking lists can be sorted by. */
+export const BOOKING_SORTS = ['created', 'start', 'order', 'venue', 'customer', 'amount', 'status'] as const;
+export type BookingSort = (typeof BOOKING_SORTS)[number];
+
 export interface AdminBookingFilters {
   status?: string;
   venueId?: string;
@@ -59,6 +63,9 @@ export interface AdminBookingFilters {
   paymentMethod?: string;
   /** Window on the booking's start time. */
   startRange?: DateRange;
+  /** What to sort by (default: when it was booked) and which way (default: the newest first). */
+  sort?: BookingSort;
+  dir?: 'asc' | 'desc';
 }
 
 export interface HoldAtomicParams {

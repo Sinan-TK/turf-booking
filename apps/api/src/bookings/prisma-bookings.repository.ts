@@ -6,12 +6,28 @@ import { PrismaService } from '../prisma/prisma.service';
 import { contains, dateWhere } from '../common/list-filters';
 import type {
   AdminBookingFilters,
+  BookingSort,
   BookingsRepository,
   CancelAtomicParams,
   HoldAtomicParams,
   OfflineAtomicParams,
   PooledHoldAtomicParams,
 } from './bookings.repository';
+
+/** The ORDER BY for a booking list: the chosen column, then the id so pages never repeat or skip a row. */
+function bookingOrderBy(sort: BookingSort = 'created', dir: 'asc' | 'desc' = 'desc'): Prisma.BookingOrderByWithRelationInput[] {
+  const by: Record<BookingSort, Prisma.BookingOrderByWithRelationInput[]> = {
+    created: [{ createdAt: dir }],
+    start: [{ startTime: dir }],
+    order: [{ orderSeq: dir }],
+    venue: [{ venue: { name: dir } }],
+    // A walk-in is named on the booking itself; everyone else by their account. Those with no name go last.
+    customer: [{ walkInName: { sort: dir, nulls: 'last' } }, { customer: { name: { sort: dir, nulls: 'last' } } }],
+    amount: [{ amount: dir }],
+    status: [{ status: dir }],
+  };
+  return [...by[sort], { id: 'asc' }];
+}
 
 /**
  * Prisma-backed BookingsRepository. The ONLY file in the bookings module
@@ -136,7 +152,8 @@ export class PrismaBookingsRepository implements BookingsRepository {
   listForCustomer(customerId: string) {
     return this.prisma.client.booking.findMany({
       where: { customerId },
-      orderBy: { startTime: 'desc' },
+      // The newest booking first.
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
       // What the My bookings list shows: the venue, and the unit or pooled item with its facility icon.
       include: {
         venue: { select: { name: true, address: true } },
@@ -181,7 +198,7 @@ export class PrismaBookingsRepository implements BookingsRepository {
         venue: { select: { id: true, name: true, facilityCode: true, organizationId: true } },
         customer: { select: { id: true, whatsappNumber: true, phoneVerified: true, email: true, name: true } },
       },
-      orderBy: [{ startTime: 'desc' }, { id: 'asc' }],
+      orderBy: bookingOrderBy(filters.sort, filters.dir),
       take: limit,
       skip: filters.offset ?? 0,
     });

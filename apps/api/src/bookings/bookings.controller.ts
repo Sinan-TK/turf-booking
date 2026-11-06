@@ -9,6 +9,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { BookingsService } from './bookings.service';
+import { BOOKING_SORTS } from './bookings.repository';
 import { CancelBookingDto, CollectBalanceDto, CreateHoldDto, CreateOfflineBookingDto } from './dto/booking.dto';
 import type { AuthContext } from '../auth/auth.types';
 import { OwnerScopeService } from '../owner-scope/owner-scope.service';
@@ -93,6 +94,8 @@ export class AdminBookingsController {
     @Query('paymentMethod') paymentMethod?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('sort') sort?: string,
+    @Query('dir') dir?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
     @Res({ passthrough: true }) res?: Response,
@@ -105,6 +108,8 @@ export class AdminBookingsController {
       search: parseSearch(search),
       paymentMethod: parseEnumFilter(paymentMethod, Object.values(PaymentMethod), 'paymentMethod'),
       startRange: parseDateRange(from, to),
+      sort: parseEnumFilter(sort, BOOKING_SORTS, 'sort'),
+      dir: parseEnumFilter(dir, ['asc', 'desc'] as const, 'dir'),
     };
     const [rows, total] = await Promise.all([
       this.bookings.listForAdmin({ ...filters, ...page }),
@@ -144,6 +149,8 @@ export class OwnerBookingsController {
     @Query('paymentMethod') paymentMethod?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('sort') sort?: string,
+    @Query('dir') dir?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
     @Res({ passthrough: true }) res?: Response,
@@ -158,6 +165,8 @@ export class OwnerBookingsController {
       search: parseSearch(search),
       paymentMethod: parseEnumFilter(paymentMethod, Object.values(PaymentMethod), 'paymentMethod'),
       startRange: parseDateRange(from, to),
+      sort: parseEnumFilter(sort, BOOKING_SORTS, 'sort'),
+      dir: parseEnumFilter(dir, ['asc', 'desc'] as const, 'dir'),
     };
     const [rows, total] = await Promise.all([
       this.bookings.listForAdmin({ ...filters, ...page }),

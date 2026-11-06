@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePagedFetch, PAGE_SIZE } from '@/lib/use-paged-fetch';
 import { useListFilters } from '@/lib/use-list-filters';
+import { useSort, withSort } from '@/lib/use-sort';
+import { SortHeader } from '@/components/sort-header';
 import { DateRangeFilter, ListToolbar, SearchBox } from '@/components/list-toolbar';
 import { Dropdown } from '@/components/dropdown';
 import { ListSection } from '@/components/list-section';
@@ -16,6 +18,8 @@ interface Booking {
   amount: string;
   currency: string;
   startTime: string;
+  /** When the booking was made. */
+  createdAt: string;
   venue: { name: string; facilityCode: string };
   /** A walk-in recorded by venue staff: its details are on the booking, not a customer account. */
   isWalkIn?: boolean;
@@ -42,7 +46,14 @@ const STATUS_OPTIONS = [
 
 export default function BookingsPage() {
   const { values, set, clear, active, page, setPage, query } = useListFilters({ search: '', status: '', paymentMethod: '', from: '', to: '' });
-  const { rows, total, error, loading } = usePagedFetch<Booking>('/admin/bookings', query, page);
+  // Newest booking first until a column is chosen; dates and money start with the newest or biggest.
+  type Column = 'created' | 'start' | 'order' | 'venue' | 'customer' | 'amount' | 'status';
+  const { sort, toggle, query: sortQuery } = useSort<Column>(
+    { key: 'created', dir: 'desc' },
+    { created: 'desc', start: 'desc', order: 'desc', amount: 'desc' },
+    () => setPage(1),
+  );
+  const { rows, total, error, loading } = usePagedFetch<Booking>('/admin/bookings', withSort(query, sortQuery), page);
 
   return (
     <div>
@@ -76,7 +87,7 @@ export default function BookingsPage() {
         </ListToolbar>
       </ListSection>
 
-      {loading && rows.length === 0 && <SkeletonTable columns={7} />}
+      {loading && rows.length === 0 && <SkeletonTable columns={8} />}
       {error && <ErrorBanner message={error} />}
       {!loading && !error && total === 0 && <EmptyState message="No bookings found." />}
       {rows.length > 0 && (
@@ -84,12 +95,13 @@ export default function BookingsPage() {
           <table className="w-full text-left text-sm">
             <thead className="border-b border-gray-200 bg-gray-50/70 text-xs font-medium uppercase tracking-wide text-gray-500">
               <tr>
-                <th className="px-4 py-3">Order</th>
-                <th className="px-4 py-3">Venue</th>
-                <th className="px-4 py-3">Customer</th>
-                <th className="px-4 py-3">Start</th>
-                <th className="px-4 py-3">Amount</th>
-                <th className="px-4 py-3">Status</th>
+                <SortHeader label="Order" k="order" sortKey={sort.key} dir={sort.dir} onSort={toggle} />
+                <SortHeader label="Venue" k="venue" sortKey={sort.key} dir={sort.dir} onSort={toggle} />
+                <SortHeader label="Customer" k="customer" sortKey={sort.key} dir={sort.dir} onSort={toggle} />
+                <SortHeader label="Booked" k="created" sortKey={sort.key} dir={sort.dir} onSort={toggle} />
+                <SortHeader label="Start" k="start" sortKey={sort.key} dir={sort.dir} onSort={toggle} />
+                <SortHeader label="Amount" k="amount" sortKey={sort.key} dir={sort.dir} onSort={toggle} />
+                <SortHeader label="Status" k="status" sortKey={sort.key} dir={sort.dir} onSort={toggle} />
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -99,6 +111,7 @@ export default function BookingsPage() {
                   <td className="px-4 py-3 font-mono text-xs">{b.orderId}</td>
                   <td className="px-4 py-3">{b.venue.name}</td>
                   <td className="px-4 py-3 text-gray-600">{b.customer.name || b.customer.whatsappNumber || b.customer.email || 'Customer'}{b.isWalkIn && <span className="ml-1.5 rounded-full bg-gray-100 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-gray-600">Walk-in</span>}</td>
+                  <td className="px-4 py-3 text-gray-600">{new Date(b.createdAt).toLocaleString()}</td>
                   <td className="px-4 py-3 text-gray-600">{new Date(b.startTime).toLocaleString()}</td>
                   <td className="px-4 py-3">
                     {b.currency} {b.amount}
