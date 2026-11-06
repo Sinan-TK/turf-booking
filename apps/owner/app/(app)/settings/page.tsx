@@ -60,6 +60,7 @@ export default function SettingsPage() {
       <div className="grid items-start gap-6 lg:grid-cols-[21rem_minmax(0,1fr)]">
         <div className="space-y-6">
           <Card>
+            <h2 className="mb-4 text-sm font-semibold text-on-surface">Account</h2>
             <div className="flex items-center gap-4">
               <span
                 aria-hidden="true"

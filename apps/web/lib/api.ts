@@ -1,5 +1,7 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
+import { describeApiError } from './api-error';
+
 export class ApiError extends Error {
   status: number;
   details: unknown;
@@ -27,10 +29,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     : undefined;
 
   if (!res.ok) {
-    const message =
-      (body && typeof body === 'object' && 'message' in body && String(body.message)) ||
-      res.statusText;
-    throw new ApiError(res.status, message, body);
+    throw new ApiError(res.status, describeApiError(body, res.statusText), body);
   }
 
   return body as T;
@@ -50,9 +49,7 @@ async function requestPage<T>(path: string): Promise<Page<T>> {
   const res = await fetch(`${API_URL}${path}`, { credentials: 'include', headers: { 'Content-Type': 'application/json' } });
   const body = (await res.json().catch(() => undefined)) as unknown;
   if (!res.ok) {
-    const said = body && typeof body === 'object' && 'message' in body ? String((body as { message: unknown }).message) : '';
-    const message = said || res.statusText;
-    throw new ApiError(res.status, message, body);
+    throw new ApiError(res.status, describeApiError(body, res.statusText), body);
   }
   const advance = Number(res.headers.get('X-Advance-Days'));
   return { data: body as T, nextCursor: res.headers.get('X-Next-Cursor'), advanceDays: Number.isInteger(advance) && advance > 0 ? advance : null, total: res.headers.get('X-Total-Count') !== null ? Number(res.headers.get('X-Total-Count')) : null };

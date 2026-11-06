@@ -133,16 +133,7 @@ export function ErrorBanner({ message }: { message: string }) {
   );
 }
 
-export function SuccessBanner({ message }: { message: string }) {
-  return (
-    <div
-      role="status"
-      className="animate-[fade-in_0.15s_ease-out] rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
-    >
-      {message}
-    </div>
-  );
-}
+export { SuccessBanner } from '@/components/success-banner';
 
 export function LoadingState() {
   return (

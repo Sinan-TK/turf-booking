@@ -1,6 +1,8 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const PORTAL = 'owner';
 
+import { describeApiError } from './api-error';
+
 export class ApiError extends Error {
   status: number;
   details: unknown;
@@ -73,10 +75,7 @@ async function request<T>(
     : undefined;
 
   if (!res.ok) {
-    const message =
-      (body && typeof body === 'object' && 'message' in body && String(body.message)) ||
-      res.statusText;
-    throw new ApiError(res.status, message, body);
+    throw new ApiError(res.status, describeApiError(body, res.statusText), body);
   }
 
   return body as T;

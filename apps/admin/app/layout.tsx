@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
 import { PwaRegister } from '@/components/pwa-register';
+import { ToastProvider } from '@/components/toast';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
 
@@ -28,7 +29,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="font-sans">
-        <AuthProvider>{children}</AuthProvider>
+        <ToastProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </ToastProvider>
         <PwaRegister />
       </body>
     </html>

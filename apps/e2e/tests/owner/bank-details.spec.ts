@@ -38,6 +38,13 @@ test.describe('owner portal: bank details', () => {
     await page.getByLabel('Your password').fill(ACCOUNTS.owner.password);
     await page.getByRole('button', { name: 'Save bank details' }).click();
     await expect(page.getByText(/Saved\. Bookyo will check/)).toBeVisible();
+    // A success message is a toast at the bottom middle of the screen, not a box in the page.
+    const toast = page.getByRole('status').filter({ hasText: /Saved\. Bookyo will check/ });
+    await expect(toast).toBeVisible();
+    const box = (await toast.boundingBox())!;
+    const view = page.viewportSize()!;
+    expect(Math.abs(box.x + box.width / 2 - view.width / 2)).toBeLessThan(8);
+    expect(box.y + box.height).toBeGreaterThan(view.height - 120);
     await expect(page.getByText(`Greenfield ${stamp}`)).toBeVisible();
     await expect(page.getByText(`••••••••${`${stamp}00`.slice(-4)}`)).toBeVisible();
     await expect(page.getByText(`4455${stamp}00`)).toHaveCount(0);

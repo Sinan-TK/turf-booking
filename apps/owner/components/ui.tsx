@@ -121,13 +121,7 @@ export function ErrorBanner({ message }: { message: string }) {
   );
 }
 
-export function SuccessBanner({ message }: { message: React.ReactNode }) {
-  return (
-    <div className="rounded-lg bg-primary-fixed-dim/20 px-4 py-3 text-body-md text-on-primary-container">
-      {message}
-    </div>
-  );
-}
+export { SuccessBanner } from '@/components/success-banner';
 
 export function LoadingState() {
   return <div className="p-6 text-body-md text-on-surface-variant">Loading…</div>;

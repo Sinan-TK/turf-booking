@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
 import { PwaRegister } from '@/components/pwa-register';
+import { ToastProvider } from '@/components/toast';
 
 export const metadata: Metadata = {
   appleWebApp: { capable: true, title: 'Bookyo Owner', statusBarStyle: 'black-translucent' },
@@ -29,7 +30,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="bg-background font-body-md text-on-surface">
-        <AuthProvider>{children}</AuthProvider>
+        <ToastProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </ToastProvider>
         <PwaRegister />
       </body>
     </html>
