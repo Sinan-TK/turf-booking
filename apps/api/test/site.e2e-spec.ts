@@ -79,6 +79,9 @@ describe('Site settings: Google sign-in switch and featured venues', () => {
       const first = (await publicGet('/site/featured-venues')).body[0];
       expect(first).toMatchObject({ id: c, facilityCode: expect.any(String), address: expect.any(String) });
       expect(first.facilities.length).toBeGreaterThan(0);
+      // The pictures (the card turns through them) and the icon of its kind of facility (shown while there are none).
+      expect(Array.isArray(first.photoUrls)).toBe(true);
+      expect(first.icon).toMatchObject({ iconKey: expect.any(String) });
 
       // A different order, and one taken off.
       await admin.put('/admin/site/featured').send({ venueIds: [b, c] }).expect(200);

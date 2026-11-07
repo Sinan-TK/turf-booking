@@ -108,8 +108,67 @@ interface FeaturedVenue {
   address: string;
   area: string | null;
   facilityCode: string;
-  photoUrl: string | null;
+  /** Every picture the venue has (none: the facility icon is shown instead). */
+  photoUrls: string[];
+  icon: { iconKey: string; iconSvg: string | null } | null;
   facilities: string[];
+}
+
+/** How long each of a venue's pictures stays before the card turns to the next. */
+const PHOTO_MS = 3000;
+
+/**
+ * The card's picture area. With no pictures it shows the icon of the venue's kind of facility; with one, that picture; with several, they
+ * fade from one to the next on their own (paused while the card is hovered or focused, and not at all for people who ask for less motion),
+ * with small dots showing which one it is.
+ */
+function CardPhotos({ photos, icon, name }: { photos: string[]; icon: FeaturedVenue['icon']; name: string }) {
+  const [at, setAt] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [still, setStill] = useState(false);
+  useEffect(() => {
+    setStill(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }, []);
+  useEffect(() => {
+    if (photos.length < 2 || paused || still) return;
+    const timer = setInterval(() => setAt((i) => (i + 1) % photos.length), PHOTO_MS);
+    return () => clearInterval(timer);
+  }, [photos.length, paused, still]);
+
+  return (
+    <span
+      className="absolute inset-0 block"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+    >
+      {photos.length === 0 && (
+        <span className="absolute inset-0 flex items-center justify-center">
+          <CategoryIcon iconKey={icon?.iconKey ?? 'stadium'} iconSvg={icon?.iconSvg} className="text-[4rem]" />
+        </span>
+      )}
+      {photos.map((src, i) => (
+        <img
+          key={src}
+          src={src}
+          alt=""
+          aria-hidden={i !== at}
+          loading={i === 0 ? 'eager' : 'lazy'}
+          decoding="async"
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 group-hover:scale-105 ${i === at ? 'opacity-100' : 'opacity-0'}`}
+        />
+      ))}
+      {photos.length > 0 && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/55 to-transparent" />}
+      {photos.length > 1 && (
+        <span role="img" aria-label={`${name}: picture ${at + 1} of ${photos.length}`} className="absolute right-3 top-4 flex gap-1.5">
+          {photos.map((_, i) => (
+            <span key={i} className={`h-1.5 rounded-full bg-white shadow transition-all duration-300 ${i === at ? 'w-4 opacity-100' : 'w-1.5 opacity-60'}`} />
+          ))}
+        </span>
+      )}
+    </span>
+  );
 }
 
 /**
@@ -125,19 +184,7 @@ function FeaturedCard({ venue: v }: { venue: FeaturedVenue }) {
         className={`group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-subtle transition duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-card ${focus}`}
       >
         <span className="relative block aspect-[4/3] overflow-hidden bg-brand-50 text-brand-700">
-          <span className="absolute inset-0 flex items-center justify-center">
-            <Icon name="stadium" className="text-[3rem]" />
-          </span>
-          {v.photoUrl && (
-            <img
-              src={v.photoUrl}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
-            />
-          )}
-          {v.photoUrl && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/55 to-transparent" />}
+          <CardPhotos photos={v.photoUrls} icon={v.icon} name={v.name} />
           <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-brand-400 px-2.5 py-1 text-xs font-extrabold text-brand-700 shadow-sm">
             <Icon name="verified" className="text-[0.875rem]" />
             Featured

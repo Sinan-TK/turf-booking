@@ -65,19 +65,28 @@ export class SiteService {
         photos: { orderBy: { sortOrder: 'asc' }, take: 1, select: { url: true } },
         resources: {
           where: { status: 'ACTIVE' },
-          select: { category: { select: { name: true } }, photos: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }], take: 1, select: { key: true } } },
+          select: {
+            category: { select: { name: true, iconKey: true, iconSvg: true } },
+            photos: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }], take: 3, select: { key: true } },
+          },
         },
       },
     });
     return rows.map((v) => {
-      const unitPhoto = v.resources.find((r) => r.photos[0])?.photos[0]?.key;
+      // Every picture the venue has (its units' first, then the venue's own), without repeats, up to six: the card turns through them.
+      const photoUrls = [
+        ...new Set([...v.resources.flatMap((r) => r.photos.map((p) => this.storage.publicUrl(p.key))), ...v.photos.map((p) => p.url)]),
+      ].slice(0, 6);
+      const first = v.resources[0]?.category;
       return {
         id: v.id,
         name: v.name,
         address: v.address,
         area: v.area?.name ?? null,
         facilityCode: v.facilityCode,
-        photoUrl: unitPhoto ? this.storage.publicUrl(unitPhoto) : (v.photos[0]?.url ?? null),
+        photoUrls,
+        // The icon of the venue's kind of facility, shown while it has no picture.
+        icon: first ? { iconKey: first.iconKey, iconSvg: first.iconSvg } : null,
         facilities: [...new Set(v.resources.map((r) => r.category.name))].slice(0, 3),
       };
     });

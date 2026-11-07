@@ -71,8 +71,8 @@ test.describe('customer site: landing page', () => {
         status: 200,
         headers: cors,
         body: JSON.stringify([
-          { id: '1', name: 'Greenfield Arena', address: '12 Park Road', area: 'Manjeri', facilityCode: 'GRN-1', photoUrl: null, facilities: ['Football', 'Cricket'] },
-          { id: '2', name: 'Blue Lagoon', address: '4 Lake View', area: null, facilityCode: 'BLU-2', photoUrl: null, facilities: [] },
+          { id: '1', name: 'Greenfield Arena', address: '12 Park Road', area: 'Manjeri', facilityCode: 'GRN-1', photoUrls: [], icon: { iconKey: 'sports_soccer', iconSvg: null }, facilities: ['Football', 'Cricket'] },
+          { id: '2', name: 'Blue Lagoon', address: '4 Lake View', area: null, facilityCode: 'BLU-2', photoUrls: [], icon: null, facilities: [] },
         ]),
       }),
     );
@@ -89,6 +89,43 @@ test.describe('customer site: landing page', () => {
     await expect(section.getByRole('link', { name: /Greenfield Arena/ })).toHaveAttribute('href', '/book/GRN-1/any');
     await expect(section.getByRole('link', { name: /Blue Lagoon/ })).toHaveAttribute('href', '/book/BLU-2/any');
     await expect(cards.nth(0)).toContainText('Book now');
+  });
+
+  const square = (colour: string) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><rect width="40" height="30" fill="${colour}"/></svg>`)}`;
+
+  test('a featured card with no picture shows its facility icon; with several it turns through them by itself', async ({ page }) => {
+    await page.route(`${URLS.api}/site/featured-venues`, (route) =>
+      route.fulfill({
+        status: 200,
+        headers: cors,
+        body: JSON.stringify([
+          { id: '1', name: 'No Photo Venue', address: '1 Road', area: null, facilityCode: 'NPV-1', photoUrls: [], icon: { iconKey: 'pool', iconSvg: null }, facilities: ['Swimming Pool'] },
+          { id: '2', name: 'One Photo Venue', address: '2 Road', area: null, facilityCode: 'OPV-2', photoUrls: [square('#c33')], icon: null, facilities: [] },
+          { id: '3', name: 'Many Photo Venue', address: '3 Road', area: null, facilityCode: 'MPV-3', photoUrls: [square('#c33'), square('#3c3'), square('#33c')], icon: null, facilities: [] },
+        ]),
+      }),
+    );
+    await page.goto('/');
+    const section = page.getByRole('region', { name: 'Featured venues' });
+    const card = (name: string) => section.getByRole('listitem').filter({ hasText: name });
+
+    // No picture: the venue type's own icon, not an empty box.
+    await expect(card('No Photo Venue').locator('img')).toHaveCount(0);
+    await expect(card('No Photo Venue').locator('.material-symbols-outlined, svg').first()).toBeVisible();
+
+    // One picture stays put and has no dots.
+    await expect(card('One Photo Venue').locator('img')).toHaveCount(1);
+    await expect(card('One Photo Venue').getByRole('img', { name: /picture \d of/ })).toHaveCount(0);
+
+    // Several: it moves on by itself, round to the first again.
+    const many = card('Many Photo Venue');
+    const which = () => many.getByRole('img', { name: /picture \d of 3/ }).getAttribute('aria-label');
+    expect(await which()).toContain('picture 1 of 3');
+    await expect.poll(which, { timeout: 8000 }).toContain('picture 2 of 3');
+    await expect.poll(which, { timeout: 8000 }).toContain('picture 3 of 3');
+    await expect.poll(which, { timeout: 8000 }).toContain('picture 1 of 3');
+    // The picture shown is the opaque one.
+    await expect(many.locator('img:not([aria-hidden="true"])')).toHaveCount(1);
   });
 
   test('with no featured venues there is no empty section', async ({ page }) => {
