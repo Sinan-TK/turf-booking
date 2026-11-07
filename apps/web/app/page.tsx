@@ -118,22 +118,36 @@ interface FeaturedVenue {
 const PHOTO_MS = 3000;
 
 /**
- * The card's picture area. With no pictures it shows the icon of the venue's kind of facility; with one, that picture; with several, they
- * fade from one to the next on their own (paused while the card is hovered or focused, and not at all for people who ask for less motion),
- * with small dots showing which one it is.
+ * The card's picture area. The facility's icon is what shows whenever there is no picture to show yet: when the venue has none, while a
+ * picture is still loading, and if it fails to load; a picture fades in over it once it has arrived. With several pictures they fade from
+ * one to the next on their own (only onto ones that have loaded; paused while the card is hovered or focused, and not at all for people
+ * who ask for less motion), with small dots showing which one it is.
  */
 function CardPhotos({ photos, icon, name }: { photos: string[]; icon: FeaturedVenue['icon']; name: string }) {
   const [at, setAt] = useState(0);
   const [paused, setPaused] = useState(false);
   const [still, setStill] = useState(false);
+  // Which pictures have arrived (a picture that fails never does, so the icon stays).
+  const [ready, setReady] = useState<Record<string, boolean>>({});
   useEffect(() => {
     setStill(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   }, []);
+  const arrived = (src: string) => setReady((cur) => (cur[src] ? cur : { ...cur, [src]: true }));
   useEffect(() => {
     if (photos.length < 2 || paused || still) return;
-    const timer = setInterval(() => setAt((i) => (i + 1) % photos.length), PHOTO_MS);
+    const timer = setInterval(() => {
+      setAt((i) => {
+        for (let step = 1; step < photos.length; step++) {
+          const next = (i + step) % photos.length;
+          if (ready[photos[next]!]) return next;
+        }
+        return i;
+      });
+    }, PHOTO_MS);
     return () => clearInterval(timer);
-  }, [photos.length, paused, still]);
+  }, [photos, paused, still, ready]);
+
+  const showing = photos[at] !== undefined && ready[photos[at]!] === true;
 
   return (
     <span
@@ -143,23 +157,26 @@ function CardPhotos({ photos, icon, name }: { photos: string[]; icon: FeaturedVe
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
     >
-      {photos.length === 0 && (
-        <span className="absolute inset-0 flex items-center justify-center">
-          <CategoryIcon iconKey={icon?.iconKey ?? 'stadium'} iconSvg={icon?.iconSvg} className="text-[4rem]" />
-        </span>
-      )}
+      <span className={`absolute inset-0 flex items-center justify-center transition-opacity duration-500 ${showing ? 'opacity-0' : 'opacity-100'}`}>
+        <CategoryIcon iconKey={icon?.iconKey ?? 'stadium'} iconSvg={icon?.iconSvg} className="text-[4rem]" />
+      </span>
       {photos.map((src, i) => (
         <img
           key={src}
+          // A picture that was already in the browser's cache can finish before React listens for it.
+          ref={(el) => {
+            if (el?.complete && el.naturalWidth > 0) arrived(src);
+          }}
           src={src}
           alt=""
           aria-hidden={i !== at}
           loading={i === 0 ? 'eager' : 'lazy'}
           decoding="async"
-          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 group-hover:scale-105 ${i === at ? 'opacity-100' : 'opacity-0'}`}
+          onLoad={() => arrived(src)}
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 group-hover:scale-105 ${i === at && ready[src] ? 'opacity-100' : 'opacity-0'}`}
         />
       ))}
-      {photos.length > 0 && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/55 to-transparent" />}
+      {showing && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/55 to-transparent" />}
       {photos.length > 1 && (
         <span role="img" aria-label={`${name}: picture ${at + 1} of ${photos.length}`} className="absolute right-3 top-4 flex gap-1.5">
           {photos.map((_, i) => (

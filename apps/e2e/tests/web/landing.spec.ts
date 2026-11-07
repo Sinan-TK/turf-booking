@@ -128,6 +128,47 @@ test.describe('customer site: landing page', () => {
     await expect(many.locator('img:not([aria-hidden="true"])')).toHaveCount(1);
   });
 
+  test('the facility icon shows while a picture is loading (and if it never loads), then the picture fades in', async ({ page }) => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><rect width="40" height="30" fill="#3c3"/></svg>';
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    // The picture is served from this site (the page only loads its own pictures) but is held back until the test lets it through.
+    await page.route(`${URLS.web}/slow-photo.svg`, async (route) => {
+      await gate;
+      await route.fulfill({ status: 200, contentType: 'image/svg+xml', body: svg });
+    });
+    await page.route(`${URLS.web}/missing-photo.svg`, (route) => route.fulfill({ status: 404, body: '' }));
+    await page.route(`${URLS.api}/site/featured-venues`, (route) =>
+      route.fulfill({
+        status: 200,
+        headers: cors,
+        body: JSON.stringify([
+          { id: '1', name: 'Slow Picture Venue', address: '1 Road', area: null, facilityCode: 'SPV-1', photoUrls: ['/slow-photo.svg'], icon: { iconKey: 'pool', iconSvg: null }, facilities: [] },
+          { id: '2', name: 'Broken Picture Venue', address: '2 Road', area: null, facilityCode: 'BPV-2', photoUrls: ['/missing-photo.svg'], icon: { iconKey: 'pool', iconSvg: null }, facilities: [] },
+        ]),
+      }),
+    );
+    await page.goto('/');
+    const section = page.getByRole('region', { name: 'Featured venues' });
+    const slow = section.getByRole('listitem').filter({ hasText: 'Slow Picture Venue' });
+    const broken = section.getByRole('listitem').filter({ hasText: 'Broken Picture Venue' });
+    const iconLayer = (card: typeof slow) => card.locator('span.absolute.inset-0.flex.items-center.justify-center').first();
+    const opacity = (card: typeof slow) => iconLayer(card).evaluate((el) => getComputedStyle(el).opacity);
+
+    // While it loads: the icon is there and the picture is not shown.
+    await expect(slow).toBeVisible();
+    expect(await opacity(slow)).toBe('1');
+    expect(await slow.locator('img').evaluate((el) => getComputedStyle(el).opacity)).toBe('0');
+    // A picture that fails to load leaves the icon.
+    await expect.poll(() => opacity(broken)).toBe('1');
+
+    // Once it has arrived, the picture takes over from the icon.
+    release();
+    await expect.poll(() => opacity(slow), { timeout: 8000 }).toBe('0');
+    await expect.poll(() => slow.locator('img').evaluate((el) => getComputedStyle(el).opacity), { timeout: 8000 }).toBe('1');
+    expect(await opacity(broken)).toBe('1');
+  });
+
   test('with no featured venues there is no empty section', async ({ page }) => {
     await page.route(`${URLS.api}/site/featured-venues`, (route) => route.fulfill({ status: 200, headers: cors, body: '[]' }));
     await page.goto('/');
