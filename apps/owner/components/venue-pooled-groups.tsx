@@ -7,6 +7,8 @@ import { optimistic, type Mutate } from '@/lib/optimistic';
 import { durationLabel, type VenueCategory, type VenueCategorySummary } from '@/lib/categories';
 import { Button, ErrorBanner, FieldError, Input, Label, Select, invalidClass } from '@/components/ui';
 import { Modal } from '@/components/modal';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { SvgIcon } from '@/components/svg-icons';
 import { UnitPhotos,type UnitPhoto } from '@/components/unit-photos';
 import { UnitDescription } from '@/components/unit-description';
 
@@ -317,66 +319,180 @@ export function GroupCard({ group, category, onChanged }: { group: Group; catego
 /** What one kayak costs for a length and the hours/days it can be booked; the open hours of the group come from these. */
 function PricesSection({ group, category, prices, refetch, mutate }: { group: Group; category?: VenueCategory; prices: GroupPrice[]; refetch: () => void; mutate: Mutate<GroupPrice[]> }) {
   const lengths = category?.policy.durations?.length ? category.policy.durations : [60, 120, 180];
-  const [adding, setAdding] = useState(false);
+  // The add/edit modal: { price } = edit that price, {} = add a new one, null = closed.
+  const [editing, setEditing] = useState<{ price?: GroupPrice } | null>(null);
+  const [pending, setPending] = useState<{ kind: 'block' | 'unblock' | 'remove'; price: GroupPrice } | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  /** The price leaves the list at once; it comes back with a message if the server could not remove it. */
-  async function remove(id: string) {
-    setError(null);
-    await optimistic(mutate, (all) => all.filter((p) => p.id !== id), () => api.delete(`/resources/pricing-rules/${id}`), setError);
-    refetch();
+  function ask(kind: 'block' | 'unblock' | 'remove', price: GroupPrice) {
+    setActionError(null);
+    setPending({ kind, price });
+  }
+
+  async function confirmAction() {
+    if (!pending) return;
+    // Removing or blocking shows at once; the row comes back with a message if the server refused it.
+    if (pending.kind !== 'unblock') {
+      const change = pending;
+      setPending(null);
+      setError(null);
+      await optimistic(
+        mutate,
+        (all) => (change.kind === 'remove' ? all.filter((p) => p.id !== change.price.id) : all.map((p) => (p.id === change.price.id ? { ...p, isActive: false } : p))),
+        () => (change.kind === 'remove' ? api.delete(`/resources/pricing-rules/${change.price.id}`) : api.patch(`/resources/pricing-rules/${change.price.id}`, { isActive: false })),
+        setError,
+      );
+      refetch();
+      return;
+    }
+    // Unblocking waits for the answer: the server refuses it when the price would now overlap another, and says which.
+    setActionBusy(true);
+    setActionError(null);
+    try {
+      await api.patch(`/resources/pricing-rules/${pending.price.id}`, { isActive: true });
+      setPending(null);
+      refetch();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : 'Something went wrong. Nothing was changed.');
+    } finally {
+      setActionBusy(false);
+    }
   }
 
   const unit = group.category.unitLabel.toLowerCase();
+  const iconButton = 'inline-flex h-9 w-9 items-center justify-center rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40';
+  const when = (p: GroupPrice) => (p.startWindow && p.endWindow ? `${clock(p.startWindow)} – ${clock(p.endWindow)}` : 'All day');
   return (
     <div>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h4 className="text-sm font-semibold text-on-surface">Prices (for one {unit})</h4>
           <p className="mt-0.5 text-xs text-on-surface-variant">
-            A customer pays the price times how many they book. The hours of these prices are the hours the {group.name.toLowerCase()} can be booked. Add one price for each length you offer.
+            A customer pays the price times how many they book. The hours of these prices are the hours the {group.name.toLowerCase()} can be booked. Add one price for each length you offer. Two active prices can&apos;t cover the same days and times: block or remove one first.
           </p>
         </div>
-        <Button type="button" onClick={() => setAdding(true)}>
+        <Button type="button" onClick={() => setEditing({})} className="inline-flex items-center gap-2">
+          <SvgIcon name="plus" className="h-4 w-4" />
           Add price
         </Button>
       </div>
-      {error && <div className="mt-2"><ErrorBanner message={error} /></div>}
-      {prices.length > 0 && (
-        <ul className="mt-3 divide-y divide-outline-variant/20 rounded-lg ring-1 ring-outline-variant/30">
-          {prices.map((p) => (
-            <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-body-md">
-              <span>
-                <strong>INR {Number(p.offerPrice ?? p.normalPrice).toLocaleString('en-IN')}</strong>
-                {p.offerPrice != null && <s className="ml-1 text-xs text-on-surface-variant">INR {Number(p.normalPrice).toLocaleString('en-IN')}</s>} per {unit} · {p.durationMinutes ? durationLabel(p.durationMinutes) : ''} · {daysText(p.weekdays)}
-                {p.startWindow && p.endWindow ? ` · ${clock(p.startWindow)} – ${clock(p.endWindow)}` : ' · all day'}
-                <span className="text-xs text-on-surface-variant"> · pay online INR {Number(p.bookingPrice).toLocaleString('en-IN')}</span>
-              </span>
-              <Button type="button" variant="secondary" aria-label={`Remove price of INR ${Number(p.offerPrice ?? p.normalPrice)} for ${p.durationMinutes ?? ''} minutes`} onClick={() => void remove(p.id)}>
-                Remove
-              </Button>
-            </li>
-          ))}
-        </ul>
+      {error && (
+        <div role="alert" className="mt-2">
+          <ErrorBanner message={error} />
+        </div>
       )}
-      {adding && (
+      {prices.length > 0 && (
+        <div className="mt-3 overflow-x-auto rounded-xl ring-1 ring-outline-variant/30">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-surface-container-low text-xs uppercase text-on-surface-variant">
+              <tr>
+                <th className="px-4 py-2.5 font-medium">Days</th>
+                <th className="px-4 py-2.5 font-medium">Time of day</th>
+                <th className="px-4 py-2.5 font-medium">Length</th>
+                <th className="px-4 py-2.5 font-medium">Price for one</th>
+                <th className="px-4 py-2.5 font-medium">Pay online</th>
+                <th className="px-4 py-2.5 font-medium">Status</th>
+                <th className="px-4 py-2.5">
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {prices.map((p) => {
+                const full = Number(p.offerPrice ?? p.normalPrice);
+                return (
+                  <tr key={p.id} className={`border-t border-outline-variant/20 ${p.isActive ? '' : 'bg-surface-container-low/60'}`}>
+                    <td className={`px-4 py-3 font-medium ${p.isActive ? '' : 'text-on-surface-variant line-through'}`}>{daysText(p.weekdays)}</td>
+                    <td className={`px-4 py-3 text-on-surface-variant ${p.isActive ? '' : 'line-through'}`}>{when(p)}</td>
+                    <td className="px-4 py-3">{p.durationMinutes ? durationLabel(p.durationMinutes) : ''}</td>
+                    <td className="whitespace-nowrap px-4 py-3 font-semibold">
+                      {p.offerPrice != null && <span className="mr-2 text-xs font-normal text-on-surface-variant line-through">INR {Number(p.normalPrice).toLocaleString('en-IN')}</span>}
+                      INR {full.toLocaleString('en-IN')}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      INR {Number(p.bookingPrice).toLocaleString('en-IN')}
+                      {Number(p.bookingPrice) < full && <span className="block text-xs text-on-surface-variant">INR {(full - Number(p.bookingPrice)).toLocaleString('en-IN')} at the venue</span>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${p.isActive ? 'border-emerald-600/40 bg-emerald-50 text-emerald-900' : 'border-amber-600/40 bg-amber-50 text-amber-900'}`}>
+                        {p.isActive ? 'Active' : 'Blocked'}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2 text-right">
+                      <button type="button" aria-label="Edit price" title="Edit" onClick={() => setEditing({ price: p })} className={`${iconButton} border-primary/40 bg-primary/5 text-primary hover:bg-primary/15`}>
+                        <SvgIcon name="edit" className="h-[18px] w-[18px]" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={p.isActive ? 'Block price' : 'Unblock price'}
+                        title={p.isActive ? 'Block' : 'Unblock'}
+                        onClick={() => ask(p.isActive ? 'block' : 'unblock', p)}
+                        className={`${iconButton} ${p.isActive ? 'border-amber-600/50 bg-amber-50 text-amber-900 hover:bg-amber-100' : 'border-emerald-600/50 bg-emerald-50 text-emerald-900 hover:bg-emerald-100'}`}
+                      >
+                        <SvgIcon name={p.isActive ? 'block' : 'unblock'} className="h-[18px] w-[18px]" />
+                      </button>
+                      <button type="button" aria-label="Remove price" title="Remove" onClick={() => ask('remove', p)} className={`${iconButton} border-red-600/40 bg-red-50 text-red-800 hover:bg-red-100`}>
+                        <SvgIcon name="trash" className="h-[18px] w-[18px]" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {prices.length === 0 && (
+        <p className="mt-3 rounded-xl border border-dashed border-outline-variant p-6 text-center text-sm text-on-surface-variant">
+          No prices yet. Use <span className="font-medium text-on-surface">Add price</span> to set one. Times with no matching price can&apos;t be booked.
+        </p>
+      )}
+      {editing && (
         <PriceModal
           group={group}
+          price={editing.price}
           lengths={lengths}
-          onClose={() => setAdding(false)}
+          onClose={() => setEditing(null)}
           onSaved={() => {
-            setAdding(false);
+            setEditing(null);
             refetch();
           }}
         />
+      )}
+      {pending && (
+        <ConfirmDialog
+          title={pending.kind === 'remove' ? 'Remove this price?' : pending.kind === 'block' ? 'Block this price?' : 'Turn this price back on?'}
+          tone={pending.kind === 'remove' ? 'danger' : pending.kind === 'block' ? 'warn' : 'primary'}
+          confirmLabel={pending.kind === 'remove' ? 'Remove price' : pending.kind === 'block' ? 'Block price' : 'Unblock price'}
+          busy={actionBusy}
+          error={actionError}
+          onConfirm={confirmAction}
+          onCancel={() => setPending(null)}
+        >
+          <p className="font-medium text-on-surface">
+            {daysText(pending.price.weekdays)}, {when(pending.price).toLowerCase()}, {pending.price.durationMinutes ? durationLabel(pending.price.durationMinutes) : ''} at INR {Number(pending.price.offerPrice ?? pending.price.normalPrice).toLocaleString('en-IN')} for one {unit}
+          </p>
+          {pending.kind === 'block' && <p>It stays in the list but won&apos;t be used. Times it covered can&apos;t be booked until another price covers them, or you unblock it.</p>}
+          {pending.kind === 'unblock' && <p>It will price those times again. If another active price already covers the same days and times, it can&apos;t be turned on.</p>}
+          {pending.kind === 'remove' && <p>This deletes the price for good. Times it covered can&apos;t be booked until another price covers them.</p>}
+        </ConfirmDialog>
       )}
     </div>
   );
 }
 
-/** Adds one price for a pooled item, in a modal like a normal unit's price. */
-function PriceModal({ group, lengths, onClose, onSaved }: { group: Group; lengths: number[]; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({ length: String(lengths[0] ?? 60), days: [1, 2, 3, 4, 5, 6, 7] as number[], from: '06:00', to: '18:00', price: '', advance: '' });
+/** Adds or edits one price for a pooled item, in a modal like a normal unit's price. */
+function PriceModal({ group, price, lengths, onClose, onSaved }: { group: Group; price?: GroupPrice; lengths: number[]; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({
+    length: String(price?.durationMinutes ?? lengths[0] ?? 60),
+    days: (price?.weekdays?.length ? [...price.weekdays] : [1, 2, 3, 4, 5, 6, 7]) as number[],
+    from: price?.startWindow ?? '06:00',
+    to: price?.endWindow ?? '18:00',
+    price: price ? String(Number(price.offerPrice ?? price.normalPrice)) : '',
+    advance: price ? String(Number(price.bookingPrice)) : '',
+  });
   const [errors, setErrors] = useState<{ price?: string; time?: string; days?: string }>({});
   const toggleDay = (n: number) => {
     setErrors((e) => ({ ...e, days: undefined }));
@@ -398,17 +514,16 @@ function PriceModal({ group, lengths, onClose, onSaved }: { group: Group; length
     if (found.price || found.time || found.days) return;
     setBusy(true);
     try {
-      await api.post('/resources/pricing-rules', {
-        resourceGroupId: group.id,
+      const body = {
         durationMinutes: Number(form.length),
         days: form.days,
-        pricingMode: 'PER_UNIT',
         normalPrice: Number(form.price),
         bookingPrice: form.advance.trim() === '' ? Number(form.price) : Number(form.advance),
         startWindow: form.from,
         endWindow: form.to,
-        currency: 'INR',
-      });
+      };
+      if (price) await api.patch(`/resources/pricing-rules/${price.id}`, { ...body, offerPrice: null });
+      else await api.post('/resources/pricing-rules', { ...body, resourceGroupId: group.id, pricingMode: 'PER_UNIT', currency: 'INR' });
       onSaved();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not save this price');
@@ -418,7 +533,7 @@ function PriceModal({ group, lengths, onClose, onSaved }: { group: Group; length
 
   const unit = group.category.unitLabel.toLowerCase();
   return (
-    <Modal title="Add a price" subtitle={`What one ${unit} costs for a length, on which days and at what times.`} onClose={onClose} busy={busy}>
+    <Modal title={price ? 'Edit price' : 'Add a price'} subtitle={price ? 'Change the length, days, hours or amount.' : `What one ${unit} costs for a length, on which days and at what times.`} onClose={onClose} busy={busy}>
       <form onSubmit={add} noValidate>
        <div className="grid grid-cols-2 items-start gap-4 p-6 md:grid-cols-4">
         <div className="col-span-2 md:col-span-4">
@@ -498,7 +613,7 @@ function PriceModal({ group, lengths, onClose, onSaved }: { group: Group; length
             Cancel
           </Button>
           <Button type="submit" disabled={busy}>
-            {busy ? 'Adding…' : 'Add price'}
+            {busy ? 'Saving…' : price ? 'Save changes' : 'Add price'}
           </Button>
         </footer>
       </form>

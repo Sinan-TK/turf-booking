@@ -163,6 +163,37 @@ test.describe('owner portal: pooled items', () => {
     await modal.getByRole('button', { name: 'Add price' }).click();
     await expect(modal).toHaveCount(0);
     await expect(card.getByText(/Fri–Sun/)).toBeVisible();
+
+    // Listed like a unit's prices, in a table with edit, block and remove.
+    const row = card.getByRole('row', { name: /Fri–Sun/ });
+    await expect(row).toContainText('Active');
+    await expect(row).toContainText('INR 300');
+
+    // Edit: change the days and the price.
+    await row.getByRole('button', { name: 'Edit price' }).click();
+    const edit = page.getByRole('dialog', { name: 'Edit price' });
+    await expect(edit.getByLabel('Price for one')).toHaveValue('300');
+    await expect(edit.getByRole('button', { name: 'Friday' })).toHaveAttribute('aria-pressed', 'true');
+    await edit.getByRole('button', { name: 'Friday' }).click();
+    await edit.getByLabel('Price for one').fill('350');
+    await edit.getByLabel('Pay online (one)').fill('350');
+    await edit.getByRole('button', { name: 'Save changes' }).click();
+    await expect(edit).toHaveCount(0);
+    const edited = card.getByRole('row', { name: /Sat, Sun/ });
+    await expect(edited).toContainText('INR 350');
+
+    // Block keeps it in the list but off; unblock turns it back on.
+    await edited.getByRole('button', { name: 'Block price' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Block price' }).click();
+    await expect(edited).toContainText('Blocked');
+    await edited.getByRole('button', { name: 'Unblock price' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Unblock price' }).click();
+    await expect(edited).toContainText('Active');
+
+    // Remove.
+    await edited.getByRole('button', { name: 'Remove price' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Remove price' }).click();
+    await expect(card.getByRole('row', { name: /Sat, Sun/ })).toHaveCount(0);
   });
 
   test('a facility with pooled stock is not offered in the unit form', async ({ page, venue }) => {
