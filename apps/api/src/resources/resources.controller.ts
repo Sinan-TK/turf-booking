@@ -29,6 +29,7 @@ import {
   UpdateResourceGroupDto,
   SetFacilityBookableDto,
   ReorderPhotosDto,
+  ReusePhotoDto,
   SetResourceBookableDto,
   SetResourceDescriptionDto,
   SetResourceDurationsDto,
@@ -144,6 +145,21 @@ export class ResourcesController {
     return this.photos.reorderGroup(id, dto.photoIds, actor);
   }
 
+  // Photos the organization already has on its other units and pooled items, to use here without uploading again.
+  @Get('groups/:id/photos/library')
+  @Roles(Role.SUPER_ADMIN, Role.VENUE_OWNER)
+  @OwnerRoles('OWNER_ADMIN')
+  groupPhotoLibrary(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthContext) {
+    return this.photos.libraryGroup(id, actor);
+  }
+
+  @Post('groups/:id/photos/reuse')
+  @Roles(Role.SUPER_ADMIN, Role.VENUE_OWNER)
+  @OwnerRoles('OWNER_ADMIN')
+  reuseGroupPhoto(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReusePhotoDto, @CurrentUser() actor: AuthContext) {
+    return this.photos.reuseGroup(id, dto.photoId, actor);
+  }
+
   @Delete('groups/:id/photos/:photoId')
   @Roles(Role.SUPER_ADMIN, Role.VENUE_OWNER)
   removeGroupPhoto(
@@ -178,6 +194,20 @@ export class ResourcesController {
   @Roles(Role.SUPER_ADMIN, Role.VENUE_OWNER)
   reorderPhotos(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReorderPhotosDto, @CurrentUser() actor: AuthContext) {
     return this.photos.reorder(id, dto.photoIds, actor);
+  }
+
+  @Get(':id/photos/library')
+  @Roles(Role.SUPER_ADMIN, Role.VENUE_OWNER)
+  @OwnerRoles('OWNER_ADMIN')
+  photoLibrary(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthContext) {
+    return this.photos.library(id, actor);
+  }
+
+  @Post(':id/photos/reuse')
+  @Roles(Role.SUPER_ADMIN, Role.VENUE_OWNER)
+  @OwnerRoles('OWNER_ADMIN')
+  reusePhoto(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReusePhotoDto, @CurrentUser() actor: AuthContext) {
+    return this.photos.reuse(id, dto.photoId, actor);
   }
 
   @Delete(':id/photos/:photoId')

@@ -94,3 +94,7 @@ export class UpdateResourceGroupDto extends createZodDto(updateResourceGroupSche
 // The order of a unit's photos: every one of its photo ids, main photo first.
 export const reorderPhotosSchema = z.object({ photoIds: z.array(z.string().uuid()).min(1).max(3) });
 export class ReorderPhotosDto extends createZodDto(reorderPhotosSchema) {}
+
+// Use a photo one of the owner's other units (or pooled items) already has, instead of uploading it again.
+export const reusePhotoSchema = z.object({ photoId: z.string().uuid() });
+export class ReusePhotoDto extends createZodDto(reusePhotoSchema) {}

@@ -4,10 +4,16 @@ import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { SvgIcon } from '@/components/svg-icons';
 import { PhotoCropper } from '@/components/photo-cropper';
+import { Modal } from '@/components/modal';
 
 export interface UnitPhoto {
   id: string;
   url: string;
+}
+
+/** A photo the owner already has on another unit, with where it is used. */
+interface LibraryPhoto extends UnitPhoto {
+  from: string;
 }
 
 /** A unit shows at most this many photos to customers (the API enforces it too). */
@@ -36,6 +42,8 @@ export function UnitPhotos({ unitId, unitName, initial, basePath, onChanged }: {
   // The picked file, waiting in the cropper.
   const [cropping, setCropping] = useState<File | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  // The picker of photos the owner already has on other units: null while closed.
+  const [library, setLibrary] = useState<LibraryPhoto[] | null | 'loading'>(null);
 
   async function run(label: string, action: () => Promise<UnitPhoto[]>) {
     setBusy(label);
@@ -68,6 +76,24 @@ export function UnitPhotos({ unitId, unitName, initial, basePath, onChanged }: {
       form.append('file', photo, photo.type === 'image/webp' ? 'photo.webp' : 'photo.jpg');
       return api.upload<UnitPhoto[]>(`${base}/photos`, form);
     });
+  }
+
+  /** Opens the picker of photos already on the owner's other units and pooled items (across all their venues). */
+  async function openLibrary() {
+    setError(null);
+    setLibrary('loading');
+    try {
+      setLibrary(await api.get<LibraryPhoto[]>(`${base}/photos/library`));
+    } catch (err) {
+      setLibrary(null);
+      setError(err instanceof ApiError ? err.message : 'Could not load your photos.');
+    }
+  }
+
+  /** Uses one of those photos here: the same stored picture, so nothing is uploaded again. */
+  function reuse(photo: LibraryPhoto) {
+    setLibrary(null);
+    void run('reuse', () => api.post<UnitPhoto[]>(`${base}/photos/reuse`, { photoId: photo.id }));
   }
 
   /** Shows the new order or the removal at once, then takes the server's list; if the server refuses, the photos go back as they were. */
@@ -147,9 +173,55 @@ export function UnitPhotos({ unitId, unitName, initial, basePath, onChanged }: {
             {busy === 'upload' ? 'Uploading…' : photos.length === 0 ? 'Add photo' : `Add (${photos.length}/${MAX_UNIT_PHOTOS})`}
           </button>
         )}
+        {photos.length < MAX_UNIT_PHOTOS && (
+          <button
+            type="button"
+            onClick={() => void openLibrary()}
+            disabled={busy !== null || library === 'loading'}
+            className="flex h-32 w-52 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low px-3 text-center text-sm font-semibold text-on-surface transition hover:border-primary/60 hover:bg-surface-container disabled:opacity-60 sm:h-36 sm:w-60"
+          >
+            {busy === 'reuse' || library === 'loading' ? (
+              <span className="h-6 w-6 animate-spin rounded-full border-2 border-outline-variant border-t-primary" aria-hidden="true" />
+            ) : (
+              <SvgIcon name="image" className="h-7 w-7" />
+            )}
+            {busy === 'reuse' ? 'Adding…' : 'Use a photo you already have'}
+            <span className="text-xs font-normal text-on-surface-variant">from your other units</span>
+          </button>
+        )}
         <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={onPick} />
       </div>
       {cropping && <PhotoCropper file={cropping} onCancel={() => setCropping(null)} onCropped={upload} />}
+      {Array.isArray(library) && (
+        <Modal
+          title="Use a photo you already have"
+          subtitle={`Pick one from your other units or pooled items. It is shared, so ${unitName} shows the same picture without it being uploaded again.`}
+          onClose={() => setLibrary(null)}
+        >
+          <div className="p-6">
+            {library.length === 0 ? (
+              <p className="rounded-xl bg-surface-container-low px-4 py-8 text-center text-sm text-on-surface-variant">
+                You have no other photos to use yet. Add a photo to one of your units first, then it can be used here.
+              </p>
+            ) : (
+              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3" aria-label="Photos you already have">
+                {library.map((photo) => (
+                  <li key={photo.id}>
+                    <button
+                      type="button"
+                      onClick={() => reuse(photo)}
+                      className="group block w-full overflow-hidden rounded-xl bg-surface-container text-left shadow-sm ring-1 ring-outline-variant/50 transition hover:ring-2 hover:ring-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                      <img src={photo.url} alt={`Photo from ${photo.from}`} loading="lazy" className="aspect-[4/3] w-full object-cover" />
+                      <span className="block truncate px-2.5 py-2 text-xs font-medium text-on-surface">{photo.from}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </Modal>
+      )}
       {error && (
         <p role="alert" className="mt-1.5 text-xs text-red-700">
           {error}

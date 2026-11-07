@@ -16,6 +16,14 @@ export interface UnitPhoto {
   url: string;
 }
 
+/** A photo the owner already has on another unit or pooled item, offered for reuse. */
+export interface LibraryPhoto {
+  id: string;
+  url: string;
+  /** Where it is used now, e.g. "Greenfield Arena · Turf A". */
+  from: string;
+}
+
 /** Whose photos: a unit's, or a pooled group's (a kayak fleet). */
 type Owner = { resourceId: string } | { resourceGroupId: string };
 
@@ -55,6 +63,18 @@ export class ResourcePhotosService {
   reorderGroup(resourceGroupId: string, photoIds: string[], actor: AuthContext): Promise<UnitPhoto[]> {
     return this.reorderFor({ resourceGroupId }, photoIds, actor);
   }
+  library(resourceId: string, actor: AuthContext): Promise<LibraryPhoto[]> {
+    return this.libraryFor({ resourceId }, actor);
+  }
+  libraryGroup(resourceGroupId: string, actor: AuthContext): Promise<LibraryPhoto[]> {
+    return this.libraryFor({ resourceGroupId }, actor);
+  }
+  reuse(resourceId: string, photoId: string, actor: AuthContext): Promise<UnitPhoto[]> {
+    return this.reuseFor({ resourceId }, photoId, actor);
+  }
+  reuseGroup(resourceGroupId: string, photoId: string, actor: AuthContext): Promise<UnitPhoto[]> {
+    return this.reuseFor({ resourceGroupId }, photoId, actor);
+  }
 
   private async listFor(owner: Owner, actor: AuthContext): Promise<UnitPhoto[]> {
     await this.owned(owner, actor);
@@ -87,8 +107,62 @@ export class ResourcePhotosService {
     const photo = await this.prisma.client.resourcePhoto.findFirst({ where: { id: photoId, ...owner } });
     if (!photo) throw new NotFoundException('Photo not found');
     await this.prisma.client.resourcePhoto.delete({ where: { id: photo.id } });
-    await this.storage.remove(photo.key);
+    // A photo can be shared (another unit or venue of the same owner uses the same file): the file goes only with its last use.
+    if ((await this.prisma.client.resourcePhoto.count({ where: { key: photo.key } })) === 0) await this.storage.remove(photo.key);
     return this.photosFor(owner);
+  }
+
+  /**
+   * The photos the actor's organization already has on its other units and pooled items (across all its venues), without repeats and
+   * without the ones this unit already shows, so one picture can serve several units without being uploaded again.
+   */
+  private async libraryFor(owner: Owner, actor: AuthContext): Promise<LibraryPhoto[]> {
+    const { organizationId } = await this.orgOf(owner, actor);
+    const mine = new Set((await this.prisma.client.resourcePhoto.findMany({ where: owner, select: { key: true } })).map((p) => p.key));
+    const rows = await this.prisma.client.resourcePhoto.findMany({
+      where: { OR: [{ resource: { venue: { organizationId } } }, { resourceGroup: { venue: { organizationId } } }] },
+      orderBy: [{ createdAt: 'asc' }],
+      select: {
+        id: true,
+        key: true,
+        resource: { select: { name: true, venue: { select: { name: true } } } },
+        resourceGroup: { select: { name: true, venue: { select: { name: true } } } },
+      },
+    });
+    const seen = new Set<string>();
+    const out: LibraryPhoto[] = [];
+    for (const r of rows) {
+      if (mine.has(r.key) || seen.has(r.key)) continue;
+      seen.add(r.key);
+      const where = r.resource ?? r.resourceGroup;
+      out.push({ id: r.id, url: this.storage.publicUrl(r.key), from: where ? `${where.venue.name} · ${where.name}` : '' });
+    }
+    return out.sort((a, b) => a.from.localeCompare(b.from));
+  }
+
+  /** Gives this unit a photo another of the organization's units already has: the same stored file, shown here too. */
+  private async reuseFor(owner: Owner, photoId: string, actor: AuthContext): Promise<UnitPhoto[]> {
+    const { organizationId } = await this.orgOf(owner, actor);
+    const source = await this.prisma.client.resourcePhoto.findFirst({
+      where: { id: photoId, OR: [{ resource: { venue: { organizationId } } }, { resourceGroup: { venue: { organizationId } } }] },
+      select: { key: true },
+    });
+    if (!source) throw new NotFoundException('That photo is not available to use here.');
+    const existing = await this.prisma.client.resourcePhoto.findMany({ where: owner, select: { key: true, sortOrder: true } });
+    if (existing.some((p) => p.key === source.key)) throw new BadRequestException('This unit already has that photo.');
+    if (existing.length >= MAX_PHOTOS_PER_UNIT) {
+      throw new BadRequestException(`A unit can have ${MAX_PHOTOS_PER_UNIT} photos at most. Remove one first.`);
+    }
+    const nextOrder = existing.reduce((most, p) => Math.max(most, p.sortOrder + 1), 0);
+    await this.prisma.client.resourcePhoto.create({ data: { ...owner, key: source.key, sortOrder: nextOrder } });
+    return this.photosFor(owner);
+  }
+
+  /** The organization the unit or group belongs to, after checking the actor may manage it. */
+  private async orgOf(owner: Owner, actor: AuthContext): Promise<{ organizationId: string }> {
+    const { venueId } = await this.owned(owner, actor);
+    const venue = await this.prisma.client.venue.findUniqueOrThrow({ where: { id: venueId }, select: { organizationId: true } });
+    return { organizationId: venue.organizationId };
   }
 
   /** Puts the photos in the given order (every photo, each once). The first is the main one. */
