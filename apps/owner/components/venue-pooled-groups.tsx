@@ -6,7 +6,8 @@ import { api, ApiError } from '@/lib/api';
 import { optimistic, type Mutate } from '@/lib/optimistic';
 import { durationLabel, type VenueCategory, type VenueCategorySummary } from '@/lib/categories';
 import { Button, ErrorBanner, FieldError, Input, Label, Select, invalidClass } from '@/components/ui';
-import { UnitPhotos, type UnitPhoto } from '@/components/unit-photos';
+import { Modal } from '@/components/modal';
+import { UnitPhotos,type UnitPhoto } from '@/components/unit-photos';
 import { UnitDescription } from '@/components/unit-description';
 
 /** A fixed slot as the API keeps it: venue-local times, how many items, and the price and online amount for one item (null = not priced yet). */
@@ -316,6 +317,65 @@ export function GroupCard({ group, category, onChanged }: { group: Group; catego
 /** What one kayak costs for a length and the hours/days it can be booked; the open hours of the group come from these. */
 function PricesSection({ group, category, prices, refetch, mutate }: { group: Group; category?: VenueCategory; prices: GroupPrice[]; refetch: () => void; mutate: Mutate<GroupPrice[]> }) {
   const lengths = category?.policy.durations?.length ? category.policy.durations : [60, 120, 180];
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /** The price leaves the list at once; it comes back with a message if the server could not remove it. */
+  async function remove(id: string) {
+    setError(null);
+    await optimistic(mutate, (all) => all.filter((p) => p.id !== id), () => api.delete(`/resources/pricing-rules/${id}`), setError);
+    refetch();
+  }
+
+  const unit = group.category.unitLabel.toLowerCase();
+  return (
+    <div>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h4 className="text-sm font-semibold text-on-surface">Prices (for one {unit})</h4>
+          <p className="mt-0.5 text-xs text-on-surface-variant">
+            A customer pays the price times how many they book. The hours of these prices are the hours the {group.name.toLowerCase()} can be booked. Add one price for each length you offer.
+          </p>
+        </div>
+        <Button type="button" onClick={() => setAdding(true)}>
+          Add price
+        </Button>
+      </div>
+      {error && <div className="mt-2"><ErrorBanner message={error} /></div>}
+      {prices.length > 0 && (
+        <ul className="mt-3 divide-y divide-outline-variant/20 rounded-lg ring-1 ring-outline-variant/30">
+          {prices.map((p) => (
+            <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-body-md">
+              <span>
+                <strong>INR {Number(p.offerPrice ?? p.normalPrice).toLocaleString('en-IN')}</strong>
+                {p.offerPrice != null && <s className="ml-1 text-xs text-on-surface-variant">INR {Number(p.normalPrice).toLocaleString('en-IN')}</s>} per {unit} · {p.durationMinutes ? durationLabel(p.durationMinutes) : ''} · {daysText(p.weekdays)}
+                {p.startWindow && p.endWindow ? ` · ${clock(p.startWindow)} – ${clock(p.endWindow)}` : ' · all day'}
+                <span className="text-xs text-on-surface-variant"> · pay online INR {Number(p.bookingPrice).toLocaleString('en-IN')}</span>
+              </span>
+              <Button type="button" variant="secondary" aria-label={`Remove price of INR ${Number(p.offerPrice ?? p.normalPrice)} for ${p.durationMinutes ?? ''} minutes`} onClick={() => void remove(p.id)}>
+                Remove
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {adding && (
+        <PriceModal
+          group={group}
+          lengths={lengths}
+          onClose={() => setAdding(false)}
+          onSaved={() => {
+            setAdding(false);
+            refetch();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Adds one price for a pooled item, in a modal like a normal unit's price. */
+function PriceModal({ group, lengths, onClose, onSaved }: { group: Group; lengths: number[]; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({ length: String(lengths[0] ?? 60), days: [1, 2, 3, 4, 5, 6, 7] as number[], from: '06:00', to: '18:00', price: '', advance: '' });
   const [errors, setErrors] = useState<{ price?: string; time?: string; days?: string }>({});
   const toggleDay = (n: number) => {
@@ -349,48 +409,19 @@ function PricesSection({ group, category, prices, refetch, mutate }: { group: Gr
         endWindow: form.to,
         currency: 'INR',
       });
-      setForm((f) => ({ ...f, price: '', advance: '' }));
-      refetch();
+      onSaved();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not save this price');
-    } finally {
       setBusy(false);
     }
   }
 
-  /** The price leaves the list at once; it comes back with a message if the server could not remove it. */
-  async function remove(id: string) {
-    setError(null);
-    await optimistic(mutate, (all) => all.filter((p) => p.id !== id), () => api.delete(`/resources/pricing-rules/${id}`), setError);
-    refetch();
-  }
-
   const unit = group.category.unitLabel.toLowerCase();
   return (
-    <div>
-      <h4 className="text-sm font-semibold text-on-surface">Prices (for one {unit})</h4>
-      <p className="mt-0.5 text-xs text-on-surface-variant">
-        A customer pays the price times how many they book. The hours of these prices are the hours the {group.name.toLowerCase()} can be booked. Add one price for each length you offer.
-      </p>
-      {prices.length > 0 && (
-        <ul className="mt-3 divide-y divide-outline-variant/20 rounded-lg ring-1 ring-outline-variant/30">
-          {prices.map((p) => (
-            <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-body-md">
-              <span>
-                <strong>INR {Number(p.offerPrice ?? p.normalPrice).toLocaleString('en-IN')}</strong>
-                {p.offerPrice != null && <s className="ml-1 text-xs text-on-surface-variant">INR {Number(p.normalPrice).toLocaleString('en-IN')}</s>} per {unit} · {p.durationMinutes ? durationLabel(p.durationMinutes) : ''} · {daysText(p.weekdays)}
-                {p.startWindow && p.endWindow ? ` · ${clock(p.startWindow)} – ${clock(p.endWindow)}` : ' · all day'}
-                <span className="text-xs text-on-surface-variant"> · pay online INR {Number(p.bookingPrice).toLocaleString('en-IN')}</span>
-              </span>
-              <Button type="button" variant="secondary" aria-label={`Remove price of INR ${Number(p.offerPrice ?? p.normalPrice)} for ${p.durationMinutes ?? ''} minutes`} onClick={() => void remove(p.id)}>
-                Remove
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <form onSubmit={add} noValidate className="mt-3 grid grid-cols-2 items-start gap-3 md:grid-cols-6">
-        <div>
+    <Modal title="Add a price" subtitle={`What one ${unit} costs for a length, on which days and at what times.`} onClose={onClose} busy={busy}>
+      <form onSubmit={add} noValidate>
+       <div className="grid grid-cols-2 items-start gap-4 p-6 md:grid-cols-4">
+        <div className="col-span-2 md:col-span-4">
           <Label htmlFor={`len-${group.id}`}>Length</Label>
           <Select id={`len-${group.id}`} value={form.length} onChange={(e) => setForm((f) => ({ ...f, length: e.target.value }))}>
             {lengths.map((m) => (
@@ -400,7 +431,7 @@ function PricesSection({ group, category, prices, refetch, mutate }: { group: Gr
             ))}
           </Select>
         </div>
-        <div className="col-span-2 md:col-span-6">
+        <div className="col-span-2 md:col-span-4">
           <Label>Days</Label>
           <div className="flex flex-wrap gap-2" role="group" aria-label="Days this price applies to">
             {DAYS.map((d) => {
@@ -456,14 +487,22 @@ function PricesSection({ group, category, prices, refetch, mutate }: { group: Gr
           <Label htmlFor={`adv-${group.id}`}>Pay online (one)</Label>
           <Input id={`adv-${group.id}`} inputMode="decimal" placeholder="same as price" value={form.advance} onChange={(e) => setForm((f) => ({ ...f, advance: e.target.value }))} />
         </div>
-        <div className="col-span-2 md:col-span-6">
-          {error && <div className="mb-2"><ErrorBanner message={error} /></div>}
+        {error && (
+          <div className="col-span-2 md:col-span-4">
+            <ErrorBanner message={error} />
+          </div>
+        )}
+       </div>
+        <footer className="flex justify-end gap-2 border-t border-outline-variant/20 bg-surface-container-low px-6 py-4">
+          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
           <Button type="submit" disabled={busy}>
             {busy ? 'Adding…' : 'Add price'}
           </Button>
-        </div>
+        </footer>
       </form>
-    </div>
+    </Modal>
   );
 }
 

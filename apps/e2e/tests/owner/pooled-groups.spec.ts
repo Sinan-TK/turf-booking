@@ -138,7 +138,10 @@ test.describe('owner portal: pooled items', () => {
     await page.goto(`/venues/${venue.id}`);
     await openUnitTab(page, 'PW Days kayaks');
     const card = page.getByRole('region', { name: 'PW Days kayaks' });
-    const days = card.getByRole('group', { name: 'Days this price applies to' });
+    // Prices are added in a modal, like a normal unit's.
+    await card.getByRole('button', { name: 'Add price' }).click();
+    const modal = page.getByRole('dialog', { name: 'Add a price' });
+    const days = modal.getByRole('group', { name: 'Days this price applies to' });
 
     // No day chosen is refused with a message.
     await days.getByRole('button', { name: 'Monday' }).click();
@@ -148,16 +151,17 @@ test.describe('owner portal: pooled items', () => {
     await days.getByRole('button', { name: 'Friday' }).click();
     await days.getByRole('button', { name: 'Saturday' }).click();
     await days.getByRole('button', { name: 'Sunday' }).click();
-    await card.getByLabel('Price for one').fill('300');
-    await card.getByRole('button', { name: 'Add price' }).click();
-    await expect(card.getByText('Choose at least one day.')).toBeVisible();
+    await modal.getByLabel('Price for one').fill('300');
+    await modal.getByRole('button', { name: 'Add price' }).click();
+    await expect(modal.getByText('Choose at least one day.')).toBeVisible();
 
     // Friday to Sunday is a choice no fixed list had.
     await days.getByRole('button', { name: 'Friday' }).click();
     await days.getByRole('button', { name: 'Saturday' }).click();
     await days.getByRole('button', { name: 'Sunday' }).click();
     await expect(days.getByRole('button', { name: 'Saturday' })).toHaveAttribute('aria-pressed', 'true');
-    await card.getByRole('button', { name: 'Add price' }).click();
+    await modal.getByRole('button', { name: 'Add price' }).click();
+    await expect(modal).toHaveCount(0);
     await expect(card.getByText(/Fri–Sun/)).toBeVisible();
   });
 
