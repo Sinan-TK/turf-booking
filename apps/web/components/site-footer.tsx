@@ -15,10 +15,10 @@ function Column({ title, children }: { title: string; children: React.ReactNode 
 }
 
 /** The footer of the customer site's public pages: who we are, where to go, and the legal pages. */
-export function SiteFooter() {
+export function SiteFooter({ wide = false }: { wide?: boolean }) {
   return (
     <footer className="border-t border-slate-200 bg-slate-50">
-      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-10">
+      <div className={wide ? 'w-full px-4 sm:px-6 lg:px-10 xl:px-14' : 'mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-10'}>
         <div className="grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_repeat(2,minmax(0,1fr))] lg:gap-12">
           <div className="max-w-sm">
             <Link href="/" aria-label={`${LEGAL.brand} home`} className={`inline-block select-none rounded-md ${focus}`}>

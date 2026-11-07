@@ -31,12 +31,13 @@ const REASONS = [
 ] as const;
 
 const focus = 'outline-none focus-visible:ring-4 focus-visible:ring-brand-700/20';
-const shell = 'mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8';
+// The sections run the full width of the page, with an even margin at each side.
+const shell = 'w-full px-4 sm:px-6 lg:px-10 xl:px-14';
 
 /** One venue type: its picture (or icon) and name, leading to its slots. */
 function TypeCard({ category: c }: { category: VenueCategory }) {
   return (
-    <li className="w-[10.5rem] shrink-0 snap-start sm:w-[13rem]">
+    <li className="min-w-[10.5rem] flex-1 shrink-0 snap-start sm:min-w-[13rem]">
       <Link
         href={`/explore?type=${encodeURIComponent(c.slug)}`}
         className={`group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white transition duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-card ${focus}`}
@@ -84,11 +85,11 @@ function TypeCarousel({ categories }: { categories: VenueCategory[] | null }) {
       <ul
         ref={row}
         onScroll={measure}
-        className="scrollbar-hide -mx-4 flex snap-x snap-mandatory scroll-pl-4 gap-3 overflow-x-auto scroll-smooth px-4 pb-2 sm:-mx-6 sm:scroll-pl-6 sm:gap-4 sm:px-6 lg:-mx-8 lg:scroll-pl-8 lg:px-8"
+        className="scrollbar-hide -mx-4 flex snap-x snap-mandatory scroll-pl-4 gap-3 overflow-x-auto scroll-smooth px-4 pb-2 sm:-mx-6 sm:scroll-pl-6 sm:gap-4 sm:px-6 lg:-mx-10 lg:scroll-pl-10 lg:px-10 xl:-mx-14 xl:scroll-pl-14 xl:px-14"
       >
         {categories === null &&
           Array.from({ length: 6 }, (_, i) => (
-            <li key={i} className="w-[10.5rem] shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white sm:w-[13rem]">
+            <li key={i} className="min-w-[10.5rem] flex-1 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white sm:min-w-[13rem]">
               <Skeleton className="aspect-[4/3] w-full rounded-none" />
               <div className="px-4 py-3.5">
                 <Skeleton className="h-5 w-2/3" />
@@ -261,7 +262,7 @@ export default function LandingPage() {
               Featured venues
             </h2>
             <p className="mt-1.5 text-base text-slate-600">Popular places to play, picked for you.</p>
-            <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
               {featured.map((v) => (
                 <FeaturedCard key={v.id} venue={v} />
               ))}
@@ -324,7 +325,7 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <SiteFooter />
+      <SiteFooter wide />
     </div>
   );
 }

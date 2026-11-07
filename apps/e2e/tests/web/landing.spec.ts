@@ -130,8 +130,11 @@ test.describe('customer site: landing page', () => {
     await next.click();
     await expect.poll(() => row.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100);
     await expect(prev).toBeEnabled();
-    for (let i = 0; i < 8 && (await next.isEnabled()); i++) await next.click();
-    await expect(next).toBeDisabled();
+    // Keep paging (the scroll is animated) until the end of the row is reached.
+    await expect(async () => {
+      if (await next.isEnabled()) await next.click();
+      await expect(next).toBeDisabled({ timeout: 700 });
+    }).toPass({ timeout: 20_000 });
     await page.screenshot({ path: 'test-results/landing-carousel.png', clip: { x: 0, y: 640, width: 1280, height: 330 } });
   });
 
