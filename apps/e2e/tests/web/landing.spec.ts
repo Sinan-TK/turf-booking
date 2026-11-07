@@ -108,6 +108,33 @@ test.describe('customer site: landing page', () => {
     }
   });
 
+  test('Browse by type is one row that scrolls sideways, with arrows', async ({ page }) => {
+    const kinds = Array.from({ length: 12 }, (_, i) => ({ slug: `kind-${i}`, name: `Kind ${i + 1}`, iconKey: 'category', iconSvg: null, imageUrl: null }));
+    await page.route(`${URLS.api}/categories?available=true`, (route) =>
+      route.fulfill({ status: 200, headers: { 'content-type': 'application/json', 'access-control-allow-origin': URLS.web, 'access-control-allow-credentials': 'true' }, body: JSON.stringify(kinds) }),
+    );
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/');
+    const cards = page.locator('a[href^="/explore?type="]');
+    await expect(cards).toHaveCount(12);
+    // All twelve are on a single line (the same top), though they do not all fit across.
+    const tops = await cards.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+    expect(new Set(tops).size).toBe(1);
+    const row = page.getByRole('list').filter({ has: cards.first() });
+    expect(await row.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+
+    // The arrows page through the row: Previous is off at the start, then Next moves it along.
+    const next = page.getByRole('button', { name: 'Next venue types' });
+    const prev = page.getByRole('button', { name: 'Previous venue types' });
+    await expect(prev).toBeDisabled();
+    await next.click();
+    await expect.poll(() => row.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100);
+    await expect(prev).toBeEnabled();
+    for (let i = 0; i < 8 && (await next.isEnabled()); i++) await next.click();
+    await expect(next).toBeDisabled();
+    await page.screenshot({ path: 'test-results/landing-carousel.png', clip: { x: 0, y: 640, width: 1280, height: 330 } });
+  });
+
   test('the landing page runs with nothing blocked by the content security policy', async ({ page }) => {
     const seen = await scanForViolations(page, ['/']);
     expect(seen, JSON.stringify(seen, null, 1)).toEqual([]);

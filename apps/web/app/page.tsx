@@ -5,7 +5,7 @@
  * why Bookyo, and a way in for venue owners. Black, warm white and the logo's lime; nothing else competes with the search.
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
@@ -36,7 +36,7 @@ const shell = 'mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8';
 /** One venue type: its picture (or icon) and name, leading to its slots. */
 function TypeCard({ category: c }: { category: VenueCategory }) {
   return (
-    <li>
+    <li className="w-[10.5rem] shrink-0 snap-start sm:w-[13rem]">
       <Link
         href={`/explore?type=${encodeURIComponent(c.slug)}`}
         className={`group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white transition duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-card ${focus}`}
@@ -51,6 +51,53 @@ function TypeCard({ category: c }: { category: VenueCategory }) {
         </span>
       </Link>
     </li>
+  );
+}
+
+/** The venue types in one row that scrolls sideways (swipe, trackpad or the arrows), each card snapping into place. */
+function TypeCarousel({ categories }: { categories: VenueCategory[] | null }) {
+  const row = useRef<HTMLUListElement>(null);
+  const [edge, setEdge] = useState({ start: true, end: false });
+
+  const measure = useCallback(() => {
+    const el = row.current;
+    if (!el) return;
+    setEdge({ start: el.scrollLeft <= 4, end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 4 });
+  }, []);
+  useEffect(() => {
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [measure, categories]);
+
+  const go = (dir: -1 | 1) => row.current?.scrollBy({ left: dir * Math.max(240, Math.round(row.current.clientWidth * 0.8)), behavior: 'smooth' });
+  const arrow = `absolute top-[38%] z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-900 shadow-card transition hover:bg-brand-50 disabled:pointer-events-none disabled:opacity-0 sm:flex ${focus}`;
+
+  return (
+    <div className="relative mt-8">
+      <button type="button" aria-label="Previous venue types" disabled={edge.start} onClick={() => go(-1)} className={`${arrow} -left-5`}>
+        <Icon name="chevron_left" className="text-[1.375rem]" />
+      </button>
+      <button type="button" aria-label="Next venue types" disabled={edge.end} onClick={() => go(1)} className={`${arrow} -right-5`}>
+        <Icon name="chevron_right" className="text-[1.375rem]" />
+      </button>
+      <ul
+        ref={row}
+        onScroll={measure}
+        className="scrollbar-hide -mx-4 flex snap-x snap-mandatory scroll-pl-4 gap-3 overflow-x-auto scroll-smooth px-4 pb-2 sm:-mx-6 sm:scroll-pl-6 sm:gap-4 sm:px-6 lg:-mx-8 lg:scroll-pl-8 lg:px-8"
+      >
+        {categories === null &&
+          Array.from({ length: 6 }, (_, i) => (
+            <li key={i} className="w-[10.5rem] shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white sm:w-[13rem]">
+              <Skeleton className="aspect-[4/3] w-full rounded-none" />
+              <div className="px-4 py-3.5">
+                <Skeleton className="h-5 w-2/3" />
+              </div>
+            </li>
+          ))}
+        {categories?.map((c) => <TypeCard key={c.slug} category={c} />)}
+      </ul>
+    </div>
   );
 }
 
@@ -203,18 +250,7 @@ export default function LandingPage() {
               <Icon name="chevron_right" className="text-[1.125rem]" />
             </Link>
           </div>
-          <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-            {categories === null &&
-              Array.from({ length: 8 }, (_, i) => (
-                <li key={i} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                  <Skeleton className="aspect-[4/3] w-full rounded-none" />
-                  <div className="px-4 py-3.5">
-                    <Skeleton className="h-5 w-2/3" />
-                  </div>
-                </li>
-              ))}
-            {categories?.map((c) => <TypeCard key={c.slug} category={c} />)}
-          </ul>
+          <TypeCarousel categories={categories} />
           {categories && categories.length === 0 && <p className="mt-8 text-base text-slate-600">Venues are being added. Check back soon.</p>}
         </section>
 
