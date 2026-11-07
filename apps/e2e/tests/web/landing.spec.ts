@@ -85,7 +85,10 @@ test.describe('customer site: landing page', () => {
     await expect(cards.nth(0)).toContainText('Manjeri');
     await expect(cards.nth(0)).toContainText('Football');
     await expect(cards.nth(1)).toContainText('Blue Lagoon');
-    await expect(section.getByRole('link', { name: /Greenfield Arena/ })).toHaveAttribute('href', '/explore?q=Greenfield%20Arena');
+    // The card opens the venue's own page (its first unit), where the day and slots are picked.
+    await expect(section.getByRole('link', { name: /Greenfield Arena/ })).toHaveAttribute('href', '/book/GRN-1/any');
+    await expect(section.getByRole('link', { name: /Blue Lagoon/ })).toHaveAttribute('href', '/book/BLU-2/any');
+    await expect(cards.nth(0)).toContainText('Book now');
   });
 
   test('with no featured venues there is no empty section', async ({ page }) => {

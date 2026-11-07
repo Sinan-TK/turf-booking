@@ -112,36 +112,57 @@ interface FeaturedVenue {
   facilities: string[];
 }
 
-/** One featured venue: its picture, name, place and the kinds of facility it has, leading to its slots. */
+/**
+ * One featured venue: a big picture with its kinds of facility on it, the name and place, and a Book now row. The whole card opens the
+ * venue's page ("any" picks the venue's first unit, the same way the saved venues do), where the day and slots are chosen.
+ */
 function FeaturedCard({ venue: v }: { venue: FeaturedVenue }) {
   return (
     <li>
       <Link
-        href={`/explore?q=${encodeURIComponent(v.name)}`}
-        className={`group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white transition duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-card ${focus}`}
+        href={`/book/${encodeURIComponent(v.facilityCode)}/any`}
+        aria-label={`${v.name}: view the venue and book`}
+        className={`group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-subtle transition duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-card ${focus}`}
       >
-        <span className="relative flex aspect-[16/10] items-center justify-center bg-brand-50 text-brand-700">
-          <Icon name="stadium" className="text-[2.5rem]" />
-          {v.photoUrl && <img src={v.photoUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />}
-        </span>
-        <span className="flex flex-1 flex-col gap-2 px-4 pb-4 pt-3.5">
-          <span className="truncate text-lg font-extrabold text-slate-900">{v.name}</span>
-          <span className="flex items-center gap-1.5 text-sm text-slate-600">
-            <Icon name="location_on" className="shrink-0 text-[1rem] text-slate-400" />
-            <span className="truncate">{v.area ? `${v.area} · ${v.address}` : v.address}</span>
+        <span className="relative block aspect-[4/3] overflow-hidden bg-brand-50 text-brand-700">
+          <span className="absolute inset-0 flex items-center justify-center">
+            <Icon name="stadium" className="text-[3rem]" />
+          </span>
+          {v.photoUrl && (
+            <img
+              src={v.photoUrl}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+            />
+          )}
+          {v.photoUrl && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/55 to-transparent" />}
+          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-brand-400 px-2.5 py-1 text-xs font-extrabold text-brand-700 shadow-sm">
+            <Icon name="verified" className="text-[0.875rem]" />
+            Featured
           </span>
           {v.facilities.length > 0 && (
-            <span className="flex flex-wrap gap-1.5">
+            <span className="absolute inset-x-3 bottom-3 flex flex-wrap gap-1.5">
               {v.facilities.map((f) => (
-                <span key={f} className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700 ring-1 ring-brand-200">
+                <span key={f} className="rounded-full bg-white/95 px-2.5 py-1 text-xs font-bold text-slate-900 shadow-sm backdrop-blur">
                   {f}
                 </span>
               ))}
             </span>
           )}
-          <span className="mt-auto inline-flex items-center gap-1 pt-1 text-sm font-bold text-brand-700">
-            View slots
-            <Icon name="chevron_right" className="text-[1.125rem] transition group-hover:translate-x-0.5" />
+        </span>
+        <span className="flex flex-1 flex-col px-5 pb-5 pt-4">
+          <span className="truncate text-xl font-black tracking-tight text-slate-900">{v.name}</span>
+          <span className="mt-1.5 flex items-start gap-1.5 text-sm leading-snug text-slate-600">
+            <Icon name="location_on" className="mt-px shrink-0 text-[1rem] text-slate-400" />
+            <span className="line-clamp-2">{v.area ? `${v.area} · ${v.address}` : v.address}</span>
+          </span>
+          <span className="mt-auto flex items-center justify-between border-t border-slate-100 pt-4">
+            <span className="text-sm font-extrabold text-slate-900">Book now</span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-700 text-white transition group-hover:bg-brand-400 group-hover:text-brand-700">
+              <Icon name="chevron_right" className="text-[1.25rem] transition group-hover:translate-x-0.5" />
+            </span>
           </span>
         </span>
       </Link>
@@ -258,11 +279,19 @@ export default function LandingPage() {
         {/* ------------------------------------------------- Featured venues */}
         {featured.length > 0 && (
           <section aria-labelledby="featured-heading" className={`${shell} pb-16 sm:pb-24`}>
-            <h2 id="featured-heading" className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
-              Featured venues
-            </h2>
-            <p className="mt-1.5 text-base text-slate-600">Popular places to play, picked for you.</p>
-            <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 id="featured-heading" className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
+                  Featured venues
+                </h2>
+                <p className="mt-1.5 text-base text-slate-600">Popular places to play, picked for you. Tap one to see its open slots.</p>
+              </div>
+              <Link href="/explore" className={`inline-flex items-center gap-1 rounded-md text-[0.9375rem] font-bold text-brand-700 hover:underline ${focus}`}>
+                See all venues
+                <Icon name="chevron_right" className="text-[1.125rem]" />
+              </Link>
+            </div>
+            <ul className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-[repeat(auto-fill,minmax(19rem,1fr))]">
               {featured.map((v) => (
                 <FeaturedCard key={v.id} venue={v} />
               ))}
