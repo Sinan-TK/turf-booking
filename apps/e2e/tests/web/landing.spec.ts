@@ -169,6 +169,39 @@ test.describe('customer site: landing page', () => {
     expect(await opacity(broken)).toBe('1');
   });
 
+  test('a venue type card shows its icon while its picture loads, and keeps it if the picture never loads', async ({ page }) => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><rect width="40" height="30" fill="#3c3"/></svg>';
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    await page.route(`${URLS.web}/slow-type.svg`, async (route) => {
+      await gate;
+      await route.fulfill({ status: 200, contentType: 'image/svg+xml', body: svg });
+    });
+    await page.route(`${URLS.web}/missing-type.svg`, (route) => route.fulfill({ status: 404, body: '' }));
+    await page.route(`${URLS.api}/categories?available=true`, (route) =>
+      route.fulfill({
+        status: 200,
+        headers: cors,
+        body: JSON.stringify([
+          { slug: 'slow', name: 'Slow Type', iconKey: 'sports_soccer', iconSvg: null, imageUrl: '/slow-type.svg' },
+          { slug: 'broken', name: 'Broken Type', iconKey: 'pool', iconSvg: null, imageUrl: '/missing-type.svg' },
+        ]),
+      }),
+    );
+    await page.goto('/');
+    const slow = page.locator('a[href="/explore?type=slow"]');
+    const broken = page.locator('a[href="/explore?type=broken"]');
+    const photo = (card: typeof slow) => card.locator('img').evaluate((el) => getComputedStyle(el).opacity);
+    await expect(slow).toBeVisible();
+    // Loading: the picture is not shown (so the icon behind it is).
+    expect(await photo(slow)).toBe('0');
+    // Never loads: still not shown, so no broken-picture mark.
+    await expect.poll(() => photo(broken)).toBe('0');
+    release();
+    await expect.poll(() => photo(slow), { timeout: 8000 }).toBe('1');
+    expect(await photo(broken)).toBe('0');
+  });
+
   test('with no featured venues there is no empty section', async ({ page }) => {
     await page.route(`${URLS.api}/site/featured-venues`, (route) => route.fulfill({ status: 200, headers: cors, body: '[]' }));
     await page.goto('/');

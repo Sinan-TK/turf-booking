@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { FadeImage } from '@/components/fade-image';
 import { useAccountData } from '@/lib/account-cache';
 import { useToast } from '@/components/toast';
 import { CategoryIcon, ErrorBanner, Icon } from '@/components/ui';
@@ -58,7 +59,12 @@ export function SavedVenuesPanel() {
                 {v.units.length > 0 ? (
                   <UnitSlideshow name={v.name} units={v.units} />
                 ) : v.photoUrl ? (
-                  <img src={v.photoUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                  <div className="relative h-full w-full bg-gray-100 text-gray-300">
+                    <span className="absolute inset-0 flex items-center justify-center">
+                      <Icon name="location_on" className="text-[2.5rem]" />
+                    </span>
+                    <FadeImage src={v.photoUrl} className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                  </div>
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-gray-300">
                     <Icon name="location_on" className="text-[2.5rem]" />
@@ -126,7 +132,12 @@ function UnitSlideshow({ name, units }: { name: string; units: SavedVenue['units
           className={`absolute inset-0 transition-opacity duration-500 ${n === index ? 'opacity-100' : 'opacity-0'}`}
         >
           {u.photoUrl ? (
-            <img src={u.photoUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+            <div className="relative h-full w-full bg-brand-50 text-brand-700">
+              <span className="absolute inset-0 flex items-center justify-center">
+                <CategoryIcon iconKey={u.iconKey} iconSvg={u.iconSvg} className="text-[3rem]" />
+              </span>
+              <FadeImage src={u.photoUrl} className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+            </div>
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-brand-50 text-brand-700">
               <CategoryIcon iconKey={u.iconKey} iconSvg={u.iconSvg} className="text-[3rem]" />

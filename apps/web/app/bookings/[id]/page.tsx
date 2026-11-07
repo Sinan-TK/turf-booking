@@ -212,6 +212,16 @@ function BookingDetail() {
         : null;
     const toPayAtVenue = booking.status === 'CONFIRMED' && paid < amount ? amount - paid : 0;
     const countdown = booking.status === 'CONFIRMED' ? startsIn(start, end) : null;
+    // The venue-type icon: the picture when there is none, and what stands in for it while one loads or if it never does.
+    const venuePictureStandIn = (
+      <div className="flex aspect-square h-full items-center justify-center bg-brand-50 text-brand-700">
+                      {booking.facility?.iconKey ? (
+                        <CategoryIcon iconKey={booking.facility.iconKey} iconSvg={booking.facility.iconSvg} className="text-[2.5rem]" />
+                      ) : (
+                        <Icon name="location_on" className="text-[2.5rem]" />
+                      )}
+                    </div>
+    );
     const termsShown = !!preview && preview.windows.length > 0 && booking.status === 'CONFIRMED';
 
     return (
@@ -236,21 +246,7 @@ function BookingDetail() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
                 {/* A small picture (the venue-type icon when there is no photo), not a banner. */}
                 <div className="w-full shrink-0 overflow-hidden rounded-xl sm:h-36 sm:w-auto sm:max-w-full sm:self-start">
-                  {picture ? (
-                    <Thumb src={picture} />
-                  ) : (
-                    <div className="flex aspect-square h-full items-center justify-center bg-brand-50 text-brand-700">
-                      {booking.facility?.iconKey ? (
-                        <CategoryIcon
-                          iconKey={booking.facility.iconKey}
-                          iconSvg={booking.facility.iconSvg}
-                          className="text-[2.5rem]"
-                        />
-                      ) : (
-                        <Icon name="location_on" className="text-[2.5rem]" />
-                      )}
-                    </div>
-                  )}
+                  {picture ? <Thumb src={picture} fallback={venuePictureStandIn} /> : venuePictureStandIn}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
@@ -477,19 +473,28 @@ function startsIn(start: Date, end: Date): string {
  * small picture, as tall as the box and as wide as the photo's shape makes it (a very wide or tall photo is held to a sensible shape),
  * so it fills the box with nothing left empty around it.
  */
-function Thumb({ src }: { src: string }) {
+function Thumb({ src, fallback }: { src: string; fallback: React.ReactNode }) {
   const [ratio, setRatio] = useState(1.5);
+  const [loaded, setLoaded] = useState(false);
+  // Until the picture has arrived (or if it never does), the venue-type icon stands in for it, so the box is never empty.
   return (
-    <img
-      src={src}
-      alt=""
-      onLoad={(e) => {
-        const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
-        if (w > 0 && h > 0) setRatio(Math.min(2.2, Math.max(0.7, w / h)));
-      }}
-      style={{ '--ratio': ratio } as React.CSSProperties}
-      className="block h-auto max-h-[70vh] w-full object-contain sm:h-full sm:max-h-none sm:w-auto sm:object-cover sm:[aspect-ratio:var(--ratio)]"
-    />
+    <>
+      {!loaded && fallback}
+      <img
+        src={src}
+        alt=""
+        ref={(el) => {
+          if (el?.complete && el.naturalWidth > 0) setLoaded(true);
+        }}
+        onLoad={(e) => {
+          const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+          if (w > 0 && h > 0) setRatio(Math.min(2.2, Math.max(0.7, w / h)));
+          setLoaded(true);
+        }}
+        style={{ '--ratio': ratio } as React.CSSProperties}
+        className={`h-auto max-h-[70vh] w-full object-contain sm:h-full sm:max-h-none sm:w-auto sm:object-cover sm:[aspect-ratio:var(--ratio)] ${loaded ? 'block' : 'hidden'}`}
+      />
+    </>
   );
 }
 

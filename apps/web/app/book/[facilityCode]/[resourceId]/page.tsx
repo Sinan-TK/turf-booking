@@ -23,6 +23,7 @@ import {
 } from '@/lib/booking';
 import { CategoryIcon, ErrorBanner, Icon } from '@/components/ui';
 import { BookPageSkeleton } from '@/components/skeleton';
+import { FadeImage } from '@/components/fade-image';
 import { readSearch, writeSearch } from '@/lib/search-cache';
 import { useSavedVenues } from '@/lib/saved-venues';
 import { BrowseHeader } from '@/components/browse-header';
@@ -73,6 +74,9 @@ function Pictures({ unit, venueName, saved, onToggleSave }: { unit: SearchResult
   }, [unit]);
   const [index, setIndex] = useState(0);
   const shown = photos[Math.min(index, photos.length - 1)];
+  // The photos that have arrived: one that has not (or never does) leaves the facility icon showing.
+  const [loaded, setLoaded] = useState<Set<string>>(new Set());
+  const markLoaded = (src: string) => setLoaded((cur) => (cur.has(src) ? cur : new Set(cur).add(src)));
 
   // Several photos move on by themselves every few seconds; the pointer over the picture (or a dot in focus) holds them, and so does
   // a visitor who asked for less motion.
@@ -91,25 +95,27 @@ function Pictures({ unit, venueName, saved, onToggleSave }: { unit: SearchResult
         onFocus={() => setHeld(true)}
         onBlur={() => setHeld(false)}
         className="relative aspect-[16/9] overflow-hidden rounded-xl bg-stone-200 sm:aspect-[16/7]">
-        {photos.length > 0 ? (
-          // Every photo is stacked and loaded up front; the shown one fades in over the others, so a change is a smooth cross-fade, never a blank.
-          photos.map((src) => {
-            const active = src === shown;
-            return (
-              <img
-                key={src}
-                src={src}
-                alt={active ? `${venueName}, ${unit.resource.name}` : ''}
-                aria-hidden={active ? undefined : true}
-                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-[900ms] ease-in-out ${active ? 'opacity-100' : 'opacity-0'}`}
-              />
-            );
-          })
-        ) : (
-          <div aria-hidden="true" className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-stone-100 via-stone-200 to-stone-300">
-            <CategoryIcon iconKey={unit.category?.iconKey ?? 'category'} iconSvg={unit.category?.iconSvg} className="text-[6rem] text-stone-500/70" />
-          </div>
-        )}
+        {/* The facility's icon is always there: it is what shows with no photos, while a photo is loading, and if one never loads. */}
+        <div aria-hidden="true" className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-stone-100 via-stone-200 to-stone-300">
+          <CategoryIcon iconKey={unit.category?.iconKey ?? 'category'} iconSvg={unit.category?.iconSvg} className="text-[6rem] text-stone-500/70" />
+        </div>
+        {/* Every photo is stacked and loaded up front; the shown one fades in over the others once it has arrived, so a change is a smooth cross-fade, never a blank. */}
+        {photos.map((src) => {
+          const active = src === shown;
+          return (
+            <img
+              key={src}
+              ref={(el) => {
+                if (el?.complete && el.naturalWidth > 0) markLoaded(src);
+              }}
+              src={src}
+              alt={active ? `${venueName}, ${unit.resource.name}` : ''}
+              aria-hidden={active ? undefined : true}
+              onLoad={() => markLoaded(src)}
+              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-[900ms] ease-in-out ${active && loaded.has(src) ? 'opacity-100' : 'opacity-0'}`}
+            />
+          );
+        })}
 
         {offer && <OfferTag offer={offer} className="absolute left-3 top-3" />}
         <button
@@ -301,13 +307,10 @@ function BookingPage() {
                   onClick={() => go({ resource: u.resource.id })}
                   className={`relative h-24 w-40 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-stone-100 to-stone-300 text-left outline-none transition focus-visible:ring-4 focus-visible:ring-brand-600/30 sm:h-28 sm:w-48 ${on ? 'ring-[3px] ring-brand-700 ring-offset-2 ring-offset-gray-50' : 'opacity-90 hover:opacity-100'}`}
                 >
-                  {photo ? (
-                    <img src={photo} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
-                  ) : (
-                    <span aria-hidden="true" className="absolute inset-x-0 bottom-9 top-0 flex items-center justify-center">
-                      <CategoryIcon iconKey={u.category?.iconKey ?? 'category'} iconSvg={u.category?.iconSvg} className="text-[2.5rem] text-stone-500/70" />
-                    </span>
-                  )}
+                  <span aria-hidden="true" className="absolute inset-x-0 bottom-9 top-0 flex items-center justify-center">
+                    <CategoryIcon iconKey={u.category?.iconKey ?? 'category'} iconSvg={u.category?.iconSvg} className="text-[2.5rem] text-stone-500/70" />
+                  </span>
+                  {photo && <FadeImage src={photo} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />}
                   {photo && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-black/75 to-transparent" />}
                   <span className="absolute inset-x-0 bottom-0 px-2.5 pb-2">
                     <span className={`block truncate text-sm font-extrabold leading-tight ${photo ? 'text-white' : 'text-slate-900'}`}>{label}</span>

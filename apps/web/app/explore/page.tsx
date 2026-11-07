@@ -700,33 +700,35 @@ function CardGallery({
         go(end < start ? 1 : -1);
       }}
     >
-      {photos.length > 0 ? (
-        photos.map((src, i) =>
-          // Only the photo on show is fetched, and the next one once that has arrived: a card with three photos does not pull three.
-          i === index || visited.has(i) || (loaded.has(photos[index] ?? '') && i === (index + 1) % photos.length) ? (
-            <img
-              key={src}
-              src={src}
-              alt={i === index ? alt : ''}
-              aria-hidden={i !== index}
-              loading="lazy"
-              decoding="async"
-              onLoad={() => setLoaded((l) => (l.has(src) ? l : new Set(l).add(src)))}
-              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${i === index && loaded.has(src) ? 'opacity-100' : 'opacity-0'}`}
-            />
-          ) : null,
-        )
-      ) : (
-        <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-br from-stone-100 via-stone-200 to-stone-300">
-          {/* Faint centre circle behind the icon. */}
-          <div className="absolute left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full border border-stone-400/30" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <CategoryIcon iconKey={iconKey} iconSvg={iconSvg} className="text-[5.5rem] text-stone-500/70 sm:text-[6.5rem]" />
-          </div>
+      {/* The facility's icon is always behind: it shows with no photos, while one loads, and if one never does. */}
+      <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-br from-stone-100 via-stone-200 to-stone-300">
+        {/* Faint centre circle behind the icon. */}
+        <div className="absolute left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full border border-stone-400/30" />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <CategoryIcon iconKey={iconKey} iconSvg={iconSvg} className="text-[5.5rem] text-stone-500/70 sm:text-[6.5rem]" />
         </div>
+      </div>
+      {photos.map((src, i) =>
+        // Only the photo on show is fetched, and the next one once that has arrived: a card with three photos does not pull three.
+        i === index || visited.has(i) || (loaded.has(photos[index] ?? '') && i === (index + 1) % photos.length) ? (
+          <img
+            key={src}
+            src={src}
+            alt={i === index ? alt : ''}
+            aria-hidden={i !== index}
+            loading="lazy"
+            decoding="async"
+            ref={(el) => {
+              // A photo already in the browser's cache can finish before React listens for it.
+              if (el?.complete && el.naturalWidth > 0) setLoaded((l) => (l.has(src) ? l : new Set(l).add(src)));
+            }}
+            onLoad={() => setLoaded((l) => (l.has(src) ? l : new Set(l).add(src)))}
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${i === index && loaded.has(src) ? 'opacity-100' : 'opacity-0'}`}
+          />
+        ) : null,
       )}
       {/* A soft shade under the badge, only over real photos. */}
-      {photos.length > 0 && <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/35 to-transparent" />}
+      {loaded.has(photos[index] ?? '') && <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/35 to-transparent" />}
 
       {offer && <OfferTag offer={offer} className="absolute left-2.5 top-2.5" />}
 

@@ -12,6 +12,7 @@ import { api } from '@/lib/api';
 import type { VenueCategory } from '@/lib/categories';
 import { AccountMenu } from '@/components/account-menu';
 import { CategoryIcon, Icon } from '@/components/ui';
+import { FadeImage } from '@/components/fade-image';
 import { Skeleton } from '@/components/skeleton';
 import { OWNER_PORTAL_URL } from '@/lib/legal';
 import { SiteFooter } from '@/components/site-footer';
@@ -44,7 +45,7 @@ function TypeCard({ category: c }: { category: VenueCategory }) {
       >
         <span className="relative flex aspect-[4/3] items-center justify-center bg-brand-50 text-brand-700">
           <CategoryIcon iconKey={c.iconKey} iconSvg={c.iconSvg} className="text-[2.5rem]" />
-          {c.imageUrl && <img src={c.imageUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />}
+          {c.imageUrl && <FadeImage src={c.imageUrl} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />}
         </span>
         <span className="flex items-center justify-between gap-2 px-4 py-3.5">
           <span className="truncate text-base font-bold text-slate-900">{c.name}</span>
