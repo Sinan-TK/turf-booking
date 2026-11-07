@@ -16,7 +16,11 @@ export function FadeImage({ className = '', onLoad, ...rest }: ImgHTMLAttributes
       alt={rest.alt ?? ''}
       // A picture already in the browser's cache can finish before React listens for it.
       ref={(el) => {
-        if (el?.complete && el.naturalWidth > 0) setLoaded(true);
+        if (!loaded && el?.complete && el.naturalWidth > 0) {
+          setLoaded(true);
+          // Tell the owner too, as its own load event may already have passed.
+          onLoad?.({ currentTarget: el, target: el } as unknown as React.SyntheticEvent<HTMLImageElement>);
+        }
       }}
       onLoad={(e) => {
         setLoaded(true);

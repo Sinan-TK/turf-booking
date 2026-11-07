@@ -310,14 +310,7 @@ function BookingPage() {
                   <span aria-hidden="true" className="absolute inset-x-0 bottom-9 top-0 flex items-center justify-center">
                     <CategoryIcon iconKey={u.category?.iconKey ?? 'category'} iconSvg={u.category?.iconSvg} className="text-[2.5rem] text-stone-500/70" />
                   </span>
-                  {photo && <FadeImage src={photo} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />}
-                  {photo && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-black/75 to-transparent" />}
-                  <span className="absolute inset-x-0 bottom-0 px-2.5 pb-2">
-                    <span className={`block truncate text-sm font-extrabold leading-tight ${photo ? 'text-white' : 'text-slate-900'}`}>{label}</span>
-                    <span className={`block text-xs font-semibold ${photo ? 'text-white/85' : 'text-slate-600'}`}>
-                      {u.availableStartTimes.length === 0 ? 'No slots left' : u.price ? formatPrice(u.price) : ''}
-                    </span>
-                  </span>
+                  <TabPhoto photo={photo} label={label} note={u.availableStartTimes.length === 0 ? 'No slots left' : u.price ? formatPrice(u.price) : ''} />
                 </button>
               );
             })}
@@ -501,5 +494,32 @@ export default function BookPage() {
     <Suspense fallback={<Screen><BookPageSkeleton /></Screen>}>
       <BookingPage />
     </Suspense>
+  );
+}
+
+/**
+ * The picture and name on a facility tab. The dark fade and white text exist only to read over a picture, so they appear once the picture
+ * has arrived; while it loads, or if it never does, the facility icon and dark text show on the light tab instead.
+ */
+function TabPhoto({ photo, label, note }: { photo?: string | null; label: string; note: string }) {
+  const [loaded, setLoaded] = useState(false);
+  const shown = !!photo && loaded;
+  return (
+    <>
+      {photo && (
+        <FadeImage
+          src={photo}
+          loading="lazy"
+          decoding="async"
+          onLoad={() => setLoaded(true)}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      )}
+      {shown && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-black/75 to-transparent" />}
+      <span className="absolute inset-x-0 bottom-0 px-2.5 pb-2">
+        <span className={`block truncate text-sm font-extrabold leading-tight ${shown ? 'text-white' : 'text-slate-900'}`}>{label}</span>
+        <span className={`block text-xs font-semibold ${shown ? 'text-white/85' : 'text-slate-600'}`}>{note}</span>
+      </span>
+    </>
   );
 }
