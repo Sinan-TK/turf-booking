@@ -129,6 +129,38 @@ test.describe('owner portal: pooled items', () => {
     await expect(closed.getByText('PW Rough water')).toHaveCount(0);
   });
 
+  test('a pooled item price takes any days, picked like a normal unit (not only every day, weekdays or weekends)', async ({ page, makeVenue, ownerApi }) => {
+    test.setTimeout(120_000);
+    const venue = await makeVenue();
+    const kayak = ((await (await ownerApi.get('/categories')).json()) as Array<{ id: string; slug: string }>).find((c) => c.slug === 'KAYAKING')!;
+    const made = await ownerApi.post('/resources/groups', { data: { venueId: venue.id, categoryId: kayak.id, name: 'PW Days kayaks', allocationMode: 'POOLED', totalUnits: 4, sortOrder: 0 } });
+    expect(made.ok(), await made.text()).toBeTruthy();
+    await page.goto(`/venues/${venue.id}`);
+    await openUnitTab(page, 'PW Days kayaks');
+    const card = page.getByRole('region', { name: 'PW Days kayaks' });
+    const days = card.getByRole('group', { name: 'Days this price applies to' });
+
+    // No day chosen is refused with a message.
+    await days.getByRole('button', { name: 'Monday' }).click();
+    await days.getByRole('button', { name: 'Tuesday' }).click();
+    await days.getByRole('button', { name: 'Wednesday' }).click();
+    await days.getByRole('button', { name: 'Thursday' }).click();
+    await days.getByRole('button', { name: 'Friday' }).click();
+    await days.getByRole('button', { name: 'Saturday' }).click();
+    await days.getByRole('button', { name: 'Sunday' }).click();
+    await card.getByLabel('Price for one').fill('300');
+    await card.getByRole('button', { name: 'Add price' }).click();
+    await expect(card.getByText('Choose at least one day.')).toBeVisible();
+
+    // Friday to Sunday is a choice no fixed list had.
+    await days.getByRole('button', { name: 'Friday' }).click();
+    await days.getByRole('button', { name: 'Saturday' }).click();
+    await days.getByRole('button', { name: 'Sunday' }).click();
+    await expect(days.getByRole('button', { name: 'Saturday' })).toHaveAttribute('aria-pressed', 'true');
+    await card.getByRole('button', { name: 'Add price' }).click();
+    await expect(card.getByText(/Fri–Sun/)).toBeVisible();
+  });
+
   test('a facility with pooled stock is not offered in the unit form', async ({ page, venue }) => {
     await page.goto(`/venues/${venue.id}`);
     await openUnitTab(page, 'New');

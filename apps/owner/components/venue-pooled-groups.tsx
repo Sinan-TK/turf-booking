@@ -81,15 +81,39 @@ interface GroupPrice {
   bookingPrice: string;
 }
 
-const DAY_CHOICES = [
+// Monday-first ISO numbers (1 = Monday .. 7 = Sunday), the same day picker a normal unit's prices use.
+const DAYS = [
+  { n: 1, short: 'Mon', long: 'Monday' },
+  { n: 2, short: 'Tue', long: 'Tuesday' },
+  { n: 3, short: 'Wed', long: 'Wednesday' },
+  { n: 4, short: 'Thu', long: 'Thursday' },
+  { n: 5, short: 'Fri', long: 'Friday' },
+  { n: 6, short: 'Sat', long: 'Saturday' },
+  { n: 7, short: 'Sun', long: 'Sunday' },
+];
+
+const DAY_PRESETS = [
   { label: 'Every day', days: [1, 2, 3, 4, 5, 6, 7] },
   { label: 'Weekdays', days: [1, 2, 3, 4, 5] },
   { label: 'Weekends', days: [6, 7] },
+  { label: 'Fri–Sun', days: [5, 6, 7] },
 ];
 
+/** "Mon–Fri", "Sat, Sun", "Every day": runs of 3+ consecutive days become a range. */
 function daysText(days: number[]): string {
-  const hit = DAY_CHOICES.find((c) => c.days.length === days.length && c.days.every((d) => days.includes(d)));
-  return hit ? hit.label : days.map((d) => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][d - 1]).join(', ');
+  if (days.length === 0) return 'No days';
+  if (days.length === 7) return 'Every day';
+  const sorted = [...days].sort((x, y) => x - y);
+  const name = (n: number) => DAYS[n - 1]!.short;
+  const parts: string[] = [];
+  for (let i = 0; i < sorted.length;) {
+    let j = i;
+    while (j + 1 < sorted.length && sorted[j + 1] === sorted[j]! + 1) j++;
+    if (j - i >= 2) parts.push(`${name(sorted[i]!)}–${name(sorted[j]!)}`);
+    else for (let k = i; k <= j; k++) parts.push(name(sorted[k]!));
+    i = j + 1;
+  }
+  return parts.join(', ');
 }
 
 /** "18:30" -> "6:30 pm". */
@@ -292,26 +316,32 @@ export function GroupCard({ group, category, onChanged }: { group: Group; catego
 /** What one kayak costs for a length and the hours/days it can be booked; the open hours of the group come from these. */
 function PricesSection({ group, category, prices, refetch, mutate }: { group: Group; category?: VenueCategory; prices: GroupPrice[]; refetch: () => void; mutate: Mutate<GroupPrice[]> }) {
   const lengths = category?.policy.durations?.length ? category.policy.durations : [60, 120, 180];
-  const [form, setForm] = useState({ length: String(lengths[0] ?? 60), days: 0, from: '06:00', to: '18:00', price: '', advance: '' });
-  const [errors, setErrors] = useState<{ price?: string; time?: string }>({});
+  const [form, setForm] = useState({ length: String(lengths[0] ?? 60), days: [1, 2, 3, 4, 5, 6, 7] as number[], from: '06:00', to: '18:00', price: '', advance: '' });
+  const [errors, setErrors] = useState<{ price?: string; time?: string; days?: string }>({});
+  const toggleDay = (n: number) => {
+    setErrors((e) => ({ ...e, days: undefined }));
+    setForm((f) => ({ ...f, days: f.days.includes(n) ? f.days.filter((d) => d !== n) : [...f.days, n].sort((x, y) => x - y) }));
+  };
+  const sameDays = (x: number[], y: number[]) => x.length === y.length && x.every((d) => y.includes(d));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const found: { price?: string; time?: string } = {
+    const found: { price?: string; time?: string; days?: string } = {
+      days: form.days.length === 0 ? 'Choose at least one day.' : undefined,
       price: form.price.trim() === '' || !(Number(form.price) >= 0) ? 'Enter the price for one.' : undefined,
       time: !form.from || !form.to || form.from >= form.to ? 'The end time must be after the start time.' : undefined,
     };
     setErrors(found);
-    if (found.price || found.time) return;
+    if (found.price || found.time || found.days) return;
     setBusy(true);
     try {
       await api.post('/resources/pricing-rules', {
         resourceGroupId: group.id,
         durationMinutes: Number(form.length),
-        days: DAY_CHOICES[form.days]!.days,
+        days: form.days,
         pricingMode: 'PER_UNIT',
         normalPrice: Number(form.price),
         bookingPrice: form.advance.trim() === '' ? Number(form.price) : Number(form.advance),
@@ -370,15 +400,43 @@ function PricesSection({ group, category, prices, refetch, mutate }: { group: Gr
             ))}
           </Select>
         </div>
-        <div>
-          <Label htmlFor={`days-${group.id}`}>Days</Label>
-          <Select id={`days-${group.id}`} value={form.days} onChange={(e) => setForm((f) => ({ ...f, days: Number(e.target.value) }))}>
-            {DAY_CHOICES.map((c, i) => (
-              <option key={c.label} value={i}>
-                {c.label}
-              </option>
+        <div className="col-span-2 md:col-span-6">
+          <Label>Days</Label>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Days this price applies to">
+            {DAYS.map((d) => {
+              const on = form.days.includes(d.n);
+              return (
+                <button
+                  key={d.n}
+                  type="button"
+                  aria-pressed={on}
+                  aria-label={d.long}
+                  onClick={() => toggleDay(d.n)}
+                  className={`min-w-[3.25rem] rounded-lg px-3 py-2 text-body-md font-medium transition-colors ${
+                    on ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container-lowest text-on-surface ring-1 ring-inset ring-outline-variant/50 hover:bg-surface-container'
+                  }`}
+                >
+                  {d.short}
+                </button>
+              );
+            })}
+          </div>
+          <FieldError id={`days-${group.id}-error`} message={errors.days} />
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+            {DAY_PRESETS.map((pr) => (
+              <button
+                key={pr.label}
+                type="button"
+                onClick={() => {
+                  setErrors((e) => ({ ...e, days: undefined }));
+                  setForm((f) => ({ ...f, days: pr.days }));
+                }}
+                className={`font-medium hover:underline ${sameDays(form.days, pr.days) ? 'text-on-surface' : 'text-primary'}`}
+              >
+                {pr.label}
+              </button>
             ))}
-          </Select>
+          </div>
         </div>
         <div>
           <Label htmlFor={`from-${group.id}`}>From</Label>
