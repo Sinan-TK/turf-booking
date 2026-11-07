@@ -138,9 +138,6 @@ export default function LandingPage() {
             <Link href="/explore" className={`rounded-md px-3 py-1.5 transition hover:text-brand-700 ${focus}`}>
               Explore venues
             </Link>
-            <Link href="/support" className={`rounded-md px-3 py-1.5 transition hover:text-brand-700 ${focus}`}>
-              Support
-            </Link>
           </nav>
           <div className="ml-auto">
             <AccountMenu />

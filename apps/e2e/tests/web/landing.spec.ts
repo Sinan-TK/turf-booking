@@ -52,6 +52,9 @@ test.describe('customer site: landing page', () => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto('/');
     await expect(page.getByRole('banner').getByRole('img', { name: 'Bookyo' })).toHaveCount(0);
+    // The nav bar has only Explore venues (no Support link) beside the account menu.
+    await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link')).toHaveText(['Explore venues']);
+    await expect(page.getByRole('banner').getByRole('link', { name: 'Support' })).toHaveCount(0);
     const hero = page.getByRole('main').getByRole('img', { name: 'Bookyo' }).first();
     await expect(hero).toBeVisible();
     // The logo sits above the headline.
