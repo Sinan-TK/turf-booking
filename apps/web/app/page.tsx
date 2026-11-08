@@ -263,15 +263,9 @@ export default function LandingPage() {
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-cream/90 backdrop-blur">
         <div className={`${shell} flex items-center gap-4 py-3`}>
           <nav aria-label="Main" className="flex items-center gap-1 text-[0.9375rem] font-semibold text-slate-600">
-            {[
-              ['#types', 'Venue types'],
-              ['#how-it-works', 'How it works'],
-              ['#for-owners', 'For owners'],
-            ].map(([href, label]) => (
-              <a key={href} href={href} className={`rounded-md px-3 py-1.5 transition hover:text-brand-700 ${focus}`}>
-                {label}
-              </a>
-            ))}
+            <Link href="/explore" className={`rounded-md px-3 py-1.5 transition hover:text-brand-700 ${focus}`}>
+              Explore venues
+            </Link>
           </nav>
           <div className="ml-auto">
             <AccountMenu />
