@@ -52,8 +52,8 @@ test.describe('customer site: landing page', () => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto('/');
     await expect(page.getByRole('banner').getByRole('img', { name: 'Bookyo' })).toHaveCount(0);
-    // The nav bar has only Explore venues (no Support link) beside the account menu.
-    await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link')).toHaveText(['Explore venues']);
+    // The nav bar has anchor links to the page sections (no Support link) beside the account menu.
+    await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link')).toHaveText(['Venue types', 'How it works', 'For owners']);
     await expect(page.getByRole('banner').getByRole('link', { name: 'Support' })).toHaveCount(0);
     const hero = page.getByRole('main').getByRole('img', { name: 'Bookyo' }).first();
     await expect(hero).toBeVisible();

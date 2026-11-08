@@ -263,9 +263,15 @@ export default function LandingPage() {
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-cream/90 backdrop-blur">
         <div className={`${shell} flex items-center gap-4 py-3`}>
           <nav aria-label="Main" className="flex items-center gap-1 text-[0.9375rem] font-semibold text-slate-600">
-            <Link href="/explore" className={`rounded-md px-3 py-1.5 transition hover:text-brand-700 ${focus}`}>
-              Explore venues
-            </Link>
+            {[
+              ['#types', 'Venue types'],
+              ['#how-it-works', 'How it works'],
+              ['#for-owners', 'For owners'],
+            ].map(([href, label]) => (
+              <a key={href} href={href} className={`rounded-md px-3 py-1.5 transition hover:text-brand-700 ${focus}`}>
+                {label}
+              </a>
+            ))}
           </nav>
           <div className="ml-auto">
             <AccountMenu />
@@ -288,7 +294,7 @@ export default function LandingPage() {
             onSubmit={search}
             role="search"
             style={{ '--d': '550ms' } as React.CSSProperties}
-            className="landing-rise mx-auto mt-8 flex max-w-2xl flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-card sm:flex-row"
+            className="landing-rise mx-auto mt-9 flex max-w-2xl flex-col gap-2 rounded-3xl border border-slate-200 bg-white p-2 shadow-[0_18px_50px_-18px_rgba(5,5,5,0.25)] transition focus-within:border-brand-700 sm:flex-row sm:rounded-full"
           >
             <label className="relative flex-1">
               <span className="sr-only">Search venues</span>
@@ -297,21 +303,24 @@ export default function LandingPage() {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 placeholder="Search venues, turfs, pools, badminton..."
-                className="h-12 w-full rounded-xl bg-transparent pl-12 pr-4 text-base font-medium text-slate-900 placeholder-slate-400 outline-none"
+                className="h-14 w-full rounded-full bg-transparent pl-12 pr-4 text-base font-medium text-slate-900 placeholder-slate-400 outline-none"
               />
             </label>
             <button
               type="submit"
-              className={`h-12 rounded-xl bg-brand-700 px-7 text-base font-bold text-white transition hover:bg-brand-600 active:scale-[0.98] ${focus}`}
+              className={`inline-flex h-14 items-center justify-center gap-2 rounded-full bg-brand-700 px-8 text-base font-extrabold text-white transition hover:bg-brand-600 active:scale-[0.98] ${focus}`}
             >
               Find venues
+              <Icon name="chevron_right" className="text-[1.125rem] text-brand-400" />
             </button>
           </form>
 
-          <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-semibold text-slate-600">
+          <ul style={{ '--d': '700ms' } as React.CSSProperties} className="landing-rise mt-6 flex flex-wrap items-center justify-center gap-2.5 text-sm font-bold text-slate-700">
             {['Live availability', 'Pay only a small advance', 'Instant booking ID'].map((t) => (
-              <li key={t} className="inline-flex items-center gap-1.5">
-                <Icon name="check" className="text-[1rem] text-brand-700" />
+              <li key={t} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1.5 pl-1.5 pr-4 shadow-sm">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-400 text-[0.9rem] text-brand-700">
+                  <Icon name="check" />
+                </span>
                 {t}
               </li>
             ))}
@@ -319,7 +328,7 @@ export default function LandingPage() {
         </section>
 
         {/* ---------------------------------------------------- Venue types */}
-        <section aria-labelledby="types-heading" className={`${shell} pb-16 sm:pb-24`}>
+        <section id="types" aria-labelledby="types-heading" className={`${shell} scroll-mt-20 pb-16 sm:pb-24`}>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 id="types-heading" className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
@@ -360,7 +369,7 @@ export default function LandingPage() {
         )}
 
         {/* -------------------------------------------------- How it works */}
-        <section className={`${shell} py-16 sm:py-20`}>
+        <section id="how-it-works" className={`${shell} scroll-mt-20 py-16 sm:py-20`}>
           <h2 className="text-center text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">How it works</h2>
           <p className="mx-auto mt-2 max-w-lg text-center text-base text-slate-600">Three taps from searching to a confirmed slot.</p>
           <ol className="mt-10 grid gap-5 md:grid-cols-3 md:gap-6">
@@ -389,7 +398,7 @@ export default function LandingPage() {
         </section>
 
         {/* ------------------------------------------------------- For owners */}
-        <section className={`${shell} pb-16 sm:pb-24`}>
+        <section id="for-owners" className={`${shell} scroll-mt-20 pb-16 sm:pb-24`}>
           <div className="relative isolate overflow-hidden rounded-[2rem] bg-brand-700 px-6 py-10 text-white sm:px-10 sm:py-14 lg:px-14">
             {/* Soft lime glows and a faint dot grid give the dark card depth without noise. */}
             <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 -z-10 h-80 w-80 rounded-full bg-brand-400/25 blur-3xl" />
