@@ -18,10 +18,11 @@ import { OWNER_PORTAL_URL } from '@/lib/legal';
 import { SiteFooter } from '@/components/site-footer';
 import { Logo } from '@/components/logo';
 
+// Each step has its own colour, so the three read as a path from first to last: light, dark, then the brand lime.
 const STEPS = [
-  { title: 'Find a venue', text: 'Search by area or pick a type: turfs, courts, pools, game rooms and more.' },
-  { title: 'Pick a time', text: 'See which slots are free right now and choose the length that suits you.' },
-  { title: 'Book and play', text: 'Reserve with a small advance online and get your booking ID straight away.' },
+  { title: 'Find a venue', icon: 'search', text: 'Search by area or pick a type: turfs, courts, pools, game rooms and more.', card: 'bg-white text-slate-900 border-slate-200', body: 'text-slate-600', badge: 'bg-brand-400 text-brand-700', ghost: '#cbd5e1' },
+  { title: 'Pick a time', icon: 'schedule', text: 'See which slots are free right now and choose the length that suits you.', card: 'bg-brand-700 text-white border-brand-700', body: 'text-white/75', badge: 'bg-brand-400 text-brand-700', ghost: 'rgba(255,255,255,0.28)' },
+  { title: 'Book and play', icon: 'verified', text: 'Reserve with a small advance online and get your booking ID straight away.', card: 'bg-brand-400 text-brand-700 border-brand-400', body: 'text-brand-700/80', badge: 'bg-brand-700 text-brand-400', ghost: 'rgba(5,5,5,0.3)' },
 ] as const;
 
 const focus = 'outline-none focus-visible:ring-4 focus-visible:ring-brand-700/20';
@@ -358,21 +359,32 @@ export default function LandingPage() {
         )}
 
         {/* -------------------------------------------------- How it works */}
-        <section className="border-y border-slate-200 bg-white">
-          <div className={`${shell} py-16 sm:py-20`}>
-            <h2 className="text-center text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">How it works</h2>
-            <ol className="mt-10 grid gap-4 md:grid-cols-3 md:gap-6">
-              {STEPS.map((step, i) => (
-                <li key={step.title} className="rounded-2xl border border-slate-200 bg-cream p-6">
-                  <span aria-hidden="true" className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-400 text-lg font-black text-brand-700">
-                    {i + 1}
-                  </span>
-                  <h3 className="mt-4 text-xl font-extrabold text-slate-900">{step.title}</h3>
-                  <p className="mt-1.5 text-pretty text-base leading-relaxed text-slate-600">{step.text}</p>
-                </li>
-              ))}
-            </ol>
-          </div>
+        <section className={`${shell} py-16 sm:py-20`}>
+          <h2 className="text-center text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">How it works</h2>
+          <p className="mx-auto mt-2 max-w-lg text-center text-base text-slate-600">Three taps from searching to a confirmed slot.</p>
+          <ol className="mt-10 grid gap-5 md:grid-cols-3 md:gap-6">
+            {STEPS.map((step, i) => (
+              <li
+                key={step.title}
+                className={`group relative flex min-h-[15rem] flex-col overflow-hidden rounded-3xl border p-7 transition duration-300 hover:-translate-y-1 hover:shadow-card ${step.card} ${i === 1 ? 'md:translate-y-5 md:hover:translate-y-4' : ''}`}
+              >
+                {/* The step number, drawn large and hollow behind the words. */}
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -bottom-6 -right-2 select-none text-[9rem] font-black leading-none transition duration-300 group-hover:-translate-y-1 group-hover:scale-105"
+                  style={{ color: 'transparent', WebkitTextStroke: `2px ${step.ghost}` }}
+                >
+                  {i + 1}
+                </span>
+                <span className={`relative flex h-12 w-12 items-center justify-center rounded-2xl text-2xl ${step.badge}`}>
+                  <Icon name={step.icon} />
+                </span>
+                <p className="relative mt-5 text-xs font-extrabold uppercase tracking-widest opacity-60">Step {i + 1}</p>
+                <h3 className="relative mt-1 text-2xl font-black tracking-tight">{step.title}</h3>
+                <p className={`relative mt-2 max-w-[17rem] text-pretty text-base leading-relaxed ${step.body}`}>{step.text}</p>
+              </li>
+            ))}
+          </ol>
         </section>
 
         {/* ------------------------------------------------------- For owners */}

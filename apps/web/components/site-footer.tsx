@@ -58,7 +58,7 @@ export function SiteFooter({ wide = false }: { wide?: boolean }) {
           </Column>
         </div>
 
-        <div className="flex flex-col gap-1 border-t border-slate-200 py-5 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+        <div className={`flex flex-col gap-1 border-t border-slate-200 py-5 text-sm text-slate-500 sm:flex-row sm:items-center ${wide ? 'sm:justify-end sm:gap-6' : 'sm:justify-between'}`}>
           <p>
             &copy; {new Date().getFullYear()} {LEGAL.operator}. All rights reserved.
           </p>
