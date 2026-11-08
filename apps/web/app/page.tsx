@@ -24,13 +24,6 @@ const STEPS = [
   { title: 'Book and play', text: 'Reserve with a small advance online and get your booking ID straight away.' },
 ] as const;
 
-const REASONS = [
-  { icon: 'bolt', title: 'Live availability', text: 'What you see is open right now, down to the hour.' },
-  { icon: 'wallet', title: 'Pay only an advance', text: 'Hold a slot online and settle the rest at the venue.' },
-  { icon: 'verified', title: 'Instant confirmation', text: 'No calls or waiting. You get a booking ID straight away.' },
-  { icon: 'bookings', title: 'Everything in one place', text: 'Your bookings, your wallet and support, all under your account.' },
-] as const;
-
 const focus = 'outline-none focus-visible:ring-4 focus-visible:ring-brand-700/20';
 // The sections run the full width of the page, with an even margin at each side.
 const shell = 'w-full px-4 sm:px-6 lg:px-10 xl:px-14';
@@ -380,23 +373,6 @@ export default function LandingPage() {
               ))}
             </ol>
           </div>
-        </section>
-
-        {/* -------------------------------------------------------------- Why */}
-        <section className={`${shell} py-16 sm:py-20`}>
-          <h2 className="text-center text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">Why book with Bookyo</h2>
-          <p className="mx-auto mt-2 max-w-lg text-center text-base text-slate-600">Less chasing, more playing. Get a slot sorted in a minute.</p>
-          <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {REASONS.map((r) => (
-              <li key={r.title} className="rounded-2xl border border-slate-200 bg-white p-6">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-[1.375rem] text-brand-700">
-                  <Icon name={r.icon} />
-                </span>
-                <h3 className="mt-4 text-lg font-extrabold text-slate-900">{r.title}</h3>
-                <p className="mt-1.5 text-pretty text-[0.9375rem] leading-relaxed text-slate-600">{r.text}</p>
-              </li>
-            ))}
-          </ul>
         </section>
 
         {/* ------------------------------------------------------- For owners */}
