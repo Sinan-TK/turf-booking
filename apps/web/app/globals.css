@@ -172,6 +172,76 @@ html {
   }
 }
 
+/* The page-loading screen (app/loading.tsx): the logo breathes while a lime bar sweeps beneath it. */
+@keyframes loader-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+@keyframes loader-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(260%);
+  }
+}
+.loader-breathe {
+  animation: loader-breathe 1.6s ease-in-out infinite;
+}
+.loader-sweep {
+  animation: loader-sweep 1.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+/* The landing logo drops in with a small bounce. */
+@keyframes logo-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.85);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(2px) scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+.logo-pop {
+  animation: logo-pop 0.9s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+/* The Own a venue card: soft floating motion on its illustration. */
+@keyframes float-soft {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--r, 0deg));
+  }
+  50% {
+    transform: translateY(-8px) rotate(var(--r, 0deg));
+  }
+}
+.float-soft {
+  animation: float-soft 5s ease-in-out infinite;
+  animation-delay: var(--d, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loader-breathe,
+  .loader-sweep,
+  .logo-pop,
+  .float-soft {
+    animation: none;
+  }
+}
+
 /* The shown photo's dot on the venue page: a bar that fills across the 3.5 seconds before the next photo (see Pictures). */
 .photo-dot-fill {
   transform-origin: left center;

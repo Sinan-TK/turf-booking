@@ -276,18 +276,19 @@ export default function LandingPage() {
       <main className="flex-1">
         {/* ----------------------------------------------------------- Hero */}
         <section className={`${shell} pb-14 pt-10 text-center sm:pb-20 sm:pt-14`}>
-          <Logo hole="#FFFCF6" className="mx-auto mb-8 h-16 w-auto select-none sm:mb-10 sm:h-24" />
-          <h1 className="mx-auto max-w-3xl text-balance text-[2.75rem] font-black leading-[1.05] tracking-tight text-slate-900 sm:text-6xl">
+          <Logo hole="#FFFCF6" className="logo-pop mx-auto mb-8 h-24 w-auto select-none sm:mb-10 sm:h-32 lg:h-40" />
+          <h1 style={{ '--d': '250ms' } as React.CSSProperties} className="landing-rise mx-auto max-w-3xl text-balance text-[2.75rem] font-black leading-[1.05] tracking-tight text-slate-900 sm:text-6xl">
             Book your game, <span className="rounded-md bg-brand-400 px-2 [box-decoration-break:clone]">in seconds.</span>
           </h1>
-          <p className="mx-auto mt-5 max-w-xl text-pretty text-lg leading-relaxed text-slate-600">
+          <p style={{ '--d': '400ms' } as React.CSSProperties} className="landing-rise mx-auto mt-5 max-w-xl text-pretty text-lg leading-relaxed text-slate-600">
             Turfs, courts, pools, game rooms and activity venues near you. See which slots are free right now and book in a minute.
           </p>
 
           <form
             onSubmit={search}
             role="search"
-            className="mx-auto mt-8 flex max-w-2xl flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-card sm:flex-row"
+            style={{ '--d': '550ms' } as React.CSSProperties}
+            className="landing-rise mx-auto mt-8 flex max-w-2xl flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-card sm:flex-row"
           >
             <label className="relative flex-1">
               <span className="sr-only">Search venues</span>
@@ -389,20 +390,73 @@ export default function LandingPage() {
 
         {/* ------------------------------------------------------- For owners */}
         <section className={`${shell} pb-16 sm:pb-24`}>
-          <div className="flex flex-col items-start justify-between gap-6 rounded-2xl bg-brand-700 p-8 text-white sm:flex-row sm:items-center sm:p-10">
-            <div>
-              <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Own a venue?</h2>
-              <p className="mt-2 max-w-xl text-pretty text-base leading-relaxed text-white/75">
-                List your turf, court or activity space on Bookyo, take online bookings and see your earnings in one place.
-              </p>
+          <div className="relative isolate overflow-hidden rounded-[2rem] bg-brand-700 px-6 py-10 text-white sm:px-10 sm:py-14 lg:px-14">
+            {/* Soft lime glows and a faint dot grid give the dark card depth without noise. */}
+            <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 -z-10 h-80 w-80 rounded-full bg-brand-400/25 blur-3xl" />
+            <div aria-hidden="true" className="pointer-events-none absolute -bottom-32 left-1/3 -z-10 h-72 w-72 rounded-full bg-brand-400/10 blur-3xl" />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 -z-10 opacity-[0.12]"
+              style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '22px 22px', maskImage: 'linear-gradient(90deg, transparent, #000 85%)', WebkitMaskImage: 'linear-gradient(90deg, transparent, #000 85%)' }}
+            />
+
+            <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+              <div>
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1.5 text-xs font-extrabold uppercase tracking-widest text-brand-400 ring-1 ring-white/15">
+                  <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
+                  For venue owners
+                </span>
+                <h2 className="mt-5 text-balance text-4xl font-black leading-[1.05] tracking-tight sm:text-5xl">
+                  Own a venue? <span className="text-brand-400">Fill every slot.</span>
+                </h2>
+                <p className="mt-4 max-w-xl text-pretty text-base leading-relaxed text-white/70 sm:text-lg">
+                  List your turf, court or activity space on Bookyo, take online bookings and see your earnings in one place.
+                </p>
+                <ul className="mt-6 flex flex-wrap gap-x-6 gap-y-2.5 text-[0.9375rem] font-semibold text-white/90">
+                  {['Online bookings, day and night', 'An advance paid up front', 'Earnings and payouts in one view'].map((perk) => (
+                    <li key={perk} className="flex items-center gap-2">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-400 text-[0.8rem] text-brand-700">
+                        <Icon name="check" />
+                      </span>
+                      {perk}
+                    </li>
+                  ))}
+                </ul>
+                <a
+                  href={`${OWNER_PORTAL_URL}/register`}
+                  className="group mt-8 inline-flex items-center gap-2 rounded-xl bg-brand-400 px-7 py-4 text-base font-extrabold text-brand-700 shadow-[0_10px_30px_-10px_rgba(165,245,43,0.7)] outline-none transition hover:bg-white focus-visible:ring-4 focus-visible:ring-white/40 active:scale-[0.98]"
+                >
+                  List your venue
+                  <Icon name="chevron_right" className="text-[1.125rem] transition group-hover:translate-x-1" />
+                </a>
+              </div>
+
+              {/* A made-up booking card, only to show what the owner's day looks like. */}
+              <div aria-hidden="true" className="relative mx-auto hidden h-72 w-full max-w-md sm:block">
+                <div style={{ '--r': '-3deg', '--d': '0ms' } as React.CSSProperties} className="float-soft absolute left-0 top-4 w-72 rounded-2xl bg-white p-5 text-slate-900 shadow-2xl">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold uppercase tracking-widest text-slate-500">New booking</span>
+                    <span className="rounded-full bg-brand-400 px-2.5 py-0.5 text-xs font-extrabold text-brand-700">Confirmed</span>
+                  </div>
+                  <p className="mt-3 text-xl font-black">Turf A · 7:00 PM</p>
+                  <p className="text-sm font-medium text-slate-500">1 hour · advance paid online</p>
+                  <div className="mt-4 flex gap-1.5">
+                    {[40, 65, 50, 85, 70, 95, 60].map((h, i) => (
+                      <span key={i} className="flex h-12 flex-1 items-end rounded-md bg-slate-100">
+                        <span className="w-full rounded-md bg-brand-700" style={{ height: `${h}%` }} />
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ '--r': '4deg', '--d': '900ms' } as React.CSSProperties} className="float-soft absolute bottom-0 right-0 w-56 rounded-2xl bg-brand-400 p-5 text-brand-700 shadow-2xl">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-700 text-xl text-brand-400">
+                    <Icon name="wallet" />
+                  </span>
+                  <p className="mt-3 text-xs font-extrabold uppercase tracking-widest opacity-70">This week</p>
+                  <p className="text-2xl font-black">Payout on its way</p>
+                </div>
+              </div>
             </div>
-            <a
-              href={`${OWNER_PORTAL_URL}/register`}
-              className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-brand-400 px-6 py-3.5 text-base font-extrabold text-brand-700 outline-none transition hover:bg-white focus-visible:ring-4 focus-visible:ring-white/40 active:scale-[0.98]"
-            >
-              List your venue
-              <Icon name="chevron_right" className="text-[1.125rem]" />
-            </a>
           </div>
         </section>
       </main>
