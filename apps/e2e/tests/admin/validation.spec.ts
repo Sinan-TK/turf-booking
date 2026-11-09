@@ -81,6 +81,17 @@ test.describe('admin: field errors on forms', () => {
     await expect(page.getByText('Customer 50% · Owner 15% · Platform 35%')).toBeVisible();
   });
 
+  test('commercial terms: customer cancellation has an on/off switch', async ({ page }) => {
+    await page.goto('/policies');
+    const sw = page.getByRole('switch', { name: 'Allow customers to cancel' });
+    await expect(sw).toBeChecked();
+    await expect(page.getByText('On: the cancellation windows apply')).toBeVisible();
+    await sw.uncheck();
+    await expect(page.getByText('Off: no cancellation is available')).toBeVisible();
+    await sw.check();
+    await expect(page.getByText('On: the cancellation windows apply')).toBeVisible();
+  });
+
   test('commercial terms: the server refuses a commission above the minimum advance', async ({ page }) => {
     await page.goto('/policies');
     await page.getByLabel('Minimum advance').fill('10');

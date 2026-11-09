@@ -892,9 +892,11 @@ export class BookingsService {
     commercialTerms: Prisma.JsonValue;
   }): Promise<CommercialTerms> {
     const snapshot = commercialTermsSchema.safeParse(booking.commercialTerms);
-    if (snapshot.success) return snapshot.data;
     const categoryId = await this.commercialTerms.categoryOf(booking);
-    return (await this.commercialTerms.resolve(booking.venueId, categoryId)).terms;
+    const current = (await this.commercialTerms.resolve(booking.venueId, categoryId)).terms;
+    // The windows and money split are the ones the booking was made under; the on/off switch is the venue's
+    // current choice, so turning cancellation off also stops bookings made earlier.
+    return snapshot.success ? { ...snapshot.data, cancellationEnabled: current.cancellationEnabled } : current;
   }
 
   /** What was paid online for a booking (0 when nothing was: unpaid, or a walk-in). */
@@ -914,6 +916,7 @@ export class BookingsService {
     const paidMinor = this.paidOnlineMinor(booking);
     const outcome = paidMinor > 0 ? cancellationOutcome(terms, minutesUntil(booking.startTime), paidMinor) : null;
     return {
+      cancellationEnabled: terms.cancellationEnabled !== false,
       canCancel: cancellable && (outcome === null || outcome.allowed),
       currency: booking.currency,
       paidOnline: fromMinor(paidMinor),
@@ -950,7 +953,10 @@ export class BookingsService {
         statusCode: 400,
         error: 'Bad Request',
         code: 'CANCELLATION_CLOSED',
-        message: `This booking can no longer be cancelled: cancelling closes ${describeMinutes(terms.cancelCutoffMinutes)} before the start.`,
+        message:
+          outcome.reason === 'DISABLED'
+            ? 'This venue does not allow customers to cancel a paid booking. Contact the venue if you need help.'
+            : `This booking can no longer be cancelled: cancelling closes ${describeMinutes(terms.cancelCutoffMinutes)} before the start.`,
       });
     }
     const context = await this.settlements.contextOf(booking);

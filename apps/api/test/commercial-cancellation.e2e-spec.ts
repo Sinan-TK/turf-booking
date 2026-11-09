@@ -196,4 +196,27 @@ describe('Cancellation windows, cut-off and staff cancellation', () => {
     expect((await balance(customerId)) - before).toBe(240);
     expect(await prisma.bookingSettlement.findUnique({ where: { bookingId } })).toBeNull();
   });
+
+  test('a venue deal can switch customer cancellation off and on; staff can still cancel', async () => {
+    const { agent, customerId, bookingId } = await paidBooking(14);
+    const deal = (cancellationEnabled: boolean) =>
+      adminAgent.put(`/admin/venues/${venue.venueId}/facilities/${categoryId}/commercial-terms`).send({ cancellationEnabled });
+
+    expect((await deal(false)).status).toBe(200);
+    const preview = await agent.get(`/me/bookings/${bookingId}/cancellation`);
+    expect(preview.body.cancellationEnabled).toBe(false);
+    expect(preview.body.canCancel).toBe(false);
+    const blocked = await agent.post(`/me/bookings/${bookingId}/cancel`).send({});
+    expect(blocked.status).toBe(400);
+    expect(blocked.body.code).toBe('CANCELLATION_CLOSED');
+    expect(blocked.body.message).toMatch(/does not allow/);
+
+    // Turned back on: the windows apply again, even for a booking made while it was off.
+    expect((await deal(true)).status).toBe(200);
+    const before = await balance(customerId);
+    const ok = await agent.post(`/me/bookings/${bookingId}/cancel`).send({});
+    expect(ok.status).toBe(201);
+    expect((await balance(customerId)) - before).toBe(800);
+    await adminAgent.delete(`/admin/venues/${venue.venueId}/facilities/${categoryId}/commercial-terms`);
+  });
 });

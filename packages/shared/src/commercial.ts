@@ -72,6 +72,8 @@ const facilityTermsShape = {
   afterCapFeePercent: z.number().min(0).max(100),
   /** The online advance must be at least this percentage of the full price. */
   minAdvancePercent: z.number().min(0).max(100),
+  /** Off = customers can't cancel a paid booking at all (staff still can). Missing in older terms = on. */
+  cancellationEnabled: z.boolean().default(true),
   cancellationTiers,
   /** Customers can't cancel a paid booking less than this many minutes before the start. */
   cancelCutoffMinutes: z.number().int().min(0).max(60 * 24 * 365),
@@ -115,6 +117,12 @@ export function mergeCommercialTerms(
   const sources: Partial<Record<CommercialTermKey, CommercialSource>> = {};
   for (const key of COMMERCIAL_TERM_KEYS) {
     const layer = layers.find((l) => l.terms && Object.prototype.hasOwnProperty.call(l.terms, key));
+    // Terms saved before the switch existed have no value for it: cancelling stays on.
+    if (!layer && key === 'cancellationEnabled') {
+      terms[key] = true;
+      sources[key] = 'PLATFORM_DEFAULT';
+      continue;
+    }
     if (!layer) throw new Error(`Commercial terms are not configured: "${key}" has no value at any level.`);
     terms[key] = (layer.terms as Record<string, unknown>)[key];
     sources[key] = layer.source;
@@ -134,6 +142,7 @@ export function commercialTermsProblems(terms: CommercialTerms): string[] {
       `The commission (${maxPercent}%) can't be more than the minimum online advance (${terms.minAdvancePercent}%), because the commission is taken out of the advance.`,
     );
   }
+  if (terms.cancellationEnabled === false) return problems;
   const lowestWindowMinutes = Math.min(...terms.cancellationTiers.map((t) => t.minHoursBeforeStart)) * 60;
   if (lowestWindowMinutes > terms.cancelCutoffMinutes) {
     problems.push(
@@ -220,7 +229,7 @@ export function settlePlayedBooking(input: PlayedSettlementInput): PlayedSettlem
 }
 
 export type CancellationOutcome =
-  | { allowed: false; reason: 'CUTOFF' }
+  | { allowed: false; reason: 'CUTOFF' | 'DISABLED' }
   | {
       allowed: true;
       tier: CancellationTier;
@@ -231,10 +240,11 @@ export type CancellationOutcome =
 
 /** What a customer cancellation `minutesBeforeStart` before the start does with the amount paid online. */
 export function cancellationOutcome(
-  terms: Pick<CommercialTerms, 'cancellationTiers' | 'cancelCutoffMinutes'>,
+  terms: Pick<CommercialTerms, 'cancellationTiers' | 'cancelCutoffMinutes'> & { cancellationEnabled?: boolean },
   minutesBeforeStart: number,
   collectedMinor: number,
 ): CancellationOutcome {
+  if (terms.cancellationEnabled === false) return { allowed: false, reason: 'DISABLED' };
   if (minutesBeforeStart < terms.cancelCutoffMinutes) return { allowed: false, reason: 'CUTOFF' };
   const tier = [...terms.cancellationTiers]
     .sort((a, b) => b.minHoursBeforeStart - a.minHoursBeforeStart)

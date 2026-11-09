@@ -23,23 +23,25 @@ import { Button, ErrorBanner, FieldError, Input, Label, Select, SuccessBanner, i
  */
 type Mode = 'platform' | 'facility' | 'override';
 
-export type Group = 'commission' | 'cap' | 'afterCap' | 'advance' | 'cancellation' | 'cutoff' | 'payout';
+export type Group = 'commission' | 'cap' | 'afterCap' | 'advance' | 'cancelSwitch' | 'cancellation' | 'cutoff' | 'payout';
 const GROUP_KEYS: Record<Group, TermKey[]> = {
   commission: ['commissionTiers'],
   cap: ['monthlyCommissionCap'],
   afterCap: ['afterCapFeePercent'],
   advance: ['minAdvancePercent'],
+  cancelSwitch: ['cancellationEnabled'],
   cancellation: ['cancellationTiers'],
   cutoff: ['cancelCutoffMinutes'],
   payout: ['payoutWeekday', 'payoutTimezone'],
 };
-const FACILITY_GROUPS: Group[] = ['commission', 'cap', 'afterCap', 'advance', 'cancellation', 'cutoff'];
+const FACILITY_GROUPS: Group[] = ['commission', 'cap', 'afterCap', 'advance', 'cancelSwitch', 'cancellation', 'cutoff'];
 
 interface Draft {
   commissionTiers: Array<{ fromBooking: string; type: 'PERCENTAGE' | 'FLAT'; value: string }>;
   monthlyCommissionCap: string;
   afterCapFeePercent: string;
   minAdvancePercent: string;
+  cancellationEnabled: boolean;
   cancellationTiers: Array<{ minHoursBeforeStart: string; refundPercent: string; ownerPercent: string }>;
   cancelCutoffMinutes: string;
   payoutWeekday: string;
@@ -52,6 +54,7 @@ function toDraft(t: CommercialTerms): Draft {
     monthlyCommissionCap: t.monthlyCommissionCap === null ? '' : String(t.monthlyCommissionCap),
     afterCapFeePercent: String(t.afterCapFeePercent),
     minAdvancePercent: String(t.minAdvancePercent),
+    cancellationEnabled: t.cancellationEnabled !== false,
     cancellationTiers: t.cancellationTiers.map((x) => ({
       minHoursBeforeStart: String(x.minHoursBeforeStart),
       refundPercent: String(x.refundPercent),
@@ -95,6 +98,8 @@ function groupError(group: Group, d: Draft): string | undefined {
       return pct(d.afterCapFeePercent, 'The after-cap fee');
     case 'advance':
       return pct(d.minAdvancePercent, 'The minimum advance');
+    case 'cancelSwitch':
+      return undefined;
     case 'cancellation': {
       const seen = new Set<number>();
       for (const [i, t] of d.cancellationTiers.entries()) {
@@ -132,6 +137,8 @@ function groupValue(group: Group, d: Draft): Partial<CommercialTerms> {
       return { afterCapFeePercent: Number(d.afterCapFeePercent) };
     case 'advance':
       return { minAdvancePercent: Number(d.minAdvancePercent) };
+    case 'cancelSwitch':
+      return { cancellationEnabled: d.cancellationEnabled };
     case 'cancellation':
       return {
         cancellationTiers: d.cancellationTiers.map(
@@ -256,6 +263,10 @@ export function CommercialTermsEditor({
             ? `${t.afterCapFeePercent}%`
             : group === 'advance'
               ? `${t.minAdvancePercent}%`
+              : group === 'cancelSwitch'
+                ? t.cancellationEnabled === false
+                  ? 'Customers cannot cancel a paid booking'
+                  : 'Customers can cancel under the windows below'
               : group === 'cancellation'
                 ? t.cancellationTiers.map((x) => `${x.minHoursBeforeStart}h+: ${x.refundPercent}% to the customer, ${x.ownerPercent}% to the owner`).join('; ')
                 : group === 'cutoff'
@@ -377,6 +388,26 @@ export function CommercialTermsEditor({
           </GroupCard>
         )}
       </div>
+
+      {shown.includes('cancelSwitch') && (
+        <GroupCard
+          title="Customer cancellation"
+          hint="Off = customers can't cancel a paid booking at all, so the windows below don't apply. Venue staff and the Super Admin can still cancel."
+          override={override('cancelSwitch')}
+        >
+          <label className="flex items-center gap-3 text-sm font-medium text-gray-800">
+            <input
+              type="checkbox"
+              role="switch"
+              checked={draft.cancellationEnabled}
+              onChange={(e) => patch({ cancellationEnabled: e.target.checked })}
+              className="h-5 w-5 rounded border-gray-300"
+              aria-label="Allow customers to cancel"
+            />
+            {draft.cancellationEnabled ? 'On: the cancellation windows apply' : 'Off: no cancellation is available'}
+          </label>
+        </GroupCard>
+      )}
 
       {shown.includes('cancellation') && (
         <GroupCard

@@ -395,7 +395,7 @@ function BookingDetail() {
 
                 {preview && !preview.canCancel && (
                   <p className="text-center text-sm text-gray-600">
-                    This booking can no longer be cancelled. If something has gone wrong, contact
+                    {preview.cancellationEnabled === false ? 'This venue does not allow cancelling a paid booking.' : 'This booking can no longer be cancelled.'} If something has gone wrong, contact
                     the venue or{' '}
                     <a href="/support" className="font-medium text-gray-900 underline">
                       our support

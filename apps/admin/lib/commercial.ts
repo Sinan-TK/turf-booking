@@ -16,6 +16,8 @@ export interface CommercialTerms {
   monthlyCommissionCap: number | null;
   afterCapFeePercent: number;
   minAdvancePercent: number;
+  /** Off = customers can't cancel a paid booking. Older saved terms have no value: treat as on. */
+  cancellationEnabled?: boolean;
   cancellationTiers: CancellationTier[];
   cancelCutoffMinutes: number;
   payoutWeekday: number;

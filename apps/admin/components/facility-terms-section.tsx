@@ -15,7 +15,7 @@ const VIEWS = {
   cancellation: {
     title: 'Cancellation',
     hint: 'How refunds and the owner share work when a customer cancels, and the cut-off after which they cannot, for every venue offering this facility.',
-    groups: ['cancellation', 'cutoff'] as Group[],
+    groups: ['cancelSwitch', 'cancellation', 'cutoff'] as Group[],
   },
 };
 

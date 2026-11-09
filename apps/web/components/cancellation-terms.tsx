@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 
 export interface CancellationPreview {
+  /** False when the venue does not allow cancelling a paid booking. */
+  cancellationEnabled?: boolean;
   canCancel: boolean;
   currency: string;
   paidOnline: string;
@@ -34,6 +36,14 @@ const when = (iso: string) =>
 
 /** "Cancellation: full refund in coins until Fri 4:00 PM, 30% until Fri 9:00 PM, then no cancelling". */
 export function CancellationTerms({ preview }: { preview: CancellationPreview }) {
+  if (preview.cancellationEnabled === false) {
+    return (
+      <div className="mt-4 rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
+        <p className="mb-1 font-medium text-gray-800">Cancelling</p>
+        <p>This venue does not allow cancelling a booking once it is paid.</p>
+      </div>
+    );
+  }
   return (
     <div className="mt-4 rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
       <p className="mb-1 font-medium text-gray-800">Cancelling</p>
