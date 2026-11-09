@@ -164,13 +164,13 @@ test.describe('admin: commercial terms', () => {
       name: string;
       own: Record<string, unknown> | null;
     }>;
-    const football = rows.find((r) => r.name === 'Football Turf')!;
+    const football = rows.find((r) => r.name === 'Football')!;
     expect(football.own).toEqual({ monthlyCommissionCap: 1234, capPerUnit: true });
 
     await page.getByRole('button', { name: "Remove this venue's deal" }).click();
     await expect(page.getByText(/capped at ₹1234\/month/)).toHaveCount(0);
     const after = (await (await adminApi.get(`/admin/venues/${venue.id}/commercial-terms`)).json()) as typeof rows;
-    expect(after.find((r) => r.name === 'Football Turf')!.own).toBeNull();
+    expect(after.find((r) => r.name === 'Football')!.own).toBeNull();
   });
 
   test('a facility cancellation tab has the on/off switch and an editable platform share; the platform default has no cancellation', async ({ page, adminApi }) => {

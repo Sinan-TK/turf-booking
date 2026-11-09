@@ -59,9 +59,16 @@ test.describe('owner portal: earnings', () => {
     await expect(page.getByText(/booking(s)? last month/)).toBeVisible();
 
     // "Bookings" on a venue's row opens the bookings listing already filtered to it.
-    const venueSearch = page.getByLabel('Search venues');
-    if (await venueSearch.count()) await venueSearch.fill(venue.name);
-    await page.getByRole('row').filter({ hasText: venue.name }).getByRole('button', { name: /Bookings/ }).click();
+    // Wait for the table first: the search box only exists once the rows have loaded, and a long list needs it to find this venue.
+    await expect(page.getByRole('columnheader', { name: 'Venue' })).toBeVisible();
+    const venueRow = page.getByRole('row').filter({ hasText: venue.name });
+    // The list reloads after the period changes and can clear the search box, so type the name again until the row shows.
+    await expect(async () => {
+      const venueSearch = page.getByLabel('Search venues');
+      if (await venueSearch.count()) await venueSearch.fill(venue.name);
+      await expect(venueRow).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
+    await venueRow.getByRole('button', { name: /Bookings/ }).click();
     await expect(page).toHaveURL(/tab=bookings/);
     await expect(page.getByRole('tab', { name: 'Bookings' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('label').filter({ hasText: /^Venue/ }).locator('select')).not.toHaveValue('');
