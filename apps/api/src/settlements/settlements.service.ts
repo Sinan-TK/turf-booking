@@ -5,6 +5,7 @@ import {
   BOOKING_TRANSITIONS,
   assertTransition,
   commercialTermsSchema,
+  effectiveMonthlyCap,
   fromMinor,
   settlePlayedBooking,
   toMinor,
@@ -152,12 +153,14 @@ export class SettlementsService {
           SELECT "bookingCount", "commissionTotal" FROM venue_commission_months
           WHERE "venueId" = ${key.venueId}::uuid AND "categoryId" = ${key.categoryId}::uuid AND "periodMonth" = ${key.periodMonth}
           FOR UPDATE`;
+        const unitCount = await this.unitCount(tx, key.venueId, key.categoryId);
         const r = settlePlayedBooking({
           fullPriceMinor: toMinor(booking.amount.toString()),
           collectedMinor,
           bookingsBefore: counter!.bookingCount,
           commissionBeforeMinor: toMinor(counter!.commissionTotal.toString()),
           terms,
+          unitCount,
         });
         const settlement = await tx.bookingSettlement.create({
           data: {
@@ -179,6 +182,9 @@ export class SettlementsService {
               tier: r.tier,
               capReachedBefore: r.capReachedBefore,
               monthlyCommissionCap: terms.monthlyCommissionCap,
+              capPerUnit: terms.capPerUnit,
+              unitCount,
+              effectiveCap: effectiveMonthlyCap(terms, unitCount),
               afterCapFeePercent: terms.afterCapFeePercent,
               commissionBefore: counter!.commissionTotal.toString(),
             },
@@ -195,6 +201,15 @@ export class SettlementsService {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return null;
       throw error;
     }
+  }
+
+  /** How many units (active resources and pooled items) a venue has in a facility: the cap is multiplied by it. */
+  private async unitCount(tx: Prisma.TransactionClient, venueId: string, categoryId: string): Promise<number> {
+    const [resources, groups] = await Promise.all([
+      tx.resource.count({ where: { venueId, categoryId, status: 'ACTIVE' } }),
+      tx.resourceGroup.count({ where: { venueId, categoryId } }),
+    ]);
+    return Math.max(1, resources + groups);
   }
 
   /** The settlement data the cancellation flow needs about a booking's venue and facility. */

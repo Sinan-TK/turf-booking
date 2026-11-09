@@ -81,6 +81,7 @@ function MonthUsage({ usage }: { usage?: FacilityMonthUsage }) {
       <p className="text-gray-700">
         <span className="font-medium">{month}:</span> {usage.bookings} played booking{usage.bookings === 1 ? '' : 's'} · {money(used)} commission
         {cap !== null ? ` of ${money(cap)} cap` : ' · no monthly cap'}
+        {cap !== null && usage.capUnits && usage.capUnits > 1 && usage.capPerUnit ? ` (${money(usage.capPerUnit)} × ${usage.capUnits} units)` : ''}
       </p>
       {cap !== null && (
         <div className="mt-2" role="progressbar" aria-label="Commission cap used" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>

@@ -25,6 +25,8 @@ import { SettlementsService } from '../src/settlements/settlements.service';
 const BASE_TERMS = {
   commissionTiers: [{ fromBooking: 1, type: 'PERCENTAGE', value: 10 }],
   monthlyCommissionCap: 250,
+  capPerUnit: false, // the older tests count one shared cap; the per-unit tests turn it on
+
   afterCapFeePercent: 2.5,
   minAdvancePercent: 25,
   cancellationTiers: [
@@ -193,6 +195,18 @@ describe('Settling played bookings: tiers, monthly cap and after-cap fee', () =>
     expect(Number((await settlementOf(b1)).commission)).toBe(120); // other facility: 15%, no cap
     expect(Number((await settlementOf(b2)).commission)).toBe(120);
     expect((await settlementOf(b1)).categoryId).toBe(otherCategory);
+  });
+
+  test('the cap is multiplied by the venue units in the facility when capPerUnit is on', async () => {
+    // The fixture venue has three units in the facility (two halves and the full ground): 80 x 3 = 240 of commission in the month.
+    const v = await facilityVenue({ ...BASE_TERMS, monthlyCommissionCap: 80, capPerUnit: true });
+    const ids: string[] = [];
+    for (let i = 0; i < 4; i++) ids.push(await playedBooking(i % 2 ? v.halfBId : v.halfAId, { hourIndex: i }));
+    await settlements.completeAndSettle();
+    const rows = await Promise.all(ids.map(settlementOf));
+    expect(rows.map((r) => Number(r.commission))).toEqual([80, 80, 80, 0]);
+    expect((rows[3]!.details as { unitCount: number }).unitCount).toBe(3);
+    expect((rows[3]!.details as { effectiveCap: number }).effectiveCap).toBe(240);
   });
 
   test('a venue deal overrides the facility for that venue only', async () => {

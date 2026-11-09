@@ -264,7 +264,7 @@ describe('Payout weeks and the monthly cap', () => {
   // -------------------------------------------------------------------------------------------------------------------
 
   test('the month is the calendar month of the slot in the venue timezone: the cap starts over at local midnight on the 1st', async () => {
-    const o = await org({ ...TERMS, monthlyCommissionCap: 100 }); // 10% of 800 = 80 a booking: the second one is cut to 20
+    const o = await org({ ...TERMS, monthlyCommissionCap: 100, capPerUnit: false }); // 10% of 800 = 80 a booking: the second one is cut to 20
     // 28 Sep to 4 Oct is one payout week; the month changes in the middle of it, at midnight on 1 Oct in Kolkata.
     const slots = [
       ist('2026-09-30T21:00:00'),
@@ -306,7 +306,7 @@ describe('Payout weeks and the monthly cap', () => {
   });
 
   test('a venue in another timezone keeps its own month, while the payout week still follows the platform timezone', async () => {
-    const o = await org({ ...TERMS, monthlyCommissionCap: 100 });
+    const o = await org({ ...TERMS, monthlyCommissionCap: 100, capPerUnit: false });
     // 23:30 UTC on 31 Oct is 19:30 on 31 Oct in New York, but already 05:00 on 1 Nov in Kolkata.
     const lateOctober = new Date('2026-10-31T23:30:00Z');
     // 04:30 UTC on 1 Nov is 00:30 on 1 Nov in New York (clocks go back at 02:00), 10:00 in Kolkata.
@@ -335,7 +335,7 @@ describe('Payout weeks and the monthly cap', () => {
   });
 
   test('a late cancellation is paid to the owner but never counts toward the cap or the tier', async () => {
-    const o = await org({ ...TERMS, monthlyCommissionCap: 100 });
+    const o = await org({ ...TERMS, monthlyCommissionCap: 100, capPerUnit: false });
     // A booking made for a slot a few days ahead (inside the 10-day window, outside 2 days), then cancelled by the customer:
     // 30% of what was paid goes back, 50% to the owner, the platform keeps the rest.
     const { agent, customerId } = await createCustomerFixture(app);

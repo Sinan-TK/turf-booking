@@ -68,6 +68,8 @@ const facilityTermsShape = {
   commissionTiers,
   /** Most commission one venue pays per facility per month; null = no cap. */
   monthlyCommissionCap: z.number().min(0).nullable(),
+  /** On = the cap is multiplied by the number of units the venue has in this facility (two turfs: twice the cap). Missing in older terms = on. */
+  capPerUnit: z.boolean().default(true),
   /** Percentage of what was paid online charged instead of commission once the cap is reached. */
   afterCapFeePercent: z.number().min(0).max(100),
   /** The online advance must be at least this percentage of the full price. */
@@ -118,7 +120,7 @@ export function mergeCommercialTerms(
   for (const key of COMMERCIAL_TERM_KEYS) {
     const layer = layers.find((l) => l.terms && Object.prototype.hasOwnProperty.call(l.terms, key));
     // Terms saved before the switch existed have no value for it: cancelling stays on.
-    if (!layer && key === 'cancellationEnabled') {
+    if (!layer && (key === 'cancellationEnabled' || key === 'capPerUnit')) {
       terms[key] = true;
       sources[key] = 'PLATFORM_DEFAULT';
       continue;
@@ -176,6 +178,16 @@ export function commissionTierFor(tiers: CommissionTier[], bookingNumber: number
   return tier;
 }
 
+/** The monthly cap that applies to a venue: the cap times its units in the facility when capPerUnit is on. null = no cap. */
+export function effectiveMonthlyCap(
+  terms: Pick<CommercialTerms, 'monthlyCommissionCap'> & { capPerUnit?: boolean },
+  unitCount: number,
+): number | null {
+  if (terms.monthlyCommissionCap === null) return null;
+  const units = terms.capPerUnit === false ? 1 : Math.max(1, Math.floor(unitCount));
+  return Math.round(terms.monthlyCommissionCap * units * 100) / 100;
+}
+
 export interface PlayedSettlementInput {
   /** The booking's full price (the commission base). */
   fullPriceMinor: number;
@@ -185,7 +197,9 @@ export interface PlayedSettlementInput {
   bookingsBefore: number;
   /** Commission already charged to this venue + facility this month. */
   commissionBeforeMinor: number;
-  terms: Pick<CommercialTerms, 'commissionTiers' | 'monthlyCommissionCap' | 'afterCapFeePercent'>;
+  terms: Pick<CommercialTerms, 'commissionTiers' | 'monthlyCommissionCap' | 'afterCapFeePercent'> & { capPerUnit?: boolean };
+  /** The venue's units in this facility (the cap is multiplied by it when capPerUnit is on). Default 1. */
+  unitCount?: number;
 }
 
 export interface PlayedSettlement {
@@ -209,7 +223,8 @@ export function settlePlayedBooking(input: PlayedSettlementInput): PlayedSettlem
   let commission =
     tier.type === 'PERCENTAGE' ? Math.round((input.fullPriceMinor * tier.value) / 100) : toMinor(tier.value);
 
-  const capMinor = input.terms.monthlyCommissionCap === null ? null : toMinor(input.terms.monthlyCommissionCap);
+  const cap = effectiveMonthlyCap(input.terms, input.unitCount ?? 1);
+  const capMinor = cap === null ? null : toMinor(cap);
   const capReachedBefore = capMinor !== null && input.commissionBeforeMinor >= capMinor;
   if (capMinor !== null) commission = Math.min(commission, Math.max(0, capMinor - input.commissionBeforeMinor));
   let fee = capReachedBefore ? Math.round((input.collectedMinor * input.terms.afterCapFeePercent) / 100) : 0;

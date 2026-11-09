@@ -14,6 +14,8 @@ export interface CancellationTier {
 export interface CommercialTerms {
   commissionTiers: CommissionTier[];
   monthlyCommissionCap: number | null;
+  /** On = the cap is multiplied by the venue's units in the facility. Older saved terms have no value: treat as on. */
+  capPerUnit?: boolean;
   afterCapFeePercent: number;
   minAdvancePercent: number;
   /** Off = customers can't cancel a paid booking. Older saved terms have no value: treat as on. */
@@ -69,6 +71,9 @@ export interface FacilityMonthUsage {
   bookings: number;
   commission: string;
   monthlyCommissionCap: string | null;
+  /** The cap for one unit and how many units it was multiplied by (monthlyCommissionCap is the product). */
+  capPerUnit?: string | null;
+  capUnits?: number;
   capRemaining: string | null;
   capReached: boolean;
 }

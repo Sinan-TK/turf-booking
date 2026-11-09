@@ -26,7 +26,7 @@ type Mode = 'platform' | 'facility' | 'override';
 export type Group = 'commission' | 'cap' | 'afterCap' | 'advance' | 'cancelSwitch' | 'cancellation' | 'cutoff' | 'payout';
 const GROUP_KEYS: Record<Group, TermKey[]> = {
   commission: ['commissionTiers'],
-  cap: ['monthlyCommissionCap'],
+  cap: ['monthlyCommissionCap', 'capPerUnit'],
   afterCap: ['afterCapFeePercent'],
   advance: ['minAdvancePercent'],
   cancelSwitch: ['cancellationEnabled'],
@@ -39,6 +39,7 @@ const FACILITY_GROUPS: Group[] = ['commission', 'cap', 'afterCap', 'advance', 'c
 interface Draft {
   commissionTiers: Array<{ fromBooking: string; type: 'PERCENTAGE' | 'FLAT'; value: string }>;
   monthlyCommissionCap: string;
+  capPerUnit: boolean;
   afterCapFeePercent: string;
   minAdvancePercent: string;
   cancellationEnabled: boolean;
@@ -52,6 +53,7 @@ function toDraft(t: CommercialTerms): Draft {
   return {
     commissionTiers: t.commissionTiers.map((x) => ({ fromBooking: String(x.fromBooking), type: x.type, value: String(x.value) })),
     monthlyCommissionCap: t.monthlyCommissionCap === null ? '' : String(t.monthlyCommissionCap),
+    capPerUnit: t.capPerUnit !== false,
     afterCapFeePercent: String(t.afterCapFeePercent),
     minAdvancePercent: String(t.minAdvancePercent),
     cancellationEnabled: t.cancellationEnabled !== false,
@@ -132,7 +134,7 @@ function groupValue(group: Group, d: Draft): Partial<CommercialTerms> {
         commissionTiers: d.commissionTiers.map((t): CommissionTier => ({ fromBooking: Number(t.fromBooking), type: t.type, value: Number(t.value) })),
       };
     case 'cap':
-      return { monthlyCommissionCap: d.monthlyCommissionCap.trim() === '' ? null : Number(d.monthlyCommissionCap) };
+      return { monthlyCommissionCap: d.monthlyCommissionCap.trim() === '' ? null : Number(d.monthlyCommissionCap), capPerUnit: d.capPerUnit };
     case 'afterCap':
       return { afterCapFeePercent: Number(d.afterCapFeePercent) };
     case 'advance':
@@ -258,7 +260,7 @@ export function CommercialTermsEditor({
         : group === 'cap'
           ? t.monthlyCommissionCap === null
             ? 'No monthly cap'
-            : `₹${t.monthlyCommissionCap} a month`
+            : `₹${t.monthlyCommissionCap} a month${t.capPerUnit === false ? '' : ' for each unit'}`
           : group === 'afterCap'
             ? `${t.afterCapFeePercent}%`
             : group === 'advance'
@@ -367,10 +369,15 @@ export function CommercialTermsEditor({
 
       <div className="grid gap-4 md:grid-cols-3">
         {shown.includes('cap') && (
-          <GroupCard title="Monthly cap" hint="Most commission one venue pays for this facility in a month. Empty = no cap." override={override('cap')} error={errors.cap}>
+          <GroupCard title="Monthly cap" hint="Most commission one venue pays for this facility in a month. Empty = no cap. With the switch on, the cap is multiplied by the venue's units in this facility." override={override('cap')} error={errors.cap}>
             <Unit unit="₹">
               <Input type="number" min={0} placeholder="No cap" value={draft.monthlyCommissionCap} onChange={(e) => patch({ monthlyCommissionCap: e.target.value })} className={`pr-8 ${errors.cap ? invalidClass : ''}`} aria-label="Monthly commission cap" />
             </Unit>
+            <label className="mt-3 flex items-center gap-2 text-xs font-medium text-gray-700">
+              <input type="checkbox" checked={draft.capPerUnit} onChange={(e) => patch({ capPerUnit: e.target.checked })} className="h-4 w-4 rounded border-gray-300" />
+              Multiply by the number of units
+            </label>
+            <p className="mt-1 text-xs text-gray-500">{draft.capPerUnit ? 'Two turfs in a venue: twice the cap.' : 'One cap shared by all units of the venue.'}</p>
           </GroupCard>
         )}
         {shown.includes('afterCap') && (

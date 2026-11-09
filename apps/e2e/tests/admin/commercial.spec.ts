@@ -165,7 +165,7 @@ test.describe('admin: commercial terms', () => {
       own: Record<string, unknown> | null;
     }>;
     const football = rows.find((r) => r.name === 'Football Turf')!;
-    expect(football.own).toEqual({ monthlyCommissionCap: 1234 });
+    expect(football.own).toEqual({ monthlyCommissionCap: 1234, capPerUnit: true });
 
     await page.getByRole('button', { name: "Remove this venue's deal" }).click();
     await expect(page.getByText(/capped at ₹1234\/month/)).toHaveCount(0);

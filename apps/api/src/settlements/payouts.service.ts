@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DateTime } from 'luxon';
-import { commercialTermsSchema, commissionTierFor, fromMinor, toMinor } from '@venue/shared';
+import { commercialTermsSchema, commissionTierFor, effectiveMonthlyCap, fromMinor, toMinor } from '@venue/shared';
 import { Prisma, type PayoutStatus, type SettlementKind } from '@venue/database';
 import { contains, dateWhere, type DateRange } from '../common/list-filters';
 import { PrismaService } from '../prisma/prisma.service';
@@ -221,6 +221,17 @@ export class PayoutsService {
         countersByMonth.set(month, await this.prisma.client.venueCommissionMonth.findMany({ where: { venueId: { in: ids }, periodMonth: month } }));
       }),
     );
+    // Units per venue + facility: the cap is multiplied by it (unless the terms turn that off).
+    const unitsOf = new Map<string, number>();
+    const venueIds = venues.map((v) => v.id);
+    const [resourceCounts, groupCounts] = await Promise.all([
+      this.prisma.client.resource.groupBy({ by: ['venueId', 'categoryId'], where: { venueId: { in: venueIds }, status: 'ACTIVE' }, _count: { _all: true } }),
+      this.prisma.client.resourceGroup.groupBy({ by: ['venueId', 'categoryId'], where: { venueId: { in: venueIds } }, _count: { _all: true } }),
+    ]);
+    for (const row of [...resourceCounts, ...groupCounts]) {
+      const k = `${row.venueId}:${row.categoryId}`;
+      unitsOf.set(k, (unitsOf.get(k) ?? 0) + row._count._all);
+    }
     const usage = [];
     for (const venue of venues) {
       const month = monthOf.get(venue.id)!;
@@ -230,7 +241,8 @@ export class PayoutsService {
         const counter = counters.find((c) => c.categoryId === f.categoryId);
         const bookings = counter?.bookingCount ?? 0;
         const commissionMinor = toMinor(counter?.commissionTotal.toString() ?? 0);
-        const cap = f.terms.monthlyCommissionCap;
+        const units = Math.max(1, unitsOf.get(`${venue.id}:${f.categoryId}`) ?? 0);
+        const cap = effectiveMonthlyCap(f.terms, units);
         const capReached = cap !== null && commissionMinor >= toMinor(cap);
         usage.push({
           venueId: venue.id,
@@ -243,6 +255,9 @@ export class PayoutsService {
           bookings,
           commission: fromMinor(commissionMinor),
           monthlyCommissionCap: cap === null ? null : fromMinor(toMinor(cap)),
+          // The cap for one unit, and how many units it was multiplied by (1 when capPerUnit is off).
+          capPerUnit: f.terms.monthlyCommissionCap === null ? null : fromMinor(toMinor(f.terms.monthlyCommissionCap)),
+          capUnits: f.terms.capPerUnit === false ? 1 : units,
           capRemaining: cap === null ? null : fromMinor(Math.max(0, toMinor(cap) - commissionMinor)),
           capReached,
           // What the next settled booking pays.
