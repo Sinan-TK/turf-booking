@@ -92,6 +92,7 @@ const BADGE_COLORS: Record<string, string> = {
   OPEN: 'bg-sky-50 text-sky-700 ring-sky-600/20',
   PENDING: 'bg-amber-50 text-amber-700 ring-amber-600/20',
   INITIATED: 'bg-sky-50 text-sky-700 ring-sky-600/20',
+  OVERDUE: 'bg-red-50 text-red-700 ring-red-600/20',
   PENDING_PAYMENT: 'bg-amber-50 text-amber-700 ring-amber-600/20',
   PROCESSING: 'bg-amber-50 text-amber-700 ring-amber-600/20',
   IN_PROGRESS: 'bg-amber-50 text-amber-700 ring-amber-600/20',

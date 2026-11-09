@@ -153,6 +153,35 @@ describe('Payout weeks and the monthly cap', () => {
     await admin.patch(`/admin/organizations/${own.organizationId}/payout-day`).send({ payoutWeekday: 9 }).expect(400);
   });
 
+  test('an Initiated payout unpaid for the platform overdue days shows as overdue to the admin only', async () => {
+    const o = await org();
+    await playedAt(o.halfAId, ist('2026-10-09T09:00:00'));
+    const tue = ist('2026-10-13T12:00:00');
+    await settlements.completeAndSettle(tue);
+    const [payout] = mine(await payouts.createDuePayouts(tue), o.organizationId);
+    expect(payout!.status).toBe('INITIATED');
+
+    // Just created: not overdue. Make it 6 days old: overdue at the default 5 days, not at 7.
+    const detail = async () => (await admin.get(`/admin/payouts/${payout!.id}`)).body;
+    expect((await detail()).overdue).toBe(false);
+    await prisma.payout.update({ where: { id: payout!.id }, data: { createdAt: new Date(Date.now() - 6 * 86_400_000) } });
+    expect((await detail()).overdue).toBe(true);
+    const list = await admin.get(`/admin/payouts?status=OVERDUE&organizationId=${o.organizationId}`);
+    expect(list.body.map((p: { id: string }) => p.id)).toEqual([payout!.id]);
+    expect(list.body[0].overdue).toBe(true);
+    expect((await admin.get('/admin/payouts/summary')).body.overduePayouts.count).toBeGreaterThan(0);
+
+    await putDefault({ payoutOverdueDays: 7 });
+    expect((await detail()).overdue).toBe(false);
+    expect((await admin.get(`/admin/payouts?status=OVERDUE&organizationId=${o.organizationId}`)).body).toHaveLength(0);
+    await admin.put('/admin/commercial-terms/default').send({ ...defaultTerms, payoutOverdueDays: 0 }).expect(400);
+
+    // The owner's own view never carries the flag, and a paid payout is never overdue.
+    expect(Object.keys(await payouts.getForOwner(payout!.id, o.organizationId))).not.toContain('overdue');
+    await admin.post(`/admin/payouts/${payout!.id}/mark-paid`).send({ reference: 'UTR-OVERDUE-1' }).expect(201);
+    expect((await detail()).overdue).toBe(false);
+  });
+
   // -------------------------------------------------------------------------------------------------------------------
   // Week by week
   // -------------------------------------------------------------------------------------------------------------------

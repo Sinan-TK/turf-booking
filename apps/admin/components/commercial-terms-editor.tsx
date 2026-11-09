@@ -32,7 +32,7 @@ const GROUP_KEYS: Record<Group, TermKey[]> = {
   cancelSwitch: ['cancellationEnabled'],
   cancellation: ['cancellationTiers'],
   cutoff: ['cancelCutoffMinutes'],
-  payout: ['payoutWeekday', 'payoutTimezone'],
+  payout: ['payoutWeekday', 'payoutTimezone', 'payoutOverdueDays'],
 };
 const FACILITY_GROUPS: Group[] = ['commission', 'cap', 'afterCap', 'advance', 'cancelSwitch', 'cancellation', 'cutoff'];
 
@@ -47,6 +47,7 @@ interface Draft {
   cancelCutoffMinutes: string;
   payoutWeekday: string;
   payoutTimezone: string;
+  payoutOverdueDays: string;
 }
 
 function toDraft(t: CommercialTerms): Draft {
@@ -65,6 +66,7 @@ function toDraft(t: CommercialTerms): Draft {
     cancelCutoffMinutes: String(t.cancelCutoffMinutes),
     payoutWeekday: String(t.payoutWeekday),
     payoutTimezone: t.payoutTimezone,
+    payoutOverdueDays: String(t.payoutOverdueDays ?? 5),
   };
 }
 
@@ -122,7 +124,8 @@ function groupError(group: Group, d: Draft): string | undefined {
       return Number.isInteger(n) && n >= 0 ? undefined : 'Enter the cut-off in whole minutes (0 or more).';
     }
     case 'payout':
-      return d.payoutTimezone.trim() ? undefined : 'Enter the timezone payout weeks are counted in, e.g. Asia/Kolkata.';
+      if (!d.payoutTimezone.trim()) return 'Enter the timezone payout weeks are counted in, e.g. Asia/Kolkata.';
+      return Number.isInteger(num(d.payoutOverdueDays)) && num(d.payoutOverdueDays) >= 1 ? undefined : 'Enter the overdue limit in whole days (1 or more).';
   }
 }
 
@@ -154,7 +157,7 @@ function groupValue(group: Group, d: Draft): Partial<CommercialTerms> {
     case 'cutoff':
       return { cancelCutoffMinutes: Number(d.cancelCutoffMinutes) };
     case 'payout':
-      return { payoutWeekday: Number(d.payoutWeekday), payoutTimezone: d.payoutTimezone.trim() };
+      return { payoutWeekday: Number(d.payoutWeekday), payoutTimezone: d.payoutTimezone.trim(), payoutOverdueDays: Number(d.payoutOverdueDays) };
   }
 }
 
@@ -529,6 +532,15 @@ export function CommercialTermsEditor({
             <div>
               <Label>Timezone</Label>
               <Input value={draft.payoutTimezone} onChange={(e) => patch({ payoutTimezone: e.target.value })} aria-label="Payout timezone" />
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Overdue after</Label>
+              <div className="max-w-xs">
+                <Unit unit="days">
+                  <Input type="number" min={1} value={draft.payoutOverdueDays} onChange={(e) => patch({ payoutOverdueDays: e.target.value })} className="pr-12" aria-label="Payout overdue days" />
+                </Unit>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">A payout still unpaid this many days after it was created shows as Overdue to you (owners do not see this).</p>
             </div>
           </div>
         </GroupCard>

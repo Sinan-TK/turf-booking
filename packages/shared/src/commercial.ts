@@ -87,6 +87,8 @@ const platformTermsShape = {
   payoutWeekday: z.number().int().min(1).max(7),
   /** The timezone payout weeks are counted in. */
   payoutTimezone: z.string().refine(isTimeZone, { message: 'Unknown timezone.' }),
+  /** An Initiated payout that is still unpaid this many days after it was created is shown to the admin as overdue. Missing in older terms = 5. */
+  payoutOverdueDays: z.number().int().min(1).max(365).default(5),
 };
 
 export const commercialTermsSchema = z.object({ ...facilityTermsShape, ...platformTermsShape }).strict();
@@ -98,7 +100,7 @@ export const commercialTermsOverrideSchema = z.object(facilityTermsShape).partia
 export type CommercialTermsOverride = z.infer<typeof commercialTermsOverrideSchema>;
 
 export const COMMERCIAL_TERM_KEYS = Object.keys(commercialTermsSchema.shape) as CommercialTermKey[];
-export const PLATFORM_ONLY_TERM_KEYS: CommercialTermKey[] = ['payoutWeekday', 'payoutTimezone'];
+export const PLATFORM_ONLY_TERM_KEYS: CommercialTermKey[] = ['payoutWeekday', 'payoutTimezone', 'payoutOverdueDays'];
 
 export type CommercialSource = 'PLATFORM_DEFAULT' | 'FACILITY' | 'VENUE_FACILITY';
 
@@ -120,6 +122,11 @@ export function mergeCommercialTerms(
   for (const key of COMMERCIAL_TERM_KEYS) {
     const layer = layers.find((l) => l.terms && Object.prototype.hasOwnProperty.call(l.terms, key));
     // Terms saved before the switch existed have no value for it: cancelling stays on.
+    if (!layer && key === 'payoutOverdueDays') {
+      terms[key] = 5;
+      sources[key] = 'PLATFORM_DEFAULT';
+      continue;
+    }
     if (!layer && (key === 'cancellationEnabled' || key === 'capPerUnit')) {
       terms[key] = true;
       sources[key] = 'PLATFORM_DEFAULT';

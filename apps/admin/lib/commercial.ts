@@ -24,6 +24,8 @@ export interface CommercialTerms {
   cancelCutoffMinutes: number;
   payoutWeekday: number;
   payoutTimezone: string;
+  /** Initiated payouts unpaid for this many days show as overdue. Older saved terms have no value: 5. */
+  payoutOverdueDays?: number;
 }
 
 export type TermKey = keyof CommercialTerms;

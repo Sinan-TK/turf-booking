@@ -32,6 +32,7 @@ interface PayoutDetail {
   totalOwnerAmount: string;
   settlementCount: number;
   status: 'INITIATED' | 'PAID';
+  overdue?: boolean;
   reference: string | null;
   paidAt: string | null;
   settlements: Settlement[];
@@ -88,7 +89,8 @@ export default function PayoutDetailPage() {
       <Card>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <Badge value={data.status} />
+            <Badge value={data.overdue ? 'OVERDUE' : data.status} />
+            {data.overdue && <p className="mt-2 text-sm text-red-700">This payout has been waiting longer than the overdue limit set on the Commercial terms page. Transfer it as soon as you can.</p>}
             {data.status === 'PAID' && (
               <p className="mt-2 text-sm text-gray-600">
                 Paid {data.paidAt ? new Date(data.paidAt).toLocaleString('en-IN') : ''} · reference <span className="font-mono">{data.reference}</span>

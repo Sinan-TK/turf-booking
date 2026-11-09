@@ -47,8 +47,11 @@ export class AdminPayoutsController {
     @Query('offset') offset?: string,
     @Res({ passthrough: true }) res?: Response,
   ) {
+    // "OVERDUE" is the admin's view of an Initiated payout that has waited too long; it is not stored.
+    const overdue = status === 'OVERDUE';
     const filters = {
-      status: parseEnumFilter(status, Object.values(PayoutStatus), 'status') as PayoutStatus | undefined,
+      status: overdue ? undefined : (parseEnumFilter(status, Object.values(PayoutStatus), 'status') as PayoutStatus | undefined),
+      overdue,
       organizationId,
     };
     const [rows, total] = await Promise.all([

@@ -21,6 +21,8 @@ interface Payout {
   totalOwnerAmount: string;
   settlementCount: number;
   status: 'INITIATED' | 'PAID';
+  /** Initiated and unpaid for longer than the platform's overdue days (admin only). */
+  overdue: boolean;
   reference: string | null;
   paidAt: string | null;
 }
@@ -31,11 +33,13 @@ interface Summary {
   commissionThisMonth: string;
   feesThisMonth: string;
   pendingPayouts: { count: number; total: string };
+  overduePayouts: { count: number; total: string };
 }
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All' },
   { value: 'INITIATED', label: 'To pay' },
+  { value: 'OVERDUE', label: 'Overdue' },
   { value: 'PAID', label: 'Paid' },
 ];
 
@@ -80,6 +84,9 @@ export default function PayoutsPage() {
       {summary.data && (
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard label="Payouts to pay" icon="rupee" tone="amber" value={`${summary.data.pendingPayouts.count} · ${money(summary.data.pendingPayouts.total)}`} />
+          {summary.data.overduePayouts.count > 0 && (
+            <StatCard label="Overdue payouts" icon="rupee" tone="amber" value={`${summary.data.overduePayouts.count} · ${money(summary.data.overduePayouts.total)}`} />
+          )}
           <StatCard label="Platform earnings this month" icon="card" tone="brand" value={money(summary.data.platformEarningsThisMonth)} />
           <StatCard label="Commission this month" icon="refund" tone="sky" value={money(summary.data.commissionThisMonth)} />
           <StatCard label="Coins customers hold" icon="users" tone="violet" value={money(summary.data.coinsOutstanding)} />
@@ -120,7 +127,7 @@ export default function PayoutsPage() {
                   <td className="px-4 py-3">{p.settlementCount}</td>
                   <td className="px-4 py-3">{money(p.totalOwnerAmount)}</td>
                   <td className="px-4 py-3">
-                    <Badge value={p.status} />
+                    <Badge value={p.overdue ? 'OVERDUE' : p.status} />
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Link href={`/payouts/${p.id}`} className="text-sm font-medium text-gray-900 hover:underline">

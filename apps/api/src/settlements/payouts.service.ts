@@ -120,22 +120,34 @@ export class PayoutsService {
   // Admin
   // ---------------------------------------------------------------------------
 
-  private adminWhere(filters: { status?: PayoutStatus; organizationId?: string }): Prisma.PayoutWhereInput {
-    return { status: filters.status, organizationId: filters.organizationId };
+  /** Initiated payouts created before this moment are overdue (the number of days is a platform setting; admin-only). */
+  async overdueCutoff(now: Date = new Date()): Promise<Date> {
+    const parsed = commercialTermsSchema.safeParse((await this.commercialTerms.getDefault()).terms);
+    const days = parsed.success ? parsed.data.payoutOverdueDays : 5;
+    return new Date(now.getTime() - days * 86_400_000);
   }
 
-  listForAdmin(filters: { status?: PayoutStatus; organizationId?: string; limit: number; offset: number }) {
-    return this.prisma.client.payout.findMany({
-      where: this.adminWhere(filters),
+  private adminWhere(filters: { status?: PayoutStatus; overdue?: boolean; organizationId?: string }, cutoff: Date): Prisma.PayoutWhereInput {
+    return {
+      organizationId: filters.organizationId,
+      ...(filters.overdue ? { status: 'INITIATED' as const, createdAt: { lt: cutoff } } : { status: filters.status }),
+    };
+  }
+
+  async listForAdmin(filters: { status?: PayoutStatus; overdue?: boolean; organizationId?: string; limit: number; offset: number }) {
+    const cutoff = await this.overdueCutoff();
+    const rows = await this.prisma.client.payout.findMany({
+      where: this.adminWhere(filters, cutoff),
       include: { organization: { select: { id: true, name: true } } },
       orderBy: [{ periodEnd: 'desc' }, { createdAt: 'desc' }],
       take: filters.limit,
       skip: filters.offset,
     });
+    return rows.map((p) => ({ ...p, overdue: p.status === 'INITIATED' && p.createdAt < cutoff }));
   }
 
-  countForAdmin(filters: { status?: PayoutStatus; organizationId?: string }) {
-    return this.prisma.client.payout.count({ where: this.adminWhere(filters) });
+  async countForAdmin(filters: { status?: PayoutStatus; overdue?: boolean; organizationId?: string }) {
+    return this.prisma.client.payout.count({ where: this.adminWhere(filters, await this.overdueCutoff()) });
   }
 
   async getForAdmin(id: string) {
@@ -143,7 +155,8 @@ export class PayoutsService {
     if (!payout) throw new NotFoundException('Payout not found');
     // Where to send the money, and whether the admin has checked it. Not a reason to refuse paying: the admin sees the warning.
     const bankAccount = await this.prisma.client.organizationBankAccount.findUnique({ where: { organizationId: payout.organization.id } });
-    return { ...payout, bankAccount };
+    const overdue = payout.status === 'INITIATED' && payout.createdAt < (await this.overdueCutoff());
+    return { ...payout, bankAccount, overdue };
   }
 
   /**
@@ -185,13 +198,15 @@ export class PayoutsService {
   async platformSummary(now: Date = new Date()) {
     const { timezone } = await this.payoutSchedule(now);
     const monthStart = DateTime.fromJSDate(now).setZone(timezone).startOf('month').toJSDate();
-    const [coins, month, pending] = await Promise.all([
+    const cutoff = await this.overdueCutoff(now);
+    const [coins, month, pending, overdue] = await Promise.all([
       this.prisma.client.coinWallet.aggregate({ _sum: { cachedBalance: true } }),
       this.prisma.client.bookingSettlement.aggregate({
         where: { slotStart: { gte: monthStart } },
         _sum: { platformAmount: true, commission: true, fee: true },
       }),
       this.prisma.client.payout.aggregate({ where: { status: 'INITIATED' }, _sum: { totalOwnerAmount: true }, _count: true }),
+      this.prisma.client.payout.aggregate({ where: { status: 'INITIATED', createdAt: { lt: cutoff } }, _sum: { totalOwnerAmount: true }, _count: true }),
     ]);
     return {
       coinsOutstanding: (coins._sum.cachedBalance ?? new Prisma.Decimal(0)).toString(),
@@ -199,6 +214,7 @@ export class PayoutsService {
       commissionThisMonth: (month._sum.commission ?? new Prisma.Decimal(0)).toString(),
       feesThisMonth: (month._sum.fee ?? new Prisma.Decimal(0)).toString(),
       pendingPayouts: { count: pending._count, total: (pending._sum.totalOwnerAmount ?? new Prisma.Decimal(0)).toString() },
+      overduePayouts: { count: overdue._count, total: (overdue._sum.totalOwnerAmount ?? new Prisma.Decimal(0)).toString() },
     };
   }
 
@@ -220,7 +236,7 @@ export class PayoutsService {
   }
 
   async getForOwner(id: string, organizationId: string) {
-    const payout = await this.getForAdmin(id);
+    const { overdue: _adminOnly, ...payout } = await this.getForAdmin(id); // "overdue" is for the admin only
     if (payout.organizationId !== organizationId) throw new ForbiddenException("Cannot access another organization's payout");
     return payout;
   }
