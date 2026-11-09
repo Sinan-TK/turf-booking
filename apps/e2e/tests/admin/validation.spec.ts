@@ -69,6 +69,18 @@ test.describe('admin: field errors on forms', () => {
     await expect(page.getByText(/^Saved\./)).toHaveCount(0);
   });
 
+  test('commercial terms: the platform share of a cancellation window is shown and editable', async ({ page }) => {
+    await page.goto('/policies');
+    await page.getByLabel('Window 1 customer share').fill('50');
+    await page.getByLabel('Window 1 owner share').fill('30');
+    await expect(page.getByLabel('Window 1 platform share')).toHaveValue('20');
+    await expect(page.getByText('Customer 50% · Owner 30% · Platform 20%')).toBeVisible();
+    // Raising the platform's share takes it out of the owner's.
+    await page.getByLabel('Window 1 platform share').fill('35');
+    await expect(page.getByLabel('Window 1 owner share')).toHaveValue('15');
+    await expect(page.getByText('Customer 50% · Owner 15% · Platform 35%')).toBeVisible();
+  });
+
   test('commercial terms: the server refuses a commission above the minimum advance', async ({ page }) => {
     await page.goto('/policies');
     await page.getByLabel('Minimum advance').fill('10');

@@ -178,11 +178,11 @@ function GroupCard({
   error?: string;
 }) {
   return (
-    <div className="rounded-lg border border-gray-200 p-4">
-      <div className="mb-3 flex items-start justify-between gap-4">
+    <div className="rounded-xl border border-gray-200/80 bg-white p-5 shadow-card">
+      <div className="mb-4 flex items-start justify-between gap-4 border-b border-gray-100 pb-3">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-          <p className="text-xs text-gray-500">{hint}</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-gray-500">{hint}</p>
         </div>
         {override && (
           <label className="flex shrink-0 items-center gap-2 text-xs font-medium text-gray-700">
@@ -385,37 +385,72 @@ export function CommercialTermsEditor({
           override={override('cancellation')}
           error={errors.cancellation}
         >
-          <div className="space-y-2">
+          <div className="space-y-3">
             {draft.cancellationTiers.map((t, i) => {
-              const platform = 100 - (Number(t.refundPercent) || 0) - (Number(t.ownerPercent) || 0);
+              const refund = Number(t.refundPercent) || 0;
+              const owner = Number(t.ownerPercent) || 0;
+              const platform = Math.round((100 - refund - owner) * 100) / 100;
+              const bad = platform < 0;
+              const seg = (n: number) => `${Math.max(0, Math.min(100, n))}%`;
               return (
-                <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto_auto] items-end gap-2">
-                  <div className={cell}>
-                    {i === 0 && <Label>Hours before start</Label>}
-                    <Input type="number" min={0} step="0.5" value={t.minHoursBeforeStart} onChange={(e) => window(i, { minHoursBeforeStart: e.target.value })} aria-label={`Window ${i + 1} hours`} />
+                <div key={i} className="rounded-lg border border-gray-200 bg-gray-50/60 p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Window {i + 1}</p>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={draft.cancellationTiers.length === 1}
+                      onClick={() => patch({ cancellationTiers: draft.cancellationTiers.filter((_, j) => j !== i) })}
+                      aria-label={`Remove window ${i + 1}`}
+                    >
+                      Remove
+                    </Button>
                   </div>
-                  <div className={cell}>
-                    {i === 0 && <Label>Customer gets (coins)</Label>}
-                    <Unit unit="%">
-                      <Input type="number" min={0} max={100} value={t.refundPercent} onChange={(e) => window(i, { refundPercent: e.target.value })} className="pr-8" aria-label={`Window ${i + 1} customer share`} />
-                    </Unit>
+                  <div className="grid gap-3 sm:grid-cols-4">
+                    <div className={cell}>
+                      <Label>Hours before start</Label>
+                      <Input type="number" min={0} step="0.5" value={t.minHoursBeforeStart} onChange={(e) => window(i, { minHoursBeforeStart: e.target.value })} aria-label={`Window ${i + 1} hours`} />
+                    </div>
+                    <div className={cell}>
+                      <Label>Customer gets (coins)</Label>
+                      <Unit unit="%">
+                        <Input type="number" min={0} max={100} value={t.refundPercent} onChange={(e) => window(i, { refundPercent: e.target.value })} className="pr-8" aria-label={`Window ${i + 1} customer share`} />
+                      </Unit>
+                    </div>
+                    <div className={cell}>
+                      <Label>Owner gets</Label>
+                      <Unit unit="%">
+                        <Input type="number" min={0} max={100} value={t.ownerPercent} onChange={(e) => window(i, { ownerPercent: e.target.value })} className="pr-8" aria-label={`Window ${i + 1} owner share`} />
+                      </Unit>
+                    </div>
+                    <div className={cell}>
+                      <Label>Platform keeps</Label>
+                      <Unit unit="%">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={String(platform)}
+                          // The platform keeps what is left, so changing it moves the owner's share to match.
+                          onChange={(e) => {
+                            const p = Number(e.target.value);
+                            if (!Number.isFinite(p)) return;
+                            window(i, { ownerPercent: String(Math.max(0, Math.round((100 - refund - p) * 100) / 100)) });
+                          }}
+                          className={`pr-8 ${bad ? invalidClass : ''}`}
+                          aria-label={`Window ${i + 1} platform share`}
+                        />
+                      </Unit>
+                    </div>
                   </div>
-                  <div className={cell}>
-                    {i === 0 && <Label>Owner gets</Label>}
-                    <Unit unit="%">
-                      <Input type="number" min={0} max={100} value={t.ownerPercent} onChange={(e) => window(i, { ownerPercent: e.target.value })} className="pr-8" aria-label={`Window ${i + 1} owner share`} />
-                    </Unit>
+                  <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-gray-200" aria-hidden="true">
+                    <span className="bg-sky-500" style={{ width: seg(refund) }} />
+                    <span className="bg-emerald-500" style={{ width: seg(owner) }} />
+                    <span className="bg-gray-800" style={{ width: seg(platform) }} />
                   </div>
-                  <p className={`pb-2 text-xs ${platform < 0 ? 'text-red-600' : 'text-gray-500'}`}>Platform {platform}%</p>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={draft.cancellationTiers.length === 1}
-                    onClick={() => patch({ cancellationTiers: draft.cancellationTiers.filter((_, j) => j !== i) })}
-                    aria-label={`Remove window ${i + 1}`}
-                  >
-                    Remove
-                  </Button>
+                  <p className={`mt-1.5 text-xs ${bad ? 'text-red-600' : 'text-gray-500'}`}>
+                    {bad ? `Shares add up to more than 100% (platform ${platform}%).` : `Customer ${refund}% · Owner ${owner}% · Platform ${platform}%`}
+                  </p>
                 </div>
               );
             })}
