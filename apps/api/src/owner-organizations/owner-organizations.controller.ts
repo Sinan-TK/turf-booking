@@ -8,7 +8,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { OwnerOrganizationsService } from './owner-organizations.service';
-import { CreateOrganizationDto, CreateOwnerUserDto, SetOrganizationStatusDto, SetOwnerUserStatusDto } from './dto/owner-organization.dto';
+import { CreateOrganizationDto, CreateOwnerUserDto, SetOrganizationStatusDto, SetOwnerUserStatusDto, SetPayoutDayDto } from './dto/owner-organization.dto';
 import type { AuthContext } from '../auth/auth.types';
 
 // Super Admin only — this is platform-level provisioning of Venue Owner
@@ -32,6 +32,11 @@ export class OwnerOrganizationsController {
   @Get(':id')
   getById(@Param('id', ParseUUIDPipe) id: string) {
     return this.orgs.getOrganizationDetail(id);
+  }
+
+  @Patch(':id/payout-day')
+  setPayoutDay(@Param('id', ParseUUIDPipe) id: string, @Body() dto: SetPayoutDayDto, @CurrentUser() actor: AuthContext) {
+    return this.orgs.setPayoutDay(id, dto.payoutWeekday, actor);
   }
 
   @Patch(':id/status')

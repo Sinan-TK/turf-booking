@@ -48,6 +48,8 @@ interface Organization {
   name: string;
   contactEmail: string;
   contactPhone: string;
+  /** This organization's own payout weekday (1 = Monday ... 7 = Sunday); null = the platform default. */
+  payoutWeekday: number | null;
   status: string;
   createdAt: string;
   stats: {
@@ -166,6 +168,60 @@ function ApprovalPanel({ org, onChanged }: { org: { id: string; name: string; st
   );
 }
 
+/** The weekday this business is paid on. "Platform default" follows the day set on the Commercial terms page. */
+function PayoutDayCard({ org, onChanged }: { org: { id: string; payoutWeekday: number | null }; onChanged: () => void }) {
+  const { data: platform } = useFetch<{ terms: { payoutWeekday: number; payoutTimezone: string } | null }>('/admin/commercial-terms/default');
+  const [value, setValue] = useState(org.payoutWeekday === null ? '' : String(org.payoutWeekday));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const dirty = value !== (org.payoutWeekday === null ? '' : String(org.payoutWeekday));
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      await api.patch(`/admin/organizations/${org.id}/payout-day`, { payoutWeekday: value === '' ? null : Number(value) });
+      setSaved(true);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not save the payout day.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <h2 className="text-sm font-semibold text-gray-900">Payout day</h2>
+      <p className="mb-3 mt-0.5 text-xs text-gray-500">
+        On this day each week a payout is created automatically (as Initiated) for everything this business earned from slots played before it.
+        {platform?.terms ? ` Without its own day it is paid on ${days[platform.terms.payoutWeekday - 1]} (${platform.terms.payoutTimezone}).` : ''}
+      </p>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="w-56">
+          <Label>Weekly payout day</Label>
+          <Select value={value} onChange={(e) => { setValue(e.target.value); setSaved(false); }} aria-label="Payout day">
+            <option value="">{platform?.terms ? `Platform default (${days[platform.terms.payoutWeekday - 1]})` : 'Platform default'}</option>
+            {days.map((d, i) => (
+              <option key={d} value={i + 1}>
+                {d}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <Button type="button" onClick={save} loading={saving} disabled={!dirty}>
+          Save payout day
+        </Button>
+      </div>
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {saved && !dirty && <p className="mt-2 text-sm text-emerald-700">Saved. The next payout run uses this day.</p>}
+    </Card>
+  );
+}
+
 export default function OwnerOrgDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: org, error, loading, refetch } = useFetch<Organization>(`/admin/organizations/${id}`);
@@ -261,6 +317,8 @@ export default function OwnerOrgDetailPage() {
         />
         <StatCard label="Last booked" value={date(org.stats.lastBookedAt)} icon="calendar" tone="amber" />
       </div>
+
+      <PayoutDayCard key={org.payoutWeekday ?? 'default'} org={org} onChanged={refetch} />
 
       <Card>
         <h2 className="mb-3 text-sm font-semibold text-gray-900">Details</h2>

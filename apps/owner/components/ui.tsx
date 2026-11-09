@@ -86,6 +86,7 @@ const BADGE_COLORS: Record<string, string> = {
   COMPLETED: 'bg-primary-fixed-dim/30 text-on-primary-container',
   OPEN: 'bg-secondary-container text-on-secondary-container',
   PENDING: 'bg-tertiary-container/30 text-on-tertiary-container',
+  INITIATED: 'bg-tertiary-container/30 text-on-tertiary-container',
   PENDING_PAYMENT: 'bg-tertiary-container/30 text-on-tertiary-container',
   PROCESSING: 'bg-tertiary-container/30 text-on-tertiary-container',
   IN_PROGRESS: 'bg-tertiary-container/30 text-on-tertiary-container',

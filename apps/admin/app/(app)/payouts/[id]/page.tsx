@@ -31,7 +31,7 @@ interface PayoutDetail {
   periodEnd: string;
   totalOwnerAmount: string;
   settlementCount: number;
-  status: 'PENDING' | 'PAID';
+  status: 'INITIATED' | 'PAID';
   reference: string | null;
   paidAt: string | null;
   settlements: Settlement[];
@@ -95,7 +95,7 @@ export default function PayoutDetailPage() {
               </p>
             )}
           </div>
-          {data.status === 'PENDING' && (
+          {data.status === 'INITIATED' && (
             <div className="flex flex-wrap items-end gap-3">
               <div>
                 <Label htmlFor="utr">Bank transfer reference (UTR)</Label>

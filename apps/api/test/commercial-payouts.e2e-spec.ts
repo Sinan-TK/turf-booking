@@ -105,7 +105,7 @@ describe('Weekly owner payouts', () => {
     expect(Number(pa.totalOwnerAmount)).toBe(1440);
     expect(pb.settlementCount).toBe(1);
     expect(Number(pb.totalOwnerAmount)).toBe(720);
-    expect(pa.status).toBe('PENDING');
+    expect(pa.status).toBe('INITIATED');
     expect(pa.periodEnd.getTime()).toBe(end.getTime());
 
     for (const id of [a1, a2]) expect((await prisma.bookingSettlement.findUniqueOrThrow({ where: { bookingId: id } })).payoutId).toBe(pa.id);
@@ -223,7 +223,7 @@ describe('Weekly owner payouts', () => {
     const run = await adminAgent.post('/admin/payouts/run').send({});
     expect(run.status).toBe(201);
     expect(run.body).toHaveProperty('payouts');
-    const list = await adminAgent.get('/admin/payouts?status=PENDING&limit=5');
+    const list = await adminAgent.get('/admin/payouts?status=INITIATED&limit=5');
     expect(list.status).toBe(200);
     expect(Number(list.headers['x-total-count'])).toBeGreaterThanOrEqual(list.body.length);
     expect((await adminAgent.get('/admin/payouts?status=BOGUS')).status).toBe(400);

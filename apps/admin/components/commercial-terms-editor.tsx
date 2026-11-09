@@ -514,7 +514,7 @@ export function CommercialTermsEditor({
       )}
 
       {shown.includes('payout') && (
-        <GroupCard title="Owner payouts" hint="Owners are paid once a week for the slots played before this day. Applies to every facility." error={errors.payout}>
+        <GroupCard title="Owner payouts" hint="Owners are paid once a week for the slots played before this day. This is the default: a business with its own payout day (set on its page) is paid on that day instead." error={errors.payout}>
           <div className="grid max-w-lg gap-3 sm:grid-cols-2">
             <div>
               <Label>Payout day</Label>

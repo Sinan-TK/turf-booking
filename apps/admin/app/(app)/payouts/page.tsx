@@ -20,7 +20,7 @@ interface Payout {
   currency: string;
   totalOwnerAmount: string;
   settlementCount: number;
-  status: 'PENDING' | 'PAID';
+  status: 'INITIATED' | 'PAID';
   reference: string | null;
   paidAt: string | null;
 }
@@ -35,7 +35,7 @@ interface Summary {
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All' },
-  { value: 'PENDING', label: 'To pay' },
+  { value: 'INITIATED', label: 'To pay' },
   { value: 'PAID', label: 'Paid' },
 ];
 
@@ -124,7 +124,7 @@ export default function PayoutsPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Link href={`/payouts/${p.id}`} className="text-sm font-medium text-gray-900 hover:underline">
-                      {p.status === 'PENDING' ? 'Review & pay →' : 'View →'}
+                      {p.status === 'INITIATED' ? 'Review & pay →' : 'View →'}
                     </Link>
                   </td>
                 </tr>

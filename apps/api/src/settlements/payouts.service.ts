@@ -38,26 +38,44 @@ export class PayoutsService {
     private readonly commercialTerms: CommercialTermsService,
   ) {}
 
-  /** The latest payout day at or before `now` (the exclusive end of the week being paid) and the next one. */
-  async payoutSchedule(now: Date) {
+  /**
+   * The latest payout day at or before `now` (the exclusive end of the week being paid) and the next one. An
+   * organization with its own payout weekday uses it; the others follow the platform default weekday.
+   */
+  async payoutSchedule(now: Date, organizationWeekday?: number | null) {
     const parsed = commercialTermsSchema.safeParse((await this.commercialTerms.getDefault()).terms);
     if (!parsed.success) throw new Error('The platform default commercial terms are missing or invalid.');
-    const { payoutWeekday, payoutTimezone } = parsed.data;
+    const { payoutTimezone } = parsed.data;
+    const payoutWeekday = organizationWeekday ?? parsed.data.payoutWeekday;
     let day = DateTime.fromJSDate(now).setZone(payoutTimezone).startOf('day');
     while (day.weekday !== payoutWeekday) day = day.minus({ days: 1 });
     return { periodEnd: day.toJSDate(), nextPayoutOn: day.plus({ weeks: 1 }).toJSDate(), timezone: payoutTimezone };
   }
 
-  /** Groups every due, unpaid settlement into its organization's payout for the week. Idempotent. */
+  /**
+   * On each organization's own payout day, groups its due, unpaid settlements into one payout, created automatically in
+   * the INITIATED state. Idempotent: running it again the same week adds late settlements to the same payout.
+   */
   @Cron(CronExpression.EVERY_HOUR)
   async createDuePayouts(now: Date = new Date()) {
-    const { periodEnd } = await this.payoutSchedule(now);
-    const groups = await this.prisma.client.bookingSettlement.groupBy({
+    const candidates = await this.prisma.client.bookingSettlement.groupBy({
       by: ['organizationId', 'currency'],
-      where: { payoutId: null, slotStart: { lt: periodEnd } },
+      where: { payoutId: null, slotStart: { lt: now } },
     });
+    const orgs = await this.prisma.client.ownerOrganization.findMany({
+      where: { id: { in: [...new Set(candidates.map((c) => c.organizationId))] } },
+      select: { id: true, payoutWeekday: true },
+    });
+    const weekdayOf = new Map(orgs.map((o) => [o.id, o.payoutWeekday]));
+    let latestPeriodEnd = now;
     const touched = [];
-    for (const g of groups) {
+    for (const g of candidates) {
+      const { periodEnd } = await this.payoutSchedule(now, weekdayOf.get(g.organizationId));
+      latestPeriodEnd = periodEnd;
+      const due = await this.prisma.client.bookingSettlement.count({
+        where: { payoutId: null, organizationId: g.organizationId, currency: g.currency, slotStart: { lt: periodEnd } },
+      });
+      if (due === 0) continue;
       const payout = await this.prisma.client.$transaction(async (tx) => {
         const key = { organizationId: g.organizationId, periodEnd, currency: g.currency };
         const row = await tx.payout.upsert({
@@ -85,7 +103,8 @@ export class PayoutsService {
       if (payout) touched.push(payout);
     }
     if (touched.length > 0) {
-      this.logger.log(`Prepared ${touched.length} payout(s) for the week ending ${periodEnd.toISOString()}`);
+      const periodEnd = latestPeriodEnd;
+      this.logger.log(`Prepared ${touched.length} payout(s) (last week ending ${periodEnd.toISOString()})`);
       await this.audit.record({
         actor: 'SYSTEM',
         action: 'PAYOUTS_PREPARED',
@@ -141,7 +160,7 @@ export class PayoutsService {
       throw new BadRequestException('The reviewed amount is not a valid amount.');
     }
     const closed = await this.prisma.client.payout.updateMany({
-      where: { id, status: 'PENDING', ...(expectedTotal !== undefined ? { totalOwnerAmount: new Prisma.Decimal(expectedTotal) } : {}) },
+      where: { id, status: 'INITIATED', ...(expectedTotal !== undefined ? { totalOwnerAmount: new Prisma.Decimal(expectedTotal) } : {}) },
       data: { status: 'PAID', reference, paidAt: new Date(), paidByAdminId: actor.id },
     });
     if (closed.count === 0) {
@@ -172,7 +191,7 @@ export class PayoutsService {
         where: { slotStart: { gte: monthStart } },
         _sum: { platformAmount: true, commission: true, fee: true },
       }),
-      this.prisma.client.payout.aggregate({ where: { status: 'PENDING' }, _sum: { totalOwnerAmount: true }, _count: true }),
+      this.prisma.client.payout.aggregate({ where: { status: 'INITIATED' }, _sum: { totalOwnerAmount: true }, _count: true }),
     ]);
     return {
       coinsOutstanding: (coins._sum.cachedBalance ?? new Prisma.Decimal(0)).toString(),
@@ -382,12 +401,14 @@ export class PayoutsService {
         _count: true,
       }),
       this.prisma.client.payout.aggregate({
-        where: { organizationId, status: 'PENDING' },
+        where: { organizationId, status: 'INITIATED' },
         _sum: { totalOwnerAmount: true },
         _count: true,
       }),
       this.prisma.client.payout.findFirst({ where: { organizationId, status: 'PAID' }, orderBy: { paidAt: 'desc' } }),
-      this.payoutSchedule(now),
+      this.prisma.client.ownerOrganization
+        .findUnique({ where: { id: organizationId }, select: { payoutWeekday: true } })
+        .then((o) => this.payoutSchedule(now, o?.payoutWeekday)),
     ]);
     return {
       facilities,

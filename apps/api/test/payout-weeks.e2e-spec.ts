@@ -123,6 +123,36 @@ describe('Payout weeks and the monthly cap', () => {
     expect(justBefore.periodEnd.toISOString()).toBe('2026-10-26T04:00:00.000Z');
   });
 
+  test('an organization can have its own payout day; its payout is created automatically as INITIATED when that day comes', async () => {
+    const standard = await org(); // follows the platform default (Monday)
+    const own = await org(); // paid on Thursdays
+    await admin.patch(`/admin/organizations/${own.organizationId}/payout-day`).send({ payoutWeekday: 4 }).expect(200);
+    expect((await prisma.ownerOrganization.findUniqueOrThrow({ where: { id: own.organizationId } })).payoutWeekday).toBe(4);
+
+    // Played on Friday 9 Oct: Monday 12 Oct's payout covers it, Thursday 8 Oct's does not.
+    for (const o of [standard, own]) await playedAt(o.halfAId, ist('2026-10-09T09:00:00'));
+    const tue = ist('2026-10-13T12:00:00');
+    await settlements.completeAndSettle(tue);
+    const first = await payouts.createDuePayouts(tue);
+    expect(mine(first, standard.organizationId)).toHaveLength(1);
+    expect(mine(first, standard.organizationId)[0]!.status).toBe('INITIATED');
+    expect(mine(first, own.organizationId)).toHaveLength(0);
+
+    // Thursday 15 Oct 00:00: now it is that organization's day, and the payout appears by itself.
+    const thu = ist('2026-10-15T00:00:00');
+    const second = await payouts.createDuePayouts(thu);
+    const mineNow = mine(second, own.organizationId);
+    expect(mineNow).toHaveLength(1);
+    expect(mineNow[0]!.status).toBe('INITIATED');
+    expect(mineNow[0]!.periodEnd.getTime()).toBe(thu.getTime());
+    expect(Number(mineNow[0]!.totalOwnerAmount)).toBe(720);
+
+    // Clearing the day goes back to the platform default.
+    await admin.patch(`/admin/organizations/${own.organizationId}/payout-day`).send({ payoutWeekday: null }).expect(200);
+    expect((await prisma.ownerOrganization.findUniqueOrThrow({ where: { id: own.organizationId } })).payoutWeekday).toBeNull();
+    await admin.patch(`/admin/organizations/${own.organizationId}/payout-day`).send({ payoutWeekday: 9 }).expect(400);
+  });
+
   // -------------------------------------------------------------------------------------------------------------------
   // Week by week
   // -------------------------------------------------------------------------------------------------------------------
@@ -237,7 +267,7 @@ describe('Payout weeks and the monthly cap', () => {
     const stale = await admin.post(`/admin/payouts/${first!.id}/mark-paid`).send({ reference: 'UTR-STALE-0001', totalOwnerAmount: seenByTreasurer.toFixed(2) });
     expect(stale.status).toBe(409);
     expect(stale.body.message).toMatch(/changed/);
-    expect((await prisma.payout.findUniqueOrThrow({ where: { id: first!.id } })).status).toBe('PENDING');
+    expect((await prisma.payout.findUniqueOrThrow({ where: { id: first!.id } })).status).toBe('INITIATED');
     const fresh = await admin.post(`/admin/payouts/${first!.id}/mark-paid`).send({ reference: 'UTR-FRESH-0001', totalOwnerAmount: Number(grown.totalOwnerAmount).toFixed(2) });
     expect(fresh.status).toBe(201);
   });

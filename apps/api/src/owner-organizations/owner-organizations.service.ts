@@ -151,6 +151,21 @@ export class OwnerOrganizationsService {
     };
   }
 
+  /** Sets (or clears, with null) the weekday this business is paid on; the next payout run uses it. */
+  async setPayoutDay(id: string, payoutWeekday: number | null, actor: AuthContext) {
+    const org = await this.getOrganization(id);
+    if (org.payoutWeekday === payoutWeekday) return org;
+    const updated = await this.prisma.client.ownerOrganization.update({ where: { id }, data: { payoutWeekday } });
+    await this.audit.record({
+      actor,
+      action: 'OWNER_ORGANIZATION_PAYOUT_DAY_CHANGED',
+      entityType: 'OwnerOrganization',
+      entityId: id,
+      metadata: { from: org.payoutWeekday, to: payoutWeekday },
+    });
+    return updated;
+  }
+
   /**
    * Suspending an organization signs its owners out (refresh sessions are
    * revoked; login and refresh already refuse a suspended organization).

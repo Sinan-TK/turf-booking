@@ -28,7 +28,7 @@ interface PayoutDetail {
   currency: string;
   totalOwnerAmount: string;
   settlementCount: number;
-  status: 'PENDING' | 'PAID';
+  status: 'INITIATED' | 'PAID';
   reference: string | null;
   paidAt: string | null;
   settlements: Settlement[];
@@ -66,7 +66,7 @@ export default function PayoutStatementPage() {
             Transferred {data.paidAt ? new Date(data.paidAt).toLocaleString('en-IN') : ''} · bank reference <span className="font-mono">{data.reference}</span>
           </p>
         )}
-        {data.status === 'PENDING' && <p className="mt-2 text-sm text-on-surface-variant">Prepared; the transfer to your bank is on its way.</p>}
+        {data.status === 'INITIATED' && <p className="mt-2 text-sm text-on-surface-variant">Prepared; the transfer to your bank is on its way.</p>}
       </Card>
       <DataTable
         columns={['Slot', 'Order', 'Venue · facility', 'What happened', 'Paid online', 'Commission & fee', 'Coins back to customer', 'You get']}

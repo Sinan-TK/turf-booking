@@ -29,6 +29,12 @@ export const setOrganizationStatusSchema = z.object({
 });
 export class SetOrganizationStatusDto extends createZodDto(setOrganizationStatusSchema) {}
 
+export const setPayoutDaySchema = z.object({
+  // ISO weekday (1 = Monday ... 7 = Sunday); null = follow the platform default day.
+  payoutWeekday: z.number().int().min(1).max(7).nullable(),
+});
+export class SetPayoutDayDto extends createZodDto(setPayoutDaySchema) {}
+
 export const setOwnerUserStatusSchema = z.object({
   status: z.enum(['ACTIVE', 'DISABLED']),
   reason: z.string().max(500).optional(),

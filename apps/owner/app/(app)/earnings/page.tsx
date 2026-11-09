@@ -72,7 +72,7 @@ interface Payout {
   currency: string;
   totalOwnerAmount: string;
   settlementCount: number;
-  status: 'PENDING' | 'PAID';
+  status: 'INITIATED' | 'PAID';
   reference: string | null;
   paidAt: string | null;
 }
@@ -89,7 +89,7 @@ interface Line {
   booking: { id: string; orderId: string };
   venue: { id: string; name: string };
   category: { id: string; name: string };
-  payout: { id: string; status: 'PENDING' | 'PAID' } | null;
+  payout: { id: string; status: 'INITIATED' | 'PAID' } | null;
 }
 
 const KIND: Record<Line['kind'], string> = { PLAYED: 'Played', NO_SHOW: 'No-show', LATE_CANCEL: 'Late cancellation' };
@@ -479,7 +479,7 @@ function Payouts() {
               <td className="px-4 py-3">{p.settlementCount}</td>
               <td className="whitespace-nowrap px-4 py-3 font-medium">{formatMoney(p.currency, p.totalOwnerAmount)}</td>
               <td className="px-4 py-3">
-                <Badge value={p.status === 'PAID' ? 'PAID' : 'PENDING'} />
+                <Badge value={p.status === 'PAID' ? 'PAID' : 'INITIATED'} />
               </td>
               <td className="whitespace-nowrap px-4 py-3 text-on-surface-variant">{p.paidAt ? date(p.paidAt) : '—'}</td>
               <td className="px-4 py-3 font-mono text-xs">{p.reference ?? '—'}</td>
