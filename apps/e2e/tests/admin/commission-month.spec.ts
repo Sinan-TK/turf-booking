@@ -14,7 +14,7 @@ test.describe('admin: commission usage this month', () => {
       capRemaining: string | null;
       capReached: boolean;
     }>;
-    expect(rows.map((r) => r.facility).sort()).toEqual(['Badminton Court', 'Football Turf']);
+    expect(rows.map((r) => r.facility).sort()).toEqual(['Badminton Court', 'Football']);
 
     // The month is the venue's own (India): "2026-10" style, and it starts over on the 1st of the next month at local midnight.
     const istNow = new Date(Date.now() + 330 * 60_000);
@@ -38,7 +38,7 @@ test.describe('admin: commission usage this month', () => {
   test('the venue\'s Commercial terms tab shows the cap used and when it starts over', async ({ page, makeVenue, adminApi }) => {
     const venue = await makeVenue();
     // Give the football turf a cap of its own, as the terms editor does.
-    const put = await adminApi.put(`/admin/venues/${venue.id}/facilities/${(await categoryId(adminApi, 'Football Turf'))}/commercial-terms`, {
+    const put = await adminApi.put(`/admin/venues/${venue.id}/facilities/${(await categoryId(adminApi, 'Football'))}/commercial-terms`, {
       data: { monthlyCommissionCap: 1234 },
     });
     expect(put.ok(), await put.text()).toBeTruthy();

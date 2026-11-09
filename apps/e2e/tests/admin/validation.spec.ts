@@ -21,16 +21,18 @@ test.describe('admin: field errors on forms', () => {
 
   test('locations: a district needs a name and a code of at most 10 characters', async ({ page }) => {
     await page.goto('/locations');
-    await page.locator('select').first().selectOption({ index: 1 });
-    await page.getByRole('button', { name: 'Add District' }).click();
-    await expect(page.getByText('Enter the district name.')).toBeVisible();
-    await expect(page.getByText('Enter the district code, like MPM.')).toBeVisible();
+    // Open a state (its districts appear below the states table).
+    await page.getByRole('button', { name: /^Open / }).first().click();
+    const addDistrict = page.getByRole('form', { name: 'Add a district' });
+    await addDistrict.getByRole('button', { name: 'Add district' }).click();
+    await expect(addDistrict.getByText('Enter the district name.')).toBeVisible();
+    await expect(addDistrict.getByText('Enter the district code, like KL.')).toBeVisible();
 
-    await page.getByLabel('District Name').fill('PW District');
-    await page.getByLabel(/District Code/).fill('ABCDEFGHIJK');
-    await page.getByRole('button', { name: 'Add District' }).click();
-    await expect(page.getByText('The code can be at most 10 characters.')).toBeVisible();
-    await expect(page.getByText('Enter the district name.')).toHaveCount(0);
+    await addDistrict.getByLabel('District name').fill('PW District');
+    await addDistrict.getByLabel(/District code/).fill('ABCDEFGHIJK');
+    await addDistrict.getByRole('button', { name: 'Add district' }).click();
+    await expect(addDistrict.getByText('The code can be at most 10 characters.')).toBeVisible();
+    await expect(addDistrict.getByText('Enter the district name.')).toHaveCount(0);
   });
 
   test('owners: a new organization needs a name, a valid email and a phone number', async ({ page }) => {

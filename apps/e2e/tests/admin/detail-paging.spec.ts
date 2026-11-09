@@ -85,7 +85,7 @@ test.describe('admin: paged lists on detail pages', () => {
     test.setTimeout(120_000);
     const venue = await makeVenue();
     const categories = (await (await ownerApi.get('/categories')).json()) as Array<{ id: string; name: string }>;
-    const football = categories.find((c) => c.name === 'Football Turf')!;
+    const football = categories.find((c) => c.name === 'Football')!;
     for (let i = 0; i < 12; i++) {
       const res = await ownerApi.post('/resources', { data: { venueId: venue.id, categoryId: football.id, name: `PW Extra ${i}`, groundType: '5S' } });
       expect(res.ok(), await res.text()).toBeTruthy();

@@ -16,7 +16,7 @@ test.describe('admin: venue details', () => {
   test('units can be blocked and reopened, and a unit can be added', async ({ page, makeVenue }) => {
     const venue = await makeVenue();
     await page.goto(`/venues/${venue.id}`);
-    await expect(page.getByRole('heading', { name: 'Football Turf', level: 2, exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Football', level: 2, exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Badminton Court', level: 2, exact: true })).toBeVisible();
 
     await page.getByRole('switch', { name: `Block ${venue.turfName}` }).click();
@@ -48,7 +48,7 @@ test.describe('admin: venue details', () => {
     // Units are searched by name, type or facility.
     await page.getByLabel('Search units').fill(venue.courtName);
     await expect(page.getByRole('heading', { name: 'Badminton Court', level: 2, exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Football Turf', level: 2, exact: true })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Football', level: 2, exact: true })).toHaveCount(0);
     await page.getByLabel('Search units').fill('zzz-no-such-unit-zzz');
     await expect(page.getByText('No units match your search.')).toBeVisible();
 
@@ -68,7 +68,7 @@ test.describe('admin: venue details', () => {
     await page.getByLabel('Search venues').fill(venue.name);
     const row = page.getByRole('row').filter({ hasText: venue.name });
     await expect(row).toHaveCount(1);
-    await expect(row).toContainText('Football Turf');
+    await expect(row).toContainText('Football');
     await expect(row).toContainText('Badminton Court');
     await row.getByRole('link').first().click();
     await expect(page).toHaveURL(new RegExp(`/venues/${venue.id}$`));
@@ -142,7 +142,7 @@ test.describe('admin: facilities', () => {
     await page.goto('/venue-types');
     await expect(page.getByRole('heading', { name: 'Facilities', level: 1 })).toBeVisible();
     await page.getByLabel('Search facilities').fill('Football');
-    await page.getByRole('row').filter({ hasText: 'Football Turf' }).first().getByRole('link').first().click();
+    await page.getByRole('row').filter({ hasText: 'Football' }).first().getByRole('link').first().click();
     await expect(page).toHaveURL(/\/venue-types\/[0-9a-f-]{36}$/);
 
     await page.goto('/venue-types');

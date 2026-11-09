@@ -53,6 +53,7 @@ test.describe('owner portal: new venue form', () => {
     await expect(page).toHaveURL(/\/venues\/[0-9a-f-]{36}$/);
     await expect(page.getByRole('heading', { name })).toBeVisible();
     await expect(page.getByText('DRAFT').first()).toBeVisible();
+    await page.getByRole('tab', { name: /^Units/ }).click(); // units live on their own tab
     await expect(page.getByText('No units yet')).toBeVisible();
   });
 });
