@@ -173,6 +173,47 @@ test.describe('admin: commercial terms', () => {
     expect(after.find((r) => r.name === 'Football Turf')!.own).toBeNull();
   });
 
+  test('a facility cancellation tab has the on/off switch and an editable platform share; the platform default has no cancellation', async ({ page, adminApi }) => {
+    const slug = `PW_${unique().toUpperCase()}`;
+    const created = await adminApi.post('/admin/categories', {
+      data: {
+        slug,
+        name: `PW Facility ${slug}`,
+        defaultAllocationMode: 'EXCLUSIVE',
+        iconKey: 'category',
+        unitLabel: 'Unit',
+        venueLabel: 'Venue',
+        unitTypes: [],
+        policy: { slotIntervalMin: 60, minDurationMin: 60, maxDurationMin: 180, durationIncrementMin: 60, bufferBeforeMin: 0, bufferAfterMin: 0, maxAdvanceDays: 30, minLeadMinutes: 0 },
+      },
+    });
+    expect(created.ok(), await created.text()).toBeTruthy();
+    const { id } = (await created.json()) as { id: string };
+
+    await page.goto('/policies');
+    await expect(page.getByRole('heading', { name: 'Commission', level: 3 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Cancellation windows', level: 3 })).toHaveCount(0);
+    await expect(page.getByRole('switch', { name: 'Allow customers to cancel' })).toHaveCount(0);
+
+    await page.goto(`/venue-types/${id}`);
+    await page.getByRole('tab', { name: 'Cancellation' }).click();
+    const sw = page.getByRole('switch', { name: 'Allow customers to cancel' });
+    await expect(sw).toBeChecked();
+    await sw.uncheck();
+    await expect(page.getByText('Off: no cancellation is available')).toBeVisible();
+    await sw.check();
+    await expect(page.getByText('On: the cancellation windows apply')).toBeVisible();
+
+    await page.getByLabel('Window 1 customer share').fill('50');
+    await page.getByLabel('Window 1 owner share').fill('30');
+    await expect(page.getByLabel('Window 1 platform share')).toHaveValue('20');
+    await expect(page.getByText('Customer 50% · Owner 30% · Platform 20%')).toBeVisible();
+    // Raising the platform's share takes it out of the owner's.
+    await page.getByLabel('Window 1 platform share').fill('35');
+    await expect(page.getByLabel('Window 1 owner share')).toHaveValue('15');
+    await expect(page.getByText('Customer 50% · Owner 15% · Platform 35%')).toBeVisible();
+  });
+
   test('the platform default holds the payout day', async ({ page }) => {
     await page.goto('/policies');
     await expect(page.getByRole('heading', { name: 'Owner payouts', level: 3 })).toBeVisible();

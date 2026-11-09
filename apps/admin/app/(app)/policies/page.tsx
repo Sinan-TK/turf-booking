@@ -25,31 +25,27 @@ export default function PoliciesPage() {
   const { data, error, loading, refetch } = useFetch<{ terms: CommercialTerms | null }>('/admin/commercial-terms/default');
   const t = data?.terms;
   const first = t?.commissionTiers[0];
-  const lateWindow = t?.cancellationTiers.length ? [...t.cancellationTiers].sort((a, b) => a.minHoursBeforeStart - b.minHoursBeforeStart)[0] : undefined;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Commercial terms"
-        subtitle="The platform default. Every facility keeps its own commission, cap, minimum advance and cancellation terms, edited on the facility's page; this default pre-fills a new facility and sets the weekly owner payout day."
+        subtitle="The platform default. Every facility keeps its own commission, cap, minimum advance and cancellation terms, edited on the facility's page; this default pre-fills a new facility and sets the weekly owner payout day. Cancellation is set on each facility only."
       />
       {loading && !data && <SkeletonDetailCard fields={4} />}
       {error && <ErrorBanner message={error} />}
       {data && !data.terms && <ErrorBanner message="No platform default is configured. Run the database seed or migration." />}
       {t && (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-3">
             <Stat label="Commission" value={first ? describeTier(first) : '-'} note={t.commissionTiers.length > 1 ? `${t.commissionTiers.length} tiers by booking count` : 'on each played booking'} />
             <Stat label="Minimum advance" value={`${t.minAdvancePercent}%`} note="paid online" />
-            <Stat
-              label="Last-window cancel"
-              value={lateWindow ? `Platform keeps ${Math.round((100 - lateWindow.refundPercent - lateWindow.ownerPercent) * 100) / 100}%` : '-'}
-              note={lateWindow ? `from ${lateWindow.minHoursBeforeStart}h before the start` : undefined}
-            />
             <Stat label="Owner payout" value={WEEKDAYS[t.payoutWeekday - 1] ?? '-'} note={t.payoutTimezone} />
           </div>
           <CommercialTermsEditor
             mode="platform"
+            // Cancellation is set per facility (on its Cancellation tab), so it is not part of the platform default page.
+            show={['commission', 'cap', 'afterCap', 'advance', 'payout']}
             own={t}
             effective={t}
             onSave={async (terms) => {

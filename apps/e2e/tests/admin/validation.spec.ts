@@ -51,45 +51,19 @@ test.describe('admin: field errors on forms', () => {
     await expect(page.getByText('Indian mobile numbers start with 6, 7, 8 or 9.')).toBeVisible();
   });
 
-  test('commercial terms: percentages, shares and tiers are checked before anything is sent', async ({ page }) => {
+  test('commercial terms: percentages and tiers are checked before anything is sent', async ({ page }) => {
     await page.goto('/policies');
     await expect(page.getByRole('heading', { name: 'Commission', level: 3 })).toBeVisible();
 
     await page.getByLabel('Minimum advance').fill('150');
-    await page.getByLabel('Window 1 customer share').fill('80');
-    await page.getByLabel('Window 1 owner share').fill('40');
     await page.getByLabel('Fee after the cap').fill('-1');
     await page.getByLabel('Tier 1 value').fill('');
     await page.getByRole('button', { name: 'Save terms' }).click();
 
     await expect(page.getByText('The minimum advance must be between 0 and 100.')).toBeVisible();
-    await expect(page.getByText('Window 1: the customer and owner shares add up to more than 100%.')).toBeVisible();
     await expect(page.getByText('The after-cap fee must be between 0 and 100.')).toBeVisible();
     await expect(page.getByText('Tier 1: enter the commission.')).toBeVisible();
     await expect(page.getByText(/^Saved\./)).toHaveCount(0);
-  });
-
-  test('commercial terms: the platform share of a cancellation window is shown and editable', async ({ page }) => {
-    await page.goto('/policies');
-    await page.getByLabel('Window 1 customer share').fill('50');
-    await page.getByLabel('Window 1 owner share').fill('30');
-    await expect(page.getByLabel('Window 1 platform share')).toHaveValue('20');
-    await expect(page.getByText('Customer 50% · Owner 30% · Platform 20%')).toBeVisible();
-    // Raising the platform's share takes it out of the owner's.
-    await page.getByLabel('Window 1 platform share').fill('35');
-    await expect(page.getByLabel('Window 1 owner share')).toHaveValue('15');
-    await expect(page.getByText('Customer 50% · Owner 15% · Platform 35%')).toBeVisible();
-  });
-
-  test('commercial terms: customer cancellation has an on/off switch', async ({ page }) => {
-    await page.goto('/policies');
-    const sw = page.getByRole('switch', { name: 'Allow customers to cancel' });
-    await expect(sw).toBeChecked();
-    await expect(page.getByText('On: the cancellation windows apply')).toBeVisible();
-    await sw.uncheck();
-    await expect(page.getByText('Off: no cancellation is available')).toBeVisible();
-    await sw.check();
-    await expect(page.getByText('On: the cancellation windows apply')).toBeVisible();
   });
 
   test('commercial terms: the server refuses a commission above the minimum advance', async ({ page }) => {
