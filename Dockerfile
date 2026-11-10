@@ -6,7 +6,7 @@
 # docker-compose.yml builds and runs all four. No secrets go into an image: the API's settings (database URL, keys)
 # are given to the container when it starts. The web apps only bake in their NEXT_PUBLIC_* values, which are public.
 
-FROM node:22-slim AS base
+FROM node:26-slim AS base
 # openssl: the Prisma query engine needs it. corepack: installs the pnpm version the repo pins.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends openssl ca-certificates \
