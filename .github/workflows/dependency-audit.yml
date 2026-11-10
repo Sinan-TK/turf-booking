@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4
       # The pnpm version comes from "packageManager" in the root package.json.
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       # Fails on a high or critical advisory that is not in .github/audit-baseline.json (or whose review date has passed).
